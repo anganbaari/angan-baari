@@ -1,0 +1,253 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Order Received — Angan Baari</title>
+    <link rel="shortcut icon" href="{% static 'thsf.ico' %}">
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'DM Sans', sans-serif;
+            background: #f7f2ea;
+            color: #3d4a3f;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .success-card {
+            background: white;
+            border-radius: 20px;
+            padding: 52px 44px;
+            max-width: 560px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(26,47,30,0.12);
+            border-top: 5px solid #4a7c59;
+        }
+
+        .success-icon {
+            width: 80px;
+            height: 80px;
+            background: #eaf3de;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 24px;
+            font-size: 2rem;
+            color: #3b6d11;
+        }
+
+        .success-title {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 2.2rem;
+            font-weight: 600;
+            color: #1a2f1e;
+            margin-bottom: 8px;
+        }
+
+        .success-subtitle {
+            font-size: 1rem;
+            color: #7a8a7d;
+            margin-bottom: 32px;
+            line-height: 1.6;
+        }
+
+        .order-box {
+            background: #f7f2ea;
+            border: 1px solid #e8ede6;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 28px;
+            text-align: left;
+        }
+
+        .order-box-title {
+            font-size: 0.7rem;
+            font-weight: 600;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            color: #c9a84c;
+            margin-bottom: 16px;
+        }
+
+        .order-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            padding: 8px 0;
+            border-bottom: 1px solid #e8ede6;
+            font-size: 0.9rem;
+            gap: 16px;
+        }
+
+        .order-row:last-child { border-bottom: none; }
+
+        .order-label {
+            color: #7a8a7d;
+            flex-shrink: 0;
+        }
+
+        .order-value {
+            color: #1a2f1e;
+            font-weight: 500;
+            text-align: right;
+        }
+
+        .order-number-value {
+            color: #4a7c59;
+            font-weight: 700;
+            font-size: 1rem;
+            font-family: 'Cormorant Garamond', serif;
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: #faeeda;
+            color: #854f0b;
+            padding: 4px 12px;
+            border-radius: 50px;
+            font-size: 0.78rem;
+            font-weight: 600;
+        }
+
+        .info-text {
+            font-size: 0.88rem;
+            color: #7a8a7d;
+            line-height: 1.7;
+            margin-bottom: 28px;
+        }
+
+        .info-text strong {
+            color: #1a2f1e;
+        }
+
+        .btn-whatsapp {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            background: #25d366;
+            color: white;
+            padding: 14px 28px;
+            border-radius: 50px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            width: 100%;
+            margin-bottom: 12px;
+        }
+
+        .btn-whatsapp:hover {
+            background: #1da851;
+            transform: translateY(-2px);
+        }
+
+        .btn-home {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            background: transparent;
+            color: #4a7c59;
+            padding: 13px 28px;
+            border-radius: 50px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            text-decoration: none;
+            border: 1.5px solid #4a7c59;
+            transition: all 0.3s ease;
+            width: 100%;
+        }
+
+        .btn-home:hover {
+            background: #4a7c59;
+            color: white;
+        }
+
+        .footer-text {
+            margin-top: 28px;
+            font-size: 0.78rem;
+            color: #7a8a7d;
+        }
+
+        .footer-text strong {
+            color: #1a2f1e;
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="success-card">
+
+        <div class="success-icon">
+            <i class="fas fa-check"></i>
+        </div>
+
+        <h1 class="success-title">Order Received!</h1>
+        <p class="success-subtitle">
+            नमस्ते <strong>{{ order.name }}</strong>! 🌿<br>
+            Thank you for ordering from Angan Baari.
+        </p>
+
+        <div class="order-box">
+            <p class="order-box-title">📦 Order Details</p>
+
+            <div class="order-row">
+                <span class="order-label">Order No</span>
+                <span class="order-value order-number-value">{{ order.order_number }}</span>
+            </div>
+            <div class="order-row">
+                <span class="order-label">Product</span>
+                <span class="order-value">{{ order.product_interest }}</span>
+            </div>
+            <div class="order-row">
+                <span class="order-label">Address</span>
+                <span class="order-value">{{ order.address }}</span>
+            </div>
+            <div class="order-row">
+                <span class="order-label">Status</span>
+                <span class="order-value">
+                    <span class="status-badge">
+                        <i class="fas fa-clock"></i> Pending Confirmation
+                    </span>
+                </span>
+            </div>
+        </div>
+
+        <p class="info-text">
+            A confirmation email has been sent to <strong>{{ order.email }}</strong>.<br>
+            We will confirm your order shortly. Expected delivery: <strong>2–3.5 hours</strong> after confirmation.
+        </p>
+
+        <a href="https://wa.me/9779821025084?text=Hello%20Angan%20Baari!%20I%20just%20placed%20an%20order%20{{ order.order_number }}%20and%20want%20to%20confirm."
+           class="btn-whatsapp">
+            <i class="fab fa-whatsapp"></i> Confirm via WhatsApp
+        </a>
+
+        <a href="/" class="btn-home">
+            <i class="fas fa-home"></i> Back to Homepage
+        </a>
+
+        <div class="footer-text">
+            <strong>Angan Baari · आँगन बारी</strong><br>
+            Bhulka Danda, Rupandehi, Nepal 🇳🇵
+        </div>
+
+    </div>
+
+</body>
+</html>

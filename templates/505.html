@@ -1,0 +1,55 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Server Error — Angan Baari</title>
+    <link rel="shortcut icon" href="{% static 'thsf.ico' %}">
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'DM Sans', sans-serif;
+            background: #1a2f1e;
+            color: #f7f2ea;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .error-card { text-align: center; max-width: 520px; width: 100%; }
+        .error-icon { font-size: 5rem; color: #c9a84c; margin-bottom: 24px; display: block; }
+        .error-number { font-family: 'Cormorant Garamond', serif; font-size: 8rem; font-weight: 600; color: #c9a84c; line-height: 1; margin-bottom: 8px; }
+        .error-title { font-family: 'Cormorant Garamond', serif; font-size: 2rem; font-weight: 400; color: #f7f2ea; margin-bottom: 16px; }
+        .error-text { font-size: 0.95rem; color: #b5cebf; line-height: 1.7; margin-bottom: 40px; }
+        .btn-home { display: inline-flex; align-items: center; justify-content: center; gap: 10px; background: #4a7c59; color: white; padding: 14px 32px; border-radius: 50px; font-size: 0.9rem; font-weight: 500; text-decoration: none; transition: all 0.3s ease; width: 100%; max-width: 280px; }
+        .btn-home:hover { background: #2d4a32; transform: translateY(-2px); }
+        .buttons { display: flex; flex-direction: column; align-items: center; gap: 12px; margin-bottom: 40px; }
+        .footer-text { font-size: 0.78rem; color: #7a8a7d; }
+        .footer-text strong { color: #b5cebf; font-family: 'Cormorant Garamond', serif; font-size: 0.9rem; }
+    </style>
+</head>
+<body>
+    <div class="error-card">
+        <i class="fas fa-leaf error-icon"></i>
+        <div class="error-number">500</div>
+        <h1 class="error-title">Something Went Wrong</h1>
+        <p class="error-text">
+            Our farm is experiencing some technical difficulties. 🌱<br>
+            Please try again in a few minutes or contact us via WhatsApp.
+        </p>
+        <div class="buttons">
+            <a href="/" class="btn-home">
+                <i class="fas fa-home"></i> Back to Homepage
+            </a>
+        </div>
+        <div class="footer-text">
+            <strong>Angan Baari · आँगन बारी</strong><br>
+            Bhulka Danda, Rupandehi, Nepal 🇳🇵
+        </div>
+    </div>
+</body>
+</html>
