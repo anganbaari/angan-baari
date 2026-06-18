@@ -1,0 +1,207 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cancel Order — Angan Baari</title>
+    <link rel="shortcut icon" href="{% static 'thsf.ico' %}">
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'DM Sans', sans-serif;
+            background: #f7f2ea;
+            color: #3d4a3f;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .card {
+            background: white;
+            border-radius: 20px;
+            padding: 52px 44px;
+            max-width: 520px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(26,47,30,0.12);
+        }
+        .icon {
+            width: 80px; height: 80px;
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            margin: 0 auto 24px;
+            font-size: 2rem;
+        }
+        .icon-warning { background: #faeeda; color: #854f0b; }
+        .icon-success { background: #eaf3de; color: #3b6d11; }
+        .icon-error   { background: #fde8e8; color: #c0392b; }
+        .title {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 2rem;
+            font-weight: 600;
+            color: #1a2f1e;
+            margin-bottom: 12px;
+        }
+        .subtitle {
+            font-size: 0.95rem;
+            color: #7a8a7d;
+            line-height: 1.7;
+            margin-bottom: 28px;
+        }
+        .order-box {
+            background: #f7f2ea;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 28px;
+            text-align: left;
+        }
+        .order-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #e8ede6;
+            font-size: 0.9rem;
+        }
+        .order-row:last-child { border-bottom: none; }
+        .order-label { color: #7a8a7d; }
+        .order-value { color: #1a2f1e; font-weight: 500; }
+        .timer {
+            background: #faeeda;
+            border: 1px solid #f0d4a0;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 24px;
+            font-size: 0.9rem;
+            color: #854f0b;
+        }
+        .timer strong { font-size: 1.1rem; }
+        .btn-cancel {
+            width: 100%;
+            padding: 14px;
+            background: #c0392b;
+            border: none;
+            border-radius: 50px;
+            color: white;
+            font-family: 'DM Sans', sans-serif;
+            font-size: 0.92rem;
+            font-weight: 700;
+            cursor: pointer;
+            margin-bottom: 12px;
+            transition: all 0.3s ease;
+        }
+        .btn-cancel:hover { background: #a93226; transform: translateY(-2px); }
+        .btn-home {
+            display: block;
+            width: 100%;
+            padding: 13px;
+            background: transparent;
+            border: 1.5px solid #4a7c59;
+            border-radius: 50px;
+            color: #4a7c59;
+            font-family: 'DM Sans', sans-serif;
+            font-size: 0.92rem;
+            font-weight: 500;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+        .btn-home:hover { background: #4a7c59; color: white; }
+        .footer-text {
+            margin-top: 28px;
+            font-size: 0.78rem;
+            color: #7a8a7d;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        {% if cancelled %}
+            <div class="icon icon-success">
+                <i class="fas fa-check"></i>
+            </div>
+            <h1 class="title">Order Cancelled</h1>
+            <p class="subtitle">
+                Your order <strong>{{ order.order_number }}</strong> has been cancelled successfully.
+                A confirmation email has been sent to {{ order.email }}.
+            </p>
+            <a href="/" class="btn-home">
+                <i class="fas fa-home"></i> Back to Homepage
+            </a>
+
+        {% elif expired %}
+            <div class="icon icon-error">
+                <i class="fas fa-times"></i>
+            </div>
+            <h1 class="title">Cannot Cancel</h1>
+            <p class="subtitle">
+                Sorry! The 30-minute cancellation window for order
+                <strong>{{ order.order_number }}</strong> has expired.
+                Please contact us via WhatsApp.
+            </p>
+            <a href="https://wa.me/9779821025084" class="btn-home" style="background:#25d366; color:white; border-color:#25d366;">
+                <i class="fab fa-whatsapp"></i> Contact via WhatsApp
+            </a>
+
+        {% elif already_cancelled %}
+            <div class="icon icon-error">
+                <i class="fas fa-times"></i>
+            </div>
+            <h1 class="title">Already Cancelled</h1>
+            <p class="subtitle">
+                Order <strong>{{ order.order_number }}</strong> has already been cancelled.
+            </p>
+            <a href="/" class="btn-home">
+                <i class="fas fa-home"></i> Back to Homepage
+            </a>
+
+        {% else %}
+            <div class="icon icon-warning">
+                <i class="fas fa-exclamation-triangle"></i>
+            </div>
+            <h1 class="title">Cancel Order?</h1>
+            <p class="subtitle">
+                Are you sure you want to cancel this order?
+                This action cannot be undone.
+            </p>
+
+            <div class="order-box">
+                <div class="order-row">
+                    <span class="order-label">Order No</span>
+                    <span class="order-value">{{ order.order_number }}</span>
+                </div>
+                <div class="order-row">
+                    <span class="order-label">Product</span>
+                    <span class="order-value">{{ order.product_interest }}</span>
+                </div>
+                <div class="order-row">
+                    <span class="order-label">Status</span>
+                    <span class="order-value">{{ order.get_status_display }}</span>
+                </div>
+            </div>
+
+            <div class="timer">
+                ⏱️ You can cancel within <strong>30 minutes</strong> of placing your order.
+            </div>
+
+            <form method="POST">
+                {% csrf_token %}
+                <button type="submit" class="btn-cancel">
+                    <i class="fas fa-times-circle"></i> Yes, Cancel My Order
+                </button>
+            </form>
+            <a href="/" class="btn-home">
+                <i class="fas fa-arrow-left"></i> No, Keep My Order
+            </a>
+        {% endif %}
+
+        <div class="footer-text">
+            <strong style="font-family:'Cormorant Garamond',serif;">Angan Baari · आँगन बारी</strong><br>
+            Bhulka Danda, Rupandehi, Nepal 🇳🇵
+        </div>
+    </div>
+</body>
+</html>

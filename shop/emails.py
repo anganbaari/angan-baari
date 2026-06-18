@@ -2,6 +2,8 @@ from django.core.mail import send_mail
 from django.conf import settings
 
 def send_order_received_email(order):
+    cancel_link = f"https://anganbaari.pythonanywhere.com/cancel/{order.cancel_token}/"
+
     # Email to customer
     send_mail(
         subject='✅ Order Received — Angan Baari | आँगन बारी',
@@ -21,6 +23,9 @@ Product   : {order.product_interest}
 Address   : {order.address}
 Message   : {order.message or 'None'}
 ━━━━━━━━━━━━━━━━━━━━━━
+
+⚠️ Need to cancel? You can cancel within 30 minutes:
+{cancel_link}
 
 📱 Questions? WhatsApp us:
 https://wa.me/9779821025084
@@ -54,7 +59,7 @@ Ordered at: {order.ordered_at}
 ━━━━━━━━━━━━━━━━━━━━━━
 
 Go to admin panel to confirm:
-http://127.0.0.1:8000/admin/shop/productorder/
+https://anganbaari.pythonanywhere.com/admin/shop/productorder/
         ''',
         from_email=settings.DEFAULT_FROM_EMAIL,
         recipient_list=[settings.ADMIN_EMAIL],
@@ -63,7 +68,6 @@ http://127.0.0.1:8000/admin/shop/productorder/
 
 
 def send_order_confirmed_email(order):
-    # Email to customer
     send_mail(
         subject='🎉 Order Confirmed — Angan Baari | आँगन बारी',
         message=f'''
@@ -102,7 +106,7 @@ def send_order_delivered_email(order):
         message=f'''
 नमस्ते {order.name}! 🌿
 
-Your order has been DELIVERED! 
+Your order has been DELIVERED!
 
 ━━━━━━━━━━━━━━━━━━━━━━
 📦 ORDER DETAILS
@@ -146,6 +150,60 @@ Address   : {order.address}
 ━━━━━━━━━━━━━━━━━━━━━━
 
 This order is now complete! ✅
+        ''',
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        recipient_list=[settings.ADMIN_EMAIL],
+        fail_silently=False,
+    )
+
+
+def send_order_cancelled_email(order):
+    # Email to customer
+    send_mail(
+        subject='❌ Order Cancelled — Angan Baari | आँगन बारी',
+        message=f'''
+नमस्ते {order.name}! 🌿
+
+Your order has been CANCELLED successfully.
+
+━━━━━━━━━━━━━━━━━━━━━━
+📦 CANCELLED ORDER
+━━━━━━━━━━━━━━━━━━━━━━
+Order No  : {order.order_number}
+Product   : {order.product_interest}
+Status    : ❌ Cancelled
+━━━━━━━━━━━━━━━━━━━━━━
+
+Want to place a new order?
+https://anganbaari.pythonanywhere.com
+
+📱 Questions? WhatsApp us:
+https://wa.me/9779821025084
+
+With love,
+Angan Baari Team 🌱
+Bhulka Danda, Rupandehi, Nepal
+        ''',
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        recipient_list=[order.email],
+        fail_silently=False,
+    )
+
+    # Email to admin
+    send_mail(
+        subject=f'❌ Order Cancelled by {order.name} — Angan Baari',
+        message=f'''
+Order has been cancelled by customer!
+
+━━━━━━━━━━━━━━━━━━━━━━
+❌ CANCELLED ORDER
+━━━━━━━━━━━━━━━━━━━━━━
+Order No  : {order.order_number}
+Customer  : {order.name}
+Email     : {order.email}
+Phone     : {order.phone}
+Product   : {order.product_interest}
+━━━━━━━━━━━━━━━━━━━━━━
         ''',
         from_email=settings.DEFAULT_FROM_EMAIL,
         recipient_list=[settings.ADMIN_EMAIL],

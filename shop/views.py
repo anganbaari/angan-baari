@@ -1,9 +1,12 @@
-from django.shortcuts import render, redirect
-from .models import NewsletterSubscriber, ContactMessage, ProductOrder
-from .emails import send_order_received_email
+from django.shortcuts import render, redirect, get_object_or_404
+from django.http import JsonResponse
 from django.core.mail import send_mail
 from django.conf import settings
-from django.http import JsonResponse
+from .models import NewsletterSubscriber, ContactMessage, ProductOrder
+from .emails import (
+    send_order_received_email,
+    send_order_cancelled_email,
+)
 
 def home(request):
     return render(request, 'index.html')
@@ -24,7 +27,6 @@ def contact(request):
                 subject=subject,
                 message=message,
             )
-            # Email to admin
             send_mail(
                 subject=f'📩 New Message from {name} — Angan Baari',
                 message=f'''
@@ -39,43 +41,32 @@ Phone   : {phone or 'Not provided'}
 Subject : {subject}
 Message : {message}
 ━━━━━━━━━━━━━━━━━━━━━━
-
-Reply to: {email}
                 ''',
                 from_email=settings.DEFAULT_FROM_EMAIL,
                 recipient_list=[settings.ADMIN_EMAIL],
                 fail_silently=True,
             )
-            # Email to customer
             send_mail(
-                subject='✅ Message Received — Angan Baari | आँगन बारी',
+                subject='✅ Message Received — Angan Baari',
                 message=f'''
 नमस्ते {name}! 🌿
 
 Thank you for contacting Angan Baari!
+We will get back to you within 12-36 hours.
 
-We have received your message and will get back to you within 12-36 hours.
-
-━━━━━━━━━━━━━━━━━━━━━━
-📩 YOUR MESSAGE
-━━━━━━━━━━━━━━━━━━━━━━
 Subject : {subject}
 Message : {message}
-━━━━━━━━━━━━━━━━━━━━━━
 
-📱 For faster response WhatsApp us:
-https://wa.me/9779821025084
+📱 WhatsApp: https://wa.me/9779821025084
 
-With love,
 Angan Baari Team 🌱
-Bhulka Danda, Rupandehi, Nepal
                 ''',
                 from_email=settings.DEFAULT_FROM_EMAIL,
                 recipient_list=[email],
                 fail_silently=True,
             )
             return JsonResponse({'status': 'success'})
-        return JsonResponse({'status': 'error', 'message': 'Please fill all required fields.'})
+        return JsonResponse({'status': 'error'})
     return redirect('home')
 
 def place_order(request):
@@ -92,11 +83,31 @@ def place_order(request):
         return render(request, 'success.html', {'order': order})
     return redirect('home')
 
-def error_404(request, exception):
-    return render(request, '404.html', status=404)
+def cancel_order(request, token):
+    order = get_object_or_404(ProductOrder, cancel_token=token)
 
-def error_500(request):
-    return render(request, '500.html', status=500)
+    if order.status == 'cancelled':
+        return render(request, 'cancel.html', {
+            'order': order,
+            'already_cancelled': True
+        })
+
+    if not order.can_cancel():
+        return render(request, 'cancel.html', {
+            'order': order,
+            'expired': True
+        })
+
+    if request.method == 'POST':
+        order.status = 'cancelled'
+        order.save()
+        send_order_cancelled_email(order)
+        return render(request, 'cancel.html', {
+            'order': order,
+            'cancelled': True
+        })
+
+    return render(request, 'cancel.html', {'order': order})
 
 def newsletter_signup(request):
     if request.method == 'POST':
@@ -110,24 +121,20 @@ def newsletter_signup(request):
                 send_mail(
                     subject='🌿 Welcome to Angan Baari Newsletter!',
                     message=f'''
-                    नमस्ते {name or 'valued customer'}! 🌿
-                    
-                    Thank you for subscribing to Angan Baari newsletter!
-                    
-                    You will now receive updates about:
-                    🌱 New seasonal products
-                    🍯 Fresh honey harvests
-                    🥭 Fruit availability
-                    🎉 Special offers and discounts
+नमस्ते {name or 'valued customer'}! 🌿
 
-                    ━━━━━━━━━━━━━━━━━━━━━━
-                    📱 Order via WhatsApp:
-                    https://wa.me/9779821025084
-                    ━━━━━━━━━━━━━━━━━━━━━━
-                    
-                    With love,
-                    Angan Baari Team 🌱
-                    Bhulka Danda, Rupandehi, Nepal
+Thank you for subscribing to Angan Baari newsletter!
+
+You will now receive updates about:
+🌱 New seasonal products
+🍯 Fresh honey harvests
+🥭 Fruit availability
+🎉 Special offers and discounts
+
+📱 Order via WhatsApp:
+https://wa.me/9779821025084
+
+Angan Baari Team 🌱
                     ''',
                     from_email=settings.DEFAULT_FROM_EMAIL,
                     recipient_list=[email],
@@ -135,3 +142,9 @@ def newsletter_signup(request):
                 )
         return redirect('/?subscribed=1#newsletter')
     return redirect('home')
+
+def error_404(request, exception):
+    return render(request, '404.html', status=404)
+
+def error_500(request):
+    return render(request, '500.html', status=500)

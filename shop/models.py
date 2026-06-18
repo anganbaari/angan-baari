@@ -22,7 +22,12 @@ class ContactMessage(models.Model):
         return f"{self.name} — {self.subject}"
 
 class ProductOrder(models.Model):
-    STATUS = [('pending','Pending'),('confirmed','Confirmed'),('delivered','Delivered')]
+    STATUS = [
+        ('pending', 'Pending'),
+        ('confirmed', 'Confirmed'),
+        ('delivered', 'Delivered'),
+        ('cancelled', 'Cancelled'),
+    ]
 
     order_number = models.CharField(max_length=20, unique=True, blank=True)
     name = models.CharField(max_length=200)
@@ -33,12 +38,22 @@ class ProductOrder(models.Model):
     message = models.TextField(blank=True)
     status = models.CharField(max_length=20, choices=STATUS, default='pending')
     ordered_at = models.DateTimeField(auto_now_add=True)
+    cancel_token = models.CharField(max_length=64, blank=True)
 
     def save(self, *args, **kwargs):
         if not self.order_number:
-            # Generates like AB-A1B2C3D4
             self.order_number = 'AB-' + uuid.uuid4().hex[:8].upper()
+        if not self.cancel_token:
+            self.cancel_token = uuid.uuid4().hex
         super().save(*args, **kwargs)
+
+    def can_cancel(self):
+        from django.utils import timezone
+        from datetime import timedelta
+        return (
+            self.status == 'pending' and
+            timezone.now() < self.ordered_at + timedelta(minutes=30)
+        )
 
     def __str__(self):
         return f"{self.order_number} — {self.name}"

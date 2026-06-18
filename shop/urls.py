@@ -6,4 +6,5 @@ urlpatterns = [
     path('contact/', views.contact, name='contact'),
     path('order/', views.place_order, name='order'),
     path('newsletter/', views.newsletter_signup, name='newsletter'),
+    path('cancel/<str:token>/', views.cancel_order, name='cancel_order'),
 ]
