@@ -79,7 +79,10 @@ def place_order(request):
             product_interest=request.POST.get('product', ''),
             message=request.POST.get('message', ''),
         )
-        send_order_received_email(order)
+        try:
+            send_order_received_email(order)
+        except Exception:
+            pass
         return render(request, 'success.html', {'order': order})
     return redirect('home')
 
