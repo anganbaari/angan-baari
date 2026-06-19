@@ -1,6 +1,37 @@
 from django.db import models
 import uuid
 
+class Product(models.Model):
+    CATEGORY = [
+        ('fruits', 'Fruits'),
+        ('vegetables', 'Vegetables'),
+        ('honey', 'Honey'),
+        ('animals', 'Animals'),
+        ('pickles', 'Pickles'),
+    ]
+    name = models.CharField(max_length=200)
+    slug = models.SlugField(unique=True)
+    category = models.CharField(max_length=50, choices=CATEGORY)
+    description = models.TextField()
+    detail_description = models.TextField(blank=True)
+    season = models.CharField(max_length=100, blank=True)
+    farming_method = models.CharField(max_length=200, blank=True)
+    is_available = models.BooleanField(default=True)
+    main_image = models.CharField(max_length=200, blank=True)
+    image2 = models.CharField(max_length=200, blank=True)
+    image3 = models.CharField(max_length=200, blank=True)
+    image4 = models.CharField(max_length=200, blank=True)
+    whatsapp_message = models.CharField(max_length=500, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.name
+
+    def get_absolute_url(self):
+        from django.urls import reverse
+        return reverse('product_detail', kwargs={'slug': self.slug})
+
+
 class NewsletterSubscriber(models.Model):
     email = models.EmailField(unique=True)
     name = models.CharField(max_length=100, blank=True)
@@ -28,7 +59,6 @@ class ProductOrder(models.Model):
         ('delivered', 'Delivered'),
         ('cancelled', 'Cancelled'),
     ]
-
     order_number = models.CharField(max_length=20, unique=True, blank=True)
     name = models.CharField(max_length=200)
     email = models.EmailField()

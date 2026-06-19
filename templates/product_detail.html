@@ -1,0 +1,543 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ product.name }} — Angan Baari</title>
+    <link rel="shortcut icon" href="{% static 'thsf.ico' %}">
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,400&family=DM+Sans:wght@300;400;500;600&family=Cinzel:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
+    <link rel="stylesheet" href="{% static 'style.css' %}">
+    <style>
+        .product-page {
+            max-width: 1200px;
+            margin: 100px auto 60px;
+            padding: 0 5vw;
+        }
+        .breadcrumb {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.82rem;
+            color: var(--text-muted);
+            margin-bottom: 32px;
+        }
+        .breadcrumb a {
+            color: var(--moss);
+            text-decoration: none;
+        }
+        .breadcrumb a:hover { text-decoration: underline; }
+        .product-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 60px;
+            align-items: start;
+            margin-bottom: 60px;
+        }
+        .product-images { position: relative; }
+        .main-image {
+            border-radius: var(--radius-card);
+            overflow: hidden;
+            height: 420px;
+            margin-bottom: 12px;
+            background: var(--forest);
+        }
+        .main-image img {
+            width: 100%; height: 100%;
+            object-fit: cover;
+            transition: transform 0.5s ease;
+        }
+        .main-image:hover img { transform: scale(1.04); }
+        .thumb-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+        }
+        .thumb {
+            border-radius: 10px;
+            overflow: hidden;
+            height: 80px;
+            cursor: pointer;
+            border: 2px solid transparent;
+            transition: all 0.3s ease;
+        }
+        .thumb.active { border-color: var(--gold); }
+        .thumb img {
+            width: 100%; height: 100%;
+            object-fit: cover;
+        }
+        .product-info { padding-top: 8px; }
+        .product-badges {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+        }
+        .badge-season {
+            background: rgba(26,47,30,0.08);
+            color: var(--forest);
+            font-size: 0.72rem;
+            font-family: var(--font-accent);
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            padding: 5px 14px;
+            border-radius: 50px;
+        }
+        .badge-available {
+            background: rgba(74,124,89,0.12);
+            color: var(--moss);
+            font-size: 0.72rem;
+            font-family: var(--font-accent);
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            padding: 5px 14px;
+            border-radius: 50px;
+        }
+        .badge-unavailable {
+            background: rgba(180,50,50,0.1);
+            color: #c0392b;
+            font-size: 0.72rem;
+            font-family: var(--font-accent);
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            padding: 5px 14px;
+            border-radius: 50px;
+        }
+        .product-name {
+            font-family: var(--font-display);
+            font-size: clamp(2rem, 4vw, 3rem);
+            font-weight: 600;
+            color: var(--forest);
+            line-height: 1.15;
+            margin-bottom: 16px;
+        }
+        .product-desc {
+            font-size: 1rem;
+            color: var(--text-body);
+            line-height: 1.8;
+            margin-bottom: 28px;
+        }
+        .product-details-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 28px;
+        }
+        .detail-card {
+            background: var(--cream);
+            border-radius: var(--radius-sm);
+            padding: 14px 16px;
+            border: 1px solid var(--mist);
+        }
+        .detail-label {
+            font-size: 0.7rem;
+            font-family: var(--font-accent);
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+        }
+        .detail-value {
+            font-size: 0.92rem;
+            font-weight: 500;
+            color: var(--forest);
+        }
+        .order-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .btn-wa-product {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            background: #25d366;
+            color: white;
+            padding: 15px;
+            border-radius: 50px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.3s ease;
+        }
+        .btn-wa-product:hover {
+            background: #1da851;
+            transform: translateY(-2px);
+            box-shadow: 0 10px 28px rgba(37,211,102,0.35);
+            color: white;
+        }
+        .btn-back {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            background: transparent;
+            color: var(--moss);
+            padding: 14px;
+            border-radius: 50px;
+            font-size: 0.95rem;
+            font-weight: 500;
+            text-decoration: none;
+            border: 1.5px solid var(--moss);
+            transition: all 0.3s ease;
+        }
+        .btn-back:hover {
+            background: var(--moss);
+            color: white;
+        }
+        .product-features {
+            background: var(--cream-warm);
+            border-radius: var(--radius-card);
+            padding: 36px;
+            margin-bottom: 48px;
+        }
+        .features-title {
+            font-family: var(--font-display);
+            font-size: 1.6rem;
+            font-weight: 600;
+            color: var(--forest);
+            margin-bottom: 24px;
+        }
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+        }
+        .feature-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+        }
+        .feature-icon {
+            width: 40px; height: 40px;
+            background: var(--mist);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.9rem;
+            color: var(--moss);
+            flex-shrink: 0;
+        }
+        .feature-title {
+            font-size: 0.88rem;
+            font-weight: 600;
+            color: var(--forest);
+            margin-bottom: 3px;
+        }
+        .feature-desc {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            line-height: 1.5;
+        }
+        .related-section { margin-bottom: 48px; }
+        .related-title {
+            font-family: var(--font-display);
+            font-size: 1.8rem;
+            font-weight: 600;
+            color: var(--forest);
+            margin-bottom: 24px;
+        }
+        .related-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+        }
+        .related-card {
+            background: white;
+            border-radius: var(--radius-card);
+            overflow: hidden;
+            box-shadow: var(--shadow-card);
+            text-decoration: none;
+            transition: all 0.3s ease;
+            display: block;
+        }
+        .related-card:hover {
+            transform: translateY(-6px);
+            box-shadow: var(--shadow-hover);
+        }
+        .related-img {
+            height: 160px;
+            overflow: hidden;
+        }
+        .related-img img {
+            width: 100%; height: 100%;
+            object-fit: cover;
+            transition: transform 0.5s ease;
+        }
+        .related-card:hover .related-img img { transform: scale(1.06); }
+        .related-body { padding: 16px; }
+        .related-name {
+            font-family: var(--font-display);
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--forest);
+            margin-bottom: 6px;
+        }
+        .related-link {
+            font-size: 0.82rem;
+            color: var(--moss);
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        @media (max-width: 768px) {
+            .product-grid { grid-template-columns: 1fr; gap: 32px; }
+            .product-page { margin-top: 80px; }
+            .features-grid { grid-template-columns: 1fr; }
+            .related-grid { grid-template-columns: 1fr 1fr; }
+            .product-details-grid { grid-template-columns: 1fr 1fr; }
+        }
+        @media (max-width: 480px) {
+            .related-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Navbar -->
+    <header class="navbar scrolled" id="navbar">
+        <div class="navbar-inner">
+            <a href="/" class="brand">
+                <span class="brand-icon"><i class="fas fa-seedling"></i></span>
+                <div class="brand-text">
+                    <span class="brand-name">Angan</span>
+                    <span class="brand-tagline">Baari · आँगन बारी</span>
+                </div>
+            </a>
+            <nav class="desktop-nav">
+                <div class="nav-links">
+                    <a href="/#about">About</a>
+                    <a href="/#products">Products</a>
+                    <a href="/#delivery">Delivery</a>
+                    <a href="/#contact">Contact</a>
+                    <a href="/#delivery" class="nav-cta">Order Now</a>
+                </div>
+            </nav>
+        </div>
+    </header>
+
+    <div class="product-page">
+
+        <!-- Breadcrumb -->
+        <div class="breadcrumb">
+            <a href="/"><i class="fas fa-home"></i> Home</a>
+            <i class="fas fa-chevron-right"></i>
+            <a href="/#products">Products</a>
+            <i class="fas fa-chevron-right"></i>
+            <span>{{ product.name }}</span>
+        </div>
+
+        <!-- Product Grid -->
+        <div class="product-grid">
+
+            <!-- Images -->
+            <div class="product-images">
+                <div class="main-image" id="mainImage">
+                    {% if product.main_image %}
+                        <img src="{% static product.main_image %}" alt="{{ product.name }}" id="mainImg">
+                    {% else %}
+                        <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;">
+                            <i class="fas fa-seedling" style="font-size:4rem;color:var(--sage);"></i>
+                        </div>
+                    {% endif %}
+                </div>
+                <div class="thumb-grid">
+                    {% if product.main_image %}
+                    <div class="thumb active" onclick="changeImage('{% static product.main_image %}', this)">
+                        <img src="{% static product.main_image %}" alt="{{ product.name }}">
+                    </div>
+                    {% endif %}
+                    {% if product.image2 %}
+                    <div class="thumb" onclick="changeImage('{% static product.image2 %}', this)">
+                        <img src="{% static product.image2 %}" alt="{{ product.name }}">
+                    </div>
+                    {% endif %}
+                    {% if product.image3 %}
+                    <div class="thumb" onclick="changeImage('{% static product.image3 %}', this)">
+                        <img src="{% static product.image3 %}" alt="{{ product.name }}">
+                    </div>
+                    {% endif %}
+                    {% if product.image4 %}
+                    <div class="thumb" onclick="changeImage('{% static product.image4 %}', this)">
+                        <img src="{% static product.image4 %}" alt="{{ product.name }}">
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Info -->
+            <div class="product-info">
+                <div class="product-badges">
+                    {% if product.season %}
+                    <span class="badge-season">
+                        <i class="fas fa-calendar-alt"></i> {{ product.season }}
+                    </span>
+                    {% endif %}
+                    {% if product.is_available %}
+                    <span class="badge-available">
+                        <i class="fas fa-check"></i> Available
+                    </span>
+                    {% else %}
+                    <span class="badge-unavailable">
+                        <i class="fas fa-times"></i> Out of Stock
+                    </span>
+                    {% endif %}
+                </div>
+
+                <h1 class="product-name">{{ product.name }}</h1>
+                <p class="product-desc">{{ product.description }}</p>
+
+                <div class="product-details-grid">
+                    {% if product.season %}
+                    <div class="detail-card">
+                        <div class="detail-label">Season</div>
+                        <div class="detail-value">{{ product.season }}</div>
+                    </div>
+                    {% endif %}
+                    {% if product.farming_method %}
+                    <div class="detail-card">
+                        <div class="detail-label">Farming</div>
+                        <div class="detail-value">{{ product.farming_method }}</div>
+                    </div>
+                    {% endif %}
+                    <div class="detail-card">
+                        <div class="detail-label">Location</div>
+                        <div class="detail-value">Bhulka Danda, Rupandehi</div>
+                    </div>
+                    <div class="detail-card">
+                        <div class="detail-label">Delivery</div>
+                        <div class="detail-value">2–3.5 hours</div>
+                    </div>
+                </div>
+
+                <div class="order-buttons">
+                    {% if product.is_available %}
+                    <a href="https://wa.me/9779821025084?text={{ product.whatsapp_message|urlencode }}"
+                       class="btn-wa-product" target="_blank" rel="noopener noreferrer">
+                        <i class="fab fa-whatsapp"></i> Order via WhatsApp
+                    </a>
+                    {% endif %}
+                    <a href="/#delivery" class="btn-wa-product" style="background: var(--forest);">
+                        <i class="fas fa-clipboard-list"></i> Place Order Online
+                    </a>
+                    <a href="/#products" class="btn-back">
+                        <i class="fas fa-arrow-left"></i> Back to All Products
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- More Details -->
+        {% if product.detail_description %}
+        <div class="product-features">
+            <h2 class="features-title">About this Product</h2>
+            <p style="font-size:1rem; color:var(--text-body); line-height:1.8;">{{ product.detail_description }}</p>
+        </div>
+        {% endif %}
+
+        <!-- Features -->
+        <div class="product-features">
+            <h2 class="features-title">Why Choose Angan Baari?</h2>
+            <div class="features-grid">
+                <div class="feature-item">
+                    <div class="feature-icon"><i class="fas fa-flask"></i></div>
+                    <div>
+                        <div class="feature-title">No Chemicals</div>
+                        <div class="feature-desc">100% natural farming, zero synthetic pesticides or fertilizers.</div>
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon"><i class="fas fa-sun"></i></div>
+                    <div>
+                        <div class="feature-title">Naturally Ripened</div>
+                        <div class="feature-desc">Harvested only when fully ripe — no artificial ripening.</div>
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon"><i class="fas fa-truck"></i></div>
+                    <div>
+                        <div class="feature-title">Farm Fresh</div>
+                        <div class="feature-desc">Picked fresh and delivered to your door within hours.</div>
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon"><i class="fas fa-leaf"></i></div>
+                    <div>
+                        <div class="feature-title">Eco Packaging</div>
+                        <div class="feature-desc">Packed in biodegradable, eco-friendly packaging.</div>
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon"><i class="fas fa-heart"></i></div>
+                    <div>
+                        <div class="feature-title">Grown with Love</div>
+                        <div class="feature-desc">Every product is grown with care and dedication since 2015.</div>
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon"><i class="fas fa-shield-alt"></i></div>
+                    <div>
+                        <div class="feature-title">Quality Assured</div>
+                        <div class="feature-desc">Carefully selected and inspected before delivery.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Related Products -->
+        {% if related_products %}
+        <div class="related-section">
+            <h2 class="related-title">You May Also Like</h2>
+            <div class="related-grid">
+                {% for related in related_products %}
+                <a href="{{ related.get_absolute_url }}" class="related-card">
+                    <div class="related-img">
+                        {% if related.main_image %}
+                        <img src="{% static related.main_image %}" alt="{{ related.name }}">
+                        {% else %}
+                        <div style="width:100%;height:100%;background:var(--mist);display:flex;align-items:center;justify-content:center;">
+                            <i class="fas fa-seedling" style="font-size:2rem;color:var(--sage);"></i>
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div class="related-body">
+                        <div class="related-name">{{ related.name }}</div>
+                        <div class="related-link">
+                            <i class="fas fa-arrow-right"></i> Learn more
+                        </div>
+                    </div>
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+    </div>
+
+    <!-- Footer -->
+    <footer class="site-footer">
+        <div class="footer-inner">
+            <div class="footer-brand">
+                <span class="footer-icon"><i class="fas fa-seedling"></i></span>
+                <p class="footer-name">Angan Baari · आँगन बारी</p>
+                <p class="footer-tagline">Fresh · Organic · Sustainable</p>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; Since 2015. Angan Baari — Bhulka Danda, Rupandehi, Nepal</p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        function changeImage(src, thumb) {
+            document.getElementById('mainImg').src = src;
+            document.querySelectorAll('.thumb').forEach(t => t.classList.remove('active'));
+            thumb.classList.add('active');
+        }
+    </script>
+
+</body>
+</html>

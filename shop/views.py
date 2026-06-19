@@ -151,3 +151,14 @@ def error_404(request, exception):
 
 def error_500(request):
     return render(request, '500.html', status=500)
+
+def product_detail(request, slug):
+    from .models import Product
+    product = get_object_or_404(Product, slug=slug)
+    related_products = Product.objects.filter(
+        category=product.category
+    ).exclude(id=product.id)[:3]
+    return render(request, 'product_detail.html', {
+        'product': product,
+        'related_products': related_products,
+    })
