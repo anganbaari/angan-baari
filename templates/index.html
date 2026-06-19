@@ -121,6 +121,52 @@
     <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.css"></noscript>
 
     <link rel="stylesheet" href="{% static 'style.css' %}">
+
+<style>
+.btn-learn-more {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: transparent;
+    color: var(--moss);
+    padding: 10px 20px;
+    border-radius: 50px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    letter-spacing: 0.03em;
+    text-decoration: none;
+    transition: all 0.3s ease;
+    border: 1.5px solid var(--moss);
+    width: 100%;
+    margin-top: 8px;
+}
+.btn-learn-more:hover {
+    background: var(--moss);
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(74,124,89,0.25);
+}
+.btn-learn-more i { font-size: 0.85rem; }
+
+.shop-hint {
+    text-align: center;
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    background: var(--mist);
+    padding: 10px 20px;
+    border-radius: 50px;
+    width: fit-content;
+    margin-left: auto;
+    margin-right: auto;
+}
+.shop-hint i { color: var(--moss); font-size: 0.85rem; }
+</style>
 </head>
 <body>
  
@@ -547,6 +593,12 @@
         </p>
  
         <!-- Product Grid -->
+        <p class="shop-hint" data-aos="fade-up">
+            <i class="fas fa-hand-pointer"></i>
+            Click on any product card to learn more details about it!
+        </p>
+
+        <!-- Product Grid -->
         <div class="shop-grid" id="shopGrid">
  
             <!-- ── FRUITS ── -->
@@ -565,6 +617,9 @@
                        target="_blank" rel="noopener noreferrer">
                         <i class="fab fa-whatsapp"></i> Order via WhatsApp
                     </a>
+                    <a href="/products/mangoes/" class="btn-learn-more">
+                        <i class="fas fa-info-circle"></i> Learn More
+                    </a>
                 </div>
             </div>
  
@@ -581,6 +636,9 @@
                     <button class="btn-unavailable" disabled>
                         <i class="fas fa-times-circle"></i> Currently Out of Stock
                     </button>
+                    <a href="/products/litchi/" class="btn-learn-more">
+                        <i class="fas fa-info-circle"></i> Learn More
+                    </a>
                 </div>
             </div>
  
@@ -598,6 +656,9 @@
                        href="https://wa.me/9779821025084?text=Hello%20Angan%20Baari!%20I%20would%20like%20to%20order%20*Jackfruit*.%20Please%20let%20me%20know%20the%20availability%20and%20price."
                        target="_blank" rel="noopener noreferrer">
                         <i class="fab fa-whatsapp"></i> Order via WhatsApp
+                    </a>
+                    <a href="/products/jackfruit/" class="btn-learn-more">
+                        <i class="fas fa-info-circle"></i> Learn More
                     </a>
                 </div>
             </div>
@@ -617,6 +678,9 @@
                        target="_blank" rel="noopener noreferrer">
                         <i class="fab fa-whatsapp"></i> Order via WhatsApp
                     </a>
+                    <a href="/products/papaya/" class="btn-learn-more">
+                        <i class="fas fa-info-circle"></i> Learn More
+                    </a>
                 </div>
             </div>
  
@@ -635,6 +699,9 @@
                        target="_blank" rel="noopener noreferrer">
                         <i class="fab fa-whatsapp"></i> Order via WhatsApp
                     </a>
+                    <a href="/products/bananas/" class="btn-learn-more">
+                        <i class="fas fa-info-circle"></i> Learn More
+                    </a>
                 </div>
             </div>
  
@@ -652,6 +719,9 @@
                        href="https://wa.me/9779821025084?text=Hello%20Angan%20Baari!%20I%20would%20like%20to%20order%20*Lemons*.%20Please%20let%20me%20know%20the%20availability%20and%20price."
                        target="_blank" rel="noopener noreferrer">
                         <i class="fab fa-whatsapp"></i> Order via WhatsApp
+                    </a>
+                    <a href="/products/lemons/" class="btn-learn-more">
+                        <i class="fas fa-info-circle"></i> Learn More
                     </a>
                 </div>
             </div>
@@ -672,6 +742,9 @@
                        target="_blank" rel="noopener noreferrer">
                         <i class="fab fa-whatsapp"></i> Order via WhatsApp
                     </a>
+                    <a href="/products/seasonal-vegetables/" class="btn-learn-more">
+                        <i class="fas fa-info-circle"></i> Learn More
+                    </a>
                 </div>
             </div>
  
@@ -688,6 +761,9 @@
                     <button class="btn-unavailable" disabled>
                         <i class="fas fa-times-circle"></i> Currently Out of Stock
                     </button>
+                    <a href="/products/mushrooms/" class="btn-learn-more">
+                        <i class="fas fa-info-circle"></i> Learn More
+                    </a>
                 </div>
             </div>
  
@@ -706,6 +782,9 @@
                        href="https://wa.me/9779821025084?text=Hello%20Angan%20Baari!%20I%20would%20like%20to%20order%20*Pure%20Tilottama%20Gold%20Honey*.%20Please%20let%20me%20know%20the%20availability%20and%20price."
                        target="_blank" rel="noopener noreferrer">
                         <i class="fab fa-whatsapp"></i> Order via WhatsApp
+                    </a>
+                    <a href="/products/honey/" class="btn-learn-more">
+                        <i class="fas fa-info-circle"></i> Learn More
                     </a>
                 </div>
             </div>
@@ -726,6 +805,9 @@
                        target="_blank" rel="noopener noreferrer">
                         <i class="fab fa-whatsapp"></i> Enquire via WhatsApp
                     </a>
+                    <a href="/products/goats/" class="btn-learn-more">
+                        <i class="fas fa-info-circle"></i> Learn More
+                    </a>
                 </div>
             </div>
  
@@ -743,6 +825,9 @@
                        href="https://wa.me/9779821025084?text=Hello%20Angan%20Baari!%20I%20would%20like%20to%20enquire%20about%20*Free-range%20Hens*.%20Please%20let%20me%20know%20availability%20and%20pricing."
                        target="_blank" rel="noopener noreferrer">
                         <i class="fab fa-whatsapp"></i> Enquire via WhatsApp
+                    </a>
+                    <a href="/products/free-range-hens/" class="btn-learn-more">
+                        <i class="fas fa-info-circle"></i> Learn More
                     </a>
                 </div>
             </div>
@@ -762,6 +847,9 @@
                        href="https://wa.me/9779821025084?text=Hello%20Angan%20Baari!%20I%20would%20like%20to%20order%20*Homemade%20Mango%20Pickle*.%20Please%20let%20me%20know%20the%20availability%20and%20price."
                        target="_blank" rel="noopener noreferrer">
                         <i class="fab fa-whatsapp"></i> Order via WhatsApp
+                    </a>
+                    <a href="/products/mango-pickle/" class="btn-learn-more">
+                        <i class="fas fa-info-circle"></i> Learn More
                     </a>
                 </div>
             </div>
