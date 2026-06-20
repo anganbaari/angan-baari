@@ -1,5 +1,6 @@
 from django.contrib import admin
-from .models import ContactMessage, ProductOrder, NewsletterSubscriber, Product
+from .models import ContactMessage, ProductOrder, NewsletterSubscriber, Product, Review
+
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
@@ -47,3 +48,12 @@ class OrderAdmin(admin.ModelAdmin):
 @admin.register(NewsletterSubscriber)
 class NewsletterAdmin(admin.ModelAdmin):
     list_display = ['email', 'name', 'subscribed_at']
+
+@admin.register(Review)
+class ReviewAdmin(admin.ModelAdmin):
+    list_display = ('name', 'product', 'rating', 'is_approved', 'created_at')
+    list_filter = ('is_approved', 'rating', 'product')
+    list_editable = ('is_approved',)
+    search_fields = ('name', 'comment', 'product__name')
+    ordering = ('-created_at',)
+     

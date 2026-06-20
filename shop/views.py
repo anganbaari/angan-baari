@@ -2,7 +2,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse
 from django.core.mail import send_mail
 from django.conf import settings
-from .models import NewsletterSubscriber, ContactMessage, ProductOrder
+from .models import NewsletterSubscriber, ContactMessage, ProductOrder, Review
 from .emails import (
     send_order_received_email,
     send_order_cancelled_email,
@@ -158,7 +158,32 @@ def product_detail(request, slug):
     related_products = Product.objects.filter(
         category=product.category
     ).exclude(id=product.id)[:3]
+    reviews = product.reviews.filter(is_approved=True)
+    review_count = reviews.count()
+    avg_rating = round(sum(r.rating for r in reviews) / review_count, 1) if review_count else None
     return render(request, 'product_detail.html', {
         'product': product,
         'related_products': related_products,
+        'reviews': reviews,
+        'review_count': review_count,
+        'avg_rating': avg_rating,
+        'ratings': Review.RATING_CHOICES,
     })
+
+def submit_review(request, slug):
+    from .models import Product
+    product = get_object_or_404(Product, slug=slug)
+    if request.method == 'POST':
+        name = request.POST.get('name', '').strip()
+        rating = request.POST.get('rating', '').strip()
+        comment = request.POST.get('comment', '').strip()
+        if name and rating and comment:
+            Review.objects.create(
+                product=product,
+                name=name,
+                rating=int(rating),
+                comment=comment,
+                is_approved=False,  # needs admin approval
+            )
+            return redirect(product.get_absolute_url() + '?reviewed=1')
+    return redirect(product.get_absolute_url())

@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ product.name }} — Angan Baari</title>
-    <link rel="shortcut icon" href="{% static 'thsf.ico' %}">
+    <link rel="shortcut icon" href="{% static 'favicon.ico' %}">
     <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,400&family=DM+Sans:wght@300;400;500;600&family=Cinzel:wght@400;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
     <link rel="stylesheet" href="{% static 'style.css' %}">
@@ -516,6 +516,108 @@
         {% endif %}
 
     </div>
+
+    <!-- ============================================================
+         REVIEWS SECTION
+    ============================================================ -->
+    <div class="product-page" style="margin-top:0;">
+
+        <!-- Success message after submitting review -->
+        {% if request.GET.reviewed %}
+        <div style="background:rgba(74,124,89,0.1);border:1px solid var(--moss);border-radius:12px;padding:16px 24px;margin-bottom:32px;color:var(--forest);font-size:0.95rem;">
+            <i class="fas fa-check-circle" style="color:var(--moss);margin-right:8px;"></i>
+            <strong>Thank you for your review!</strong> It will appear after approval.
+        </div>
+        {% endif %}
+
+        <!-- Existing Reviews -->
+        <div style="margin-bottom:48px;">
+            <h2 class="features-title" style="margin-bottom:8px;">
+                Customer Reviews
+                {% if review_count %}
+                <span style="font-size:1rem;font-weight:400;color:var(--text-muted);font-family:var(--font-body);margin-left:12px;">
+                    {{ review_count }} review{{ review_count|pluralize }}
+                    {% if avg_rating %}· ⭐ {{ avg_rating }}/5{% endif %}
+                </span>
+                {% endif %}
+            </h2>
+
+            {% if reviews %}
+            <div style="display:flex;flex-direction:column;gap:16px;margin-top:24px;">
+                {% for review in reviews %}
+                <div style="background:var(--cream);border:1px solid var(--mist);border-radius:14px;padding:20px 24px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                        <strong style="color:var(--forest);font-size:0.95rem;">{{ review.name }}</strong>
+                        <span style="color:var(--gold);font-size:1rem;">
+                            {% for i in "12345" %}
+                                {% if forloop.counter <= review.rating %}⭐{% endif %}
+                            {% endfor %}
+                        </span>
+                    </div>
+                    <p style="color:var(--text-body);font-size:0.92rem;line-height:1.7;margin:0;">{{ review.comment }}</p>
+                    <div style="font-size:0.75rem;color:var(--text-muted);margin-top:8px;">{{ review.created_at|date:"F j, Y" }}</div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p style="color:var(--text-muted);font-size:0.92rem;margin-top:16px;">No reviews yet. Be the first to share your experience!</p>
+            {% endif %}
+        </div>
+
+        <!-- Submit Review Form -->
+        <div class="product-features">
+            <h2 class="features-title">Leave a Review</h2>
+            <form method="POST" action="{% url 'submit_review' product.slug %}" style="display:flex;flex-direction:column;gap:16px;margin-top:24px;">
+                {% csrf_token %}
+
+                <div>
+                    <label style="font-size:0.8rem;font-family:var(--font-accent);letter-spacing:0.1em;text-transform:uppercase;color:var(--text-muted);display:block;margin-bottom:6px;">Your Name</label>
+                    <input type="text" name="name" required placeholder="e.g. Ramesh Thapa"
+                        style="width:100%;padding:12px 16px;border:1px solid var(--mist);border-radius:10px;font-size:0.95rem;font-family:var(--font-body);background:var(--white);color:var(--forest);outline:none;box-sizing:border-box;">
+                </div>
+
+                <div>
+                    <label style="font-size:0.8rem;font-family:var(--font-accent);letter-spacing:0.1em;text-transform:uppercase;color:var(--text-muted);display:block;margin-bottom:10px;">Rating</label>
+                    <div style="display:flex;gap:8px;">
+                        {% for val, label in ratings %}
+                        <label style="cursor:pointer;text-align:center;">
+                            <input type="radio" name="rating" value="{{ val }}" required style="display:none;">
+                            <span class="star-btn" style="display:inline-block;padding:8px 14px;border:1.5px solid var(--mist);border-radius:50px;font-size:0.85rem;transition:all 0.2s;">{{ val }} ⭐</span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div>
+                    <label style="font-size:0.8rem;font-family:var(--font-accent);letter-spacing:0.1em;text-transform:uppercase;color:var(--text-muted);display:block;margin-bottom:6px;">Your Review</label>
+                    <textarea name="comment" required rows="4" placeholder="Tell us about your experience with this product..."
+                        style="width:100%;padding:12px 16px;border:1px solid var(--mist);border-radius:10px;font-size:0.95rem;font-family:var(--font-body);background:var(--white);color:var(--forest);outline:none;resize:vertical;box-sizing:border-box;"></textarea>
+                </div>
+
+                <button type="submit"
+                    style="background:var(--moss);color:white;border:none;padding:14px 28px;border-radius:50px;font-size:0.95rem;font-weight:600;cursor:pointer;transition:all 0.3s;align-self:flex-start;">
+                    <i class="fas fa-paper-plane"></i> Submit Review
+                </button>
+            </form>
+        </div>
+
+    </div>
+
+    <script>
+        // Star rating highlight effect
+        document.querySelectorAll('input[name="rating"]').forEach(radio => {
+            radio.addEventListener('change', function() {
+                document.querySelectorAll('.star-btn').forEach(btn => {
+                    btn.style.background = '';
+                    btn.style.color = '';
+                    btn.style.borderColor = 'var(--mist)';
+                });
+                this.nextElementSibling.style.background = 'var(--moss)';
+                this.nextElementSibling.style.color = 'white';
+                this.nextElementSibling.style.borderColor = 'var(--moss)';
+            });
+        });
+    </script>
 
     <!-- Footer -->
     <footer class="site-footer">
