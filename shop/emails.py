@@ -1,8 +1,40 @@
+import requests
 from django.core.mail import send_mail
 from django.conf import settings
 
+
+def send_telegram(message):
+    """Send a Telegram notification to the admin."""
+    try:
+        token = settings.TELEGRAM_BOT_TOKEN
+        chat_id = settings.TELEGRAM_CHAT_ID
+        url = f"https://api.telegram.org/bot{token}/sendMessage"
+        requests.post(url, data={
+            'chat_id': chat_id,
+            'text': message,
+            'parse_mode': 'HTML',
+        }, timeout=5)
+    except Exception:
+        pass  # Never crash the site if Telegram fails
+
+
 def send_order_received_email(order):
     cancel_link = f"https://anganbaari.pythonanywhere.com/cancel/{order.cancel_token}/"
+
+    # Telegram notification to admin
+    send_telegram(f"""🆕 <b>New Order Received!</b>
+
+━━━━━━━━━━━━━━━━━━━━
+📦 <b>ORDER DETAILS</b>
+━━━━━━━━━━━━━━━━━━━━
+Order No  : <b>{order.order_number}</b>
+Customer  : {order.name}
+Phone     : {order.phone}
+Product   : {order.product_interest}
+Address   : {order.address}
+Message   : {order.message or 'None'}
+━━━━━━━━━━━━━━━━━━━━
+🔗 Admin: https://anganbaari.pythonanywhere.com/admin/shop/productorder/""")
 
     # Email to customer
     send_mail(
@@ -36,7 +68,7 @@ Bhulka Danda, Rupandehi, Nepal
         ''',
         from_email=settings.DEFAULT_FROM_EMAIL,
         recipient_list=[order.email],
-        fail_silently=False,
+        fail_silently=True,
     )
 
     # Email to admin
@@ -63,11 +95,19 @@ https://anganbaari.pythonanywhere.com/admin/shop/productorder/
         ''',
         from_email=settings.DEFAULT_FROM_EMAIL,
         recipient_list=[settings.ADMIN_EMAIL],
-        fail_silently=False,
+        fail_silently=True,
     )
 
 
 def send_order_confirmed_email(order):
+    # Telegram notification to admin
+    send_telegram(f"""✅ <b>Order Confirmed!</b>
+
+Order No  : <b>{order.order_number}</b>
+Customer  : {order.name}
+Phone     : {order.phone}
+Product   : {order.product_interest}""")
+
     send_mail(
         subject='🎉 Order Confirmed — Angan Baari | आँगन बारी',
         message=f'''
@@ -95,11 +135,20 @@ Bhulka Danda, Rupandehi, Nepal
         ''',
         from_email=settings.DEFAULT_FROM_EMAIL,
         recipient_list=[order.email],
-        fail_silently=False,
+        fail_silently=True,
     )
 
 
 def send_order_delivered_email(order):
+    # Telegram notification to admin
+    send_telegram(f"""🏡 <b>Order Delivered!</b>
+
+Order No  : <b>{order.order_number}</b>
+Customer  : {order.name}
+Phone     : {order.phone}
+Product   : {order.product_interest}
+Address   : {order.address}""")
+
     # Email to customer
     send_mail(
         subject='🏡 Order Delivered — Angan Baari | आँगन बारी',
@@ -129,7 +178,7 @@ Bhulka Danda, Rupandehi, Nepal
         ''',
         from_email=settings.DEFAULT_FROM_EMAIL,
         recipient_list=[order.email],
-        fail_silently=False,
+        fail_silently=True,
     )
 
     # Email to admin
@@ -153,11 +202,19 @@ This order is now complete! ✅
         ''',
         from_email=settings.DEFAULT_FROM_EMAIL,
         recipient_list=[settings.ADMIN_EMAIL],
-        fail_silently=False,
+        fail_silently=True,
     )
 
 
 def send_order_cancelled_email(order):
+    # Telegram notification to admin
+    send_telegram(f"""❌ <b>Order Cancelled!</b>
+
+Order No  : <b>{order.order_number}</b>
+Customer  : {order.name}
+Phone     : {order.phone}
+Product   : {order.product_interest}""")
+
     # Email to customer
     send_mail(
         subject='❌ Order Cancelled — Angan Baari | आँगन बारी',
@@ -186,7 +243,7 @@ Bhulka Danda, Rupandehi, Nepal
         ''',
         from_email=settings.DEFAULT_FROM_EMAIL,
         recipient_list=[order.email],
-        fail_silently=False,
+        fail_silently=True,
     )
 
     # Email to admin
@@ -207,5 +264,5 @@ Product   : {order.product_interest}
         ''',
         from_email=settings.DEFAULT_FROM_EMAIL,
         recipient_list=[settings.ADMIN_EMAIL],
-        fail_silently=False,
+        fail_silently=True,
     )
