@@ -13,271 +13,307 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
     <link rel="stylesheet" href="{% static 'style.css' %}">
     <style>
-        /* ── Page Layout ── */
-        .shop-page {
-            max-width: 1200px;
-            margin: 100px auto 80px;
-            padding: 0 5vw;
+        * { box-sizing: border-box; }
+
+        .shop-wrapper {
+            display: flex;
+            max-width: 1280px;
+            margin: 90px auto 60px;
+            padding: 0 20px;
+            gap: 24px;
         }
 
-        /* ── Breadcrumb ── */
-        .breadcrumb {
+        /* ── Sidebar ── */
+        .shop-sidebar {
+            width: 220px;
+            flex-shrink: 0;
+        }
+        .sidebar-box {
+            background: var(--white);
+            border-radius: 12px;
+            border: 1px solid var(--mist);
+            padding: 20px;
+            margin-bottom: 16px;
+        }
+        .sidebar-title {
+            font-family: var(--font-accent);
+            font-size: 0.7rem;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            margin-bottom: 14px;
+            display: block;
+        }
+        .cat-list { list-style: none; padding: 0; margin: 0; }
+        .cat-list li { margin-bottom: 4px; }
+        .cat-list a {
             display: flex;
             align-items: center;
             gap: 8px;
-            font-size: 0.82rem;
-            color: var(--text-muted);
-            margin-bottom: 40px;
+            padding: 8px 10px;
+            border-radius: 8px;
+            font-size: 0.88rem;
+            color: var(--text-body);
+            transition: all 0.2s ease;
+            cursor: pointer;
+            text-decoration: none;
         }
-        .breadcrumb a { color: var(--moss); }
-        .breadcrumb a:hover { text-decoration: underline; }
-
-        /* ── Page Header ── */
-        .shop-header {
-            text-align: center;
-            margin-bottom: 48px;
-        }
-        .shop-eyebrow {
-            font-family: var(--font-accent);
-            font-size: 0.72rem;
-            letter-spacing: 0.2em;
-            text-transform: uppercase;
-            color: var(--moss);
-            margin-bottom: 12px;
-            display: block;
-        }
-        .shop-title {
-            font-family: var(--font-display);
-            font-size: clamp(2.2rem, 5vw, 3.5rem);
-            font-weight: 600;
+        .cat-list a:hover, .cat-list a.active {
+            background: var(--mist);
             color: var(--forest);
-            line-height: 1.15;
-            margin-bottom: 16px;
+            font-weight: 500;
         }
-        .shop-subtitle {
-            font-size: 1rem;
+        .cat-list a .cat-count {
+            margin-left: auto;
+            background: var(--mist);
             color: var(--text-muted);
-            max-width: 500px;
-            margin: 0 auto;
+            font-size: 0.72rem;
+            padding: 1px 7px;
+            border-radius: 50px;
+        }
+        .cat-list a.active .cat-count {
+            background: var(--moss);
+            color: white;
         }
 
-        /* ── Search Bar ── */
-        .shop-search-wrap {
-            max-width: 520px;
-            margin: 0 auto 40px;
+        /* ── Main Content ── */
+        .shop-main { flex: 1; min-width: 0; }
+
+        /* ── Top Bar ── */
+        .shop-topbar {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .search-wrap {
+            flex: 1;
+            min-width: 200px;
             position: relative;
         }
-        .shop-search {
+        .search-wrap i {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+            font-size: 0.85rem;
+        }
+        .search-input {
             width: 100%;
-            padding: 14px 24px 14px 50px;
+            padding: 9px 14px 9px 36px;
             border: 1.5px solid var(--mist);
-            border-radius: 50px;
-            font-size: 0.95rem;
+            border-radius: 8px;
+            font-size: 0.88rem;
             font-family: var(--font-body);
             background: var(--white);
             color: var(--forest);
             outline: none;
-            transition: border-color 0.3s ease;
-            box-shadow: 0 4px 20px rgba(26,47,30,0.06);
+            transition: border-color 0.2s;
         }
-        .shop-search:focus { border-color: var(--moss); }
-        .shop-search-icon {
-            position: absolute;
-            left: 18px;
-            top: 50%;
-            transform: translateY(-50%);
+        .search-input:focus { border-color: var(--moss); }
+        .results-info {
+            font-size: 0.82rem;
             color: var(--text-muted);
-            font-size: 0.9rem;
+            white-space: nowrap;
         }
-
-        /* ── Category Filter ── */
-        .category-filters {
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-            justify-content: center;
-            margin-bottom: 48px;
-        }
-        .cat-btn {
-            padding: 8px 20px;
-            border-radius: 50px;
+        .sort-select {
+            padding: 8px 12px;
             border: 1.5px solid var(--mist);
-            background: var(--white);
-            color: var(--text-body);
+            border-radius: 8px;
             font-size: 0.85rem;
             font-family: var(--font-body);
+            background: var(--white);
+            color: var(--forest);
+            outline: none;
             cursor: pointer;
-            transition: all 0.3s ease;
-        }
-        .cat-btn:hover, .cat-btn.active {
-            background: var(--forest);
-            color: var(--white);
-            border-color: var(--forest);
         }
 
-        /* ── Results Count ── */
-        .results-count {
+        /* ── Banner ── */
+        .shop-banner {
+            background: var(--forest);
+            border-radius: 12px;
+            padding: 22px 28px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+        }
+        .banner-text h2 {
+            font-family: var(--font-display);
+            font-size: 1.5rem;
+            color: var(--cream);
+            margin-bottom: 4px;
+            font-weight: 600;
+        }
+        .banner-text p {
             font-size: 0.85rem;
-            color: var(--text-muted);
-            margin-bottom: 24px;
+            color: var(--sage-light);
+        }
+        .banner-icon {
+            font-size: 2.5rem;
+            opacity: 0.4;
         }
 
         /* ── Product Grid ── */
-        .shop-grid {
+        .product-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-            gap: 28px;
+            grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+            gap: 14px;
         }
 
-        /* ── Product Card ── */
-        .shop-card {
+        /* ── Product Card (compact Daraz style) ── */
+        .p-card {
             background: var(--white);
-            border-radius: var(--radius-card);
+            border-radius: 10px;
+            border: 1px solid var(--mist);
             overflow: hidden;
-            box-shadow: var(--shadow-card);
-            transition: all 0.35s var(--ease-smooth);
+            transition: all 0.25s ease;
             display: flex;
             flex-direction: column;
-        }
-        .shop-card:hover {
-            transform: translateY(-6px);
-            box-shadow: var(--shadow-hover);
-        }
-        .shop-card-img {
+            cursor: pointer;
             position: relative;
-            height: 220px;
-            overflow: hidden;
-            background: var(--forest);
         }
-        .shop-card-img img {
+        .p-card:hover {
+            border-color: var(--sage);
+            transform: translateY(-3px);
+            box-shadow: 0 8px 24px rgba(26,47,30,0.12);
+        }
+        .p-card-img {
+            height: 160px;
+            overflow: hidden;
+            background: var(--mist);
+            position: relative;
+        }
+        .p-card-img img {
             width: 100%;
             height: 100%;
             object-fit: cover;
-            transition: transform 0.5s ease;
+            transition: transform 0.4s ease;
         }
-        .shop-card:hover .shop-card-img img { transform: scale(1.07); }
-        .card-category-badge {
+        .p-card:hover .p-card-img img { transform: scale(1.06); }
+        .p-cat-tag {
             position: absolute;
-            top: 14px;
-            left: 14px;
-            background: rgba(26,47,30,0.75);
-            color: var(--white);
-            font-size: 0.65rem;
-            font-family: var(--font-accent);
-            letter-spacing: 0.12em;
-            text-transform: uppercase;
-            padding: 4px 12px;
-            border-radius: 50px;
-            backdrop-filter: blur(4px);
-        }
-        .card-unavailable-overlay {
-            position: absolute;
-            inset: 0;
-            background: rgba(0,0,0,0.45);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .card-unavailable-label {
-            background: rgba(180,50,50,0.9);
+            top: 8px;
+            left: 8px;
+            background: rgba(26,47,30,0.8);
             color: white;
-            font-size: 0.75rem;
+            font-size: 0.6rem;
             font-family: var(--font-accent);
             letter-spacing: 0.1em;
             text-transform: uppercase;
-            padding: 6px 16px;
+            padding: 3px 8px;
             border-radius: 50px;
         }
-        .shop-card-body {
-            padding: 20px 22px 22px;
+        .p-unavailable-badge {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: rgba(180,50,50,0.85);
+            color: white;
+            font-size: 0.6rem;
+            font-family: var(--font-accent);
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            padding: 3px 8px;
+            border-radius: 50px;
+        }
+        .p-card-body {
+            padding: 10px 12px 12px;
             display: flex;
             flex-direction: column;
             flex: 1;
         }
-        .card-name {
-            font-family: var(--font-display);
-            font-size: 1.35rem;
+        .p-name {
+            font-size: 0.9rem;
             font-weight: 600;
             color: var(--forest);
-            margin-bottom: 8px;
-            line-height: 1.2;
-        }
-        .card-desc {
-            font-size: 0.88rem;
-            color: var(--text-muted);
-            line-height: 1.6;
-            margin-bottom: 16px;
-            flex: 1;
+            margin-bottom: 4px;
+            line-height: 1.3;
             display: -webkit-box;
             -webkit-line-clamp: 2;
             -webkit-box-orient: vertical;
             overflow: hidden;
         }
-        .card-price {
-            font-family: var(--font-display);
-            font-size: 1.4rem;
+        .p-price {
+            font-size: 1rem;
             font-weight: 600;
-            color: var(--moss);
-            margin-bottom: 16px;
+            color: #c0392b;
+            margin-bottom: 2px;
         }
-        .card-price span {
-            font-size: 0.8rem;
-            font-family: var(--font-body);
+        .p-price-unit {
+            font-size: 0.72rem;
             color: var(--text-muted);
             font-weight: 400;
+            margin-bottom: 8px;
         }
-        .card-price-tbd {
-            font-size: 0.85rem;
+        .p-price-tbd {
+            font-size: 0.78rem;
             color: var(--text-muted);
             font-style: italic;
-            margin-bottom: 16px;
+            margin-bottom: 8px;
         }
-        .card-actions {
-            display: flex;
-            gap: 8px;
-        }
-        .btn-card-detail {
-            flex: 1;
-            display: flex;
+        .p-organic-badge {
+            display: inline-flex;
             align-items: center;
-            justify-content: center;
-            gap: 6px;
-            padding: 11px;
-            border-radius: 50px;
-            border: 1.5px solid var(--moss);
+            gap: 4px;
+            font-size: 0.68rem;
             color: var(--moss);
-            font-size: 0.85rem;
-            font-weight: 500;
-            transition: all 0.3s ease;
-            text-decoration: none;
+            background: rgba(74,124,89,0.1);
+            padding: 2px 7px;
+            border-radius: 50px;
+            margin-bottom: 8px;
+            width: fit-content;
         }
-        .btn-card-detail:hover {
-            background: var(--moss);
-            color: white;
+        .p-card-actions {
+            display: flex;
+            gap: 6px;
+            margin-top: auto;
         }
-        .btn-card-order {
+        .btn-detail {
             flex: 1;
+            padding: 7px 6px;
+            border: 1.5px solid var(--mist);
+            border-radius: 6px;
+            background: white;
+            color: var(--forest);
+            font-size: 0.75rem;
+            font-weight: 500;
+            font-family: var(--font-body);
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+            text-decoration: none;
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 6px;
-            padding: 11px;
-            border-radius: 50px;
+            gap: 4px;
+        }
+        .btn-detail:hover { border-color: var(--moss); color: var(--moss); }
+        .btn-order {
+            flex: 1;
+            padding: 7px 6px;
+            border: none;
+            border-radius: 6px;
             background: var(--forest);
             color: white;
-            font-size: 0.85rem;
+            font-size: 0.75rem;
             font-weight: 500;
-            transition: all 0.3s ease;
-            text-decoration: none;
-            border: none;
+            font-family: var(--font-body);
             cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
         }
-        .btn-card-order:hover {
-            background: var(--moss);
-            transform: translateY(-2px);
-        }
-        .btn-card-order.disabled {
-            background: var(--text-muted);
+        .btn-order:hover { background: var(--moss); }
+        .btn-order.disabled {
+            background: var(--sage-light);
             cursor: not-allowed;
             pointer-events: none;
         }
@@ -285,24 +321,27 @@
         /* ── No Results ── */
         .no-results {
             text-align: center;
-            padding: 80px 20px;
+            padding: 60px 20px;
             display: none;
+            grid-column: 1/-1;
         }
-        .no-results i {
-            font-size: 3rem;
-            color: var(--sage-light);
-            margin-bottom: 16px;
-        }
-        .no-results p {
-            color: var(--text-muted);
-            font-size: 1rem;
-        }
+        .no-results i { font-size: 2.5rem; color: var(--sage-light); margin-bottom: 12px; display: block; }
+        .no-results p { color: var(--text-muted); font-size: 0.9rem; }
 
-        /* ── Responsive ── */
-        @media (max-width: 600px) {
-            .shop-grid { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 18px; }
-            .category-filters { gap: 8px; }
-            .cat-btn { font-size: 0.8rem; padding: 7px 16px; }
+        /* ── Mobile ── */
+        @media (max-width: 768px) {
+            .shop-wrapper { flex-direction: column; margin-top: 80px; }
+            .shop-sidebar { width: 100%; }
+            .cat-list { display: flex; flex-wrap: wrap; gap: 6px; }
+            .cat-list li { margin: 0; }
+            .cat-list a { padding: 6px 12px; font-size: 0.82rem; border: 1px solid var(--mist); }
+            .sidebar-box { padding: 14px; }
+            .product-grid { grid-template-columns: repeat(auto-fill, minmax(145px, 1fr)); gap: 10px; }
+            .p-card-img { height: 130px; }
+            .shop-banner { display: none; }
+        }
+        @media (max-width: 400px) {
+            .product-grid { grid-template-columns: repeat(2, 1fr); }
         }
     </style>
 </head>
@@ -335,103 +374,119 @@
         </div>
     </header>
 
-    <!-- Main Shop Page -->
-    <div class="shop-page">
+    <div class="shop-wrapper">
 
-        <!-- Breadcrumb -->
-        <div class="breadcrumb">
-            <a href="/"><i class="fas fa-home"></i> Home</a>
-            <i class="fas fa-chevron-right" style="font-size:0.65rem;"></i>
-            <span>Shop</span>
-        </div>
+        <!-- Sidebar -->
+        <aside class="shop-sidebar">
+            <div class="sidebar-box">
+                <span class="sidebar-title">Categories</span>
+                <ul class="cat-list" id="catList">
+                    <li><a class="active" data-cat="all"><i class="fas fa-th-large" style="color:var(--moss);width:14px;"></i> All Products <span class="cat-count" id="count-all">{{ products|length }}</span></a></li>
+                    <li><a data-cat="fruits"><i class="fas fa-apple-alt" style="color:#e74c3c;width:14px;"></i> Fruits <span class="cat-count" id="count-fruits">{{ fruits_count }}</span></a></li>
+                    <li><a data-cat="vegetables"><i class="fas fa-carrot" style="color:#e67e22;width:14px;"></i> Vegetables <span class="cat-count" id="count-vegetables">{{ vegetables_count }}</span></a></li>
+                    <li><a data-cat="honey"><i class="fas fa-jar" style="color:#f39c12;width:14px;"></i> Honey <span class="cat-count" id="count-honey">{{ honey_count }}</span></a></li>
+                    <li><a data-cat="animals"><i class="fas fa-paw" style="color:var(--moss);width:14px;"></i> Animals <span class="cat-count" id="count-animals">{{ animals_count }}</span></a></li>
+                    <li><a data-cat="pickles"><i class="fas fa-pepper-hot" style="color:#c0392b;width:14px;"></i> Pickles <span class="cat-count" id="count-pickles">{{ pickles_count }}</span></a></li>
+                </ul>
+            </div>
+            <div class="sidebar-box">
+                <span class="sidebar-title">Contact Us</span>
+                <a href="https://wa.me/9779821025084" target="_blank" style="display:flex;align-items:center;gap:8px;background:#25D366;color:white;padding:9px 14px;border-radius:8px;font-size:0.82rem;font-weight:500;text-decoration:none;">
+                    <i class="fab fa-whatsapp"></i> Order via WhatsApp
+                </a>
+            </div>
+        </aside>
 
-        <!-- Header -->
-        <div class="shop-header">
-            <span class="shop-eyebrow">Farm Fresh · Organic</span>
-            <h1 class="shop-title">Our <em>Online Shop</em></h1>
-            <p class="shop-subtitle">Fresh produce straight from our farm in Bhulka Danda, Rupandehi, Nepal 🌿</p>
-        </div>
+        <!-- Main -->
+        <main class="shop-main">
 
-        <!-- Search -->
-        <div class="shop-search-wrap">
-            <i class="fas fa-search shop-search-icon"></i>
-            <input type="text" class="shop-search" id="shopSearch" placeholder="Search products...">
-        </div>
-
-        <!-- Category Filters -->
-        <div class="category-filters">
-            <button class="cat-btn active" data-cat="all">All Products</button>
-            <button class="cat-btn" data-cat="fruits"><i class="fas fa-apple-alt"></i> Fruits</button>
-            <button class="cat-btn" data-cat="vegetables"><i class="fas fa-carrot"></i> Vegetables</button>
-            <button class="cat-btn" data-cat="honey"><i class="fas fa-jar"></i> Honey</button>
-            <button class="cat-btn" data-cat="animals"><i class="fas fa-paw"></i> Animals</button>
-            <button class="cat-btn" data-cat="pickles"><i class="fas fa-pepper-hot"></i> Pickles</button>
-        </div>
-
-        <!-- Results Count -->
-        <p class="results-count" id="resultsCount">{{ products|length }} product{{ products|length|pluralize }} available</p>
-
-        <!-- Product Grid -->
-        <div class="shop-grid" id="shopGrid">
-            {% for product in products %}
-            <div class="shop-card" data-cat="{{ product.category }}" data-name="{{ product.name|lower }}">
-                <div class="shop-card-img">
-                    {% if product.main_image %}
-                    <img src="{% static product.main_image %}" alt="{{ product.name }}" loading="lazy">
-                    {% else %}
-                    <img src="{% static 'images/placeholder.jpg' %}" alt="{{ product.name }}" loading="lazy">
-                    {% endif %}
-                    <span class="card-category-badge">{{ product.get_category_display }}</span>
-                    {% if not product.is_available %}
-                    <div class="card-unavailable-overlay">
-                        <span class="card-unavailable-label">Out of Season</span>
-                    </div>
-                    {% endif %}
+            <!-- Banner -->
+            <div class="shop-banner">
+                <div class="banner-text">
+                    <h2>Fresh From Our Farm 🌿</h2>
+                    <p>Organic produce from Bhulka Danda, Rupandehi, Nepal</p>
                 </div>
-                <div class="shop-card-body">
-                    <h2 class="card-name">{{ product.name }}</h2>
-                    <p class="card-desc">{{ product.description }}</p>
-                    {% if product.price and product.price > 0 %}
-                    <div class="card-price">
-                        Rs. {{ product.price }} <span>{{ product.price_unit }}</span>
-                    </div>
-                    {% else %}
-                    <p class="card-price-tbd">Price on request</p>
-                    {% endif %}
-                    <div class="card-actions">
-                        <a href="{% url 'product_detail' product.slug %}" class="btn-card-detail">
-                            <i class="fas fa-eye"></i> Details
-                        </a>
-                        {% if product.is_available %}
-                        <a href="/#delivery?product={{ product.name }}" class="btn-card-order">
-                            <i class="fas fa-leaf"></i> Order
-                        </a>
+                <div class="banner-icon">🌱</div>
+            </div>
+
+            <!-- Top Bar -->
+            <div class="shop-topbar">
+                <div class="search-wrap">
+                    <i class="fas fa-search"></i>
+                    <input type="text" class="search-input" id="shopSearch" placeholder="Search products...">
+                </div>
+                <span class="results-info" id="resultsInfo">{{ products|length }} products</span>
+                <select class="sort-select" id="sortSelect">
+                    <option value="default">Sort: Default</option>
+                    <option value="name-asc">Name: A–Z</option>
+                    <option value="name-desc">Name: Z–A</option>
+                    <option value="price-asc">Price: Low to High</option>
+                    <option value="price-desc">Price: High to Low</option>
+                </select>
+            </div>
+
+            <!-- Product Grid -->
+            <div class="product-grid" id="productGrid">
+                {% for product in products %}
+                <div class="p-card"
+                     data-cat="{{ product.category }}"
+                     data-name="{{ product.name|lower }}"
+                     data-price="{{ product.price|default:0 }}"
+                     onclick="window.location='{% url 'product_detail' product.slug %}'">
+                    <div class="p-card-img">
+                        {% if product.main_image %}
+                        <img src="{% static product.main_image %}" alt="{{ product.name }}" loading="lazy">
                         {% else %}
-                        <button class="btn-card-order disabled">
-                            <i class="fas fa-clock"></i> Unavailable
-                        </button>
+                        <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:var(--mist);">
+                            <i class="fas fa-seedling" style="font-size:2rem;color:var(--sage);"></i>
+                        </div>
+                        {% endif %}
+                        <span class="p-cat-tag">{{ product.get_category_display }}</span>
+                        {% if not product.is_available %}
+                        <span class="p-unavailable-badge">Out of Season</span>
                         {% endif %}
                     </div>
+                    <div class="p-card-body">
+                        <div class="p-name">{{ product.name }}</div>
+                        {% if product.price and product.price > 0 %}
+                        <div class="p-price">Rs. {{ product.price }}</div>
+                        <div class="p-price-unit">{{ product.price_unit }}</div>
+                        {% else %}
+                        <div class="p-price-tbd">Price on request</div>
+                        {% endif %}
+                        <span class="p-organic-badge"><i class="fas fa-leaf"></i> Organic</span>
+                        <div class="p-card-actions" onclick="event.stopPropagation()">
+                            <a href="{% url 'product_detail' product.slug %}" class="btn-detail">
+                                <i class="fas fa-eye"></i> View
+                            </a>
+                            {% if product.is_available %}
+                            <a href="/#delivery" class="btn-order">
+                                <i class="fas fa-shopping-bag"></i> Order
+                            </a>
+                            {% else %}
+                            <button class="btn-order disabled">
+                                <i class="fas fa-clock"></i> Unavailable
+                            </button>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% empty %}
+                <div style="grid-column:1/-1;text-align:center;padding:60px 0;color:var(--text-muted);">
+                    <i class="fas fa-seedling" style="font-size:2.5rem;margin-bottom:12px;display:block;color:var(--sage-light);"></i>
+                    <p>No products available right now. Check back soon!</p>
+                </div>
+                {% endfor %}
+                <div class="no-results" id="noResults">
+                    <i class="fas fa-search"></i>
+                    <p>No products found. Try a different search.</p>
                 </div>
             </div>
-            {% empty %}
-            <div style="grid-column:1/-1;text-align:center;padding:80px 0;color:var(--text-muted);">
-                <i class="fas fa-seedling" style="font-size:3rem;margin-bottom:16px;display:block;color:var(--sage-light);"></i>
-                <p>No products available right now. Check back soon!</p>
-            </div>
-            {% endfor %}
-        </div>
-
-        <!-- No Results Message -->
-        <div class="no-results" id="noResults">
-            <i class="fas fa-search"></i>
-            <p>No products found for your search.</p>
-        </div>
-
+        </main>
     </div>
 
-    <!-- Floating WhatsApp -->
-    <a href="https://wa.me/9779821025084?text=Hello%20Angan%20Baari!%20I%20would%20like%20to%20enquire%20about%20your%20products."
+    <!-- WhatsApp Float -->
+    <a href="https://wa.me/9779821025084?text=Hello%20Angan%20Baari!%20I%20would%20like%20to%20order."
        class="float-wa" target="_blank" rel="noopener noreferrer" aria-label="Chat on WhatsApp">
         <i class="fab fa-whatsapp"></i>
         <span class="float-wa-tooltip">Order via WhatsApp</span>
@@ -453,45 +508,59 @@
     </footer>
 
     <script>
-        // Navbar scroll effect
         const navbar = document.getElementById('navbar');
         window.addEventListener('scroll', () => {
             navbar.classList.toggle('scrolled', window.scrollY > 50);
         });
 
-        // Category filter
-        const catBtns = document.querySelectorAll('.cat-btn');
-        const cards = document.querySelectorAll('.shop-card');
-        const resultsCount = document.getElementById('resultsCount');
-        const noResults = document.getElementById('noResults');
+        const cards = Array.from(document.querySelectorAll('.p-card'));
+        const catLinks = document.querySelectorAll('#catList a');
         const searchInput = document.getElementById('shopSearch');
+        const resultsInfo = document.getElementById('resultsInfo');
+        const noResults = document.getElementById('noResults');
+        const sortSelect = document.getElementById('sortSelect');
+        const grid = document.getElementById('productGrid');
 
-        function filterProducts() {
-            const activeCat = document.querySelector('.cat-btn.active').dataset.cat;
-            const searchTerm = searchInput.value.toLowerCase().trim();
-            let visible = 0;
+        let activeCat = 'all';
 
-            cards.forEach(card => {
+        function filterAndSort() {
+            const search = searchInput.value.toLowerCase().trim();
+            const sort = sortSelect.value;
+
+            let visible = cards.filter(card => {
                 const matchCat = activeCat === 'all' || card.dataset.cat === activeCat;
-                const matchSearch = card.dataset.name.includes(searchTerm);
-                const show = matchCat && matchSearch;
-                card.style.display = show ? 'flex' : 'none';
-                if (show) visible++;
+                const matchSearch = card.dataset.name.includes(search);
+                return matchCat && matchSearch;
             });
 
-            resultsCount.textContent = `${visible} product${visible !== 1 ? 's' : ''} available`;
-            noResults.style.display = visible === 0 ? 'block' : 'none';
+            cards.forEach(c => c.style.display = 'none');
+
+            if (sort === 'name-asc') visible.sort((a, b) => a.dataset.name.localeCompare(b.dataset.name));
+            else if (sort === 'name-desc') visible.sort((a, b) => b.dataset.name.localeCompare(a.dataset.name));
+            else if (sort === 'price-asc') visible.sort((a, b) => parseFloat(a.dataset.price) - parseFloat(b.dataset.price));
+            else if (sort === 'price-desc') visible.sort((a, b) => parseFloat(b.dataset.price) - parseFloat(a.dataset.price));
+
+            visible.forEach(c => {
+                c.style.display = 'flex';
+                grid.appendChild(c);
+            });
+
+            resultsInfo.textContent = `${visible.length} product${visible.length !== 1 ? 's' : ''}`;
+            noResults.style.display = visible.length === 0 ? 'block' : 'none';
         }
 
-        catBtns.forEach(btn => {
-            btn.addEventListener('click', () => {
-                catBtns.forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                filterProducts();
+        catLinks.forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                catLinks.forEach(l => l.classList.remove('active'));
+                link.classList.add('active');
+                activeCat = link.dataset.cat;
+                filterAndSort();
             });
         });
 
-        searchInput.addEventListener('input', filterProducts);
+        searchInput.addEventListener('input', filterAndSort);
+        sortSelect.addEventListener('change', filterAndSort);
     </script>
 </body>
 </html>

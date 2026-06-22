@@ -190,5 +190,12 @@ def submit_review(request, slug):
 
 def shop(request):
     from .models import Product
-    products = Product.objects.filter(is_available=True).order_by('category', 'name')
-    return render(request, 'shop.html', {'products': products})
+    products = Product.objects.all().order_by('category', 'name')
+    return render(request, 'shop.html', {
+        'products': products,
+        'fruits_count': products.filter(category='fruits').count(),
+        'vegetables_count': products.filter(category='vegetables').count(),
+        'honey_count': products.filter(category='honey').count(),
+        'animals_count': products.filter(category='animals').count(),
+        'pickles_count': products.filter(category='pickles').count(),
+    })
