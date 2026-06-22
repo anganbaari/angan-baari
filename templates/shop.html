@@ -1,0 +1,497 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shop — Angan Baari | आँगन बारी</title>
+    <meta name="description" content="Browse fresh organic products from Angan Baari — honey, fruits, vegetables, animals and pickles from our farm in Bhulka Danda, Rupandehi, Nepal.">
+    <link rel="shortcut icon" href="{% static 'favicon.ico' %}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,400&family=DM+Sans:wght@300;400;500;600&family=Cinzel:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
+    <link rel="stylesheet" href="{% static 'style.css' %}">
+    <style>
+        /* ── Page Layout ── */
+        .shop-page {
+            max-width: 1200px;
+            margin: 100px auto 80px;
+            padding: 0 5vw;
+        }
+
+        /* ── Breadcrumb ── */
+        .breadcrumb {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.82rem;
+            color: var(--text-muted);
+            margin-bottom: 40px;
+        }
+        .breadcrumb a { color: var(--moss); }
+        .breadcrumb a:hover { text-decoration: underline; }
+
+        /* ── Page Header ── */
+        .shop-header {
+            text-align: center;
+            margin-bottom: 48px;
+        }
+        .shop-eyebrow {
+            font-family: var(--font-accent);
+            font-size: 0.72rem;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            color: var(--moss);
+            margin-bottom: 12px;
+            display: block;
+        }
+        .shop-title {
+            font-family: var(--font-display);
+            font-size: clamp(2.2rem, 5vw, 3.5rem);
+            font-weight: 600;
+            color: var(--forest);
+            line-height: 1.15;
+            margin-bottom: 16px;
+        }
+        .shop-subtitle {
+            font-size: 1rem;
+            color: var(--text-muted);
+            max-width: 500px;
+            margin: 0 auto;
+        }
+
+        /* ── Search Bar ── */
+        .shop-search-wrap {
+            max-width: 520px;
+            margin: 0 auto 40px;
+            position: relative;
+        }
+        .shop-search {
+            width: 100%;
+            padding: 14px 24px 14px 50px;
+            border: 1.5px solid var(--mist);
+            border-radius: 50px;
+            font-size: 0.95rem;
+            font-family: var(--font-body);
+            background: var(--white);
+            color: var(--forest);
+            outline: none;
+            transition: border-color 0.3s ease;
+            box-shadow: 0 4px 20px rgba(26,47,30,0.06);
+        }
+        .shop-search:focus { border-color: var(--moss); }
+        .shop-search-icon {
+            position: absolute;
+            left: 18px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        /* ── Category Filter ── */
+        .category-filters {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-bottom: 48px;
+        }
+        .cat-btn {
+            padding: 8px 20px;
+            border-radius: 50px;
+            border: 1.5px solid var(--mist);
+            background: var(--white);
+            color: var(--text-body);
+            font-size: 0.85rem;
+            font-family: var(--font-body);
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .cat-btn:hover, .cat-btn.active {
+            background: var(--forest);
+            color: var(--white);
+            border-color: var(--forest);
+        }
+
+        /* ── Results Count ── */
+        .results-count {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-bottom: 24px;
+        }
+
+        /* ── Product Grid ── */
+        .shop-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 28px;
+        }
+
+        /* ── Product Card ── */
+        .shop-card {
+            background: var(--white);
+            border-radius: var(--radius-card);
+            overflow: hidden;
+            box-shadow: var(--shadow-card);
+            transition: all 0.35s var(--ease-smooth);
+            display: flex;
+            flex-direction: column;
+        }
+        .shop-card:hover {
+            transform: translateY(-6px);
+            box-shadow: var(--shadow-hover);
+        }
+        .shop-card-img {
+            position: relative;
+            height: 220px;
+            overflow: hidden;
+            background: var(--forest);
+        }
+        .shop-card-img img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.5s ease;
+        }
+        .shop-card:hover .shop-card-img img { transform: scale(1.07); }
+        .card-category-badge {
+            position: absolute;
+            top: 14px;
+            left: 14px;
+            background: rgba(26,47,30,0.75);
+            color: var(--white);
+            font-size: 0.65rem;
+            font-family: var(--font-accent);
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            padding: 4px 12px;
+            border-radius: 50px;
+            backdrop-filter: blur(4px);
+        }
+        .card-unavailable-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(0,0,0,0.45);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .card-unavailable-label {
+            background: rgba(180,50,50,0.9);
+            color: white;
+            font-size: 0.75rem;
+            font-family: var(--font-accent);
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            padding: 6px 16px;
+            border-radius: 50px;
+        }
+        .shop-card-body {
+            padding: 20px 22px 22px;
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+        }
+        .card-name {
+            font-family: var(--font-display);
+            font-size: 1.35rem;
+            font-weight: 600;
+            color: var(--forest);
+            margin-bottom: 8px;
+            line-height: 1.2;
+        }
+        .card-desc {
+            font-size: 0.88rem;
+            color: var(--text-muted);
+            line-height: 1.6;
+            margin-bottom: 16px;
+            flex: 1;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        .card-price {
+            font-family: var(--font-display);
+            font-size: 1.4rem;
+            font-weight: 600;
+            color: var(--moss);
+            margin-bottom: 16px;
+        }
+        .card-price span {
+            font-size: 0.8rem;
+            font-family: var(--font-body);
+            color: var(--text-muted);
+            font-weight: 400;
+        }
+        .card-price-tbd {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            font-style: italic;
+            margin-bottom: 16px;
+        }
+        .card-actions {
+            display: flex;
+            gap: 8px;
+        }
+        .btn-card-detail {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 11px;
+            border-radius: 50px;
+            border: 1.5px solid var(--moss);
+            color: var(--moss);
+            font-size: 0.85rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            text-decoration: none;
+        }
+        .btn-card-detail:hover {
+            background: var(--moss);
+            color: white;
+        }
+        .btn-card-order {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 11px;
+            border-radius: 50px;
+            background: var(--forest);
+            color: white;
+            font-size: 0.85rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            border: none;
+            cursor: pointer;
+        }
+        .btn-card-order:hover {
+            background: var(--moss);
+            transform: translateY(-2px);
+        }
+        .btn-card-order.disabled {
+            background: var(--text-muted);
+            cursor: not-allowed;
+            pointer-events: none;
+        }
+
+        /* ── No Results ── */
+        .no-results {
+            text-align: center;
+            padding: 80px 20px;
+            display: none;
+        }
+        .no-results i {
+            font-size: 3rem;
+            color: var(--sage-light);
+            margin-bottom: 16px;
+        }
+        .no-results p {
+            color: var(--text-muted);
+            font-size: 1rem;
+        }
+
+        /* ── Responsive ── */
+        @media (max-width: 600px) {
+            .shop-grid { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 18px; }
+            .category-filters { gap: 8px; }
+            .cat-btn { font-size: 0.8rem; padding: 7px 16px; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Navbar -->
+    <header class="navbar" id="navbar">
+        <div class="navbar-inner">
+            <a href="/" class="brand" aria-label="Angan Baari Home">
+                <span class="brand-icon"><i class="fas fa-seedling"></i></span>
+                <div class="brand-text">
+                    <span class="brand-name">आँगन बारी</span>
+                    <span class="brand-tagline">Angan Baari</span>
+                </div>
+            </a>
+            <nav class="desktop-nav">
+                <div class="nav-links">
+                    <a href="/#about">About</a>
+                    <a href="/#products">Produce</a>
+                    <a href="{% url 'shop' %}" style="color:var(--gold);">Shop</a>
+                    <a href="/#contact">Contact</a>
+                    <a href="/#delivery" class="nav-cta">Order Now</a>
+                </div>
+            </nav>
+            <button class="hamburger" id="mobile-menu" aria-label="Open menu" aria-expanded="false">
+                <span class="ham-line ham-top"></span>
+                <span class="ham-line ham-mid"></span>
+                <span class="ham-line ham-bot"></span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Shop Page -->
+    <div class="shop-page">
+
+        <!-- Breadcrumb -->
+        <div class="breadcrumb">
+            <a href="/"><i class="fas fa-home"></i> Home</a>
+            <i class="fas fa-chevron-right" style="font-size:0.65rem;"></i>
+            <span>Shop</span>
+        </div>
+
+        <!-- Header -->
+        <div class="shop-header">
+            <span class="shop-eyebrow">Farm Fresh · Organic</span>
+            <h1 class="shop-title">Our <em>Online Shop</em></h1>
+            <p class="shop-subtitle">Fresh produce straight from our farm in Bhulka Danda, Rupandehi, Nepal 🌿</p>
+        </div>
+
+        <!-- Search -->
+        <div class="shop-search-wrap">
+            <i class="fas fa-search shop-search-icon"></i>
+            <input type="text" class="shop-search" id="shopSearch" placeholder="Search products...">
+        </div>
+
+        <!-- Category Filters -->
+        <div class="category-filters">
+            <button class="cat-btn active" data-cat="all">All Products</button>
+            <button class="cat-btn" data-cat="fruits"><i class="fas fa-apple-alt"></i> Fruits</button>
+            <button class="cat-btn" data-cat="vegetables"><i class="fas fa-carrot"></i> Vegetables</button>
+            <button class="cat-btn" data-cat="honey"><i class="fas fa-jar"></i> Honey</button>
+            <button class="cat-btn" data-cat="animals"><i class="fas fa-paw"></i> Animals</button>
+            <button class="cat-btn" data-cat="pickles"><i class="fas fa-pepper-hot"></i> Pickles</button>
+        </div>
+
+        <!-- Results Count -->
+        <p class="results-count" id="resultsCount">{{ products|length }} product{{ products|length|pluralize }} available</p>
+
+        <!-- Product Grid -->
+        <div class="shop-grid" id="shopGrid">
+            {% for product in products %}
+            <div class="shop-card" data-cat="{{ product.category }}" data-name="{{ product.name|lower }}">
+                <div class="shop-card-img">
+                    {% if product.main_image %}
+                    <img src="{% static product.main_image %}" alt="{{ product.name }}" loading="lazy">
+                    {% else %}
+                    <img src="{% static 'images/placeholder.jpg' %}" alt="{{ product.name }}" loading="lazy">
+                    {% endif %}
+                    <span class="card-category-badge">{{ product.get_category_display }}</span>
+                    {% if not product.is_available %}
+                    <div class="card-unavailable-overlay">
+                        <span class="card-unavailable-label">Out of Season</span>
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="shop-card-body">
+                    <h2 class="card-name">{{ product.name }}</h2>
+                    <p class="card-desc">{{ product.description }}</p>
+                    {% if product.price and product.price > 0 %}
+                    <div class="card-price">
+                        Rs. {{ product.price }} <span>{{ product.price_unit }}</span>
+                    </div>
+                    {% else %}
+                    <p class="card-price-tbd">Price on request</p>
+                    {% endif %}
+                    <div class="card-actions">
+                        <a href="{% url 'product_detail' product.slug %}" class="btn-card-detail">
+                            <i class="fas fa-eye"></i> Details
+                        </a>
+                        {% if product.is_available %}
+                        <a href="/#delivery?product={{ product.name }}" class="btn-card-order">
+                            <i class="fas fa-leaf"></i> Order
+                        </a>
+                        {% else %}
+                        <button class="btn-card-order disabled">
+                            <i class="fas fa-clock"></i> Unavailable
+                        </button>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% empty %}
+            <div style="grid-column:1/-1;text-align:center;padding:80px 0;color:var(--text-muted);">
+                <i class="fas fa-seedling" style="font-size:3rem;margin-bottom:16px;display:block;color:var(--sage-light);"></i>
+                <p>No products available right now. Check back soon!</p>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- No Results Message -->
+        <div class="no-results" id="noResults">
+            <i class="fas fa-search"></i>
+            <p>No products found for your search.</p>
+        </div>
+
+    </div>
+
+    <!-- Floating WhatsApp -->
+    <a href="https://wa.me/9779821025084?text=Hello%20Angan%20Baari!%20I%20would%20like%20to%20enquire%20about%20your%20products."
+       class="float-wa" target="_blank" rel="noopener noreferrer" aria-label="Chat on WhatsApp">
+        <i class="fab fa-whatsapp"></i>
+        <span class="float-wa-tooltip">Order via WhatsApp</span>
+    </a>
+
+    <!-- Footer -->
+    <footer class="site-footer">
+        <div class="footer-inner">
+            <div class="footer-brand">
+                <span class="footer-icon"><i class="fas fa-seedling"></i></span>
+                <p class="footer-name">आँगन बारी (Angan Baari)</p>
+                <p class="footer-tagline">Fresh &middot; Organic &middot; Sustainable</p>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; Since 2015. आँगन बारी/Angan Baari &mdash; Bhulka Danda, Rupandehi, Nepal</p>
+                <p class="footer-nepal">JAY NEPAL 🇳🇵</p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Navbar scroll effect
+        const navbar = document.getElementById('navbar');
+        window.addEventListener('scroll', () => {
+            navbar.classList.toggle('scrolled', window.scrollY > 50);
+        });
+
+        // Category filter
+        const catBtns = document.querySelectorAll('.cat-btn');
+        const cards = document.querySelectorAll('.shop-card');
+        const resultsCount = document.getElementById('resultsCount');
+        const noResults = document.getElementById('noResults');
+        const searchInput = document.getElementById('shopSearch');
+
+        function filterProducts() {
+            const activeCat = document.querySelector('.cat-btn.active').dataset.cat;
+            const searchTerm = searchInput.value.toLowerCase().trim();
+            let visible = 0;
+
+            cards.forEach(card => {
+                const matchCat = activeCat === 'all' || card.dataset.cat === activeCat;
+                const matchSearch = card.dataset.name.includes(searchTerm);
+                const show = matchCat && matchSearch;
+                card.style.display = show ? 'flex' : 'none';
+                if (show) visible++;
+            });
+
+            resultsCount.textContent = `${visible} product${visible !== 1 ? 's' : ''} available`;
+            noResults.style.display = visible === 0 ? 'block' : 'none';
+        }
+
+        catBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                catBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                filterProducts();
+            });
+        });
+
+        searchInput.addEventListener('input', filterProducts);
+    </script>
+</body>
+</html>

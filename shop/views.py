@@ -187,3 +187,8 @@ def submit_review(request, slug):
             )
             return redirect(product.get_absolute_url() + '?reviewed=1')
     return redirect(product.get_absolute_url())
+
+def shop(request):
+    from .models import Product
+    products = Product.objects.filter(is_available=True).order_by('category', 'name')
+    return render(request, 'shop.html', {'products': products})

@@ -16,6 +16,8 @@ class Product(models.Model):
     detail_description = models.TextField(blank=True)
     season = models.CharField(max_length=100, blank=True)
     farming_method = models.CharField(max_length=200, blank=True)
+    price = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    price_unit = models.CharField(max_length=50, blank=True, default='per kg')
     is_available = models.BooleanField(default=True)
     main_image = models.CharField(max_length=200, blank=True)
     image2 = models.CharField(max_length=200, blank=True)
