@@ -135,3 +135,5 @@ SITE_ID = 1
 # Telegram notifications
 TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
 TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
+#resend api key
+RESEND_API_KEY = os.getenv('RESEND_API_KEY')

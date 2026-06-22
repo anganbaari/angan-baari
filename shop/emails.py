@@ -1,5 +1,4 @@
 import requests
-from django.core.mail import send_mail
 from django.conf import settings
 
 
@@ -15,7 +14,28 @@ def send_telegram(message):
             'parse_mode': 'HTML',
         }, timeout=5)
     except Exception:
-        pass  # Never crash the site if Telegram fails
+        pass
+
+
+def send_resend_email(to, subject, body):
+    """Send an email via Resend API."""
+    try:
+        requests.post(
+            'https://api.resend.com/emails',
+            headers={
+                'Authorization': f'Bearer {settings.RESEND_API_KEY}',
+                'Content-Type': 'application/json',
+            },
+            json={
+                'from': 'Angan Baari <orders@anganbaari.com>',
+                'to': [to],
+                'subject': subject,
+                'text': body,
+            },
+            timeout=10,
+        )
+    except Exception:
+        pass
 
 
 def send_order_received_email(order):
@@ -37,10 +57,11 @@ Message   : {order.message or 'None'}
 🔗 Admin: https://anganbaari.pythonanywhere.com/admin/shop/productorder/""")
 
     # Email to customer
-    send_mail(
-        subject='✅ Order Received — Angan Baari | आँगन बारी',
-        message=f'''
-नमस्ते {order.name}! 🌿
+    if order.email:
+        send_resend_email(
+            to=order.email,
+            subject='✅ Order Received — Angan Baari | आँगन बारी',
+            body=f'''नमस्ते {order.name}! 🌿
 
 Thank you for ordering from Angan Baari (आँगन बारी)!
 
@@ -64,18 +85,14 @@ https://wa.me/9779821025084
 
 With love,
 Angan Baari Team 🌱
-Bhulka Danda, Rupandehi, Nepal
-        ''',
-        from_email=settings.DEFAULT_FROM_EMAIL,
-        recipient_list=[order.email],
-        fail_silently=True,
-    )
+Bhulka Danda, Rupandehi, Nepal'''
+        )
 
     # Email to admin
-    send_mail(
+    send_resend_email(
+        to='anganbaari@gmail.com',
         subject=f'🆕 New Order from {order.name} — Angan Baari',
-        message=f'''
-New order received!
+        body=f'''New order received!
 
 ━━━━━━━━━━━━━━━━━━━━━━
 📦 ORDER DETAILS
@@ -91,16 +108,11 @@ Ordered at: {order.ordered_at}
 ━━━━━━━━━━━━━━━━━━━━━━
 
 Go to admin panel to confirm:
-https://anganbaari.pythonanywhere.com/admin/shop/productorder/
-        ''',
-        from_email=settings.DEFAULT_FROM_EMAIL,
-        recipient_list=[settings.ADMIN_EMAIL],
-        fail_silently=True,
+https://anganbaari.pythonanywhere.com/admin/shop/productorder/'''
     )
 
 
 def send_order_confirmed_email(order):
-    # Telegram notification to admin
     send_telegram(f"""✅ <b>Order Confirmed!</b>
 
 Order No  : <b>{order.order_number}</b>
@@ -108,10 +120,11 @@ Customer  : {order.name}
 Phone     : {order.phone}
 Product   : {order.product_interest}""")
 
-    send_mail(
-        subject='🎉 Order Confirmed — Angan Baari | आँगन बारी',
-        message=f'''
-नमस्ते {order.name}! 🌿
+    if order.email:
+        send_resend_email(
+            to=order.email,
+            subject='🎉 Order Confirmed — Angan Baari | आँगन बारी',
+            body=f'''नमस्ते {order.name}! 🌿
 
 Great news! Your order has been CONFIRMED and is on the way!
 
@@ -131,16 +144,11 @@ https://wa.me/9779821025084
 
 With love,
 Angan Baari Team 🌱
-Bhulka Danda, Rupandehi, Nepal
-        ''',
-        from_email=settings.DEFAULT_FROM_EMAIL,
-        recipient_list=[order.email],
-        fail_silently=True,
-    )
+Bhulka Danda, Rupandehi, Nepal'''
+        )
 
 
 def send_order_delivered_email(order):
-    # Telegram notification to admin
     send_telegram(f"""🏡 <b>Order Delivered!</b>
 
 Order No  : <b>{order.order_number}</b>
@@ -149,11 +157,11 @@ Phone     : {order.phone}
 Product   : {order.product_interest}
 Address   : {order.address}""")
 
-    # Email to customer
-    send_mail(
-        subject='🏡 Order Delivered — Angan Baari | आँगन बारी',
-        message=f'''
-नमस्ते {order.name}! 🌿
+    if order.email:
+        send_resend_email(
+            to=order.email,
+            subject='🏡 Order Delivered — Angan Baari | आँगन बारी',
+            body=f'''नमस्ते {order.name}! 🌿
 
 Your order has been DELIVERED!
 
@@ -169,23 +177,18 @@ Status    : 🏡 Delivered!
 Thank you for choosing Angan Baari!
 We hope you enjoy your fresh organic products. 🌱
 
-Please share your feedback via WhatsApp:
-https://wa.me/9779821025084
+Please share your feedback:
+https://anganbaari.pythonanywhere.com
 
 With love,
 Angan Baari Team 🌱
-Bhulka Danda, Rupandehi, Nepal
-        ''',
-        from_email=settings.DEFAULT_FROM_EMAIL,
-        recipient_list=[order.email],
-        fail_silently=True,
-    )
+Bhulka Danda, Rupandehi, Nepal'''
+        )
 
-    # Email to admin
-    send_mail(
+    send_resend_email(
+        to='anganbaari@gmail.com',
         subject=f'✅ Order Delivered to {order.name} — Angan Baari',
-        message=f'''
-Order has been delivered!
+        body=f'''Order has been delivered!
 
 ━━━━━━━━━━━━━━━━━━━━━━
 📦 DELIVERY DETAILS
@@ -198,16 +201,11 @@ Product   : {order.product_interest}
 Address   : {order.address}
 ━━━━━━━━━━━━━━━━━━━━━━
 
-This order is now complete! ✅
-        ''',
-        from_email=settings.DEFAULT_FROM_EMAIL,
-        recipient_list=[settings.ADMIN_EMAIL],
-        fail_silently=True,
+This order is now complete! ✅'''
     )
 
 
 def send_order_cancelled_email(order):
-    # Telegram notification to admin
     send_telegram(f"""❌ <b>Order Cancelled!</b>
 
 Order No  : <b>{order.order_number}</b>
@@ -215,11 +213,11 @@ Customer  : {order.name}
 Phone     : {order.phone}
 Product   : {order.product_interest}""")
 
-    # Email to customer
-    send_mail(
-        subject='❌ Order Cancelled — Angan Baari | आँगन बारी',
-        message=f'''
-नमस्ते {order.name}! 🌿
+    if order.email:
+        send_resend_email(
+            to=order.email,
+            subject='❌ Order Cancelled — Angan Baari | आँगन बारी',
+            body=f'''नमस्ते {order.name}! 🌿
 
 Your order has been CANCELLED successfully.
 
@@ -239,18 +237,13 @@ https://wa.me/9779821025084
 
 With love,
 Angan Baari Team 🌱
-Bhulka Danda, Rupandehi, Nepal
-        ''',
-        from_email=settings.DEFAULT_FROM_EMAIL,
-        recipient_list=[order.email],
-        fail_silently=True,
-    )
+Bhulka Danda, Rupandehi, Nepal'''
+        )
 
-    # Email to admin
-    send_mail(
+    send_resend_email(
+        to='anganbaari@gmail.com',
         subject=f'❌ Order Cancelled by {order.name} — Angan Baari',
-        message=f'''
-Order has been cancelled by customer!
+        body=f'''Order has been cancelled by customer!
 
 ━━━━━━━━━━━━━━━━━━━━━━
 ❌ CANCELLED ORDER
@@ -260,9 +253,5 @@ Customer  : {order.name}
 Email     : {order.email}
 Phone     : {order.phone}
 Product   : {order.product_interest}
-━━━━━━━━━━━━━━━━━━━━━━
-        ''',
-        from_email=settings.DEFAULT_FROM_EMAIL,
-        recipient_list=[settings.ADMIN_EMAIL],
-        fail_silently=True,
+━━━━━━━━━━━━━━━━━━━━━━'''
     )
