@@ -328,6 +328,15 @@
         .no-results i { font-size: 2.5rem; color: var(--sage-light); margin-bottom: 12px; display: block; }
         .no-results p { color: var(--text-muted); font-size: 0.9rem; }
 
+
+        /* Accordion sidebar */
+        .cat-sub { list-style:none; padding:0 0 0 14px; margin:4px 0 0; }
+        .cat-l2 > a { font-size:0.83rem; padding:6px 8px; }
+        .cat-l3 > a { font-size:0.78rem; padding:5px 8px; color:var(--text-muted); }
+        .cat-l3 > a:hover, .cat-l3 > a.active { color:var(--moss); background:rgba(74,124,89,0.08); }
+        .cat-arrow { margin-left:auto; font-size:0.6rem; transition:transform 0.25s ease; }
+        .cat-arrow.open { transform:rotate(90deg); }
+        .cat-toggle { cursor:pointer; }
         /* ── Mobile ── */
         @media (max-width: 768px) {
             .shop-wrapper { flex-direction: column; margin-top: 80px; }
@@ -381,6 +390,7 @@
             <div class="sidebar-box">
                 <span class="sidebar-title">Categories</span>
                 <ul class="cat-list" id="catList">
+                    <!-- All Products -->
                     <li>
                         <a class="{% if not selected_category %}active{% endif %}" href="{% url 'shop' %}">
                             <i class="fas fa-th-large" style="color:var(--moss);width:14px;"></i>
@@ -388,25 +398,45 @@
                             <span class="cat-count">{{ total_count }}</span>
                         </a>
                     </li>
-                    {% for cat in main_categories %}
-                    <li>
-                        <a class="{% if selected_category.id == cat.id %}active{% endif %}"
-                           href="{% url 'shop' %}?cat={{ cat.id }}">
-                            <i class="fas {{ cat.icon }}" style="width:14px;"></i>
-                            {{ cat.name }}
-                            <span class="cat-count">{{ cat.products.count }}</span>
+                    <!-- Level 1 Categories -->
+                    {% for cat in cat_tree %}
+                    <li class="cat-l1">
+                        <a class="cat-toggle {% if selected_category.id == cat.obj.id %}active{% endif %}"
+                           href="{% url 'shop' %}?cat={{ cat.obj.id }}"
+                           data-toggle="l1-{{ cat.obj.id }}">
+                            <i class="fas {{ cat.obj.icon }}" style="width:14px;"></i>
+                            {{ cat.obj.name }}
+                            <span class="cat-count">{{ cat.count }}</span>
+                            {% if cat.children %}<i class="fas fa-chevron-right cat-arrow" id="arrow-l1-{{ cat.obj.id }}"></i>{% endif %}
                         </a>
-                        {% if cat.subcategories.exists %}
-                        <ul style="list-style:none;padding:0 0 0 18px;margin:4px 0 0;">
-                            {% for sub in cat.subcategories.all %}
-                            <li>
-                                <a class="{% if selected_category.id == sub.id %}active{% endif %}"
-                                   href="{% url 'shop' %}?cat={{ sub.id }}"
-                                   style="font-size:0.82rem;padding:5px 8px;">
-                                    <i class="fas fa-circle" style="font-size:0.4rem;width:14px;vertical-align:middle;"></i>
-                                    {{ sub.name }}
-                                    <span class="cat-count">{{ sub.products.count }}</span>
+                        {% if cat.children %}
+                        <ul class="cat-sub" id="l1-{{ cat.obj.id }}"
+                            style="{% if selected_category and selected_category.id == cat.obj.id or selected_category.parent.id == cat.obj.id or selected_category.parent.parent.id == cat.obj.id %}display:block{% else %}display:none{% endif %}">
+                            {% for sub in cat.children %}
+                            <li class="cat-l2">
+                                <a class="cat-toggle {% if selected_category.id == sub.obj.id %}active{% endif %}"
+                                   href="{% url 'shop' %}?cat={{ sub.obj.id }}"
+                                   data-toggle="l2-{{ sub.obj.id }}">
+                                    <i class="fas fa-leaf" style="width:12px;font-size:0.7rem;"></i>
+                                    {{ sub.obj.name }}
+                                    <span class="cat-count">{{ sub.count }}</span>
+                                    {% if sub.children %}<i class="fas fa-chevron-right cat-arrow" id="arrow-l2-{{ sub.obj.id }}"></i>{% endif %}
                                 </a>
+                                {% if sub.children %}
+                                <ul class="cat-sub" id="l2-{{ sub.obj.id }}"
+                                    style="{% if selected_category.id == sub.obj.id or selected_category.parent.id == sub.obj.id %}display:block{% else %}display:none{% endif %}">
+                                    {% for subsub in sub.children %}
+                                    <li class="cat-l3">
+                                        <a class="{% if selected_category.id == subsub.obj.id %}active{% endif %}"
+                                           href="{% url 'shop' %}?cat={{ subsub.obj.id }}">
+                                            <i class="fas fa-circle" style="width:10px;font-size:0.35rem;vertical-align:middle;"></i>
+                                            {{ subsub.obj.name }}
+                                            <span class="cat-count">{{ subsub.count }}</span>
+                                        </a>
+                                    </li>
+                                    {% endfor %}
+                                </ul>
+                                {% endif %}
                             </li>
                             {% endfor %}
                         </ul>
@@ -455,7 +485,7 @@
             <div class="product-grid" id="productGrid">
                 {% for product in products %}
                 <div class="p-card"
-                     data-cat="{{ product.category.id }}"
+                     data-cat="{{ product.category }}"
                      data-name="{{ product.name|lower }}"
                      data-price="{{ product.price|default:0 }}"
                      onclick="window.location='{% url 'product_detail' product.slug %}'">
@@ -467,7 +497,7 @@
                             <i class="fas fa-seedling" style="font-size:2rem;color:var(--sage);"></i>
                         </div>
                         {% endif %}
-                        <span class="p-cat-tag">{{ product.category.name }}</span>
+                        <span class="p-cat-tag">{{ product.get_category_display }}</span>
                         {% if not product.is_available %}
                         <span class="p-unavailable-badge">Out of Season</span>
                         {% endif %}
@@ -575,7 +605,15 @@
             noResults.style.display = visible.length === 0 ? 'block' : 'none';
         }
 
-        // Category filtering is handled server-side via URL
+        catLinks.forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                catLinks.forEach(l => l.classList.remove('active'));
+                link.classList.add('active');
+                activeCat = link.dataset.cat;
+                filterAndSort();
+            });
+        });
 
         searchInput.addEventListener('input', filterAndSort);
         sortSelect.addEventListener('change', filterAndSort);

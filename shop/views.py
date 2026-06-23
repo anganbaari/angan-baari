@@ -190,29 +190,66 @@ def submit_review(request, slug):
 
 def shop(request):
     from .models import Product, Category
-    
-    # Get all main categories with their subcategories
-    main_categories = Category.objects.filter(parent=None).prefetch_related('subcategories')
-    
-    # Get selected category from URL
+
+    # Get level 1 categories (no parent)
+    main_categories = Category.objects.filter(parent=None).prefetch_related(
+        'subcategories__subcategories',
+        'subcategories__products',
+        'subcategories__subcategories__products',
+    )
+
+    # Get selected category
     cat_id = request.GET.get('cat')
     selected_category = None
-    
     products = Product.objects.all().order_by('name')
-    
+
     if cat_id:
         try:
             selected_category = Category.objects.get(id=cat_id)
-            # Include products from subcategories too
-            sub_ids = list(selected_category.subcategories.values_list('id', flat=True))
-            cat_ids = [selected_category.id] + sub_ids
+            # Collect all descendant category IDs (level 2 + level 3)
+            cat_ids = [selected_category.id]
+            for sub in selected_category.subcategories.all():
+                cat_ids.append(sub.id)
+                for subsub in sub.subcategories.all():
+                    cat_ids.append(subsub.id)
             products = products.filter(category__id__in=cat_ids)
         except Category.DoesNotExist:
             pass
 
+    # Build category tree with counts for template
+    def get_total_count(cat):
+        """Count products in this category + all descendants"""
+        ids = [cat.id]
+        for sub in cat.subcategories.all():
+            ids.append(sub.id)
+            for subsub in sub.subcategories.all():
+                ids.append(subsub.id)
+        return Product.objects.filter(category__id__in=ids).count()
+
+    cat_tree = []
+    for cat in main_categories:
+        subs = []
+        for sub in cat.subcategories.all():
+            subsubs = []
+            for subsub in sub.subcategories.all():
+                subsubs.append({
+                    'obj': subsub,
+                    'count': subsub.products.count(),
+                })
+            subs.append({
+                'obj': sub,
+                'count': get_total_count(sub),
+                'children': subsubs,
+            })
+        cat_tree.append({
+            'obj': cat,
+            'count': get_total_count(cat),
+            'children': subs,
+        })
+
     return render(request, 'shop.html', {
         'products': products,
-        'main_categories': main_categories,
+        'cat_tree': cat_tree,
         'selected_category': selected_category,
         'total_count': Product.objects.count(),
     })
