@@ -191,12 +191,17 @@ def submit_review(request, slug):
 def shop(request):
     from .models import Product, Category
 
-    # Get level 1 categories (no parent)
-    main_categories = Category.objects.filter(parent=None).prefetch_related(
-        'subcategories__subcategories',
-        'subcategories__products',
-        'subcategories__subcategories__products',
-    )
+    def get_all_ids(cat):
+        """Get category ID + all descendant IDs"""
+        ids = [cat.id]
+        for sub in cat.subcategories.all():
+            ids.append(sub.id)
+            for subsub in sub.subcategories.all():
+                ids.append(subsub.id)
+        return ids
+
+    def get_count(cat):
+        return Product.objects.filter(category__id__in=get_all_ids(cat)).count()
 
     # Get selected category
     cat_id = request.GET.get('cat')
@@ -206,46 +211,23 @@ def shop(request):
     if cat_id:
         try:
             selected_category = Category.objects.get(id=cat_id)
-            # Collect all descendant category IDs (level 2 + level 3)
-            cat_ids = [selected_category.id]
-            for sub in selected_category.subcategories.all():
-                cat_ids.append(sub.id)
-                for subsub in sub.subcategories.all():
-                    cat_ids.append(subsub.id)
-            products = products.filter(category__id__in=cat_ids)
+            products = products.filter(category__id__in=get_all_ids(selected_category))
         except Category.DoesNotExist:
             pass
 
-    # Build category tree with counts for template
-    def get_total_count(cat):
-        """Count products in this category + all descendants"""
-        ids = [cat.id]
-        for sub in cat.subcategories.all():
-            ids.append(sub.id)
-            for subsub in sub.subcategories.all():
-                ids.append(subsub.id)
-        return Product.objects.filter(category__id__in=ids).count()
+    # Build 3-level tree
+    main_categories = Category.objects.filter(parent=None).prefetch_related(
+        'subcategories__subcategories'
+    )
 
     cat_tree = []
     for cat in main_categories:
         subs = []
         for sub in cat.subcategories.all():
-            subsubs = []
-            for subsub in sub.subcategories.all():
-                subsubs.append({
-                    'obj': subsub,
-                    'count': subsub.products.count(),
-                })
-            subs.append({
-                'obj': sub,
-                'count': get_total_count(sub),
-                'children': subsubs,
-            })
-        cat_tree.append({
-            'obj': cat,
-            'count': get_total_count(cat),
-            'children': subs,
-        })
+            subsubs = [{'obj': ss, 'count': ss.products.count()} 
+                       for ss in sub.subcategories.all()]
+            subs.append({'obj': sub, 'count': get_count(sub), 'children': subsubs})
+        cat_tree.append({'obj': cat, 'count': get_count(cat), 'children': subs})
 
     return render(request, 'shop.html', {
         'products': products,
