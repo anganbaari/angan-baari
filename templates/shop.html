@@ -381,12 +381,38 @@
             <div class="sidebar-box">
                 <span class="sidebar-title">Categories</span>
                 <ul class="cat-list" id="catList">
-                    <li><a class="active" data-cat="all"><i class="fas fa-th-large" style="color:var(--moss);width:14px;"></i> All Products <span class="cat-count" id="count-all">{{ products|length }}</span></a></li>
-                    <li><a data-cat="fruits"><i class="fas fa-apple-alt" style="color:#e74c3c;width:14px;"></i> Fruits <span class="cat-count" id="count-fruits">{{ fruits_count }}</span></a></li>
-                    <li><a data-cat="vegetables"><i class="fas fa-carrot" style="color:#e67e22;width:14px;"></i> Vegetables <span class="cat-count" id="count-vegetables">{{ vegetables_count }}</span></a></li>
-                    <li><a data-cat="honey"><i class="fas fa-jar" style="color:#f39c12;width:14px;"></i> Honey <span class="cat-count" id="count-honey">{{ honey_count }}</span></a></li>
-                    <li><a data-cat="animals"><i class="fas fa-paw" style="color:var(--moss);width:14px;"></i> Animals <span class="cat-count" id="count-animals">{{ animals_count }}</span></a></li>
-                    <li><a data-cat="pickles"><i class="fas fa-pepper-hot" style="color:#c0392b;width:14px;"></i> Pickles <span class="cat-count" id="count-pickles">{{ pickles_count }}</span></a></li>
+                    <li>
+                        <a class="{% if not selected_category %}active{% endif %}" href="{% url 'shop' %}">
+                            <i class="fas fa-th-large" style="color:var(--moss);width:14px;"></i>
+                            All Products
+                            <span class="cat-count">{{ total_count }}</span>
+                        </a>
+                    </li>
+                    {% for cat in main_categories %}
+                    <li>
+                        <a class="{% if selected_category.id == cat.id %}active{% endif %}"
+                           href="{% url 'shop' %}?cat={{ cat.id }}">
+                            <i class="fas {{ cat.icon }}" style="width:14px;"></i>
+                            {{ cat.name }}
+                            <span class="cat-count">{{ cat.products.count }}</span>
+                        </a>
+                        {% if cat.subcategories.exists %}
+                        <ul style="list-style:none;padding:0 0 0 18px;margin:4px 0 0;">
+                            {% for sub in cat.subcategories.all %}
+                            <li>
+                                <a class="{% if selected_category.id == sub.id %}active{% endif %}"
+                                   href="{% url 'shop' %}?cat={{ sub.id }}"
+                                   style="font-size:0.82rem;padding:5px 8px;">
+                                    <i class="fas fa-circle" style="font-size:0.4rem;width:14px;vertical-align:middle;"></i>
+                                    {{ sub.name }}
+                                    <span class="cat-count">{{ sub.products.count }}</span>
+                                </a>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                        {% endif %}
+                    </li>
+                    {% endfor %}
                 </ul>
             </div>
             <div class="sidebar-box">
@@ -429,7 +455,7 @@
             <div class="product-grid" id="productGrid">
                 {% for product in products %}
                 <div class="p-card"
-                     data-cat="{{ product.category }}"
+                     data-cat="{{ product.category.id }}"
                      data-name="{{ product.name|lower }}"
                      data-price="{{ product.price|default:0 }}"
                      onclick="window.location='{% url 'product_detail' product.slug %}'">
@@ -441,7 +467,7 @@
                             <i class="fas fa-seedling" style="font-size:2rem;color:var(--sage);"></i>
                         </div>
                         {% endif %}
-                        <span class="p-cat-tag">{{ product.get_category_display }}</span>
+                        <span class="p-cat-tag">{{ product.category.name }}</span>
                         {% if not product.is_available %}
                         <span class="p-unavailable-badge">Out of Season</span>
                         {% endif %}
@@ -549,15 +575,7 @@
             noResults.style.display = visible.length === 0 ? 'block' : 'none';
         }
 
-        catLinks.forEach(link => {
-            link.addEventListener('click', (e) => {
-                e.preventDefault();
-                catLinks.forEach(l => l.classList.remove('active'));
-                link.classList.add('active');
-                activeCat = link.dataset.cat;
-                filterAndSort();
-            });
-        });
+        // Category filtering is handled server-side via URL
 
         searchInput.addEventListener('input', filterAndSort);
         sortSelect.addEventListener('change', filterAndSort);
