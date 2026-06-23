@@ -189,13 +189,30 @@ def submit_review(request, slug):
     return redirect(product.get_absolute_url())
 
 def shop(request):
-    from .models import Product
-    products = Product.objects.all().order_by('category', 'name')
+    from .models import Product, Category
+    
+    # Get all main categories with their subcategories
+    main_categories = Category.objects.filter(parent=None).prefetch_related('subcategories')
+    
+    # Get selected category from URL
+    cat_id = request.GET.get('cat')
+    selected_category = None
+    
+    products = Product.objects.all().order_by('name')
+    
+    if cat_id:
+        try:
+            selected_category = Category.objects.get(id=cat_id)
+            # Include products from subcategories too
+            sub_ids = list(selected_category.subcategories.values_list('id', flat=True))
+            cat_ids = [selected_category.id] + sub_ids
+            products = products.filter(category__id__in=cat_ids)
+        except Category.DoesNotExist:
+            pass
+
     return render(request, 'shop.html', {
         'products': products,
-        'fruits_count': products.filter(category='fruits').count(),
-        'vegetables_count': products.filter(category='vegetables').count(),
-        'honey_count': products.filter(category='honey').count(),
-        'animals_count': products.filter(category='animals').count(),
-        'pickles_count': products.filter(category='pickles').count(),
+        'main_categories': main_categories,
+        'selected_category': selected_category,
+        'total_count': Product.objects.count(),
     })
