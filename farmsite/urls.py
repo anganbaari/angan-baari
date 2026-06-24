@@ -1,27 +1,11 @@
-"""
-URL configuration for farmsite project.
-
-The `urlpatterns` list routes URLs to views. For more information please see:
-    https://docs.djangoproject.com/en/6.0/topics/http/urls/
-Examples:
-Function views
-    1. Add an import:  from my_app import views
-    2. Add a URL to urlpatterns:  path('', views.home, name='home')
-Class-based views
-    1. Add an import:  from other_app.views import Home
-    2. Add a URL to urlpatterns:  path('', Home.as_view(), name='home')
-Including another URLconf
-    1. Import the include() function: from django.urls import include, path
-    2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
-"""
 from django.contrib import admin
 from django.urls import path, include
 from django.contrib.sitemaps.views import sitemap
-from shop.sitemaps import StaticViewSitemap, ProductSitemap 
+from shop.sitemaps import StaticViewSitemap, ProductSitemap
 
 sitemaps = {
     'static': StaticViewSitemap,
-    'products': ProductSitemap,  
+    'products': ProductSitemap,
 }
 
 handler404 = 'shop.views.error_404'
@@ -30,6 +14,7 @@ handler500 = 'shop.views.error_500'
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('shop.urls')),
+    path('account/', include('shop.auth_urls')),
     path('sitemap.xml', sitemap, {'sitemaps': sitemaps},
          name='django.contrib.sitemaps.views.sitemap'),
 ]
