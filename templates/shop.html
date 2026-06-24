@@ -392,6 +392,71 @@
         </div>
     </header>
 
+    <!-- Mobile Drawer Overlay -->
+    <div class="drawer-overlay" id="drawerOverlay"></div>
+
+    <!-- Mobile Drawer -->
+    <div class="drawer" id="mobileDrawer">
+        <div class="drawer-header">
+            <div class="drawer-brand">
+                <i class="fas fa-seedling" style="color:var(--moss);"></i>
+                आँगन बारी
+            </div>
+            <button class="drawer-close" id="drawerClose"><i class="fas fa-times"></i></button>
+        </div>
+
+        <!-- Quick Links -->
+        <div class="drawer-section">
+            <div class="drawer-section-title">Quick Links</div>
+            <a href="/" class="drawer-link">
+                <i class="fas fa-home"></i> Back to Website
+            </a>
+            {% if user.is_authenticated %}
+            <a href="{% url 'profile' %}" class="drawer-link">
+                <i class="fas fa-user"></i> My Profile
+            </a>
+            <a href="{% url 'logout' %}" class="drawer-link">
+                <i class="fas fa-sign-out-alt"></i> Logout
+            </a>
+            {% else %}
+            <a href="{% url 'login' %}" class="drawer-link">
+                <i class="fas fa-sign-in-alt"></i> Login / Sign Up
+            </a>
+            {% endif %}
+            <a href="https://wa.me/9779821025084" class="drawer-link whatsapp" target="_blank">
+                <i class="fab fa-whatsapp"></i> Order via WhatsApp
+            </a>
+        </div>
+
+        <div class="drawer-divider"></div>
+
+        <!-- Categories -->
+        <div class="drawer-section">
+            <div class="drawer-section-title">Categories</div>
+            <a href="{% url 'shop' %}" class="drawer-link {% if not selected_category %}active{% endif %}">
+                <i class="fas fa-th-large"></i> All Products
+                <span class="drawer-cat-count">{{ total_count }}</span>
+            </a>
+            {% for cat in cat_tree %}
+            <a href="{% url 'shop' %}?cat={{ cat.obj.id }}"
+               class="drawer-link {% if selected_category.id == cat.obj.id %}active{% endif %}">
+                <i class="fas {{ cat.obj.icon }}"></i> {{ cat.obj.name }}
+                <span class="drawer-cat-count">{{ cat.count }}</span>
+            </a>
+            {% if cat.children %}
+            {% for sub in cat.children %}
+            <a href="{% url 'shop' %}?cat={{ sub.obj.id }}"
+               class="drawer-link {% if selected_category.id == sub.obj.id %}active{% endif %}"
+               style="padding-left:28px;font-size:0.83rem;opacity:0.85;">
+                <i class="fas fa-leaf" style="font-size:0.7rem;"></i> {{ sub.obj.name }}
+                <span class="drawer-cat-count">{{ sub.count }}</span>
+            </a>
+            {% endfor %}
+            {% endif %}
+            {% endfor %}
+        </div>
+    </div>
+
     <div class="shop-wrapper">
 
         <!-- Sidebar -->
@@ -573,37 +638,111 @@
     </footer>
 
     <style>
-        /* Mobile nav dropdown */
+        /* ── Mobile Drawer ── */
+        .drawer-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.45);
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        .drawer-overlay.open {
+            display: block;
+            opacity: 1;
+        }
+        .drawer {
+            position: fixed;
+            top: 0;
+            right: 0;
+            width: 62%;
+            max-width: 300px;
+            height: 100vh;
+            background: var(--forest);
+            z-index: 1001;
+            transform: translateX(100%);
+            transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+        .drawer.open { transform: translateX(0); }
+        .drawer-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 20px 20px 16px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .drawer-brand {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--cream);
+            font-family: var(--font-display);
+            font-size: 1.1rem;
+        }
+        .drawer-close {
+            background: none;
+            border: none;
+            color: var(--cream);
+            font-size: 1.2rem;
+            cursor: pointer;
+            padding: 4px;
+            opacity: 0.7;
+            transition: opacity 0.2s;
+        }
+        .drawer-close:hover { opacity: 1; }
+        .drawer-section {
+            padding: 16px 20px 8px;
+        }
+        .drawer-section-title {
+            font-size: 0.65rem;
+            font-family: var(--font-accent);
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            color: rgba(255,255,255,0.4);
+            margin-bottom: 8px;
+        }
+        .drawer-link {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            border-radius: 10px;
+            color: var(--cream);
+            font-size: 0.9rem;
+            text-decoration: none;
+            transition: background 0.2s;
+            margin-bottom: 2px;
+        }
+        .drawer-link:hover { background: rgba(255,255,255,0.1); }
+        .drawer-link i { width: 16px; text-align: center; opacity: 0.8; }
+        .drawer-link.active { background: var(--moss); }
+        .drawer-link.whatsapp { background: #25D366; }
+        .drawer-link.whatsapp:hover { background: #1da851; }
+        .drawer-divider {
+            height: 1px;
+            background: rgba(255,255,255,0.1);
+            margin: 8px 20px;
+        }
+        .drawer-cat-count {
+            margin-left: auto;
+            background: rgba(255,255,255,0.15);
+            color: rgba(255,255,255,0.7);
+            font-size: 0.68rem;
+            padding: 1px 7px;
+            border-radius: 50px;
+        }
         @media (max-width: 768px) {
-            .desktop-nav {
-                display: none;
-                position: absolute;
-                top: 100%;
-                left: 0;
-                right: 0;
-                background: var(--forest);
-                padding: 16px 20px;
-                z-index: 999;
-                box-shadow: 0 8px 24px rgba(0,0,0,0.15);
-            }
-            .desktop-nav.mobile-open { display: block; }
-            .nav-links {
-                display: flex;
-                flex-direction: column;
-                gap: 4px;
-            }
-            .nav-links a {
-                padding: 10px 14px;
-                border-radius: 8px;
-                color: var(--cream) !important;
-                font-size: 0.95rem;
-                border: none !important;
-                background: transparent !important;
-                margin: 0 !important;
-            }
-            .nav-links a:hover { background: rgba(255,255,255,0.1) !important; }
-            .nav-links .nav-cta { background: var(--moss) !important; }
             .hamburger { display: flex !important; }
+            .desktop-nav { display: none !important; }
+            .shop-sidebar { display: none; }
+            .shop-wrapper { margin-top: 70px; }
+        }
+        @media (min-width: 769px) {
+            .drawer, .drawer-overlay { display: none !important; }
         }
     </style>
     <script>
@@ -611,23 +750,26 @@
         const navbar = document.getElementById('navbar');
         navbar.classList.add('scrolled');
 
-        // Hamburger menu
+        // Mobile Drawer
         const hamburger = document.getElementById('mobile-menu');
-        const mobileNav = document.querySelector('.desktop-nav');
-        if (hamburger && mobileNav) {
-            hamburger.addEventListener('click', () => {
-                const isOpen = mobileNav.classList.toggle('mobile-open');
-                hamburger.setAttribute('aria-expanded', isOpen);
-                hamburger.classList.toggle('open', isOpen);
-            });
-            document.addEventListener('click', (e) => {
-                if (!navbar.contains(e.target)) {
-                    mobileNav.classList.remove('mobile-open');
-                    hamburger.classList.remove('open');
-                    hamburger.setAttribute('aria-expanded', false);
-                }
-            });
+        const drawer = document.getElementById('mobileDrawer');
+        const overlay = document.getElementById('drawerOverlay');
+        const drawerClose = document.getElementById('drawerClose');
+
+        function openDrawer() {
+            drawer.classList.add('open');
+            overlay.classList.add('open');
+            document.body.style.overflow = 'hidden';
         }
+        function closeDrawer() {
+            drawer.classList.remove('open');
+            overlay.classList.remove('open');
+            document.body.style.overflow = '';
+        }
+
+        if (hamburger) hamburger.addEventListener('click', openDrawer);
+        if (drawerClose) drawerClose.addEventListener('click', closeDrawer);
+        if (overlay) overlay.addEventListener('click', closeDrawer);
 
         const cards = Array.from(document.querySelectorAll('.p-card'));
         const catLinks = document.querySelectorAll('#catList a');
