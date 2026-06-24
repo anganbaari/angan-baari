@@ -572,11 +572,62 @@
         </div>
     </footer>
 
+    <style>
+        /* Mobile nav dropdown */
+        @media (max-width: 768px) {
+            .desktop-nav {
+                display: none;
+                position: absolute;
+                top: 100%;
+                left: 0;
+                right: 0;
+                background: var(--forest);
+                padding: 16px 20px;
+                z-index: 999;
+                box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+            }
+            .desktop-nav.mobile-open { display: block; }
+            .nav-links {
+                display: flex;
+                flex-direction: column;
+                gap: 4px;
+            }
+            .nav-links a {
+                padding: 10px 14px;
+                border-radius: 8px;
+                color: var(--cream) !important;
+                font-size: 0.95rem;
+                border: none !important;
+                background: transparent !important;
+                margin: 0 !important;
+            }
+            .nav-links a:hover { background: rgba(255,255,255,0.1) !important; }
+            .nav-links .nav-cta { background: var(--moss) !important; }
+            .hamburger { display: flex !important; }
+        }
+    </style>
     <script>
+        // Always show navbar as solid on shop page
         const navbar = document.getElementById('navbar');
-        window.addEventListener('scroll', () => {
-            navbar.classList.toggle('scrolled', window.scrollY > 50);
-        });
+        navbar.classList.add('scrolled');
+
+        // Hamburger menu
+        const hamburger = document.getElementById('mobile-menu');
+        const mobileNav = document.querySelector('.desktop-nav');
+        if (hamburger && mobileNav) {
+            hamburger.addEventListener('click', () => {
+                const isOpen = mobileNav.classList.toggle('mobile-open');
+                hamburger.setAttribute('aria-expanded', isOpen);
+                hamburger.classList.toggle('open', isOpen);
+            });
+            document.addEventListener('click', (e) => {
+                if (!navbar.contains(e.target)) {
+                    mobileNav.classList.remove('mobile-open');
+                    hamburger.classList.remove('open');
+                    hamburger.setAttribute('aria-expanded', false);
+                }
+            });
+        }
 
         const cards = Array.from(document.querySelectorAll('.p-card'));
         const catLinks = document.querySelectorAll('#catList a');
