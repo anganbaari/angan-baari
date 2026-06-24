@@ -584,7 +584,7 @@
             const sort = sortSelect.value;
 
             let visible = cards.filter(card => {
-                const matchCat = activeCat === 'all' || card.dataset.cat === activeCat;
+                const matchCat = true; // category filtering done server-side
                 const matchSearch = card.dataset.name.includes(search);
                 return matchCat && matchSearch;
             });
@@ -605,18 +605,32 @@
             noResults.style.display = visible.length === 0 ? 'block' : 'none';
         }
 
-        catLinks.forEach(link => {
-            link.addEventListener('click', (e) => {
-                e.preventDefault();
-                catLinks.forEach(l => l.classList.remove('active'));
-                link.classList.add('active');
-                activeCat = link.dataset.cat;
-                filterAndSort();
+        // Search and sort only (category filtering done server-side via URL)
+        searchInput.addEventListener('input', filterAndSort);
+        sortSelect.addEventListener('change', filterAndSort);
+
+        // Accordion sidebar
+        document.querySelectorAll('[data-toggle]').forEach(link => {
+            link.addEventListener('click', function(e) {
+                const targetId = this.dataset.toggle;
+                const target = document.getElementById(targetId);
+                const arrow = document.getElementById('arrow-' + targetId);
+                if (target) {
+                    const isOpen = target.style.display === 'block';
+                    target.style.display = isOpen ? 'none' : 'block';
+                    if (arrow) arrow.classList.toggle('open', !isOpen);
+                }
+                // Allow normal navigation
             });
         });
 
-        searchInput.addEventListener('input', filterAndSort);
-        sortSelect.addEventListener('change', filterAndSort);
+        // Open arrows for active items on page load
+        document.querySelectorAll('.cat-sub').forEach(sub => {
+            if (sub.style.display === 'block') {
+                const arrow = document.getElementById('arrow-' + sub.id);
+                if (arrow) arrow.classList.add('open');
+            }
+        });
     </script>
 </body>
 </html>
