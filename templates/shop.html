@@ -408,24 +408,9 @@
         <!-- Quick Links -->
         <div class="drawer-section">
             <div class="drawer-section-title">Quick Links</div>
-            <a href="/" class="drawer-link">
-                <i class="fas fa-home"></i> Back to Website
-            </a>
-            {% if user.is_authenticated %}
-            <a href="{% url 'profile' %}" class="drawer-link">
-                <i class="fas fa-user"></i> My Profile
-            </a>
-            <a href="{% url 'logout' %}" class="drawer-link">
-                <i class="fas fa-sign-out-alt"></i> Logout
-            </a>
-            {% else %}
-            <a href="{% url 'login' %}" class="drawer-link">
-                <i class="fas fa-sign-in-alt"></i> Login / Sign Up
-            </a>
-            {% endif %}
-            <a href="https://wa.me/9779821025084" class="drawer-link whatsapp" target="_blank">
-                <i class="fab fa-whatsapp"></i> Order via WhatsApp
-            </a>
+            <a href="/" class="drawer-link"><i class="fas fa-home"></i> Back to Website</a>
+            {% if user.is_authenticated %}<a href="{% url 'profile' %}" class="drawer-link"><i class="fas fa-user"></i> My Profile ({{ user.first_name }})</a><a href="{% url 'logout' %}" class="drawer-link"><i class="fas fa-sign-out-alt"></i> Logout</a>{% else %}<a href="{% url 'login' %}" class="drawer-link"><i class="fas fa-sign-in-alt"></i> Login / Sign Up</a>{% endif %}
+            <a href="https://wa.me/9779821025084" class="drawer-link whatsapp" target="_blank"><i class="fab fa-whatsapp"></i> Order via WhatsApp</a>
         </div>
 
         <div class="drawer-divider"></div>
@@ -433,27 +418,8 @@
         <!-- Categories -->
         <div class="drawer-section">
             <div class="drawer-section-title">Categories</div>
-            <a href="{% url 'shop' %}" class="drawer-link {% if not selected_category %}active{% endif %}">
-                <i class="fas fa-th-large"></i> All Products
-                <span class="drawer-cat-count">{{ total_count }}</span>
-            </a>
-            {% for cat in cat_tree %}
-            <a href="{% url 'shop' %}?cat={{ cat.obj.id }}"
-               class="drawer-link {% if selected_category.id == cat.obj.id %}active{% endif %}">
-                <i class="fas {{ cat.obj.icon }}"></i> {{ cat.obj.name }}
-                <span class="drawer-cat-count">{{ cat.count }}</span>
-            </a>
-            {% if cat.children %}
-            {% for sub in cat.children %}
-            <a href="{% url 'shop' %}?cat={{ sub.obj.id }}"
-               class="drawer-link {% if selected_category.id == sub.obj.id %}active{% endif %}"
-               style="padding-left:28px;font-size:0.83rem;opacity:0.85;">
-                <i class="fas fa-leaf" style="font-size:0.7rem;"></i> {{ sub.obj.name }}
-                <span class="drawer-cat-count">{{ sub.count }}</span>
-            </a>
-            {% endfor %}
-            {% endif %}
-            {% endfor %}
+            <a href="{% url 'shop' %}" class="drawer-link {% if not selected_category %}active{% endif %}"><i class="fas fa-th-large"></i> All Products <span class="drawer-cat-count">{{ total_count }}</span></a>
+            {% for cat in cat_tree %}<a href="{% url 'shop' %}?cat={{ cat.obj.id }}" class="drawer-link {% if selected_category.id == cat.obj.id %}active{% endif %}"><i class="fas {{ cat.obj.icon }}"></i> {{ cat.obj.name }} <span class="drawer-cat-count">{{ cat.count }}</span></a>{% if cat.children %}{% for sub in cat.children %}<a href="{% url 'shop' %}?cat={{ sub.obj.id }}" class="drawer-link {% if selected_category.id == sub.obj.id %}active{% endif %}" style="padding-left:28px;font-size:0.83rem;"><i class="fas fa-circle" style="font-size:0.35rem;vertical-align:middle;"></i> {{ sub.obj.name }} <span class="drawer-cat-count">{{ sub.count }}</span></a>{% endfor %}{% endif %}{% endfor %}
         </div>
     </div>
 
