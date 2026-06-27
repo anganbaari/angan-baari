@@ -418,7 +418,7 @@
             font-family: "Cinzel", serif;
             letter-spacing: 0.15em;
             text-transform: uppercase;
-            color: rgba(255,255,255,0.4);
+            color:#c9a84c;
             margin-bottom: 8px;
         }
         .drawer-link {
@@ -427,14 +427,14 @@
             gap: 10px;
             padding: 10px 12px;
             border-radius: 10px;
-            color: #f7f2ea;
+            color: #c9a84c !important;
             font-size: 0.9rem;
             text-decoration: none;
             transition: background 0.2s;
             margin-bottom: 2px;
         }
         .drawer-link:hover { background: rgba(255,255,255,0.1); }
-        .drawer-link i { width: 16px; text-align: center; opacity: 0.8; }
+        .drawer-link i { width: 16px; text-align: center; opacity: 0.8; color: #c9a84c !important }
         .drawer-link.active { background: #4a7c59; }
         .drawer-link.whatsapp { background: #25D366; }
         .drawer-link.whatsapp:hover { background: #1da851; }
@@ -457,6 +457,14 @@
             .shop-sidebar { display: none; }
             .shop-wrapper { margin-top: 70px; }
         }
+
+#mobileDrawer a.drawer-link {
+    color: #c9a84c !important;
+    display: flex !important;
+}
+#mobileDrawer a.drawer-link i {
+    color: #c9a84c !important;
+}
         @media (min-width: 769px) {
             .drawer, .drawer-overlay { display: none !important; }
         }
@@ -501,10 +509,10 @@
     </header>
 
     <!-- Mobile Drawer Overlay -->
-    <div class="drawer-overlay" id="drawerOverlay"></div>
+    <div class="drawer-backdrop" id="drawerOverlay"></div>
 
     <!-- Mobile Drawer -->
-    <div class="drawer" id="mobileDrawer">
+    <div class="side-drawer" id="mobileDrawer">
         <div class="drawer-header">
             <div class="drawer-brand">
                 <i class="fas fa-seedling" style="color:var(--moss);"></i>
@@ -516,9 +524,9 @@
         <!-- Quick Links -->
         <div class="drawer-section">
             <div class="drawer-section-title">Quick Links</div>
-            <a href="/" class="drawer-link"><i class="fas fa-home"></i> Back to Website</a>
-            {% if user.is_authenticated %}<a href="{% url 'profile' %}" class="drawer-link"><i class="fas fa-user"></i> My Profile ({{ user.first_name }})</a><a href="{% url 'logout' %}" class="drawer-link"><i class="fas fa-sign-out-alt"></i> Logout</a>{% else %}<a href="{% url 'login' %}" class="drawer-link"><i class="fas fa-sign-in-alt"></i> Login / Sign Up</a>{% endif %}
-            <a href="https://wa.me/9779821025084" class="drawer-link whatsapp" target="_blank"><i class="fab fa-whatsapp"></i> Order via WhatsApp</a>
+            <a href="/" class="drawer-link revealed" style="color:#c9a84c!important;display:flex;"><i class="fas fa-home"></i> Back to Website</a>
+            {% if user.is_authenticated %}<a href="{% url 'profile' %}" class="drawer-link revealed" style="color:#c9a84c!important;display:flex;"><i class="fas fa-user"></i> My Profile ({{ user.first_name }})</a><a href="{% url 'logout' %}" class="drawer-link revealed" style="color:#c9a84c!important;display:flex;"><i class="fas fa-sign-out-alt"></i> Logout</a>{% else %}<a href="{% url 'login' %}" class="drawer-link revealed" style="color:#c9a84c!important;display:flex;"><i class="fas fa-sign-in-alt"></i> Login / Sign Up</a>{% endif %}
+            <a href="https://wa.me/9779821025084" class="drawer-link revealed whatsapp" target="_blank"><i class="fab fa-whatsapp"></i> Order via WhatsApp</a>
         </div>
 
         <div class="drawer-divider"></div>
@@ -526,8 +534,8 @@
         <!-- Categories -->
         <div class="drawer-section">
             <div class="drawer-section-title">Categories</div>
-            <a href="{% url 'shop' %}" class="drawer-link {% if not selected_category %}active{% endif %}"><i class="fas fa-th-large"></i> All Products <span class="drawer-cat-count">{{ total_count }}</span></a>
-            {% for cat in cat_tree %}<a href="{% url 'shop' %}?cat={{ cat.obj.id }}" class="drawer-link {% if selected_category.id == cat.obj.id %}active{% endif %}"><i class="fas {{ cat.obj.icon }}"></i> {{ cat.obj.name }} <span class="drawer-cat-count">{{ cat.count }}</span></a>{% if cat.children %}{% for sub in cat.children %}<a href="{% url 'shop' %}?cat={{ sub.obj.id }}" class="drawer-link {% if selected_category.id == sub.obj.id %}active{% endif %}" style="padding-left:28px;font-size:0.83rem;"><i class="fas fa-circle" style="font-size:0.35rem;vertical-align:middle;"></i> {{ sub.obj.name }} <span class="drawer-cat-count">{{ sub.count }}</span></a>{% endfor %}{% endif %}{% endfor %}
+            <a href="{% url 'shop' %}" class="drawer-link revealed {% if not selected_category %}active{% endif %}"><i class="fas fa-th-large"></i> All Products <span class="drawer-cat-count">{{ total_count }}</span></a>
+            {% for cat in cat_tree %}<a href="{% url 'shop' %}?cat={{ cat.obj.id }}" class="drawer-link revealed {% if selected_category.id == cat.obj.id %}active{% endif %}"><i class="fas {{ cat.obj.icon }}"></i> {{ cat.obj.name }} <span class="drawer-cat-count">{{ cat.count }}</span></a>{% if cat.children %}{% for sub in cat.children %}<a href="{% url 'shop' %}?cat={{ sub.obj.id }}" class="drawer-link revealed {% if selected_category.id == sub.obj.id %}active{% endif %}" style="padding-left:28px;font-size:0.83rem;"><i class="fas fa-circle" style="font-size:0.35rem;vertical-align:middle;"></i> {{ sub.obj.name }} <span class="drawer-cat-count">{{ sub.count }}</span></a>{% endfor %}{% endif %}{% endfor %}
         </div>
     </div>
 
@@ -725,12 +733,12 @@
 
         function openDrawer() {
             drawer.classList.add('open');
-            overlay.classList.add('open');
+            overlay.classList.add('active');
             document.body.style.overflow = 'hidden';
         }
         function closeDrawer() {
             drawer.classList.remove('open');
-            overlay.classList.remove('open');
+            overlay.classList.remove('active');
             document.body.style.overflow = '';
         }
 
