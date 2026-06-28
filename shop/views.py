@@ -235,3 +235,131 @@ def shop(request):
         'selected_category': selected_category,
         'total_count': Product.objects.count(),
     })
+
+# ─── CART SYSTEM ───────────────────────────────────────────────
+
+def get_cart(request):
+    return request.session.get('cart', {})
+
+def save_cart(request, cart):
+    request.session['cart'] = cart
+    request.session.modified = True
+
+def cart_count(request):
+    cart = get_cart(request)
+    return sum(item['qty'] for item in cart.values())
+
+def add_to_cart(request, product_id):
+    from .models import Product
+    product = get_object_or_404(Product, id=product_id)
+    cart = get_cart(request)
+    pid = str(product_id)
+    if pid in cart:
+        cart[pid]['qty'] += 1
+    else:
+        cart[pid] = {
+            'name': product.name,
+            'price': str(product.price),
+            'price_unit': product.price_unit,
+            'image': product.main_image,
+            'slug': product.slug,
+            'qty': 1,
+        }
+    save_cart(request, cart)
+    if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+        return JsonResponse({'status': 'ok', 'count': cart_count(request)})
+    return redirect(request.META.get('HTTP_REFERER', '/shop/'))
+
+def remove_from_cart(request, product_id):
+    cart = get_cart(request)
+    pid = str(product_id)
+    if pid in cart:
+        del cart[pid]
+        save_cart(request, cart)
+    return redirect('cart')
+
+def update_cart(request, product_id):
+    cart = get_cart(request)
+    pid = str(product_id)
+    qty = int(request.POST.get('qty', 1))
+    if qty <= 0:
+        if pid in cart:
+            del cart[pid]
+    else:
+        if pid in cart:
+            cart[pid]['qty'] = qty
+    save_cart(request, cart)
+    return redirect('cart')
+
+def cart_view(request):
+    cart = get_cart(request)
+    items = []
+    total = 0
+    for pid, item in cart.items():
+        try:
+            subtotal = float(item['price']) * item['qty']
+        except:
+            subtotal = 0
+        total += subtotal
+        items.append({**item, 'id': pid, 'subtotal': subtotal})
+    return render(request, 'cart.html', {
+        'items': items,
+        'total': total,
+        'count': cart_count(request),
+    })
+
+def checkout(request):
+    cart = get_cart(request)
+    if not cart:
+        return redirect('shop')
+
+    items = []
+    total = 0
+    for pid, item in cart.items():
+        try:
+            subtotal = float(item['price']) * item['qty']
+        except:
+            subtotal = 0
+        total += subtotal
+        items.append({**item, 'id': pid, 'subtotal': subtotal})
+
+    if request.method == 'POST':
+        name = request.POST.get('name', '').strip()
+        email = request.POST.get('email', '').strip()
+        phone = request.POST.get('phone', '').strip()
+        address = request.POST.get('address', '').strip()
+        message = request.POST.get('message', '').strip()
+
+        # Build product interest string from cart
+        product_list = ', '.join([f"{i['name']} x{i['qty']}" for i in items])
+
+        order = ProductOrder.objects.create(
+            name=name,
+            email=email,
+            phone=phone,
+            address=address,
+            product_interest=product_list,
+            message=message,
+        )
+        try:
+            send_order_received_email(order)
+        except Exception:
+            pass
+
+        # Clear cart after order
+        request.session['cart'] = {}
+        request.session.modified = True
+
+        return render(request, 'success.html', {'order': order})
+
+    # Pre-fill form if logged in
+    initial = {}
+    if request.user.is_authenticated:
+        initial['name'] = request.user.get_full_name()
+        initial['email'] = request.user.email
+
+    return render(request, 'checkout.html', {
+        'items': items,
+        'total': total,
+        'initial': initial,
+    })
