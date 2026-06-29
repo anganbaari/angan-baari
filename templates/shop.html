@@ -878,6 +878,25 @@
         const navbar = document.getElementById('navbar');
         if (navbar) navbar.classList.add('scrolled');
 
+        // Keep the sticky search bar locked to the real navbar height
+        // (fixes the top of the search bar getting clipped/hidden behind
+        // the navbar when its rendered height differs from the CSS guess,
+        // e.g. after the Google Fonts finish loading and reflow the navbar)
+        const stickySearchBar = document.querySelector('.shop-search-bar');
+        function syncStickyOffsets() {
+            if (!navbar || !stickySearchBar) return;
+            const navHeight = Math.ceil(navbar.getBoundingClientRect().height);
+            stickySearchBar.style.top = navHeight + 'px';
+            const barHeight = Math.ceil(stickySearchBar.getBoundingClientRect().height);
+            document.body.style.paddingTop = (navHeight + barHeight) + 'px';
+        }
+        syncStickyOffsets();
+        window.addEventListener('resize', syncStickyOffsets);
+        window.addEventListener('load', syncStickyOffsets);
+        if (document.fonts && document.fonts.ready) {
+            document.fonts.ready.then(syncStickyOffsets);
+        }
+
         // Mobile drawer
         const hamburger = document.getElementById('mobile-menu');
         const drawer = document.getElementById('mobileDrawer');
