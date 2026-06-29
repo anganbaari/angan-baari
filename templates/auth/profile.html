@@ -270,10 +270,9 @@
     </nav>
 
     <script>
+        // Navbar always solid (no transparent state) — same as the shop page
         const navbar = document.getElementById('navbar');
-        window.addEventListener('scroll', () => {
-            navbar.classList.toggle('scrolled', window.scrollY > 50);
-        });
+        if (navbar) navbar.classList.add('scrolled');
 
         // Keep the page content clear of the real navbar height, instead of
         // guessing a fixed margin-top (handles font-load reflow + any screen size)
