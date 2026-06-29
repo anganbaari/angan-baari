@@ -839,17 +839,6 @@
                 <i class="fas fa-store"></i>
                 <span>Shop</span>
             </a>
-            <!-- Website (back to main site) -->
-            <a href="/" class="nav-item">
-                <i class="fas fa-globe"></i>
-                <span>Website</span>
-            </a>
-            <!-- Offers -->
-            <a href="{% url 'shop' %}?sort=offers" class="nav-item">
-                <i class="fas fa-tag"></i>
-                <span class="offer-dot"></span>
-                <span>Offers</span>
-            </a>
             <!-- Cart -->
             <a href="{% url 'cart' %}" class="nav-item">
                 <i class="fas fa-shopping-cart"></i>
@@ -857,6 +846,13 @@
                 {% if total_qty > 0 %}<span class="cart-badge">{{ total_qty }}</span>{% endif %}
                 {% endwith %}
                 <span>Cart</span>
+            <!-- Offers -->
+            <a href="{% url 'shop' %}?sort=offers" class="nav-item">
+                <i class="fas fa-tag"></i>
+                <span class="offer-dot"></span>
+                <span>Offers</span>
+            </a>
+            
             </a>
             <!-- Profile -->
             {% if user.is_authenticated %}
@@ -870,6 +866,11 @@
                 <span>Login</span>
             </a>
             {% endif %}
+            <!-- Website (back to main site) -->
+            <a href="/" class="nav-item">
+                <i class="fas fa-globe"></i>
+                <span>Website</span>
+            </a>
         </div>
     </nav>
 
