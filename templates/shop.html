@@ -521,6 +521,8 @@
             text-decoration: none;
             transition: background 0.2s;
             margin-bottom: 2px;
+            opacity: 1 !important;
+            transform: none !important;
         }
         .drawer-link:hover { background: rgba(255,255,255,0.1); }
         .drawer-link i { width: 16px; text-align: center; }
@@ -593,6 +595,12 @@
                     {% endif %}
                 </div>
             </nav>
+            <a href="{% url 'cart' %}" style="display:none;" id="mobile-cart-btn" class="mobile-cart-icon">
+                <i class="fas fa-shopping-cart"></i>
+                {% with total_qty=request.session.cart.values|length %}
+                {% if total_qty > 0 %}<span class="mobile-cart-badge">{{ total_qty }}</span>{% endif %}
+                {% endwith %}
+            </a>
             <button class="hamburger" id="mobile-menu" aria-label="Open menu" aria-expanded="false">
                 <span class="ham-line ham-top"></span>
                 <span class="ham-line ham-mid"></span>
@@ -633,27 +641,27 @@
         </div>
         <div class="drawer-section">
             <div class="drawer-section-title">Quick Links</div>
-            <a href="/" class="drawer-link"><i class="fas fa-home"></i> Back to Home</a>
+            <a href="/" class="drawer-link revealed"><i class="fas fa-home"></i> Back to Home</a>
             {% if user.is_authenticated %}
-            <a href="{% url 'profile' %}" class="drawer-link"><i class="fas fa-user"></i> My Profile ({{ user.first_name }})</a>
-            <a href="{% url 'logout' %}" class="drawer-link"><i class="fas fa-sign-out-alt"></i> Logout</a>
+            <a href="{% url 'profile' %}" class="drawer-link revealed"><i class="fas fa-user"></i> My Profile ({{ user.first_name }})</a>
+            <a href="{% url 'logout' %}" class="drawer-link revealed"><i class="fas fa-sign-out-alt"></i> Logout</a>
             {% else %}
-            <a href="{% url 'login' %}" class="drawer-link"><i class="fas fa-sign-in-alt"></i> Login / Sign Up</a>
+            <a href="{% url 'login' %}" class="drawer-link revealed"><i class="fas fa-sign-in-alt"></i> Login / Sign Up</a>
             {% endif %}
-            <a href="https://wa.me/9779821025084" class="drawer-link whatsapp" target="_blank"><i class="fab fa-whatsapp"></i> Order via WhatsApp</a>
+            <a href="https://wa.me/9779821025084" class="drawer-link revealed whatsapp" target="_blank"><i class="fab fa-whatsapp"></i> Order via WhatsApp</a>
         </div>
         <div class="drawer-divider"></div>
         <div class="drawer-section">
             <div class="drawer-section-title">Categories</div>
-            <a href="{% url 'shop' %}" class="drawer-link {% if not selected_category %}active{% endif %}">
+            <a href="{% url 'shop' %}" class="drawer-link revealed {% if not selected_category %}active{% endif %}">
                 <i class="fas fa-th-large"></i> All Products <span class="drawer-cat-count">{{ total_count }}</span>
             </a>
             {% for cat in cat_tree %}
-            <a href="{% url 'shop' %}?cat={{ cat.obj.id }}" class="drawer-link {% if selected_category.id == cat.obj.id %}active{% endif %}">
+            <a href="{% url 'shop' %}?cat={{ cat.obj.id }}" class="drawer-link revealed {% if selected_category.id == cat.obj.id %}active{% endif %}">
                 <i class="fas {{ cat.obj.icon }}"></i> {{ cat.obj.name }} <span class="drawer-cat-count">{{ cat.count }}</span>
             </a>
             {% if cat.children %}{% for sub in cat.children %}
-            <a href="{% url 'shop' %}?cat={{ sub.obj.id }}" class="drawer-link {% if selected_category.id == sub.obj.id %}active{% endif %}" style="padding-left:28px;font-size:0.83rem;">
+            <a href="{% url 'shop' %}?cat={{ sub.obj.id }}" class="drawer-link revealed {% if selected_category.id == sub.obj.id %}active{% endif %}" style="padding-left:28px;font-size:0.83rem;">
                 <i class="fas fa-circle" style="font-size:0.35rem;vertical-align:middle;"></i> {{ sub.obj.name }} <span class="drawer-cat-count">{{ sub.count }}</span>
             </a>
             {% endfor %}{% endif %}
