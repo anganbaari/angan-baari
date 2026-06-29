@@ -10,16 +10,25 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
     <link rel="stylesheet" href="{% static 'style.css' %}">
     <style>
-        .profile-page { max-width: 800px; margin: 100px auto 60px; padding: 0 20px; }
-        .profile-header { background: var(--forest); border-radius: 16px; padding: 32px; display: flex; align-items: center; gap: 20px; margin-bottom: 32px; }
-        .profile-avatar { width: 72px; height: 72px; background: var(--moss); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; color: white; font-family: var(--font-display); flex-shrink: 0; }
-        .profile-info h2 { font-family: var(--font-display); font-size: 1.6rem; color: var(--cream); margin-bottom: 4px; }
-        .profile-info p { font-size: 0.85rem; color: var(--sage-light); }
-        .profile-actions { margin-left: auto; display: flex; gap: 10px; }
-        .btn-logout { padding: 8px 16px; background: rgba(255,255,255,0.15); color: white; border: 1px solid rgba(255,255,255,0.3); border-radius: 8px; font-size: 0.82rem; cursor: pointer; text-decoration: none; transition: all 0.2s; }
+        .profile-page { max-width: 800px; margin: 0 auto 60px; padding: 100px 20px 0; }
+        .profile-header { background: var(--forest); border-radius: 16px; padding: 32px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 20px; margin-bottom: 32px; }
+        .profile-id { display: flex; align-items: center; gap: 20px; min-width: 0; }
+        .profile-avatar { width: 72px; height: 72px; background: var(--moss); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; color: white; font-family: var(--font-display); flex-shrink: 0; box-shadow: 0 0 0 3px rgba(201,168,76,0.4), 0 4px 14px rgba(0,0,0,0.18); }
+        .profile-info { min-width: 0; }
+        .profile-info h2 { font-family: var(--font-display); font-size: 1.6rem; color: var(--cream); margin-bottom: 4px; overflow-wrap: break-word; }
+        .profile-info p { font-size: 0.85rem; color: var(--sage-light); overflow-wrap: break-word; }
+        .profile-actions { display: flex; gap: 10px; flex-shrink: 0; }
+        .btn-logout { padding: 8px 16px; background: rgba(255,255,255,0.15); color: white; border: 1px solid rgba(255,255,255,0.3); border-radius: 8px; font-size: 0.82rem; cursor: pointer; text-decoration: none; transition: all 0.2s; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
         .btn-logout:hover { background: rgba(255,255,255,0.25); }
-        .section-title { font-family: var(--font-display); font-size: 1.3rem; color: var(--forest); margin-bottom: 16px; }
-        .order-card { background: var(--white); border: 1px solid var(--mist); border-radius: 12px; padding: 20px; margin-bottom: 12px; }
+        .section-head { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+        .section-title { font-family: var(--font-display); font-size: 1.3rem; color: var(--forest); margin-bottom: 0; }
+        .orders-count-badge { background: #e8f0ea; color: #6a9e7a; font-size: 0.75rem; font-weight: 700; padding: 3px 11px; border-radius: 50px; }
+        .order-card { background: var(--white); border: 1px solid var(--mist); border-left: 4px solid var(--mist); border-radius: 12px; padding: 20px; margin-bottom: 12px; transition: transform 0.2s, box-shadow 0.2s; }
+        .order-card:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(26,47,30,0.1); }
+        .order-card.status-pending { border-left-color: #d97706; }
+        .order-card.status-confirmed { border-left-color: #2563eb; }
+        .order-card.status-delivered { border-left-color: #16a34a; }
+        .order-card.status-cancelled { border-left-color: #dc2626; }
         .order-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
         .order-num { font-weight: 600; color: var(--forest); font-size: 0.95rem; }
         .order-date { font-size: 0.78rem; color: var(--text-muted); }
@@ -119,6 +128,16 @@
             .mobile-bottom-nav { display: block; }
             .profile-page { margin-bottom: 90px; }
         }
+        @media (max-width: 600px) {
+            .profile-page { padding-left: 16px; padding-right: 16px; }
+            .profile-header { flex-direction: column; align-items: stretch; padding: 24px 20px; }
+            .profile-avatar { width: 58px; height: 58px; font-size: 1.4rem; }
+            .profile-info h2 { font-size: 1.35rem; }
+            .profile-actions { width: 100%; }
+            .btn-logout { width: 100%; justify-content: center; }
+            .order-card { padding: 16px; }
+            .order-top { flex-direction: column; align-items: flex-start; gap: 6px; }
+        }
     </style>
 </head>
 <body>
@@ -148,11 +167,13 @@
 
         <!-- Profile Header -->
         <div class="profile-header">
-            <div class="profile-avatar">{{ user.first_name|first|upper }}</div>
-            <div class="profile-info">
-                <h2>{{ user.get_full_name }}</h2>
-                <p><i class="fas fa-envelope"></i> {{ user.email }}</p>
-                <p><i class="fas fa-calendar"></i> Member since {{ user.date_joined|date:"F Y" }}</p>
+            <div class="profile-id">
+                <div class="profile-avatar">{{ user.first_name|first|upper }}</div>
+                <div class="profile-info">
+                    <h2>{{ user.get_full_name }}</h2>
+                    <p><i class="fas fa-envelope"></i> {{ user.email }}</p>
+                    <p><i class="fas fa-calendar"></i> Member since {{ user.date_joined|date:"F Y" }}</p>
+                </div>
             </div>
             <div class="profile-actions">
                 <a href="{% url 'logout' %}" class="btn-logout"><i class="fas fa-sign-out-alt"></i> Logout</a>
@@ -160,7 +181,10 @@
         </div>
 
         <!-- Order History -->
-        <h2 class="section-title">My Orders ({{ orders.count }})</h2>
+        <div class="section-head">
+            <h2 class="section-title">My Orders</h2>
+            <span class="orders-count-badge">{{ orders.count }}</span>
+        </div>
 
         {% if orders %}
             {% for order in orders %}
@@ -182,7 +206,7 @@
         {% else %}
             <div class="no-orders">
                 <i class="fas fa-shopping-bag"></i>
-                <p>You haven't placed any orders yet.</p>
+                <p>No orders yet — your first basket from the farm is just a tap away.</p>
                 <a href="{% url 'shop' %}" class="btn-shop"><i class="fas fa-leaf"></i> Start Shopping</a>
             </div>
         {% endif %}
@@ -249,6 +273,29 @@
         const navbar = document.getElementById('navbar');
         window.addEventListener('scroll', () => {
             navbar.classList.toggle('scrolled', window.scrollY > 50);
+        });
+
+        // Keep the page content clear of the real navbar height, instead of
+        // guessing a fixed margin-top (handles font-load reflow + any screen size)
+        const profilePage = document.querySelector('.profile-page');
+        function syncProfileTopSpacing() {
+            if (!navbar || !profilePage) return;
+            const navHeight = Math.ceil(navbar.getBoundingClientRect().height);
+            profilePage.style.paddingTop = (navHeight + 24) + 'px';
+        }
+        syncProfileTopSpacing();
+        window.addEventListener('resize', syncProfileTopSpacing);
+        window.addEventListener('load', syncProfileTopSpacing);
+        if (document.fonts && document.fonts.ready) {
+            document.fonts.ready.then(syncProfileTopSpacing);
+        }
+
+        // Color-code each order card's left border to match its status badge
+        document.querySelectorAll('.order-card').forEach(card => {
+            const badge = card.querySelector('.order-status');
+            if (!badge) return;
+            const statusClass = Array.from(badge.classList).find(c => c.startsWith('status-'));
+            if (statusClass) card.classList.add(statusClass);
         });
 
         // Highlight active bottom nav item
