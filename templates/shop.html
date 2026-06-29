@@ -84,7 +84,7 @@
             position: sticky;
             top: 0;
             z-index: 100;
-            background: var(--cream);
+            background: #f5efe6;
             padding: 10px 0;
             margin: -10px 0 10px;
             box-shadow: 0 2px 12px rgba(26,47,30,0.08);
@@ -462,7 +462,13 @@
             .hamburger { display: flex !important; }
             .desktop-nav { display: none !important; }
             .shop-sidebar { display: none; }
-            .shop-wrapper { margin-top: 70px; }
+            .shop-wrapper { margin-top: 70px; padding: 0 10px; gap: 0; }
+            .shop-main { min-width: 0; }
+            .product-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+            .p-card-img { height: 120px; }
+            .shop-topbar { padding: 8px 0; gap: 8px; }
+            .search-input { font-size: 0.82rem; }
+            .sort-select { font-size: 0.78rem; padding: 6px 8px; }
         }
 
 #mobileDrawer a.drawer-link {
