@@ -13,169 +13,199 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
     <link rel="stylesheet" href="{% static 'style.css' %}">
     <style>
-        * { box-sizing: border-box; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
 
-        .shop-wrapper {
-            display: flex;
-            max-width: 1280px;
-            margin: 90px auto 60px;
-            padding: 0 12px;
-            gap: 16px;
-        }
-
-        /* ── Sidebar ── */
-        .shop-sidebar {
-            width: 180px;
-            flex-shrink: 0;
-        }
-        .sidebar-box {
-            background: var(--white);
-            border-radius: 12px;
-            border: 1px solid var(--mist);
-            padding: 20px;
-            margin-bottom: 16px;
-        }
-        .sidebar-title {
-            font-family: "Cinzel", serif;
-            font-size: 0.7rem;
-            letter-spacing: 0.15em;
-            text-transform: uppercase;
-            color: var(--text-muted);
-            margin-bottom: 14px;
-            display: block;
-        }
-        .cat-list { list-style: none; padding: 0; margin: 0; }
-        .cat-list li { margin-bottom: 4px; }
-        .cat-list a {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 8px 10px;
-            border-radius: 8px;
-            font-size: 0.88rem;
-            color: var(--text-body);
-            transition: all 0.2s ease;
-            cursor: pointer;
-            text-decoration: none;
-        }
-        .cat-list a:hover, .cat-list a.active {
-            background: var(--mist);
-            color: var(--forest);
-            font-weight: 500;
-        }
-        .cat-list a .cat-count {
-            margin-left: auto;
-            background: var(--mist);
-            color: var(--text-muted);
-            font-size: 0.72rem;
-            padding: 1px 7px;
-            border-radius: 50px;
-        }
-        .cat-list a.active .cat-count {
-            background: var(--moss);
-            color: white;
-        }
-
-        /* ── Main Content ── */
-        .shop-main { flex: 1; min-width: 0; }
-
-        /* ── Top Bar ── */
-        .shop-topbar {
+        /* ══════════════════════════════════════════
+           STICKY TOP SEARCH BAR
+        ══════════════════════════════════════════ */
+        .shop-search-bar {
             position: sticky;
             top: 0;
-            z-index: 100;
-            background: #f5efe6;
-            padding: 10px 0;
-            margin: -10px 0 10px;
+            z-index: 200;
+            background: #fff;
+            border-bottom: 1.5px solid #e8e2d8;
+            padding: 10px 16px;
             box-shadow: 0 2px 12px rgba(26,47,30,0.08);
+        }
+        .search-bar-inner {
             display: flex;
             align-items: center;
-            gap: 12px;
-            margin-bottom: 20px;
-            flex-wrap: wrap;
+            gap: 10px;
+            max-width: 1280px;
+            margin: 0 auto;
+            width: 100%;
         }
-        .search-wrap {
+        .search-field {
             flex: 1;
-            min-width: 200px;
             position: relative;
         }
-        .search-wrap i {
+        .search-field i {
             position: absolute;
             left: 12px;
             top: 50%;
             transform: translateY(-50%);
-            color: var(--text-muted);
+            color: #7a9e7e;
             font-size: 0.85rem;
+            pointer-events: none;
         }
-        .search-input {
+        .search-field input {
             width: 100%;
-            padding: 9px 14px 9px 36px;
-            border: 1.5px solid var(--mist);
-            border-radius: 8px;
+            padding: 10px 14px 10px 36px;
+            border: 1.5px solid #ddd8ce;
+            border-radius: 50px;
             font-size: 0.88rem;
-            font-family: var(--font-body);
-            background: var(--white);
-            color: var(--forest);
+            font-family: 'DM Sans', sans-serif;
+            background: #f8f5f0;
+            color: #1a2f1e;
             outline: none;
-            transition: border-color 0.2s;
+            transition: border-color 0.2s, box-shadow 0.2s;
         }
-        .search-input:focus { border-color: var(--moss); }
-        .results-info {
+        .search-field input:focus {
+            border-color: #4a7c59;
+            box-shadow: 0 0 0 3px rgba(74,124,89,0.1);
+            background: #fff;
+        }
+        .sort-select-styled {
+            padding: 9px 14px;
+            border: 1.5px solid #ddd8ce;
+            border-radius: 50px;
             font-size: 0.82rem;
-            color: var(--text-muted);
-            white-space: nowrap;
-        }
-        .sort-select {
-            padding: 8px 12px;
-            border: 1.5px solid var(--mist);
-            border-radius: 8px;
-            font-size: 0.85rem;
-            font-family: var(--font-body);
-            background: var(--white);
-            color: var(--forest);
+            font-family: 'DM Sans', sans-serif;
+            background: #f8f5f0;
+            color: #1a2f1e;
             outline: none;
             cursor: pointer;
+            transition: border-color 0.2s;
+            white-space: nowrap;
+        }
+        .sort-select-styled:focus { border-color: #4a7c59; }
+        .results-count {
+            font-size: 0.78rem;
+            color: #8a9e8e;
+            white-space: nowrap;
         }
 
-        /* ── Banner ── */
-        .shop-banner {
-            background: var(--forest);
+        /* ══════════════════════════════════════════
+           LAYOUT
+        ══════════════════════════════════════════ */
+        .shop-wrapper {
+            display: flex;
+            max-width: 1280px;
+            margin: 0 auto 100px;
+            padding: 16px 12px 0;
+            gap: 16px;
+        }
+
+        /* ══════════════════════════════════════════
+           SIDEBAR (desktop only)
+        ══════════════════════════════════════════ */
+        .shop-sidebar {
+            width: 190px;
+            flex-shrink: 0;
+        }
+        .sidebar-box {
+            background: #fff;
             border-radius: 12px;
-            padding: 22px 28px;
-            margin-bottom: 20px;
+            border: 1px solid #e8e2d8;
+            padding: 16px;
+            margin-bottom: 14px;
+        }
+        .sidebar-title {
+            font-family: "Cinzel", serif;
+            font-size: 0.65rem;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            color: #8a9e8e;
+            margin-bottom: 12px;
+            display: block;
+        }
+        .cat-list { list-style: none; }
+        .cat-list li { margin-bottom: 2px; }
+        .cat-list a {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 7px 10px;
+            border-radius: 8px;
+            font-size: 0.86rem;
+            color: #3a5040;
+            transition: all 0.2s;
+            cursor: pointer;
+            text-decoration: none;
+        }
+        .cat-list a:hover, .cat-list a.active {
+            background: #f0f7f2;
+            color: #2d5a3d;
+            font-weight: 500;
+        }
+        .cat-count {
+            margin-left: auto;
+            background: #e8f0ea;
+            color: #6a9e7a;
+            font-size: 0.7rem;
+            padding: 1px 7px;
+            border-radius: 50px;
+        }
+        .cat-list a.active .cat-count {
+            background: #4a7c59;
+            color: white;
+        }
+        .cat-sub { list-style: none; padding-left: 14px; margin: 4px 0 0; }
+        .cat-l2 > a { font-size: 0.82rem; padding: 5px 8px; }
+        .cat-l3 > a { font-size: 0.76rem; padding: 4px 8px; color: #8a9e8e; }
+        .cat-arrow { margin-left: auto; font-size: 0.6rem; transition: transform 0.25s; }
+        .cat-arrow.open { transform: rotate(90deg); }
+
+        /* ══════════════════════════════════════════
+           MAIN CONTENT
+        ══════════════════════════════════════════ */
+        .shop-main { flex: 1; min-width: 0; }
+
+        /* Banner */
+        .shop-banner {
+            background: linear-gradient(135deg, #1a2f1e 0%, #2d5a3d 100%);
+            border-radius: 14px;
+            padding: 20px 24px;
+            margin-bottom: 16px;
             display: flex;
             align-items: center;
             justify-content: space-between;
             gap: 16px;
+            position: relative;
+            overflow: hidden;
+        }
+        .shop-banner::before {
+            content: '';
+            position: absolute;
+            right: -20px;
+            top: -20px;
+            width: 120px;
+            height: 120px;
+            background: rgba(255,255,255,0.04);
+            border-radius: 50%;
         }
         .banner-text h2 {
             font-family: "Cormorant Garamond", serif;
-            font-size: 1.5rem;
+            font-size: 1.4rem;
             color: #f7f2ea;
             margin-bottom: 4px;
             font-weight: 600;
         }
-        .banner-text p {
-            font-size: 0.85rem;
-            color: var(--sage-light);
-        }
-        .banner-icon {
-            font-size: 2.5rem;
-            opacity: 0.4;
-        }
+        .banner-text p { font-size: 0.82rem; color: #9ab89e; }
+        .banner-emoji { font-size: 2.2rem; opacity: 0.6; }
 
-        /* ── Product Grid ── */
+        /* Product Grid */
         .product-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-            gap: 10px;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 12px;
         }
 
-        /* ── Product Card (compact Daraz style) ── */
+        /* Product Card */
         .p-card {
-            background: var(--white);
-            border-radius: 10px;
-            border: 1px solid var(--mist);
+            background: #fff;
+            border-radius: 12px;
+            border: 1px solid #e8e2d8;
             overflow: hidden;
             transition: all 0.25s ease;
             display: flex;
@@ -184,14 +214,14 @@
             position: relative;
         }
         .p-card:hover {
-            border-color: var(--sage);
+            border-color: #7ab48a;
             transform: translateY(-3px);
             box-shadow: 0 8px 24px rgba(26,47,30,0.12);
         }
         .p-card-img {
-            height: 130px;
+            height: 140px;
             overflow: hidden;
-            background: var(--mist);
+            background: #f3efe8;
             position: relative;
         }
         .p-card-img img {
@@ -205,9 +235,9 @@
             position: absolute;
             top: 8px;
             left: 8px;
-            background: rgba(26,47,30,0.8);
-            color: white;
-            font-size: 0.6rem;
+            background: rgba(26,47,30,0.82);
+            color: #fff;
+            font-size: 0.58rem;
             font-family: "Cinzel", serif;
             letter-spacing: 0.1em;
             text-transform: uppercase;
@@ -219,54 +249,55 @@
             top: 8px;
             right: 8px;
             background: rgba(180,50,50,0.85);
-            color: white;
-            font-size: 0.6rem;
-            font-family: "Cinzel", serif;
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
+            color: #fff;
+            font-size: 0.58rem;
             padding: 3px 8px;
             border-radius: 50px;
         }
+        .p-wish {
+            position: absolute;
+            bottom: 8px;
+            right: 8px;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.9);
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 0.8rem;
+            color: #c0392b;
+            transition: background 0.2s;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+        }
+        .p-wish:hover { background: #fff; }
         .p-card-body {
-            padding: 8px 10px 10px;
+            padding: 10px;
             display: flex;
             flex-direction: column;
             flex: 1;
         }
         .p-name {
-            font-size: 0.82rem;
+            font-size: 0.84rem;
             font-weight: 600;
-            color: var(--forest);
-            margin-bottom: 3px;
+            color: #1a2f1e;
+            margin-bottom: 4px;
             line-height: 1.3;
             display: -webkit-box;
             -webkit-line-clamp: 2;
             -webkit-box-orient: vertical;
             overflow: hidden;
         }
-        .p-price {
-            font-size: 1rem;
-            font-weight: 600;
-            color: #c0392b;
-            margin-bottom: 2px;
-        }
-        .p-price-unit {
-            font-size: 0.72rem;
-            color: var(--text-muted);
-            font-weight: 400;
-            margin-bottom: 8px;
-        }
-        .p-price-tbd {
-            font-size: 0.78rem;
-            color: var(--text-muted);
-            font-style: italic;
-            margin-bottom: 8px;
-        }
+        .p-price { font-size: 1rem; font-weight: 700; color: #c0392b; margin-bottom: 1px; }
+        .p-price-unit { font-size: 0.7rem; color: #8a9e8e; margin-bottom: 8px; }
+        .p-price-tbd { font-size: 0.76rem; color: #8a9e8e; font-style: italic; margin-bottom: 8px; }
         .p-organic-badge {
             display: inline-flex;
             align-items: center;
             gap: 4px;
-            font-size: 0.68rem;
+            font-size: 0.66rem;
             color: #4a7c59;
             background: rgba(74,124,89,0.1);
             padding: 2px 7px;
@@ -274,21 +305,17 @@
             margin-bottom: 8px;
             width: fit-content;
         }
-        .p-card-actions {
-            display: flex;
-            gap: 6px;
-            margin-top: auto;
-        }
+        .p-card-actions { display: flex; gap: 6px; margin-top: auto; }
         .btn-detail {
             flex: 1;
             padding: 7px 6px;
-            border: 1.5px solid var(--mist);
-            border-radius: 6px;
-            background: white;
-            color: var(--forest);
-            font-size: 0.75rem;
+            border: 1.5px solid #ddd8ce;
+            border-radius: 7px;
+            background: #fff;
+            color: #1a2f1e;
+            font-size: 0.74rem;
             font-weight: 500;
-            font-family: var(--font-body);
+            font-family: 'DM Sans', sans-serif;
             cursor: pointer;
             transition: all 0.2s;
             text-align: center;
@@ -298,84 +325,135 @@
             justify-content: center;
             gap: 4px;
         }
-        .btn-detail:hover { border-color: var(--moss); color: var(--moss); }
+        .btn-detail:hover { border-color: #4a7c59; color: #4a7c59; }
         .btn-order {
             flex: 1;
             padding: 7px 6px;
             border: none;
-            border-radius: 6px;
-            background: var(--forest);
-            color: white;
-            font-size: 0.75rem;
+            border-radius: 7px;
+            background: #1a2f1e;
+            color: #fff;
+            font-size: 0.74rem;
             font-weight: 500;
-            font-family: var(--font-body);
+            font-family: 'DM Sans', sans-serif;
             cursor: pointer;
             transition: all 0.2s;
             text-align: center;
-            text-decoration: none;
             display: flex;
             align-items: center;
             justify-content: center;
             gap: 4px;
         }
-        .btn-order:hover { background: var(--moss); }
-        .btn-order.disabled {
-            background: var(--sage-light);
-            cursor: not-allowed;
-            pointer-events: none;
-        }
-
-        /* ── No Results ── */
+        .btn-order:hover { background: #2d5a3d; }
+        .btn-order.disabled { background: #c5d0c7; cursor: not-allowed; pointer-events: none; }
         .no-results {
             text-align: center;
             padding: 60px 20px;
             display: none;
             grid-column: 1/-1;
         }
-        .no-results i { font-size: 2.5rem; color: var(--sage-light); margin-bottom: 12px; display: block; }
-        .no-results p { color: var(--text-muted); font-size: 0.9rem; }
+        .no-results i { font-size: 2.5rem; color: #c5d0c7; margin-bottom: 12px; display: block; }
+        .no-results p { color: #8a9e8e; font-size: 0.9rem; }
 
+        /* ══════════════════════════════════════════
+           MOBILE / TABLET BOTTOM NAV
+        ══════════════════════════════════════════ */
+        .mobile-bottom-nav {
+            display: none;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            z-index: 500;
+            background: #fff;
+            border-top: 1.5px solid #e8e2d8;
+            padding: 6px 0 env(safe-area-inset-bottom, 6px);
+            box-shadow: 0 -4px 20px rgba(0,0,0,0.08);
+        }
+        .mobile-bottom-nav .nav-items {
+            display: flex;
+            justify-content: space-around;
+            align-items: flex-end;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        .mobile-bottom-nav .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2px;
+            text-decoration: none;
+            color: #8a9e8e;
+            font-size: 0.6rem;
+            font-family: 'DM Sans', sans-serif;
+            font-weight: 500;
+            padding: 4px 12px;
+            border-radius: 10px;
+            transition: color 0.2s;
+            position: relative;
+            cursor: pointer;
+            background: none;
+            border: none;
+        }
+        .mobile-bottom-nav .nav-item i { font-size: 1.25rem; }
+        .mobile-bottom-nav .nav-item:hover,
+        .mobile-bottom-nav .nav-item.active { color: #2d5a3d; }
+        /* Home — raised pill button */
+        .mobile-bottom-nav .nav-item.home-btn {
+            background: #1a2f1e;
+            color: #c9a84c;
+            border-radius: 16px;
+            padding: 8px 20px;
+            margin-bottom: 6px;
+            box-shadow: 0 4px 16px rgba(26,47,30,0.35);
+        }
+        .mobile-bottom-nav .nav-item.home-btn i { color: #c9a84c; font-size: 1.3rem; }
+        .mobile-bottom-nav .nav-item.home-btn:hover { background: #2d5a3d; }
+        /* Cart badge */
+        .cart-badge {
+            position: absolute;
+            top: 0px;
+            right: 6px;
+            background: #c0392b;
+            color: #fff;
+            font-size: 0.58rem;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+        }
+        /* Offers dot */
+        .offer-dot {
+            position: absolute;
+            top: 2px;
+            right: 8px;
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: #e67e22;
+            border: 1.5px solid #fff;
+        }
 
-        /* Accordion sidebar */
-        .cat-sub { list-style:none; padding:0 0 0 14px; margin:4px 0 0; }
-        .cat-l2 > a { font-size:0.83rem; padding:6px 8px; }
-        .cat-l3 > a { font-size:0.78rem; padding:5px 8px; color:var(--text-muted); }
-        .cat-l3 > a:hover, .cat-l3 > a.active { color:var(--moss); background:rgba(74,124,89,0.08); }
-        .cat-arrow { margin-left:auto; font-size:0.6rem; transition:transform 0.25s ease; }
-        .cat-arrow.open { transform:rotate(90deg); }
-        .cat-toggle { cursor:pointer; }
-        /* ── Mobile ── */
-        @media (max-width: 768px) {
-            .shop-wrapper { flex-direction: column; margin-top: 80px; }
-            .shop-sidebar { width: 100%; }
-            .cat-list { display: flex; flex-wrap: wrap; gap: 6px; }
-            .cat-list li { margin: 0; }
-            .cat-list a { padding: 6px 12px; font-size: 0.82rem; border: 1px solid var(--mist); }
-            .sidebar-box { padding: 14px; }
-            .product-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
-            .p-card-img { height: 110px; }
-            .shop-banner { display: none; }
+        @media (max-width: 1024px) {
+            .mobile-bottom-nav { display: block; }
+            .shop-wrapper { margin-bottom: 84px; }
         }
-        @media (max-width: 400px) {
-            .product-grid { grid-template-columns: repeat(2, 1fr); }
-        }
-    </style>
-    <style>
-        /* ── Mobile Drawer ── */
-        .drawer-overlay {
+
+        /* ══════════════════════════════════════════
+           MOBILE DRAWER
+        ══════════════════════════════════════════ */
+        .drawer-backdrop {
             display: none;
             position: fixed;
             inset: 0;
             background: rgba(0,0,0,0.45);
             z-index: 1000;
-            opacity: 0;
-            transition: opacity 0.3s ease;
         }
-        .drawer-overlay.open {
-            display: block;
-            opacity: 1;
-        }
-        .drawer {
+        .drawer-backdrop.active { display: block; }
+        .side-drawer {
             position: fixed;
             top: 0;
             right: 0;
@@ -385,12 +463,12 @@
             background: #1a2f1e;
             z-index: 1001;
             transform: translateX(100%);
-            transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+            transition: transform 0.35s cubic-bezier(0.4,0,0.2,1);
             display: flex;
             flex-direction: column;
             overflow-y: auto;
         }
-        .drawer.open { transform: translateX(0); }
+        .side-drawer.open { transform: translateX(0); }
         .drawer-header {
             display: flex;
             align-items: center;
@@ -414,18 +492,15 @@
             cursor: pointer;
             padding: 4px;
             opacity: 0.7;
-            transition: opacity 0.2s;
         }
         .drawer-close:hover { opacity: 1; }
-        .drawer-section {
-            padding: 16px 20px 8px;
-        }
+        .drawer-section { padding: 16px 20px 8px; }
         .drawer-section-title {
             font-size: 0.65rem;
             font-family: "Cinzel", serif;
             letter-spacing: 0.15em;
             text-transform: uppercase;
-            color:#c9a84c;
+            color: #c9a84c;
             margin-bottom: 8px;
         }
         .drawer-link {
@@ -435,21 +510,17 @@
             padding: 10px 12px;
             border-radius: 10px;
             color: #c9a84c !important;
-            font-size: 0.9rem;
+            font-size: 0.88rem;
             text-decoration: none;
             transition: background 0.2s;
             margin-bottom: 2px;
         }
         .drawer-link:hover { background: rgba(255,255,255,0.1); }
-        .drawer-link i { width: 16px; text-align: center; opacity: 0.8; color: #c9a84c !important }
+        .drawer-link i { width: 16px; text-align: center; }
         .drawer-link.active { background: #4a7c59; }
-        .drawer-link.whatsapp { background: #25D366; }
+        .drawer-link.whatsapp { background: #25D366; color: #fff !important; }
         .drawer-link.whatsapp:hover { background: #1da851; }
-        .drawer-divider {
-            height: 1px;
-            background: rgba(255,255,255,0.1);
-            margin: 8px 20px;
-        }
+        .drawer-divider { height: 1px; background: rgba(255,255,255,0.1); margin: 8px 20px; }
         .drawer-cat-count {
             margin-left: auto;
             background: rgba(255,255,255,0.15);
@@ -458,34 +529,29 @@
             padding: 1px 7px;
             border-radius: 50px;
         }
-        @media (max-width: 768px) {
-            .hamburger { display: flex !important; }
-            .desktop-nav { display: none !important; }
-            .shop-sidebar { display: none; }
-            .shop-wrapper { margin-top: 70px; padding: 0 10px; gap: 0; }
-            .shop-main { min-width: 0; }
-            .product-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
-            .p-card-img { height: 120px; }
-            .shop-topbar { padding: 8px 0; gap: 8px; }
-            .search-input { font-size: 0.82rem; }
-            .sort-select { font-size: 0.78rem; padding: 6px 8px; }
-        }
 
-#mobileDrawer a.drawer-link {
-    color: #c9a84c !important;
-    display: flex !important;
-}
-#mobileDrawer a.drawer-link i {
-    color: #c9a84c !important;
-}
-        @media (min-width: 769px) {
-            .drawer, .drawer-overlay { display: none !important; }
+        /* ══════════════════════════════════════════
+           RESPONSIVE
+        ══════════════════════════════════════════ */
+        @media (max-width: 1024px) {
+            .shop-sidebar { display: none; }
+            .shop-wrapper { padding: 12px 10px 0; gap: 0; }
+        }
+        @media (max-width: 600px) {
+            .product-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+            .p-card-img { height: 120px; }
+            .shop-banner { display: none; }
+            .results-count { display: none; }
+        }
+        @media (min-width: 1025px) {
+            .mobile-bottom-nav { display: none !important; }
+            .hamburger { display: none !important; }
         }
     </style>
 </head>
 <body>
 
-    <!-- Navbar -->
+    <!-- NAVBAR -->
     <header class="navbar" id="navbar">
         <div class="navbar-inner">
             <a href="/" class="brand" aria-label="Angan Baari Home">
@@ -501,13 +567,14 @@
                     <a href="/#products">Produce</a>
                     <a href="{% url 'shop' %}" style="color:var(--gold);">Shop</a>
                     <a href="/#contact">Contact</a>
-                    <a href="/#delivery" class="nav-cta">Order Now</a>
-                    <a href="{% url 'cart' %}" style="display:flex;align-items:center;gap:6px;padding:8px 16px;border-radius:50px;border:1.5px solid var(--gold);color:var(--gold);font-size:0.82rem;font-weight:500;margin-left:8px;position:relative;">
+                    <!-- Cart AFTER Contact as requested -->
+                    <a href="{% url 'cart' %}" style="display:flex;align-items:center;gap:6px;padding:8px 16px;border-radius:50px;border:1.5px solid var(--gold);color:var(--gold);font-size:0.82rem;font-weight:500;margin-left:4px;position:relative;">
                         <i class="fas fa-shopping-cart"></i>
                         {% with total_qty=request.session.cart.values|length %}
                         {% if total_qty > 0 %}<span style="position:absolute;top:-6px;right:-6px;background:#c0392b;color:white;font-size:0.65rem;width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;">{{ total_qty }}</span>{% endif %}
                         {% endwith %}
                     </a>
+                    <a href="/#delivery" class="nav-cta" style="margin-left:4px;">Order Now</a>
                     {% if user.is_authenticated %}
                     <a href="{% url 'profile' %}" style="display:flex;align-items:center;gap:6px;padding:8px 16px;border-radius:50px;background:var(--moss);color:white;font-size:0.82rem;font-weight:500;margin-left:8px;">
                         <i class="fas fa-user"></i> {{ user.first_name }}
@@ -527,10 +594,28 @@
         </div>
     </header>
 
-    <!-- Mobile Drawer Overlay -->
+    <!-- STICKY SEARCH BAR (always on top, below navbar) -->
+    <div class="shop-search-bar">
+        <div class="search-bar-inner">
+            <div class="search-field">
+                <i class="fas fa-search"></i>
+                <input type="text" id="shopSearch" placeholder="Search fruits, vegetables, honey…">
+            </div>
+            <select class="sort-select-styled" id="sortSelect" title="Sort products">
+                <option value="default">Sort: Default</option>
+                <option value="name-asc">Name: A–Z</option>
+                <option value="name-desc">Name: Z–A</option>
+                <option value="price-asc">Price ↑</option>
+                <option value="price-desc">Price ↓</option>
+            </select>
+            <span class="results-count" id="resultsInfo">{{ products|length }} products</span>
+        </div>
+    </div>
+
+    <!-- DRAWER BACKDROP -->
     <div class="drawer-backdrop" id="drawerOverlay"></div>
 
-    <!-- Mobile Drawer -->
+    <!-- MOBILE DRAWER -->
     <div class="side-drawer" id="mobileDrawer">
         <div class="drawer-header">
             <div class="drawer-brand">
@@ -539,41 +624,51 @@
             </div>
             <button class="drawer-close" id="drawerClose"><i class="fas fa-times"></i></button>
         </div>
-
-        <!-- Quick Links -->
         <div class="drawer-section">
             <div class="drawer-section-title">Quick Links</div>
-            <a href="/" class="drawer-link revealed" style="color:#c9a84c!important;display:flex;"><i class="fas fa-home"></i> Back to Website</a>
-            {% if user.is_authenticated %}<a href="{% url 'profile' %}" class="drawer-link revealed" style="color:#c9a84c!important;display:flex;"><i class="fas fa-user"></i> My Profile ({{ user.first_name }})</a><a href="{% url 'logout' %}" class="drawer-link revealed" style="color:#c9a84c!important;display:flex;"><i class="fas fa-sign-out-alt"></i> Logout</a>{% else %}<a href="{% url 'login' %}" class="drawer-link revealed" style="color:#c9a84c!important;display:flex;"><i class="fas fa-sign-in-alt"></i> Login / Sign Up</a>{% endif %}
-            <a href="https://wa.me/9779821025084" class="drawer-link revealed whatsapp" target="_blank"><i class="fab fa-whatsapp"></i> Order via WhatsApp</a>
+            <a href="/" class="drawer-link"><i class="fas fa-home"></i> Back to Home</a>
+            {% if user.is_authenticated %}
+            <a href="{% url 'profile' %}" class="drawer-link"><i class="fas fa-user"></i> My Profile ({{ user.first_name }})</a>
+            <a href="{% url 'logout' %}" class="drawer-link"><i class="fas fa-sign-out-alt"></i> Logout</a>
+            {% else %}
+            <a href="{% url 'login' %}" class="drawer-link"><i class="fas fa-sign-in-alt"></i> Login / Sign Up</a>
+            {% endif %}
+            <a href="https://wa.me/9779821025084" class="drawer-link whatsapp" target="_blank"><i class="fab fa-whatsapp"></i> Order via WhatsApp</a>
         </div>
-
         <div class="drawer-divider"></div>
-
-        <!-- Categories -->
         <div class="drawer-section">
             <div class="drawer-section-title">Categories</div>
-            <a href="{% url 'shop' %}" class="drawer-link revealed {% if not selected_category %}active{% endif %}"><i class="fas fa-th-large"></i> All Products <span class="drawer-cat-count">{{ total_count }}</span></a>
-            {% for cat in cat_tree %}<a href="{% url 'shop' %}?cat={{ cat.obj.id }}" class="drawer-link revealed {% if selected_category.id == cat.obj.id %}active{% endif %}"><i class="fas {{ cat.obj.icon }}"></i> {{ cat.obj.name }} <span class="drawer-cat-count">{{ cat.count }}</span></a>{% if cat.children %}{% for sub in cat.children %}<a href="{% url 'shop' %}?cat={{ sub.obj.id }}" class="drawer-link revealed {% if selected_category.id == sub.obj.id %}active{% endif %}" style="padding-left:28px;font-size:0.83rem;"><i class="fas fa-circle" style="font-size:0.35rem;vertical-align:middle;"></i> {{ sub.obj.name }} <span class="drawer-cat-count">{{ sub.count }}</span></a>{% endfor %}{% endif %}{% endfor %}
+            <a href="{% url 'shop' %}" class="drawer-link {% if not selected_category %}active{% endif %}">
+                <i class="fas fa-th-large"></i> All Products <span class="drawer-cat-count">{{ total_count }}</span>
+            </a>
+            {% for cat in cat_tree %}
+            <a href="{% url 'shop' %}?cat={{ cat.obj.id }}" class="drawer-link {% if selected_category.id == cat.obj.id %}active{% endif %}">
+                <i class="fas {{ cat.obj.icon }}"></i> {{ cat.obj.name }} <span class="drawer-cat-count">{{ cat.count }}</span>
+            </a>
+            {% if cat.children %}{% for sub in cat.children %}
+            <a href="{% url 'shop' %}?cat={{ sub.obj.id }}" class="drawer-link {% if selected_category.id == sub.obj.id %}active{% endif %}" style="padding-left:28px;font-size:0.83rem;">
+                <i class="fas fa-circle" style="font-size:0.35rem;vertical-align:middle;"></i> {{ sub.obj.name }} <span class="drawer-cat-count">{{ sub.count }}</span>
+            </a>
+            {% endfor %}{% endif %}
+            {% endfor %}
         </div>
     </div>
 
+    <!-- SHOP LAYOUT -->
     <div class="shop-wrapper">
 
-        <!-- Sidebar -->
+        <!-- Sidebar (desktop only) -->
         <aside class="shop-sidebar">
             <div class="sidebar-box">
                 <span class="sidebar-title">Categories</span>
                 <ul class="cat-list" id="catList">
-                    <!-- All Products -->
                     <li>
                         <a class="{% if not selected_category %}active{% endif %}" href="{% url 'shop' %}">
-                            <i class="fas fa-th-large" style="color:var(--moss);width:14px;"></i>
+                            <i class="fas fa-th-large" style="color:#4a7c59;width:14px;"></i>
                             All Products
                             <span class="cat-count">{{ total_count }}</span>
                         </a>
                     </li>
-                    <!-- Level 1 Categories -->
                     {% for cat in cat_tree %}
                     <li class="cat-l1">
                         <a class="cat-toggle {% if selected_category.id == cat.obj.id %}active{% endif %}"
@@ -622,7 +717,8 @@
             </div>
             <div class="sidebar-box">
                 <span class="sidebar-title">Contact Us</span>
-                <a href="https://wa.me/9779821025084" target="_blank" style="display:flex;align-items:center;gap:8px;background:#25D366;color:white;padding:9px 14px;border-radius:8px;font-size:0.82rem;font-weight:500;text-decoration:none;">
+                <a href="https://wa.me/9779821025084" target="_blank"
+                   style="display:flex;align-items:center;gap:8px;background:#25D366;color:white;padding:9px 14px;border-radius:8px;font-size:0.82rem;font-weight:500;text-decoration:none;">
                     <i class="fab fa-whatsapp"></i> Order via WhatsApp
                 </a>
             </div>
@@ -637,23 +733,7 @@
                     <h2>Fresh From Our Farm 🌿</h2>
                     <p>Organic produce from Bhulka Danda, Rupandehi, Nepal</p>
                 </div>
-                <div class="banner-icon">🌱</div>
-            </div>
-
-            <!-- Top Bar -->
-            <div class="shop-topbar">
-                <div class="search-wrap">
-                    <i class="fas fa-search"></i>
-                    <input type="text" class="search-input" id="shopSearch" placeholder="Search products...">
-                </div>
-                <span class="results-info" id="resultsInfo">{{ products|length }} products</span>
-                <select class="sort-select" id="sortSelect">
-                    <option value="default">Sort: Default</option>
-                    <option value="name-asc">Name: A–Z</option>
-                    <option value="name-desc">Name: Z–A</option>
-                    <option value="price-asc">Price: Low to High</option>
-                    <option value="price-desc">Price: High to Low</option>
-                </select>
+                <div class="banner-emoji">🌱</div>
             </div>
 
             <!-- Product Grid -->
@@ -668,14 +748,17 @@
                         {% if product.main_image %}
                         <img src="{% static product.main_image %}" alt="{{ product.name }}" loading="lazy">
                         {% else %}
-                        <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:var(--mist);">
-                            <i class="fas fa-seedling" style="font-size:2rem;color:var(--sage);"></i>
+                        <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#f0ece4;">
+                            <i class="fas fa-seedling" style="font-size:2rem;color:#9ab8a0;"></i>
                         </div>
                         {% endif %}
                         <span class="p-cat-tag">{{ product.get_category_display }}</span>
                         {% if not product.is_available %}
                         <span class="p-unavailable-badge">Out of Season</span>
                         {% endif %}
+                        <button class="p-wish" onclick="event.stopPropagation()" title="Save for later">
+                            <i class="far fa-heart"></i>
+                        </button>
                     </div>
                     <div class="p-card-body">
                         <div class="p-name">{{ product.name }}</div>
@@ -706,8 +789,8 @@
                     </div>
                 </div>
                 {% empty %}
-                <div style="grid-column:1/-1;text-align:center;padding:60px 0;color:var(--text-muted);">
-                    <i class="fas fa-seedling" style="font-size:2.5rem;margin-bottom:12px;display:block;color:var(--sage-light);"></i>
+                <div style="grid-column:1/-1;text-align:center;padding:60px 0;color:#8a9e8e;">
+                    <i class="fas fa-seedling" style="font-size:2.5rem;margin-bottom:12px;display:block;color:#c5d0c7;"></i>
                     <p>No products available right now. Check back soon!</p>
                 </div>
                 {% endfor %}
@@ -741,13 +824,54 @@
         </div>
     </footer>
 
+    <!-- MOBILE / TABLET BOTTOM NAV (hidden on desktop) -->
+    <nav class="mobile-bottom-nav" id="bottomNav" aria-label="Mobile navigation">
+        <div class="nav-items">
+            <!-- Home — raised center pill -->
+            <a href="/" class="nav-item home-btn">
+                <i class="fas fa-home"></i>
+                <span>Home</span>
+            </a>
+            <!-- Message / WhatsApp -->
+            <a href="https://wa.me/9779821025084?text=Hello%20Angan%20Baari!" target="_blank" rel="noopener" class="nav-item">
+                <i class="fab fa-whatsapp"></i>
+                <span>Message</span>
+            </a>
+            <!-- Offers -->
+            <a href="{% url 'shop' %}?sort=offers" class="nav-item">
+                <i class="fas fa-tag"></i>
+                <span class="offer-dot"></span>
+                <span>Offers</span>
+            </a>
+            <!-- Cart -->
+            <a href="{% url 'cart' %}" class="nav-item">
+                <i class="fas fa-shopping-cart"></i>
+                {% with total_qty=request.session.cart.values|length %}
+                {% if total_qty > 0 %}<span class="cart-badge">{{ total_qty }}</span>{% endif %}
+                {% endwith %}
+                <span>Cart</span>
+            </a>
+            <!-- Profile -->
+            {% if user.is_authenticated %}
+            <a href="{% url 'profile' %}" class="nav-item">
+                <i class="fas fa-user-circle"></i>
+                <span>Profile</span>
+            </a>
+            {% else %}
+            <a href="{% url 'login' %}" class="nav-item">
+                <i class="fas fa-user-circle"></i>
+                <span>Login</span>
+            </a>
+            {% endif %}
+        </div>
+    </nav>
 
     <script>
-        // Always show navbar as solid on shop page
+        // Navbar always solid on shop page
         const navbar = document.getElementById('navbar');
-        navbar.classList.add('scrolled');
+        if (navbar) navbar.classList.add('scrolled');
 
-        // Mobile Drawer
+        // Mobile drawer
         const hamburger = document.getElementById('mobile-menu');
         const drawer = document.getElementById('mobileDrawer');
         const overlay = document.getElementById('drawerOverlay');
@@ -763,54 +887,38 @@
             overlay.classList.remove('active');
             document.body.style.overflow = '';
         }
-
         if (hamburger) hamburger.addEventListener('click', openDrawer);
         if (drawerClose) drawerClose.addEventListener('click', closeDrawer);
         if (overlay) overlay.addEventListener('click', closeDrawer);
 
+        // Filter + sort
         const cards = Array.from(document.querySelectorAll('.p-card'));
-        const catLinks = document.querySelectorAll('#catList a');
         const searchInput = document.getElementById('shopSearch');
         const resultsInfo = document.getElementById('resultsInfo');
         const noResults = document.getElementById('noResults');
         const sortSelect = document.getElementById('sortSelect');
         const grid = document.getElementById('productGrid');
 
-        let activeCat = 'all';
-
         function filterAndSort() {
             const search = searchInput.value.toLowerCase().trim();
             const sort = sortSelect.value;
-
-            let visible = cards.filter(card => {
-                const matchCat = true; // category filtering done server-side
-                const matchSearch = card.dataset.name.includes(search);
-                return matchCat && matchSearch;
-            });
-
+            let visible = cards.filter(c => c.dataset.name.includes(search));
             cards.forEach(c => c.style.display = 'none');
-
-            if (sort === 'name-asc') visible.sort((a, b) => a.dataset.name.localeCompare(b.dataset.name));
-            else if (sort === 'name-desc') visible.sort((a, b) => b.dataset.name.localeCompare(a.dataset.name));
-            else if (sort === 'price-asc') visible.sort((a, b) => parseFloat(a.dataset.price) - parseFloat(b.dataset.price));
-            else if (sort === 'price-desc') visible.sort((a, b) => parseFloat(b.dataset.price) - parseFloat(a.dataset.price));
-
-            visible.forEach(c => {
-                c.style.display = 'flex';
-                grid.appendChild(c);
-            });
-
+            if (sort === 'name-asc') visible.sort((a,b) => a.dataset.name.localeCompare(b.dataset.name));
+            else if (sort === 'name-desc') visible.sort((a,b) => b.dataset.name.localeCompare(a.dataset.name));
+            else if (sort === 'price-asc') visible.sort((a,b) => parseFloat(a.dataset.price) - parseFloat(b.dataset.price));
+            else if (sort === 'price-desc') visible.sort((a,b) => parseFloat(b.dataset.price) - parseFloat(a.dataset.price));
+            visible.forEach(c => { c.style.display = 'flex'; grid.appendChild(c); });
             resultsInfo.textContent = `${visible.length} product${visible.length !== 1 ? 's' : ''}`;
             noResults.style.display = visible.length === 0 ? 'block' : 'none';
         }
 
-        // Search and sort only (category filtering done server-side via URL)
         searchInput.addEventListener('input', filterAndSort);
         sortSelect.addEventListener('change', filterAndSort);
 
-        // Accordion sidebar
+        // Sidebar accordion
         document.querySelectorAll('[data-toggle]').forEach(link => {
-            link.addEventListener('click', function(e) {
+            link.addEventListener('click', function() {
                 const targetId = this.dataset.toggle;
                 const target = document.getElementById(targetId);
                 const arrow = document.getElementById('arrow-' + targetId);
@@ -819,16 +927,20 @@
                     target.style.display = isOpen ? 'none' : 'block';
                     if (arrow) arrow.classList.toggle('open', !isOpen);
                 }
-                // Allow normal navigation
             });
         });
 
-        // Open arrows for active items on page load
         document.querySelectorAll('.cat-sub').forEach(sub => {
             if (sub.style.display === 'block') {
                 const arrow = document.getElementById('arrow-' + sub.id);
                 if (arrow) arrow.classList.add('open');
             }
+        });
+
+        // Highlight active bottom nav
+        const path = window.location.pathname;
+        document.querySelectorAll('.mobile-bottom-nav .nav-item').forEach(item => {
+            if (item.getAttribute('href') === path) item.classList.add('active');
         });
     </script>
 </body>
