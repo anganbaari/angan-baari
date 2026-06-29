@@ -19,13 +19,26 @@
            STICKY TOP SEARCH BAR
         ══════════════════════════════════════════ */
         .shop-search-bar {
-            position: sticky;
-            top: 0;
-            z-index: 200;
+            position: fixed;
+            top: 64px; /* sits just below the navbar */
+            left: 0;
+            right: 0;
+            z-index: 190;
             background: #fff;
             border-bottom: 1.5px solid #e8e2d8;
-            padding: 10px 16px;
+            padding: 8px 16px;
             box-shadow: 0 2px 12px rgba(26,47,30,0.08);
+        }
+        /* Push page content down so it isn't hidden under navbar + search bar */
+        .shop-wrapper {
+            padding-top: 16px;
+        }
+        body {
+            padding-top: 116px; /* navbar ~64px + search bar ~52px */
+        }
+        @media (max-width: 768px) {
+            .shop-search-bar { top: 56px; }
+            body { padding-top: 106px; }
         }
         .search-bar-inner {
             display: flex;
@@ -95,6 +108,7 @@
             padding: 16px 12px 0;
             gap: 16px;
         }
+        /* Override body padding-top from above for desktop */
 
         /* ══════════════════════════════════════════
            SIDEBAR (desktop only)
