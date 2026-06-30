@@ -7,7 +7,6 @@ from .emails import (
     send_order_received_email,
     send_order_cancelled_email,
 )
-from django.contrib.auth.decorators import login_required
 
 def home(request):
     return render(request, 'index.html')
@@ -189,53 +188,6 @@ def submit_review(request, slug):
             return redirect(product.get_absolute_url() + '?reviewed=1')
     return redirect(product.get_absolute_url())
 
-def shop(request):
-    from .models import Product, Category
-
-    def get_all_ids(cat):
-        """Get category ID + all descendant IDs"""
-        ids = [cat.id]
-        for sub in cat.subcategories.all():
-            ids.append(sub.id)
-            for subsub in sub.subcategories.all():
-                ids.append(subsub.id)
-        return ids
-
-    def get_count(cat):
-        return Product.objects.filter(category__id__in=get_all_ids(cat)).count()
-
-    # Get selected category
-    cat_id = request.GET.get('cat')
-    selected_category = None
-    products = Product.objects.all().order_by('name')
-
-    if cat_id:
-        try:
-            selected_category = Category.objects.get(id=cat_id)
-            products = products.filter(category__id__in=get_all_ids(selected_category))
-        except Category.DoesNotExist:
-            pass
-
-    # Build 3-level tree
-    main_categories = Category.objects.filter(parent=None).prefetch_related(
-        'subcategories__subcategories'
-    )
-
-    cat_tree = []
-    for cat in main_categories:
-        subs = []
-        for sub in cat.subcategories.all():
-            subsubs = [{'obj': ss, 'count': ss.products.count()} 
-                       for ss in sub.subcategories.all()]
-            subs.append({'obj': sub, 'count': get_count(sub), 'children': subsubs})
-        cat_tree.append({'obj': cat, 'count': get_count(cat), 'children': subs})
-
-    return render(request, 'shop.html', {
-        'products': products,
-        'cat_tree': cat_tree,
-        'selected_category': selected_category,
-        'total_count': Product.objects.count(),
-    })
 
 # ─── CART SYSTEM ───────────────────────────────────────────────
 
@@ -292,22 +244,91 @@ def update_cart(request, product_id):
     save_cart(request, cart)
     return redirect('cart')
 
+
+# ─── SAVE FOR LATER (session-based, no login needed) ───────────
+
+def get_saved(request):
+    return request.session.get('saved', {})
+
+def save_saved(request, saved):
+    request.session['saved'] = saved
+    request.session.modified = True
+
+def toggle_save_for_later(request, product_id):
+    from .models import Product
+    product = get_object_or_404(Product, id=product_id)
+    cart = get_cart(request)
+    saved = get_saved(request)
+    pid = str(product_id)
+
+    if pid in saved:
+        del saved[pid]
+        is_saved = False
+    else:
+        if pid in cart:
+            del cart[pid]
+            save_cart(request, cart)
+        saved[pid] = {
+            'name': product.name,
+            'price': str(product.price),
+            'price_unit': product.price_unit,
+            'image': product.main_image,
+            'slug': product.slug,
+        }
+        is_saved = True
+
+    save_saved(request, saved)
+
+    if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+        return JsonResponse({'status': 'ok', 'saved': is_saved})
+    return redirect(request.META.get('HTTP_REFERER', '/shop/'))
+
+def move_to_cart(request, product_id):
+    saved = get_saved(request)
+    cart = get_cart(request)
+    pid = str(product_id)
+    if pid in saved:
+        item = saved.pop(pid)
+        if pid in cart:
+            cart[pid]['qty'] += 1
+        else:
+            cart[pid] = {**item, 'qty': 1}
+        save_saved(request, saved)
+        save_cart(request, cart)
+    return redirect('cart')
+
+def remove_saved(request, product_id):
+    saved = get_saved(request)
+    pid = str(product_id)
+    if pid in saved:
+        del saved[pid]
+        save_saved(request, saved)
+    return redirect('cart')
+
+
 def cart_view(request):
     cart = get_cart(request)
+    saved = get_saved(request)
+
     items = []
     total = 0
     for pid, item in cart.items():
         try:
             subtotal = float(item['price']) * item['qty']
-        except:
+        except Exception:
             subtotal = 0
         total += subtotal
         items.append({**item, 'id': pid, 'subtotal': subtotal})
+
+    saved_items = [{**item, 'id': pid} for pid, item in saved.items()]
+
     return render(request, 'cart.html', {
         'items': items,
         'total': total,
         'count': cart_count(request),
+        'saved_items': saved_items,
     })
+
 
 def checkout(request):
     cart = get_cart(request)
@@ -319,7 +340,7 @@ def checkout(request):
     for pid, item in cart.items():
         try:
             subtotal = float(item['price']) * item['qty']
-        except:
+        except Exception:
             subtotal = 0
         total += subtotal
         items.append({**item, 'id': pid, 'subtotal': subtotal})
@@ -331,7 +352,6 @@ def checkout(request):
         address = request.POST.get('address', '').strip()
         message = request.POST.get('message', '').strip()
 
-        # Build product interest string from cart
         product_list = ', '.join([f"{i['name']} x{i['qty']}" for i in items])
 
         order = ProductOrder.objects.create(
@@ -347,13 +367,11 @@ def checkout(request):
         except Exception:
             pass
 
-        # Clear cart after order
         request.session['cart'] = {}
         request.session.modified = True
 
         return render(request, 'success.html', {'order': order})
 
-    # Pre-fill form if logged in
     initial = {}
     if request.user.is_authenticated:
         initial['name'] = request.user.get_full_name()
@@ -365,32 +383,11 @@ def checkout(request):
         'initial': initial,
     })
 
-@login_required
-def toggle_wishlist(request, product_id):
-    from .models import Product, Wishlist
-    product = get_object_or_404(Product, id=product_id)
-    wish, created = Wishlist.objects.get_or_create(user=request.user, product=product)
-    if not created:
-        wish.delete()
-        is_wished = False
-    else:
-        is_wished = True
- 
-    if request.headers.get('x-requested-with') == 'XMLHttpRequest':
-        return JsonResponse({'status': 'ok', 'wished': is_wished})
-    return redirect(request.META.get('HTTP_REFERER', '/shop/'))
- 
- 
-@login_required
-def wishlist_view(request):
-    from .models import Wishlist
-    items = Wishlist.objects.filter(user=request.user).select_related('product')
-    return render(request, 'wishlist.html', {'items': items})
- 
-# Update the shop() view in shop/views.py - add wishlist_ids to context
+
+# ─── SHOP PAGE ───────────────────────────────────────────────
 
 def shop(request):
-    from .models import Product, Category, Wishlist
+    from .models import Product, Category
 
     def get_all_ids(cat):
         ids = [cat.id]
@@ -427,14 +424,12 @@ def shop(request):
             subs.append({'obj': sub, 'count': get_count(sub), 'children': subsubs})
         cat_tree.append({'obj': cat, 'count': get_count(cat), 'children': subs})
 
-    wishlist_ids = []
-    if request.user.is_authenticated:
-        wishlist_ids = list(Wishlist.objects.filter(user=request.user).values_list('product_id', flat=True))
+    saved_ids = list(get_saved(request).keys())
 
     return render(request, 'shop.html', {
         'products': products,
         'cat_tree': cat_tree,
         'selected_category': selected_category,
         'total_count': Product.objects.count(),
-        'wishlist_ids': wishlist_ids,
+        'saved_ids': saved_ids,
     })

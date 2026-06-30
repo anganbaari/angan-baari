@@ -40,6 +40,25 @@
         .btn-continue { display: block; text-align: center; margin-top: 12px; color: var(--moss); font-size: 0.85rem; }
         @media (max-width: 700px) { .cart-layout { grid-template-columns: 1fr; } .cart-summary { position: static; } }
 
+        /* Saved for Later */
+        .saved-section { margin-top: 32px; }
+        .saved-title { font-family: var(--font-display); font-size: 1.4rem; color: var(--forest); margin-bottom: 16px; }
+        .saved-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 14px; }
+        .saved-card { background: var(--white); border: 1px solid var(--mist); border-radius: 12px; overflow: hidden; }
+        .saved-card-img { height: 110px; background: var(--mist); }
+        .saved-card-img img { width: 100%; height: 100%; object-fit: cover; }
+        .saved-card-body { padding: 10px; }
+        .saved-card-name { font-size: 0.82rem; font-weight: 600; color: var(--forest); margin-bottom: 4px; line-height: 1.3; }
+        .saved-card-price { font-size: 0.85rem; color: #c0392b; font-weight: 600; margin-bottom: 8px; }
+        .saved-card-actions { display: flex; gap: 6px; }
+        .btn-move-cart { flex: 1; background: var(--forest); color: white; border: none; padding: 6px; border-radius: 6px; font-size: 0.72rem; cursor: pointer; }
+        .btn-move-cart:hover { background: var(--moss); }
+        .btn-remove-saved { background: none; border: 1px solid var(--mist); color: var(--text-muted); padding: 6px 9px; border-radius: 6px; cursor: pointer; font-size: 0.72rem; }
+        .btn-remove-saved:hover { border-color: #c0392b; color: #c0392b; }
+        .cart-item-actions-row { display: flex; gap: 14px; align-items: center; margin-top: 6px; }
+        .btn-save-later { background: none; border: none; color: var(--moss); cursor: pointer; font-size: 0.78rem; }
+        .btn-save-later:hover { text-decoration: underline; }
+
         /* ══════════════════════════════════════════
            MOBILE / TABLET BOTTOM NAV
         ══════════════════════════════════════════ */
@@ -177,10 +196,16 @@
                                 <button type="submit" name="qty" value="{{ item.qty|add:'1' }}" class="qty-btn">+</button>
                             </div>
                         </form>
-                        <form method="POST" action="{% url 'remove_from_cart' item.id %}">
-                            {% csrf_token %}
-                            <button type="submit" class="btn-remove"><i class="fas fa-trash"></i> Remove</button>
-                        </form>
+                        <div class="cart-item-actions-row">
+                            <form method="POST" action="{% url 'remove_from_cart' item.id %}">
+                                {% csrf_token %}
+                                <button type="submit" class="btn-remove"><i class="fas fa-trash"></i> Remove</button>
+                            </form>
+                            <form method="POST" action="{% url 'toggle_save_for_later' item.id %}">
+                                {% csrf_token %}
+                                <button type="submit" class="btn-save-later"><i class="far fa-heart"></i> Save for later</button>
+                            </form>
+                        </div>
                     </div>
                     <div class="cart-item-subtotal">Rs. {{ item.subtotal|floatformat:2 }}</div>
                 </div>
@@ -212,6 +237,36 @@
             <a href="{% url 'shop' %}" style="display:inline-flex;align-items:center;gap:8px;background:var(--forest);color:white;padding:12px 24px;border-radius:50px;text-decoration:none;font-weight:500;">
                 <i class="fas fa-leaf"></i> Browse Products
             </a>
+        </div>
+        {% endif %}
+
+        <!-- Saved for Later -->
+        {% if saved_items %}
+        <div class="saved-section">
+            <h2 class="saved-title">❤️ Saved for Later ({{ saved_items|length }})</h2>
+            <div class="saved-grid">
+                {% for item in saved_items %}
+                <div class="saved-card">
+                    <div class="saved-card-img">
+                        {% if item.image %}<img src="{% static item.image %}" alt="{{ item.name }}">{% endif %}
+                    </div>
+                    <div class="saved-card-body">
+                        <div class="saved-card-name">{{ item.name }}</div>
+                        <div class="saved-card-price">Rs. {{ item.price }}</div>
+                        <div class="saved-card-actions">
+                            <form method="POST" action="{% url 'move_to_cart' item.id %}" style="flex:1;">
+                                {% csrf_token %}
+                                <button type="submit" class="btn-move-cart"><i class="fas fa-cart-plus"></i> Add to Cart</button>
+                            </form>
+                            <form method="POST" action="{% url 'remove_saved' item.id %}">
+                                {% csrf_token %}
+                                <button type="submit" class="btn-remove-saved"><i class="fas fa-times"></i></button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
         </div>
         {% endif %}
     </div>

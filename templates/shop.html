@@ -775,17 +775,11 @@
                         {% if not product.is_available %}
                         <span class="p-unavailable-badge">Out of Season</span>
                         {% endif %}
-                        {% if user.is_authenticated %}
-                        <button class="p-wish {% if product.id in wishlist_ids %}wished{% endif %}"
-                                onclick="event.stopPropagation(); toggleWish({{ product.id }}, this)"
+                        <button class="p-wish {% if product.id|stringformat:'s' in saved_ids %}wished{% endif %}"
+                                onclick="event.stopPropagation(); toggleSaveLater({{ product.id }}, this)"
                                 title="Save for later" data-id="{{ product.id }}">
-                            <i class="{% if product.id in wishlist_ids %}fas{% else %}far{% endif %} fa-heart"></i>
+                            <i class="{% if product.id|stringformat:'s' in saved_ids %}fas{% else %}far{% endif %} fa-heart"></i>
                         </button>
-                        {% else %}
-                        <a href="{% url 'login' %}" class="p-wish" onclick="event.stopPropagation()" title="Login to save">
-                            <i class="far fa-heart"></i>
-                        </a>
-                        {% endif %}
                     </div>
                     <div class="p-card-body">
                         <div class="p-name">{{ product.name }}</div>
@@ -895,6 +889,31 @@
     </nav>
 
     <script>
+        // Save for Later toggle
+        function toggleSaveLater(productId, btn) {
+            fetch(`/cart/save-for-later/${productId}/`, {
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                }
+            })
+            .then(res => res.json())
+            .then(data => {
+                const icon = btn.querySelector('i');
+                if (data.saved) {
+                    btn.classList.add('wished');
+                    icon.classList.remove('far');
+                    icon.classList.add('fas');
+                } else {
+                    btn.classList.remove('wished');
+                    icon.classList.remove('fas');
+                    icon.classList.add('far');
+                }
+            })
+            .catch(err => console.error('Save error:', err));
+        }
+
         // Navbar always solid on shop page
         const navbar = document.getElementById('navbar');
         if (navbar) navbar.classList.add('scrolled');
