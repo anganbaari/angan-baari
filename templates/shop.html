@@ -276,9 +276,13 @@
             cursor: pointer;
             font-size: 0.8rem;
             color: #c0392b;
-            transition: background 0.2s;
+            transition: all 0.2s;
             box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+            text-decoration: none;
         }
+        .p-wish:hover { transform: scale(1.1); background: white; }
+        .p-wish.wished { background: #c0392b; color: white; }
+        .p-wish.wished:hover { background: #a8302a; }
         .p-wish:hover { background: #fff; }
         .p-card-body {
             padding: 10px;
@@ -771,9 +775,17 @@
                         {% if not product.is_available %}
                         <span class="p-unavailable-badge">Out of Season</span>
                         {% endif %}
-                        <button class="p-wish" onclick="event.stopPropagation()" title="Save for later">
-                            <i class="far fa-heart"></i>
+                        {% if user.is_authenticated %}
+                        <button class="p-wish {% if product.id in wishlist_ids %}wished{% endif %}"
+                                onclick="event.stopPropagation(); toggleWish({{ product.id }}, this)"
+                                title="Save for later" data-id="{{ product.id }}">
+                            <i class="{% if product.id in wishlist_ids %}fas{% else %}far{% endif %} fa-heart"></i>
                         </button>
+                        {% else %}
+                        <a href="{% url 'login' %}" class="p-wish" onclick="event.stopPropagation()" title="Login to save">
+                            <i class="far fa-heart"></i>
+                        </a>
+                        {% endif %}
                     </div>
                     <div class="p-card-body">
                         <div class="p-name">{{ product.name }}</div>

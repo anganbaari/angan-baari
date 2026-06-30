@@ -7,6 +7,7 @@ from .emails import (
     send_order_received_email,
     send_order_cancelled_email,
 )
+from django.contrib.auth.decorators import login_required
 
 def home(request):
     return render(request, 'index.html')
@@ -362,4 +363,78 @@ def checkout(request):
         'items': items,
         'total': total,
         'initial': initial,
+    })
+
+@login_required
+def toggle_wishlist(request, product_id):
+    from .models import Product, Wishlist
+    product = get_object_or_404(Product, id=product_id)
+    wish, created = Wishlist.objects.get_or_create(user=request.user, product=product)
+    if not created:
+        wish.delete()
+        is_wished = False
+    else:
+        is_wished = True
+ 
+    if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+        return JsonResponse({'status': 'ok', 'wished': is_wished})
+    return redirect(request.META.get('HTTP_REFERER', '/shop/'))
+ 
+ 
+@login_required
+def wishlist_view(request):
+    from .models import Wishlist
+    items = Wishlist.objects.filter(user=request.user).select_related('product')
+    return render(request, 'wishlist.html', {'items': items})
+ 
+# Update the shop() view in shop/views.py - add wishlist_ids to context
+
+def shop(request):
+    from .models import Product, Category, Wishlist
+
+    def get_all_ids(cat):
+        ids = [cat.id]
+        for sub in cat.subcategories.all():
+            ids.append(sub.id)
+            for subsub in sub.subcategories.all():
+                ids.append(subsub.id)
+        return ids
+
+    def get_count(cat):
+        return Product.objects.filter(category__id__in=get_all_ids(cat)).count()
+
+    cat_id = request.GET.get('cat')
+    selected_category = None
+    products = Product.objects.all().order_by('name')
+
+    if cat_id:
+        try:
+            selected_category = Category.objects.get(id=cat_id)
+            products = products.filter(category__id__in=get_all_ids(selected_category))
+        except Category.DoesNotExist:
+            pass
+
+    main_categories = Category.objects.filter(parent=None).prefetch_related(
+        'subcategories__subcategories'
+    )
+
+    cat_tree = []
+    for cat in main_categories:
+        subs = []
+        for sub in cat.subcategories.all():
+            subsubs = [{'obj': ss, 'count': ss.products.count()} 
+                       for ss in sub.subcategories.all()]
+            subs.append({'obj': sub, 'count': get_count(sub), 'children': subsubs})
+        cat_tree.append({'obj': cat, 'count': get_count(cat), 'children': subs})
+
+    wishlist_ids = []
+    if request.user.is_authenticated:
+        wishlist_ids = list(Wishlist.objects.filter(user=request.user).values_list('product_id', flat=True))
+
+    return render(request, 'shop.html', {
+        'products': products,
+        'cat_tree': cat_tree,
+        'selected_category': selected_category,
+        'total_count': Product.objects.count(),
+        'wishlist_ids': wishlist_ids,
     })
