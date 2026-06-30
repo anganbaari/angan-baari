@@ -1,5 +1,6 @@
 from django.contrib import admin
 from .models import ContactMessage, ProductOrder, NewsletterSubscriber, Product, Review, Category
+from .models import Offer
 
 
 @admin.register(Category)
@@ -74,3 +75,17 @@ class ReviewAdmin(admin.ModelAdmin):
     list_editable = ('is_approved',)
     search_fields = ('name', 'comment', 'product__name')
     ordering = ('-created_at',)
+
+@admin.register(Offer)
+class OfferAdmin(admin.ModelAdmin):
+    list_display = ['title', 'discount_type', 'discount_value', 'category', 'start_date', 'end_date', 'is_active', 'live_status']
+    list_filter = ['discount_type', 'is_active', 'category']
+    list_editable = ['is_active']
+    filter_horizontal = ['products']
+    search_fields = ['title']
+    date_hierarchy = 'start_date'
+ 
+    def live_status(self, obj):
+        return '🟢 Live' if obj.is_live() else '🔴 Not Live'
+    live_status.short_description = 'Status'
+     

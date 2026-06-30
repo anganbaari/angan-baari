@@ -168,6 +168,40 @@
         ══════════════════════════════════════════ */
         .shop-main { flex: 1; min-width: 0; }
 
+        /* Offer nav icon animation */
+        .offer-flame { animation: flicker 1.2s infinite alternate; }
+        @keyframes flicker {
+            0% { transform: scale(1) rotate(-3deg); opacity: 0.85; }
+            100% { transform: scale(1.15) rotate(3deg); opacity: 1; }
+        }
+        .offer-nav-link { animation: offer-pulse 2s infinite; }
+        @keyframes offer-pulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(192,57,43,0.5); }
+            50% { box-shadow: 0 0 0 6px rgba(192,57,43,0); }
+        }
+
+        /* Offer strip banner on shop page */
+        .offer-strip {
+            background: linear-gradient(90deg, #c0392b, #e67e22, #c0392b);
+            background-size: 200% 100%;
+            animation: offer-gradient 3s linear infinite;
+            border-radius: 12px;
+            padding: 12px 20px;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            color: white;
+            text-decoration: none;
+            font-size: 0.88rem;
+            font-weight: 600;
+        }
+        @keyframes offer-gradient {
+            0% { background-position: 0% 50%; }
+            100% { background-position: 200% 50%; }
+        }
+        .offer-strip i { animation: flicker 1s infinite alternate; }
+
         /* Banner */
         .shop-banner {
             background: linear-gradient(135deg, #1a2f1e 0%, #2d5a3d 100%);
@@ -579,6 +613,9 @@
                     <a href="/#about">About</a>
                     <a href="/#products">Produce</a>
                     <a href="{% url 'shop' %}" style="color:var(--gold);">Shop</a>
+                    <a href="{% url 'offers' %}" class="offer-nav-link" style="display:flex;align-items:center;gap:5px;padding:8px 14px;border-radius:50px;background:#c0392b;color:white;font-size:0.8rem;font-weight:600;position:relative;">
+                        <i class="fas fa-fire offer-flame"></i> Offers
+                    </a>
                     <a href="/#contact">Contact</a>
                     <!-- Cart AFTER Contact as requested -->
                     <a href="{% url 'cart' %}" style="display:flex;align-items:center;gap:6px;padding:8px 16px;border-radius:50px;border:1.5px solid var(--gold);color:var(--gold);font-size:0.82rem;font-weight:500;margin-left:4px;position:relative;">
@@ -747,6 +784,14 @@
         <main class="shop-main">
 
             <!-- Banner -->
+            {% if has_active_offers %}
+            <a href="{% url 'offers' %}" class="offer-strip">
+                <i class="fas fa-fire"></i>
+                <span>🎉 Limited Time Offers Live Now — Save up to big on selected products!</span>
+                <i class="fas fa-arrow-right" style="margin-left:auto;"></i>
+            </a>
+            {% endif %}
+
             <div class="shop-banner">
                 <div class="banner-text">
                     <h2>Fresh From Our Farm 🌿</h2>

@@ -150,3 +150,59 @@ class Wishlist(models.Model):
 
     def __str__(self):
         return f"{self.user.username} → {self.product.name}"        
+    
+# Add this to shop/models.py
+
+class Offer(models.Model):
+    DISCOUNT_TYPE = [
+        ('percent', 'Percentage Off'),
+        ('fixed', 'Fixed Amount Off'),
+        ('combo', 'Combo Deal'),
+    ]
+
+    title = models.CharField(max_length=200, help_text='e.g. "Mango Mania Sale"')
+    description = models.CharField(max_length=300, blank=True, help_text='Short tagline shown on badge/banner')
+    discount_type = models.CharField(max_length=10, choices=DISCOUNT_TYPE, default='percent')
+    discount_value = models.DecimalField(max_digits=10, decimal_places=2, help_text='e.g. 20 for 20% off, or 50 for Rs.50 off')
+    combo_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text='Only for combo deals - total bundle price')
+
+    products = models.ManyToManyField(Product, blank=True, related_name='offers', help_text='Leave empty if applying to whole category')
+    category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, blank=True, related_name='offers', help_text='Apply to all products in this category')
+
+    start_date = models.DateTimeField()
+    end_date = models.DateTimeField()
+    is_active = models.BooleanField(default=True)
+    banner_image = models.CharField(max_length=200, blank=True, help_text='Optional banner image path')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return self.title
+
+    def is_live(self):
+        from django.utils import timezone
+        now = timezone.now()
+        return self.is_active and self.start_date <= now <= self.end_date
+
+    def get_products(self):
+        if self.products.exists():
+            return self.products.all()
+        elif self.category:
+            ids = [self.category.id]
+            for sub in self.category.subcategories.all():
+                ids.append(sub.id)
+                for subsub in sub.subcategories.all():
+                    ids.append(subsub.id)
+            return Product.objects.filter(category__id__in=ids)
+        return Product.objects.none()
+
+    def discounted_price(self, original_price):
+        from decimal import Decimal
+        original_price = Decimal(str(original_price))
+        if self.discount_type == 'percent':
+            return round(original_price - (original_price * self.discount_value / 100), 2)
+        elif self.discount_type == 'fixed':
+            return max(round(original_price - self.discount_value, 2), Decimal('0'))
+        return original_price    

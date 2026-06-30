@@ -387,8 +387,8 @@ def checkout(request):
 # ─── SHOP PAGE ───────────────────────────────────────────────
 
 def shop(request):
-    from .models import Product, Category
-
+    from .models import Product, Category, Offer
+ 
     def get_all_ids(cat):
         ids = [cat.id]
         for sub in cat.subcategories.all():
@@ -396,25 +396,25 @@ def shop(request):
             for subsub in sub.subcategories.all():
                 ids.append(subsub.id)
         return ids
-
+ 
     def get_count(cat):
         return Product.objects.filter(category__id__in=get_all_ids(cat)).count()
-
+ 
     cat_id = request.GET.get('cat')
     selected_category = None
     products = Product.objects.all().order_by('name')
-
+ 
     if cat_id:
         try:
             selected_category = Category.objects.get(id=cat_id)
             products = products.filter(category__id__in=get_all_ids(selected_category))
         except Category.DoesNotExist:
             pass
-
+ 
     main_categories = Category.objects.filter(parent=None).prefetch_related(
         'subcategories__subcategories'
     )
-
+ 
     cat_tree = []
     for cat in main_categories:
         subs = []
@@ -423,13 +423,32 @@ def shop(request):
                        for ss in sub.subcategories.all()]
             subs.append({'obj': sub, 'count': get_count(sub), 'children': subsubs})
         cat_tree.append({'obj': cat, 'count': get_count(cat), 'children': subs})
-
+ 
     saved_ids = list(get_saved(request).keys())
-
+ 
+    # Check for active offers
+    from django.utils import timezone
+    now = timezone.now()
+    has_active_offers = Offer.objects.filter(
+        is_active=True, start_date__lte=now, end_date__gte=now
+    ).exists()
+ 
     return render(request, 'shop.html', {
         'products': products,
         'cat_tree': cat_tree,
         'selected_category': selected_category,
         'total_count': Product.objects.count(),
         'saved_ids': saved_ids,
+        'has_active_offers': has_active_offers,
     })
+ 
+
+ 
+def offers(request):
+    from .models import Offer
+    from django.utils import timezone
+    now = timezone.now()
+    all_offers = Offer.objects.filter(is_active=True, start_date__lte=now, end_date__gte=now)
+    active_offers = [o for o in all_offers if o.is_live()]
+    return render(request, 'offers.html', {'active_offers': active_offers})
+ 
