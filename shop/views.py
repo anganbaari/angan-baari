@@ -443,12 +443,68 @@ def shop(request):
     })
  
 
- 
 def offers(request):
     from .models import Offer
     from django.utils import timezone
     now = timezone.now()
-    all_offers = Offer.objects.filter(is_active=True, start_date__lte=now, end_date__gte=now)
-    active_offers = [o for o in all_offers if o.is_live()]
-    return render(request, 'offers.html', {'active_offers': active_offers})
- 
+
+    live_offers = Offer.objects.filter(
+        is_active=True, start_date__lte=now, end_date__gte=now
+    ).exclude(discount_type='combo')
+
+    combo_offers = Offer.objects.filter(
+        is_active=True, start_date__lte=now, end_date__gte=now, discount_type='combo'
+    )
+
+    discount_offers = []
+    for offer in live_offers:
+        for product in offer.get_products():
+            if not product.price or product.price <= 0:
+                continue
+            offer_price = offer.discounted_price(product.price)
+            if offer.discount_type == 'percent':
+                discount_percent = int(offer.discount_value)
+            else:
+                # fixed amount -> compute equivalent percent for the ribbon
+                discount_percent = int(round((float(offer.discount_value) / float(product.price)) * 100))
+            discount_offers.append({
+                'id': product.id,
+                'name': product.name,
+                'slug': product.slug,
+                'main_image': product.main_image,
+                'original_price': product.price,
+                'offer_price': offer_price,
+                'price_unit': product.price_unit,
+                'discount_percent': discount_percent,
+                'is_available': product.is_available,
+            })
+
+    bundle_deals = []
+    for offer in combo_offers:
+        products = list(offer.get_products())
+        if not products:
+            continue
+        original_total = sum([p.price for p in products if p.price])
+        bundle_price = offer.combo_price or original_total
+        savings_percent = 0
+        if original_total > 0:
+            savings_percent = int(round((1 - (float(bundle_price) / float(original_total))) * 100))
+
+        items = [{'name': p.name, 'qty': p.price_unit or '1 unit'} for p in products]
+        whatsapp_msg = f"Hello Angan Baari! I want to order the {offer.title} Bundle."
+
+        bundle_deals.append({
+            'title': offer.title,
+            'subtitle': offer.description,
+            'badge_label': '🎁 Combo Deal',
+            'items': items,
+            'bundle_price': bundle_price,
+            'original_price': original_total,
+            'savings_percent': savings_percent,
+            'whatsapp_message': whatsapp_msg,
+        })
+
+    return render(request, 'offers.html', {
+        'discount_offers': discount_offers,
+        'bundle_deals': bundle_deals,
+    })
