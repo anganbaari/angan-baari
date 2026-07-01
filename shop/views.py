@@ -202,25 +202,38 @@ def cart_count(request):
     cart = get_cart(request)
     return sum(item['qty'] for item in cart.values())
 
-def add_to_cart(request, product_id):
+# Add this view to shop/views.py (after add_to_cart)
+
+def add_to_cart_offer(request, product_id):
+    """Add to cart with a discounted price from offers page."""
     from .models import Product
     product = get_object_or_404(Product, id=product_id)
     cart = get_cart(request)
     pid = str(product_id)
+    
+    # Use discounted price if provided, otherwise original
+    offer_price = request.POST.get('offer_price', None)
+    price_to_use = offer_price if offer_price else str(product.price)
+    
     if pid in cart:
         cart[pid]['qty'] += 1
+        # Update to discounted price if it's lower
+        if offer_price and float(offer_price) < float(cart[pid]['price']):
+            cart[pid]['price'] = price_to_use
+            cart[pid]['original_price'] = str(product.price)
+            cart[pid]['is_offer'] = True
     else:
         cart[pid] = {
             'name': product.name,
-            'price': str(product.price),
+            'price': price_to_use,
+            'original_price': str(product.price),
             'price_unit': product.price_unit,
             'image': product.main_image,
             'slug': product.slug,
             'qty': 1,
+            'is_offer': bool(offer_price),
         }
     save_cart(request, cart)
-    if request.headers.get('x-requested-with') == 'XMLHttpRequest':
-        return JsonResponse({'status': 'ok', 'count': cart_count(request)})
     return redirect(request.META.get('HTTP_REFERER', '/shop/'))
 
 def remove_from_cart(request, product_id):
