@@ -10,7 +10,14 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
     <link rel="stylesheet" href="{% static 'style.css' %}">
     <style>
-        .auth-page { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; background: var(--cream); }
+        .auth-page { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; background: var(--cream); position: relative; }
+        .back-to-shop { position: absolute; top: 24px; left: 24px; display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 50px; background: var(--white); color: var(--moss); font-size: 0.82rem; font-weight: 500; text-decoration: none; box-shadow: 0 2px 10px rgba(26,47,30,0.08); transition: background 0.2s, transform 0.2s; }
+        .back-to-shop:hover { background: var(--moss); color: white; transform: translateX(-2px); }
+        .auth-logo-link { display: block; text-decoration: none; }
+        @media (max-width: 480px) {
+            .back-to-shop { top: 14px; left: 14px; padding: 7px 13px; font-size: 0.78rem; }
+            .auth-card { padding-top: 60px; }
+        }
         .auth-card { background: var(--white); border-radius: 20px; padding: 48px 40px; width: 100%; max-width: 420px; box-shadow: 0 20px 60px rgba(26,47,30,0.12); }
         .auth-logo { text-align: center; margin-bottom: 32px; }
         .auth-logo i { font-size: 2rem; color: var(--moss); }
@@ -34,12 +41,15 @@
 </head>
 <body>
 <div class="auth-page">
+    <a href="{% url 'shop' %}" class="back-to-shop"><i class="fas fa-arrow-left"></i> Back to Shop</a>
     <div class="auth-card">
+        <a href="/" class="auth-logo-link">
         <div class="auth-logo">
             <i class="fas fa-seedling"></i>
             <h1>आँगन बारी</h1>
             <p>Angan Baari · Organic Farm</p>
         </div>
+        </a>
 
         <h2 class="auth-title">Create your account 🌱</h2>
 
