@@ -1,6 +1,6 @@
 from django.contrib import admin
 from .models import ContactMessage, ProductOrder, NewsletterSubscriber, Product, Review, Category
-from .models import Offer
+from .models import Offer, Coupon
 
 
 @admin.register(Category)
@@ -88,4 +88,17 @@ class OfferAdmin(admin.ModelAdmin):
     def live_status(self, obj):
         return '🟢 Live' if obj.is_live() else '🔴 Not Live'
     live_status.short_description = 'Status'
-     
+
+
+@admin.register(Coupon)
+class CouponAdmin(admin.ModelAdmin):
+    list_display = ['code', 'festival_name', 'discount_type', 'discount_value', 'min_order_amount', 'start_date', 'end_date', 'is_active', 'used_count', 'live_status']
+    list_filter = ['is_active', 'discount_type']
+    list_editable = ['is_active']
+    search_fields = ['code', 'festival_name']
+    date_hierarchy = 'start_date'
+    readonly_fields = ['used_count', 'created_at']
+
+    def live_status(self, obj):
+        return '🟢 Live' if obj.is_live() else '🔴 Not Live'
+    live_status.short_description = 'Status'
