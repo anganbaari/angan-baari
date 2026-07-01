@@ -31,9 +31,8 @@
             text-align: center;
             position: relative;
             overflow: hidden;
-            margin-top: 64px; /* below navbar */
+            margin-top: 64px;
         }
-        /* Decorative marigold circles */
         .dashain-hero::before {
             content: '';
             position: absolute;
@@ -78,7 +77,6 @@
             margin-bottom: 28px;
         }
 
-        /* Countdown */
         .countdown-wrapper {
             display: inline-flex;
             gap: 12px;
@@ -123,9 +121,6 @@
             letter-spacing: 0.05em;
         }
 
-        /* ══════════════════════════════════════════
-           PAGE BODY
-        ══════════════════════════════════════════ */
         .offers-wrapper {
             max-width: 1100px;
             margin: 0 auto;
@@ -166,9 +161,6 @@
             margin-bottom: 20px;
         }
 
-        /* ══════════════════════════════════════════
-           DISCOUNT CARDS GRID
-        ══════════════════════════════════════════ */
         .discount-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
@@ -193,7 +185,6 @@
             border-color: #c9a84c;
         }
 
-        /* Discount ribbon */
         .discount-ribbon {
             position: absolute;
             top: 12px;
@@ -230,7 +221,6 @@
         }
         .offer-card:hover .offer-card-img img { transform: scale(1.06); }
 
-        /* Placeholder when no image */
         .offer-card-img .no-img {
             width: 100%; height: 100%;
             display: flex; align-items: center; justify-content: center;
@@ -309,7 +299,6 @@
         }
         .btn-offer-add:hover { background: #2d5a3d; }
 
-        /* "Price TBD" variant */
         .offer-price-tbd {
             font-size: 0.8rem;
             color: #8a9e8e;
@@ -317,9 +306,6 @@
             margin-bottom: 10px;
         }
 
-        /* ══════════════════════════════════════════
-           BUNDLE DEALS SECTION
-        ══════════════════════════════════════════ */
         .bundle-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -427,9 +413,6 @@
         }
         .btn-bundle-order:hover { opacity: 0.9; transform: scale(1.01); }
 
-        /* ══════════════════════════════════════════
-           COUPON STRIP
-        ══════════════════════════════════════════ */
         .coupon-strip {
             background: linear-gradient(135deg, #1a2f1e, #2d5a3d);
             border-radius: 16px;
@@ -480,9 +463,6 @@
         }
         .btn-copy-code:hover { opacity: 0.85; }
 
-        /* ══════════════════════════════════════════
-           HOW IT WORKS
-        ══════════════════════════════════════════ */
         .how-it-works {
             background: #fff;
             border-radius: 16px;
@@ -516,20 +496,13 @@
             color: #c9a84c; font-size: 1rem; padding-top: 18px;
         }
 
-        /* ══════════════════════════════════════════
-           EMPTY STATE (no offers yet from Django)
-        ══════════════════════════════════════════ */
         .empty-offers {
             text-align: center;
             padding: 50px 20px;
             color: #8a9e8e;
-            display: none; /* shown by Django if no offers */
         }
         .empty-offers i { font-size: 2.5rem; color: #c5d0c7; margin-bottom: 12px; display: block; }
 
-        /* ══════════════════════════════════════════
-           BOTTOM NAV (mobile/tablet)
-        ══════════════════════════════════════════ */
         .mobile-bottom-nav {
             display: none;
             position: fixed;
@@ -592,7 +565,6 @@
 </head>
 <body>
 
-    <!-- ════ NAVBAR ════ -->
     <header class="navbar scrolled" id="navbar">
         <div class="navbar-inner">
             <a href="/" class="brand" aria-label="Angan Baari Home">
@@ -634,7 +606,6 @@
         </div>
     </header>
 
-    <!-- ════ DASHAIN HERO ════ -->
     <section class="dashain-hero">
         <div class="hero-tikas">🪔 ᳕ 🌼</div>
         <div class="hero-label">Dashain Special · दशैं विशेष</div>
@@ -644,7 +615,6 @@
         </h1>
         <p class="hero-subtitle">Celebrate Dashain with the freshest organic produce from Bhulka Danda 🌿</p>
 
-        <!-- Countdown timer -->
         <div class="countdown-wrapper" id="countdown">
             <div class="countdown-block">
                 <span class="countdown-num" id="cd-days">00</span>
@@ -670,10 +640,8 @@
         <span class="hero-badge"><i class="fas fa-fire"></i> Limited Dashain Offers — Ends at Bijaya Dashami</span>
     </section>
 
-    <!-- ════ MAIN CONTENT ════ -->
     <div class="offers-wrapper">
 
-        <!-- ── Coupon Strip ── -->
         <div class="coupon-strip">
             <div class="coupon-icon">🎁</div>
             <div class="coupon-text">
@@ -689,7 +657,6 @@
             </div>
         </div>
 
-        <!-- ── Discount Offers ── -->
         <div class="section-head">
             <div class="section-head-line"></div>
             <span class="section-label">🏷️ Dashain Discounts</span>
@@ -698,149 +665,53 @@
         <h2 class="section-title">Special Price Offers</h2>
         <p class="section-sub">Fresh from our farm — limited Dashain pricing on selected products</p>
 
+        {% if discount_offers %}
         <div class="discount-grid">
-            <!-- ════════════════════════════════════════
-                 DJANGO: loop through discount offers
-                 Replace the static cards below with your real products.
-                 Expected context: discount_offers = list of dicts with:
-                   name, slug, main_image, original_price, offer_price,
-                   price_unit, discount_percent, is_available
-            ═════════════════════════════════════════ -->
-
-            {% if discount_offers %}
-                {% for offer in discount_offers %}
-                <div class="offer-card" onclick="window.location='{% url 'product_detail' offer.slug %}'">
-                    <div class="discount-ribbon">-{{ offer.discount_percent }}%</div>
-                    <div class="offer-card-img">
-                        {% if offer.main_image %}
-                        <img src="{% static offer.main_image %}" alt="{{ offer.name }}" loading="lazy">
-                        {% else %}
-                        <div class="no-img">
-                            <i class="fas fa-seedling"></i>
-                            <span>No image</span>
-                        </div>
+            {% for offer in discount_offers %}
+            <div class="offer-card" onclick="window.location='{% url 'product_detail' offer.slug %}'">
+                <div class="discount-ribbon">-{{ offer.discount_percent }}%</div>
+                <div class="offer-card-img">
+                    {% if offer.main_image %}
+                    <img src="{% static offer.main_image %}" alt="{{ offer.name }}" loading="lazy">
+                    {% else %}
+                    <div class="no-img">
+                        <i class="fas fa-seedling"></i>
+                        <span>No image</span>
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="offer-card-body">
+                    <div class="offer-name">{{ offer.name }}</div>
+                    <div class="offer-prices">
+                        <span class="offer-price-new">Rs. {{ offer.offer_price }}</span>
+                        <span class="offer-price-old">Rs. {{ offer.original_price }}</span>
+                    </div>
+                    <div class="offer-unit">{{ offer.price_unit }}</div>
+                    <div class="offer-saving">Save Rs. {{ offer.original_price|add:offer.offer_price }}</div>
+                    <div class="offer-card-actions" onclick="event.stopPropagation()">
+                        <a href="{% url 'product_detail' offer.slug %}" class="btn-offer-detail">
+                            <i class="fas fa-eye"></i> View
+                        </a>
+                        {% if offer.is_available %}
+                        <form method="POST" action="{% url 'add_to_cart' offer.id %}" style="flex:1;">
+                            {% csrf_token %}
+                            <button type="submit" class="btn-offer-add">
+                                <i class="fas fa-cart-plus"></i> Add
+                            </button>
+                        </form>
                         {% endif %}
                     </div>
-                    <div class="offer-card-body">
-                        <div class="offer-name">{{ offer.name }}</div>
-                        <div class="offer-prices">
-                            <span class="offer-price-new">Rs. {{ offer.offer_price }}</span>
-                            <span class="offer-price-old">Rs. {{ offer.original_price }}</span>
-                        </div>
-                        <div class="offer-unit">{{ offer.price_unit }}</div>
-                        <div class="offer-saving">You save Rs. {{ offer.original_price|floatformat:0|add:"-"|add:offer.offer_price|floatformat:0 }}</div>
-                        <div class="offer-card-actions" onclick="event.stopPropagation()">
-                            <a href="{% url 'product_detail' offer.slug %}" class="btn-offer-detail">
-                                <i class="fas fa-eye"></i> View
-                            </a>
-                            {% if offer.is_available %}
-                            <form method="POST" action="{% url 'add_to_cart' offer.id %}" style="flex:1;">
-                                {% csrf_token %}
-                                <button type="submit" class="btn-offer-add">
-                                    <i class="fas fa-cart-plus"></i> Add
-                                </button>
-                            </form>
-                            {% endif %}
-                        </div>
-                    </div>
-                </div>
-                {% endfor %}
-
-            {% else %}
-            <!-- ──────────────────────────────────────────
-                 PLACEHOLDER CARDS (delete once you add
-                 real offers through Django admin/views)
-            ────────────────────────────────────────── -->
-
-            <!-- Card 1: Honey -->
-            <div class="offer-card">
-                <div class="discount-ribbon">-20%</div>
-                <div class="offer-card-img">
-                    <div class="no-img">
-                        <i class="fas fa-jar"></i>
-                        <span>Add image</span>
-                    </div>
-                </div>
-                <div class="offer-card-body">
-                    <div class="offer-name">Pure Farm Honey (मह)</div>
-                    <div class="offer-prices">
-                        <span class="offer-price-new">Rs. ____</span>
-                        <span class="offer-price-old">Rs. ____</span>
-                    </div>
-                    <div class="offer-unit">per 500g</div>
-                    <div class="offer-saving">You save Rs. ____</div>
-                    <div class="offer-card-actions">
-                        <a href="#" class="btn-offer-detail"><i class="fas fa-eye"></i> View</a>
-                        <button class="btn-offer-add"><i class="fas fa-cart-plus"></i> Add</button>
-                    </div>
                 </div>
             </div>
-
-            <!-- Card 2 -->
-            <div class="offer-card">
-                <div class="discount-ribbon">-15%</div>
-                <div class="offer-card-img">
-                    <div class="no-img"><i class="fas fa-seedling"></i><span>Add image</span></div>
-                </div>
-                <div class="offer-card-body">
-                    <div class="offer-name">Alfanso Mango (आँप)</div>
-                    <div class="offer-prices">
-                        <span class="offer-price-new">Rs. ____</span>
-                        <span class="offer-price-old">Rs. ____</span>
-                    </div>
-                    <div class="offer-unit">per kg</div>
-                    <div class="offer-saving">You save Rs. ____</div>
-                    <div class="offer-card-actions">
-                        <a href="#" class="btn-offer-detail"><i class="fas fa-eye"></i> View</a>
-                        <button class="btn-offer-add"><i class="fas fa-cart-plus"></i> Add</button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Card 3 -->
-            <div class="offer-card">
-                <div class="discount-ribbon">-25%</div>
-                <div class="offer-card-img">
-                    <div class="no-img"><i class="fas fa-pepper-hot"></i><span>Add image</span></div>
-                </div>
-                <div class="offer-card-body">
-                    <div class="offer-name">Organic Pickle (अचार)</div>
-                    <div class="offer-prices">
-                        <span class="offer-price-new">Rs. ____</span>
-                        <span class="offer-price-old">Rs. ____</span>
-                    </div>
-                    <div class="offer-unit">per 250g jar</div>
-                    <div class="offer-saving">You save Rs. ____</div>
-                    <div class="offer-card-actions">
-                        <a href="#" class="btn-offer-detail"><i class="fas fa-eye"></i> View</a>
-                        <button class="btn-offer-add"><i class="fas fa-cart-plus"></i> Add</button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Card 4 -->
-            <div class="offer-card">
-                <div class="discount-ribbon">-10%</div>
-                <div class="offer-card-img">
-                    <div class="no-img"><i class="fas fa-apple-alt"></i><span>Add image</span></div>
-                </div>
-                <div class="offer-card-body">
-                    <div class="offer-name">Seasonal Vegetables (तरकारी)</div>
-                    <div class="offer-price-tbd">Price on request</div>
-                    <div class="offer-saving">Dashain special rate</div>
-                    <div class="offer-card-actions">
-                        <a href="#" class="btn-offer-detail"><i class="fas fa-eye"></i> View</a>
-                        <a href="https://wa.me/9779821025084?text=Hello!%20I%20want%20to%20order%20vegetables%20at%20Dashain%20rate." target="_blank" class="btn-offer-add" style="text-decoration:none;">
-                            <i class="fab fa-whatsapp"></i> Ask
-                        </a>
-                    </div>
-                </div>
-            </div>
-
-            {% endif %}
+            {% endfor %}
         </div>
+        {% else %}
+        <div class="empty-offers">
+            <i class="fas fa-tag"></i>
+            <p>No discount offers active right now. Check back soon!</p>
+        </div>
+        {% endif %}
 
-        <!-- ── Bundle Deals ── -->
         <div class="section-head">
             <div class="section-head-line"></div>
             <span class="section-label">🎁 Bundle Deals</span>
@@ -849,150 +720,41 @@
         <h2 class="section-title">Dashain Combo Packages</h2>
         <p class="section-sub">Save more when you buy together — perfect Dashain gift sets</p>
 
+        {% if bundle_deals %}
         <div class="bundle-grid">
-            <!-- ════════════════════════════════════════
-                 DJANGO: loop through bundle_deals
-                 Expected context: bundle_deals = list of dicts with:
-                   title, subtitle, badge_label, items (list of {name, qty}),
-                   bundle_price, original_price, savings_percent,
-                   whatsapp_message or order_url
-            ═════════════════════════════════════════ -->
-
-            {% if bundle_deals %}
-                {% for bundle in bundle_deals %}
-                <div class="bundle-card">
-                    <div class="bundle-badge">{{ bundle.badge_label }}</div>
-                    <div class="bundle-title">{{ bundle.title }}</div>
-                    <div class="bundle-subtitle">{{ bundle.subtitle }}</div>
-                    <div class="bundle-items">
-                        {% for item in bundle.items %}
-                        <div class="bundle-item">
-                            <i class="fas fa-check-circle"></i>
-                            <span class="bundle-item-name">{{ item.name }}</span>
-                            <span class="bundle-item-qty">{{ item.qty }}</span>
-                        </div>
-                        {% endfor %}
-                    </div>
-                    <div class="bundle-pricing">
-                        <span class="bundle-price-new">Rs. {{ bundle.bundle_price }}</span>
-                        <span class="bundle-price-old">Rs. {{ bundle.original_price }}</span>
-                        <span class="bundle-saving-tag">Save {{ bundle.savings_percent }}%</span>
-                    </div>
-                    <a href="https://wa.me/9779821025084?text={{ bundle.whatsapp_message|urlencode }}"
-                       target="_blank" class="btn-bundle-order">
-                        <i class="fab fa-whatsapp"></i> Order This Bundle
-                    </a>
-                </div>
-                {% endfor %}
-
-            {% else %}
-            <!-- PLACEHOLDER BUNDLES -->
-
+            {% for bundle in bundle_deals %}
             <div class="bundle-card">
-                <div class="bundle-badge">🌿 Farmer's Pick</div>
-                <div class="bundle-title">Dashain Essentials</div>
-                <div class="bundle-subtitle">Everything you need for the celebration</div>
+                <div class="bundle-badge">{{ bundle.badge_label }}</div>
+                <div class="bundle-title">{{ bundle.title }}</div>
+                <div class="bundle-subtitle">{{ bundle.subtitle }}</div>
                 <div class="bundle-items">
+                    {% for item in bundle.items %}
                     <div class="bundle-item">
                         <i class="fas fa-check-circle"></i>
-                        <span class="bundle-item-name">Pure Farm Honey</span>
-                        <span class="bundle-item-qty">500g</span>
+                        <span class="bundle-item-name">{{ item.name }}</span>
+                        <span class="bundle-item-qty">{{ item.qty }}</span>
                     </div>
-                    <div class="bundle-item">
-                        <i class="fas fa-check-circle"></i>
-                        <span class="bundle-item-name">Fresh Vegetables Mix</span>
-                        <span class="bundle-item-qty">2 kg</span>
-                    </div>
-                    <div class="bundle-item">
-                        <i class="fas fa-check-circle"></i>
-                        <span class="bundle-item-name">Seasonal Fruits</span>
-                        <span class="bundle-item-qty">1 kg</span>
-                    </div>
-                    <div class="bundle-item">
-                        <i class="fas fa-check-circle"></i>
-                        <span class="bundle-item-name">Organic Pickle Jar</span>
-                        <span class="bundle-item-qty">250g</span>
-                    </div>
+                    {% endfor %}
                 </div>
                 <div class="bundle-pricing">
-                    <span class="bundle-price-new">Rs. ____</span>
-                    <span class="bundle-price-old">Rs. ____</span>
-                    <span class="bundle-saving-tag">Save __%</span>
+                    <span class="bundle-price-new">Rs. {{ bundle.bundle_price }}</span>
+                    <span class="bundle-price-old">Rs. {{ bundle.original_price }}</span>
+                    <span class="bundle-saving-tag">Save {{ bundle.savings_percent }}%</span>
                 </div>
-                <a href="https://wa.me/9779821025084?text=Hello%20Angan%20Baari!%20I%20want%20to%20order%20the%20Dashain%20Essentials%20Bundle."
+                <a href="https://wa.me/9779821025084?text={{ bundle.whatsapp_message|urlencode }}"
                    target="_blank" class="btn-bundle-order">
                     <i class="fab fa-whatsapp"></i> Order This Bundle
                 </a>
             </div>
-
-            <div class="bundle-card">
-                <div class="bundle-badge">🍯 Honey Special</div>
-                <div class="bundle-title">Sweet Dashain Gift</div>
-                <div class="bundle-subtitle">A perfect gift for family & friends</div>
-                <div class="bundle-items">
-                    <div class="bundle-item">
-                        <i class="fas fa-check-circle"></i>
-                        <span class="bundle-item-name">Pure Farm Honey</span>
-                        <span class="bundle-item-qty">1 kg</span>
-                    </div>
-                    <div class="bundle-item">
-                        <i class="fas fa-check-circle"></i>
-                        <span class="bundle-item-name">Beeswax (optional)</span>
-                        <span class="bundle-item-qty">100g</span>
-                    </div>
-                    <div class="bundle-item">
-                        <i class="fas fa-check-circle"></i>
-                        <span class="bundle-item-name">Fruit of the Season</span>
-                        <span class="bundle-item-qty">1 kg</span>
-                    </div>
-                </div>
-                <div class="bundle-pricing">
-                    <span class="bundle-price-new">Rs. ____</span>
-                    <span class="bundle-price-old">Rs. ____</span>
-                    <span class="bundle-saving-tag">Save __%</span>
-                </div>
-                <a href="https://wa.me/9779821025084?text=Hello%20Angan%20Baari!%20I%20want%20to%20order%20the%20Sweet%20Dashain%20Gift%20Bundle."
-                   target="_blank" class="btn-bundle-order">
-                    <i class="fab fa-whatsapp"></i> Order This Bundle
-                </a>
-            </div>
-
-            <div class="bundle-card">
-                <div class="bundle-badge">🐐 Farm Special</div>
-                <div class="bundle-title">Dashain Meat Package</div>
-                <div class="bundle-subtitle">Traditional Dashain — farm-raised animals</div>
-                <div class="bundle-items">
-                    <div class="bundle-item">
-                        <i class="fas fa-check-circle"></i>
-                        <span class="bundle-item-name">Farm Goat (बाख्रा)</span>
-                        <span class="bundle-item-qty">Whole / Half</span>
-                    </div>
-                    <div class="bundle-item">
-                        <i class="fas fa-check-circle"></i>
-                        <span class="bundle-item-name">Free-Range Chicken</span>
-                        <span class="bundle-item-qty">2 pcs</span>
-                    </div>
-                    <div class="bundle-item">
-                        <i class="fas fa-check-circle"></i>
-                        <span class="bundle-item-name">Seasonal Vegetables</span>
-                        <span class="bundle-item-qty">3 kg</span>
-                    </div>
-                </div>
-                <div class="bundle-pricing">
-                    <span class="bundle-price-new">Rs. ____</span>
-                    <span class="bundle-price-old">Rs. ____</span>
-                    <span class="bundle-saving-tag">Save __%</span>
-                </div>
-                <a href="https://wa.me/9779821025084?text=Hello%20Angan%20Baari!%20I%20want%20to%20order%20the%20Dashain%20Meat%20Package."
-                   target="_blank" class="btn-bundle-order">
-                    <i class="fab fa-whatsapp"></i> Order This Bundle
-                </a>
-            </div>
-
-            {% endif %}
+            {% endfor %}
         </div>
+        {% else %}
+        <div class="empty-offers">
+            <i class="fas fa-gift"></i>
+            <p>No combo bundles right now. Check back soon!</p>
+        </div>
+        {% endif %}
 
-        <!-- ── How It Works ── -->
         <div class="how-it-works">
             <div class="section-head" style="margin-bottom:0;">
                 <div class="section-head-line"></div>
@@ -1023,16 +785,14 @@
             </div>
         </div>
 
-    </div><!-- end offers-wrapper -->
+    </div>
 
-    <!-- WhatsApp Float -->
     <a href="https://wa.me/9779821025084?text=Hello%20Angan%20Baari!%20I%20am%20interested%20in%20your%20Dashain%20offers."
        class="float-wa" target="_blank" rel="noopener noreferrer" aria-label="Chat on WhatsApp">
         <i class="fab fa-whatsapp"></i>
         <span class="float-wa-tooltip">Dashain Offers via WhatsApp</span>
     </a>
 
-    <!-- Footer -->
     <footer class="site-footer">
         <div class="footer-inner">
             <div class="footer-brand">
@@ -1047,7 +807,6 @@
         </div>
     </footer>
 
-    <!-- ════ MOBILE BOTTOM NAV ════ -->
     <nav class="mobile-bottom-nav" aria-label="Mobile navigation">
         <div class="nav-items">
             <a href="{% url 'shop' %}" class="nav-item shop-btn">
@@ -1085,14 +844,10 @@
     </nav>
 
     <script>
-        // Navbar active state
         const navbar = document.getElementById('navbar');
         if (navbar) navbar.classList.add('scrolled');
 
-        // ── Dashain Countdown ──
-        // Set your Dashain / Bijaya Dashami date here (year, month-1, day)
-        // 2025 Bijaya Dashami falls around October 2 — adjust to your exact date
-        const dashainDate = new Date(2025, 9, 2, 0, 0, 0); // Oct 2, 2025
+        const dashainDate = new Date(2025, 9, 2, 0, 0, 0);
 
         function updateCountdown() {
             const now = new Date();
@@ -1114,7 +869,6 @@
         updateCountdown();
         setInterval(updateCountdown, 1000);
 
-        // ── Copy coupon code ──
         function copyCoupon() {
             const code = document.getElementById('couponCode').textContent;
             navigator.clipboard.writeText(code).then(() => {
