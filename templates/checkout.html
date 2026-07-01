@@ -10,26 +10,111 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
     <link rel="stylesheet" href="{% static 'style.css' %}">
     <style>
-        .checkout-page { max-width: 900px; margin: 100px auto 60px; padding: 0 20px; }
-        .checkout-title { font-family: var(--font-display); font-size: 2rem; color: var(--forest); margin-bottom: 32px; }
-        .checkout-layout { display: grid; grid-template-columns: 1fr 320px; gap: 24px; }
-        .checkout-form { background: var(--white); border-radius: 16px; border: 1px solid var(--mist); padding: 28px; }
-        .form-title { font-family: var(--font-display); font-size: 1.2rem; color: var(--forest); margin-bottom: 20px; }
-        .form-group { margin-bottom: 16px; }
-        .form-group label { display: block; font-size: 0.78rem; font-family: var(--font-accent); letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 6px; }
-        .form-group input, .form-group textarea { width: 100%; padding: 12px 16px; border: 1.5px solid var(--mist); border-radius: 10px; font-size: 0.95rem; font-family: var(--font-body); color: var(--forest); outline: none; transition: border-color 0.2s; box-sizing: border-box; }
-        .form-group input:focus, .form-group textarea:focus { border-color: var(--moss); }
-        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-        .order-summary { background: var(--white); border-radius: 16px; border: 1px solid var(--mist); padding: 24px; height: fit-content; position: sticky; top: 20px; }
-        .summary-title { font-family: var(--font-display); font-size: 1.2rem; color: var(--forest); margin-bottom: 16px; }
-        .summary-item { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 0.85rem; color: var(--text-body); padding-bottom: 10px; border-bottom: 1px solid var(--mist); }
-        .summary-item:last-of-type { border-bottom: none; }
+        body { background: var(--cream); }
+
+        .checkout-page { max-width: 1100px; margin: 100px auto 60px; padding: 0 20px; }
+
+        /* ── Header row / breadcrumb ───────────────────────── */
+        .checkout-header-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 28px; }
+        .back-link { display: inline-flex; align-items: center; gap: 6px; color: var(--moss); font-size: 0.85rem; font-weight: 500; text-decoration: none; }
+        .back-link:hover { color: var(--forest); }
+        .checkout-title { font-family: var(--font-display); font-size: 2.1rem; color: var(--forest); margin: 0; }
+        .checkout-steps { display: flex; align-items: center; gap: 6px; font-size: 0.78rem; color: var(--text-muted); font-family: 'DM Sans', sans-serif; }
+        .checkout-steps b { color: var(--forest); }
+        .checkout-steps .sep { color: var(--mist); }
+
+        /* ── Layout ─────────────────────────────────────────── */
+        .checkout-layout { display: grid; grid-template-columns: 1fr 360px; gap: 24px; align-items: start; }
+
+        /* ── Form card ──────────────────────────────────────── */
+        .checkout-form { background: var(--white); border-radius: 20px; border: 1px solid var(--mist); padding: 32px; box-shadow: 0 4px 24px rgba(26,47,30,0.05); }
+        .form-title { display: flex; align-items: center; gap: 10px; font-family: var(--font-display); font-size: 1.3rem; color: var(--forest); margin-bottom: 22px; }
+        .form-title i { color: var(--moss); font-size: 1.1rem; }
+        .form-group { margin-bottom: 18px; }
+        .form-group label { display: block; font-size: 0.75rem; font-family: var(--font-accent); letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 6px; }
+        .form-group input, .form-group textarea {
+            width: 100%; padding: 13px 16px; border: 1.5px solid var(--mist); border-radius: 12px;
+            font-size: 0.95rem; font-family: var(--font-body); color: var(--forest); outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s; box-sizing: border-box; background: var(--cream);
+        }
+        .form-group input:focus, .form-group textarea:focus { border-color: var(--moss); box-shadow: 0 0 0 3px rgba(74,124,89,0.12); background: var(--white); }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+        .payment-badge {
+            display: flex; align-items: center; gap: 10px; background: rgba(74,124,89,0.08);
+            border: 1px solid var(--moss); border-radius: 12px; padding: 14px 16px; margin: 20px 0 4px;
+            font-size: 0.85rem; color: var(--moss); font-weight: 500;
+        }
+        .payment-badge i { font-size: 1.1rem; }
+
+        /* ── Order summary card ────────────────────────────── */
+        .order-summary { background: var(--white); border-radius: 20px; border: 1px solid var(--mist); padding: 26px; position: sticky; top: 100px; box-shadow: 0 4px 24px rgba(26,47,30,0.05); }
+        .summary-title { display: flex; align-items: center; justify-content: space-between; font-family: var(--font-display); font-size: 1.25rem; color: var(--forest); margin-bottom: 18px; }
+        .summary-title .item-count { font-family: 'DM Sans', sans-serif; font-size: 0.72rem; font-weight: 600; color: var(--moss); background: rgba(74,124,89,0.1); padding: 3px 10px; border-radius: 50px; }
+
+        .summary-item { display: flex; gap: 10px; justify-content: space-between; margin-bottom: 12px; font-size: 0.85rem; color: var(--text-body); padding-bottom: 12px; border-bottom: 1px dashed var(--mist); }
+        .summary-item-thumb { width: 40px; height: 40px; border-radius: 8px; object-fit: cover; flex-shrink: 0; background: var(--cream); }
+        .summary-item-info { display: flex; gap: 10px; align-items: center; flex: 1; }
         .summary-item-name { font-weight: 500; color: var(--forest); }
-        .summary-total { display: flex; justify-content: space-between; font-weight: 700; font-size: 1.1rem; color: var(--forest); border-top: 2px solid var(--forest); padding-top: 12px; margin-top: 8px; }
-        .payment-badge { display: flex; align-items: center; gap: 8px; background: rgba(74,124,89,0.1); border: 1px solid var(--moss); border-radius: 10px; padding: 12px 16px; margin: 16px 0; font-size: 0.85rem; color: var(--moss); font-weight: 500; }
-        .btn-place-order { width: 100%; padding: 14px; background: var(--forest); color: white; border: none; border-radius: 10px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: background 0.3s; margin-top: 20px; }
-        .btn-place-order:hover { background: var(--moss); }
-        @media (max-width: 700px) { .checkout-layout { grid-template-columns: 1fr; } .order-summary { position: static; } .form-row { grid-template-columns: 1fr; } }
+
+        /* ── Coupon box ─────────────────────────────────────── */
+        .coupon-box { margin: 18px 0; }
+        .coupon-box label { display: block; font-size: 0.75rem; font-family: var(--font-accent); letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 8px; }
+        .coupon-input-row { display: flex; gap: 8px; }
+        .coupon-input-row input {
+            flex: 1; padding: 11px 14px; border: 1.5px dashed var(--gold); border-radius: 10px;
+            font-size: 0.88rem; font-family: 'DM Sans', sans-serif; color: var(--forest); outline: none;
+            background: rgba(201,168,76,0.06); text-transform: uppercase; letter-spacing: 0.03em;
+        }
+        .coupon-input-row input:focus { border-style: solid; }
+        .coupon-input-row button {
+            display: flex; align-items: center; gap: 6px; padding: 0 18px; border: none; border-radius: 10px;
+            background: var(--forest); color: white; font-size: 0.85rem; font-weight: 600; cursor: pointer;
+            transition: background 0.2s; white-space: nowrap;
+        }
+        .coupon-input-row button:hover { background: var(--moss); }
+        .coupon-msg { display: flex; align-items: center; gap: 6px; font-size: 0.8rem; margin-top: 8px; padding: 8px 12px; border-radius: 8px; }
+        .coupon-msg.success { background: #f0fdf4; color: var(--moss); border: 1px solid #bbf7d0; }
+        .coupon-msg.error { background: #fef2f2; color: #c0392b; border: 1px solid #fecaca; }
+
+        .summary-item.discount-row { color: #c0392b; font-weight: 600; }
+
+        .summary-total { display: flex; justify-content: space-between; font-weight: 700; font-size: 1.15rem; color: var(--forest); border-top: 2px solid var(--forest); padding-top: 14px; margin-top: 6px; }
+
+        .btn-place-order {
+            width: 100%; padding: 15px; background: var(--forest); color: white; border: none; border-radius: 12px;
+            font-size: 1rem; font-weight: 600; cursor: pointer; transition: background 0.3s, transform 0.15s;
+            margin-top: 20px; display: flex; align-items: center; justify-content: center; gap: 8px;
+        }
+        .btn-place-order:hover { background: var(--moss); transform: translateY(-1px); }
+
+        .trust-row { display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 0.76rem; color: var(--text-muted); margin-top: 14px; }
+        .trust-row i { color: var(--moss); }
+
+        @media (max-width: 700px) {
+            .checkout-layout { grid-template-columns: 1fr; }
+            .order-summary { position: static; }
+            .form-row { grid-template-columns: 1fr; }
+            .checkout-form, .order-summary { padding: 22px; }
+        }
+
+        /* ── Recommendations ───────────────────────────────── */
+        .recommend-section { margin-top: 48px; }
+        .recommend-section h2 { font-family: var(--font-display); font-size: 1.5rem; color: var(--forest); margin-bottom: 6px; }
+        .recommend-section .rec-sub { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 18px; }
+        .recommend-scroll { display: flex; gap: 16px; overflow-x: auto; padding-bottom: 10px; scroll-snap-type: x mandatory; }
+        .recommend-scroll::-webkit-scrollbar { height: 6px; }
+        .recommend-scroll::-webkit-scrollbar-thumb { background: var(--mist); border-radius: 10px; }
+        .rec-card {
+            flex: 0 0 170px; scroll-snap-align: start; background: var(--white); border-radius: 16px;
+            border: 1px solid var(--mist); overflow: hidden; text-decoration: none; color: inherit;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .rec-card:hover { transform: translateY(-4px); box-shadow: 0 10px 24px rgba(26,47,30,0.1); }
+        .rec-card img { width: 100%; height: 130px; object-fit: cover; background: var(--cream); }
+        .rec-card-body { padding: 12px; }
+        .rec-name { font-size: 0.85rem; font-weight: 500; color: var(--forest); margin-bottom: 4px; line-height: 1.3; }
+        .rec-price { font-size: 0.85rem; font-weight: 700; color: var(--moss); }
 
         /* ══════════════════════════════════════════
            MOBILE / TABLET BOTTOM NAV
@@ -130,21 +215,54 @@
             </a>
             <nav class="desktop-nav">
                 <div class="nav-links">
-                    <a href="{% url 'shop' %}">Shop</a>
-                    <a href="{% url 'cart' %}">🛒 Cart</a>
+                    <!-- Shop -->
+                    <a href="{% url 'shop' %}" style="display:flex;align-items:center;gap:6px;padding:8px 14px;border-radius:50px;color:var(--gold);font-size:0.85rem;font-weight:500;">
+                        <i class="fas fa-store"></i> Shop
+                    </a>
+                    <!-- Cart -->
+                    <a href="{% url 'cart' %}" style="display:flex;align-items:center;gap:6px;padding:8px 16px;border-radius:50px;border:1.5px solid var(--gold);color:var(--gold);font-size:0.82rem;font-weight:500;position:relative;">
+                        <i class="fas fa-shopping-cart"></i> Cart
+                        {% with total_qty=request.session.cart.values|length %}
+                        {% if total_qty > 0 %}<span style="position:absolute;top:-6px;right:-6px;background:#c0392b;color:white;font-size:0.65rem;width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;">{{ total_qty }}</span>{% endif %}
+                        {% endwith %}
+                    </a>
+                    <!-- Offers -->
+                    <a href="{% url 'offers' %}" class="offer-nav-link" style="display:flex;align-items:center;gap:5px;padding:8px 14px;border-radius:50px;background:#c0392b;color:white;font-size:0.8rem;font-weight:600;position:relative;">
+                        <i class="fas fa-fire offer-flame"></i> Offers
+                    </a>
+                    <!-- Login / Profile -->
+                    {% if user.is_authenticated %}
+                    <a href="{% url 'profile' %}" style="display:flex;align-items:center;gap:6px;padding:8px 16px;border-radius:50px;background:var(--moss);color:white;font-size:0.82rem;font-weight:500;">
+                        <i class="fas fa-user-circle"></i> {{ user.first_name }}
+                    </a>
+                    {% else %}
+                    <a href="{% url 'login' %}" style="display:flex;align-items:center;gap:6px;padding:8px 16px;border-radius:50px;border:1.5px solid var(--moss);color:var(--moss);font-size:0.82rem;font-weight:500;">
+                        <i class="fas fa-user-circle"></i> Login
+                    </a>
+                    {% endif %}
+                    <!-- Website -->
+                    <a href="/" style="display:flex;align-items:center;gap:6px;padding:8px 16px;border-radius:50px;color:var(--moss);font-size:0.82rem;font-weight:500;">
+                        <i class="fas fa-globe"></i> Website
+                    </a>
                 </div>
             </nav>
         </div>
     </header>
 
     <div class="checkout-page">
-        <h1 class="checkout-title">Checkout</h1>
+
+        <div class="checkout-header-row">
+            <a href="{% url 'cart' %}" class="back-link"><i class="fas fa-arrow-left"></i> Back to Cart</a>
+            <h1 class="checkout-title">Checkout</h1>
+            <div class="checkout-steps">Cart <span class="sep">→</span> <b>Checkout</b> <span class="sep">→</span> Confirmation</div>
+        </div>
+
         <div class="checkout-layout">
 
-            <!-- Form -->
+            <!-- Delivery form -->
             <div class="checkout-form">
-                <div class="form-title">Delivery Information</div>
-                <form method="POST">
+                <div class="form-title"><i class="fas fa-truck"></i> Delivery Information</div>
+                <form method="POST" id="checkoutForm">
                     {% csrf_token %}
                     <div class="form-row">
                         <div class="form-group">
@@ -169,49 +287,106 @@
                         <textarea name="message" rows="2" placeholder="Any special instructions..."></textarea>
                     </div>
 
+                    <!-- Coupon carried through to order placement -->
+                    <input type="hidden" name="coupon_code" value="{{ coupon_code|default:'' }}">
+
                     <div class="payment-badge">
                         <i class="fas fa-money-bill-wave"></i>
                         Cash on Delivery — Pay when you receive your order
                     </div>
-
-                    <button type="submit" class="btn-place-order">
-                        <i class="fas fa-check-circle"></i> Place Order — Rs. {{ total|floatformat:0 }}
-                    </button>
                 </form>
             </div>
 
             <!-- Order Summary -->
             <div class="order-summary">
-                <div class="summary-title">Your Order</div>
+                <div class="summary-title">
+                    Your Order
+                    <span class="item-count">{{ items|length }} item{{ items|length|pluralize }}</span>
+                </div>
+
                 {% for item in items %}
                 <div class="summary-item">
-                    <div>
-                        <div class="summary-item-name">{{ item.name }}</div>
-                        <div style="font-size:0.78rem;color:var(--text-muted);">Rs. {{ item.price }} × {{ item.qty }}</div>
+                    <div class="summary-item-info">
+                        {% if item.image %}<img src="{% static item.image %}" alt="{{ item.name }}" class="summary-item-thumb">{% endif %}
+                        <div>
+                            <div class="summary-item-name">{{ item.name }}</div>
+                            <div style="font-size:0.78rem;color:var(--text-muted);">Rs. {{ item.price }} × {{ item.qty }}</div>
+                        </div>
                     </div>
-                    <div style="font-weight:600;color:var(--forest);">Rs. {{ item.subtotal|floatformat:0 }}</div>
+                    <div style="font-weight:600;color:var(--forest);white-space:nowrap;">Rs. {{ item.subtotal|floatformat:0 }}</div>
                 </div>
                 {% endfor %}
+
+                <!-- Coupon code -->
+                <div class="coupon-box">
+                    <label><i class="fas fa-tag"></i> Have a coupon?</label>
+                    <form method="GET" class="coupon-input-row">
+                        <input type="text" name="coupon" placeholder="Enter code" value="{{ coupon_code|default:'' }}">
+                        <button type="submit"><i class="fas fa-check"></i> Apply</button>
+                    </form>
+                    {% if coupon_error %}
+                    <div class="coupon-msg error"><i class="fas fa-exclamation-circle"></i> {{ coupon_error }}</div>
+                    {% elif coupon_applied %}
+                    <div class="coupon-msg success"><i class="fas fa-check-circle"></i> "{{ coupon_code }}" applied — you saved Rs. {{ discount_amount|floatformat:0 }}</div>
+                    {% endif %}
+                </div>
+
+                <div class="summary-item" style="border-bottom:none;">
+                    <span>Subtotal</span>
+                    <span>Rs. {{ subtotal|default:total|floatformat:2 }}</span>
+                </div>
+                {% if discount_amount %}
+                <div class="summary-item discount-row" style="border-bottom:none;">
+                    <span>Discount</span>
+                    <span>−Rs. {{ discount_amount|floatformat:2 }}</span>
+                </div>
+                {% endif %}
+
                 <div class="summary-total">
                     <span>Total</span>
                     <span>Rs. {{ total|floatformat:2 }}</span>
                 </div>
-                <div style="font-size:0.78rem;color:var(--text-muted);margin-top:12px;text-align:center;">
-                    <i class="fas fa-shield-alt" style="color:var(--moss);"></i> Secure order · Cash on delivery
+
+                <button type="submit" form="checkoutForm" class="btn-place-order">
+                    <i class="fas fa-check-circle"></i> Place Order — Rs. {{ total|floatformat:0 }}
+                </button>
+
+                <div class="trust-row">
+                    <i class="fas fa-shield-alt"></i> Secure order · Cash on delivery
                 </div>
             </div>
         </div>
+
+        <!-- Recommendations -->
+        {% if recommended_products %}
+        <div class="recommend-section">
+            <h2>You might also like</h2>
+            <div class="rec-sub">Fresh picks to go with your order</div>
+            <div class="recommend-scroll">
+                {% for product in recommended_products %}
+                <a href="{% url 'product_detail' product.slug %}" class="rec-card">
+                    {% if product.main_image %}
+                    <img src="{% static product.main_image %}" alt="{{ product.name }}" loading="lazy">
+                    {% endif %}
+                    <div class="rec-card-body">
+                        <div class="rec-name">{{ product.name }}</div>
+                        {% if product.price %}<div class="rec-price">Rs. {{ product.price }}</div>{% endif %}
+                    </div>
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
     </div>
 
     <!-- MOBILE / TABLET BOTTOM NAV (hidden on desktop) -->
     <nav class="mobile-bottom-nav" id="bottomNav" aria-label="Mobile navigation">
         <div class="nav-items">
-            <!-- Home — goes to Shop home -->
             <a href="{% url 'shop' %}" class="nav-item home-btn">
                 <i class="fas fa-store"></i>
                 <span>Shop</span>
             </a>
-            <!-- Cart -->
             <a href="{% url 'cart' %}" class="nav-item">
                 <i class="fas fa-shopping-cart"></i>
                 {% with total_qty=request.session.cart.values|length %}
@@ -219,14 +394,11 @@
                 {% endwith %}
                 <span>Cart</span>
             </a>
-            <!-- Offers -->
-            <a href="{% url 'shop' %}?sort=offers" class="nav-item">
+            <a href="{% url 'offers' %}" class="nav-item">
                 <i class="fas fa-tag"></i>
                 <span class="offer-dot"></span>
                 <span>Offers</span>
             </a>
-            
-            <!-- Profile -->
             {% if user.is_authenticated %}
             <a href="{% url 'profile' %}" class="nav-item">
                 <i class="fas fa-user-circle"></i>
@@ -238,7 +410,6 @@
                 <span>Login</span>
             </a>
             {% endif %}
-            <!-- Website (back to main site) -->
             <a href="/" class="nav-item">
                 <i class="fas fa-globe"></i>
                 <span>Website</span>
@@ -247,7 +418,6 @@
     </nav>
 
     <script>
-        // Highlight active bottom nav item
         const bottomNavPath = window.location.pathname;
         document.querySelectorAll('.mobile-bottom-nav .nav-item').forEach(item => {
             if (item.getAttribute('href') === bottomNavPath) item.classList.add('active');

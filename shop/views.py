@@ -331,19 +331,45 @@ def cart_view(request):
 
 
 def checkout(request):
+    from .models import Coupon, Product
+    from decimal import Decimal
     cart = get_cart(request)
     if not cart:
         return redirect('shop')
 
     items = []
-    total = 0
+    subtotal = 0
     for pid, item in cart.items():
         try:
-            subtotal = float(item['price']) * item['qty']
+            item_subtotal = float(item['price']) * item['qty']
         except Exception:
-            subtotal = 0
-        total += subtotal
-        items.append({**item, 'id': pid, 'subtotal': subtotal})
+            item_subtotal = 0
+        subtotal += item_subtotal
+        items.append({**item, 'id': pid, 'subtotal': item_subtotal})
+
+    # ── Coupon handling ──────────────────────────────────────
+    # Coupon can arrive via ?coupon=CODE (Apply button) or the hidden
+    # field carried through on the POST (Place Order button).
+    coupon_code = (request.GET.get('coupon') or request.POST.get('coupon_code') or '').strip().upper()
+    coupon_applied = False
+    coupon_error = None
+    discount_amount = Decimal('0')
+    coupon_obj = None
+
+    if coupon_code:
+        try:
+            coupon_obj = Coupon.objects.get(code=coupon_code)
+            if not coupon_obj.is_live():
+                coupon_error = "This coupon has expired or is no longer active."
+            elif Decimal(str(subtotal)) < coupon_obj.min_order_amount:
+                coupon_error = f"Minimum order of Rs. {coupon_obj.min_order_amount:.0f} required for this coupon."
+            else:
+                discount_amount = coupon_obj.calculate_discount(subtotal)
+                coupon_applied = True
+        except Coupon.DoesNotExist:
+            coupon_error = "Invalid coupon code."
+
+    total = float(Decimal(str(subtotal)) - discount_amount)
 
     if request.method == 'POST':
         name = request.POST.get('name', '').strip()
@@ -353,6 +379,8 @@ def checkout(request):
         message = request.POST.get('message', '').strip()
 
         product_list = ', '.join([f"{i['name']} x{i['qty']}" for i in items])
+        if coupon_applied:
+            product_list += f" | Coupon: {coupon_code} (-Rs.{discount_amount:.0f})"
 
         order = ProductOrder.objects.create(
             name=name,
@@ -362,6 +390,11 @@ def checkout(request):
             product_interest=product_list,
             message=message,
         )
+
+        if coupon_applied and coupon_obj:
+            coupon_obj.used_count += 1
+            coupon_obj.save(update_fields=['used_count'])
+
         try:
             send_order_received_email(order)
         except Exception:
@@ -377,10 +410,20 @@ def checkout(request):
         initial['name'] = request.user.get_full_name()
         initial['email'] = request.user.email
 
+    # Simple recommendations: products not already in the cart
+    cart_ids = [int(pid) for pid in cart.keys()]
+    recommended_products = Product.objects.exclude(id__in=cart_ids).order_by('?')[:8]
+
     return render(request, 'checkout.html', {
         'items': items,
+        'subtotal': subtotal,
         'total': total,
         'initial': initial,
+        'coupon_code': coupon_code,
+        'coupon_applied': coupon_applied,
+        'coupon_error': coupon_error,
+        'discount_amount': discount_amount,
+        'recommended_products': recommended_products,
     })
 
 
@@ -444,7 +487,7 @@ def shop(request):
  
 
 def offers(request):
-    from .models import Offer
+    from .models import Offer, Coupon
     from django.utils import timezone
     now = timezone.now()
 
@@ -455,6 +498,12 @@ def offers(request):
     combo_offers = Offer.objects.filter(
         is_active=True, start_date__lte=now, end_date__gte=now, discount_type='combo'
     )
+
+    # Festival coupons currently live (e.g. Dashain, Tihar)
+    candidate_coupons = Coupon.objects.filter(
+        is_active=True, start_date__lte=now, end_date__gte=now
+    )
+    live_coupons = [c for c in candidate_coupons if c.is_live()]
 
     discount_offers = []
     for offer in live_offers:
@@ -507,4 +556,5 @@ def offers(request):
     return render(request, 'offers.html', {
         'discount_offers': discount_offers,
         'bundle_deals': bundle_deals,
+        'live_coupons': live_coupons,
     })

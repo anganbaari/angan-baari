@@ -760,20 +760,24 @@
 
     <div class="offers-wrapper">
 
+        {% if live_coupons %}
+        {% for coupon in live_coupons %}
         <div class="coupon-strip">
             <div class="coupon-icon">🎁</div>
             <div class="coupon-text">
-                <h3>Dashain Coupon Code</h3>
-                <p>Use this code at checkout to get an extra discount on your order</p>
+                <h3>{{ coupon.festival_name|default:"Special" }} Coupon Code</h3>
+                <p>{{ coupon.description|default:"Use this code at checkout to get an extra discount on your order" }}</p>
             </div>
             <div class="coupon-code-box">
-                <div class="coupon-code" id="couponCode">DASHAIN25</div>
-                <button class="btn-copy-code" onclick="copyCoupon()">
-                    <i class="fas fa-copy" id="copyIcon"></i>
-                    <span id="copyText">Copy</span>
+                <div class="coupon-code" data-code="{{ coupon.code }}">{{ coupon.code }}</div>
+                <button class="btn-copy-code" onclick="copyCoupon(this)">
+                    <i class="fas fa-copy copy-icon"></i>
+                    <span class="copy-text">Copy</span>
                 </button>
             </div>
         </div>
+        {% endfor %}
+        {% endif %}
 
         <div class="section-head">
             <div class="section-head-line"></div>
@@ -1066,14 +1070,17 @@
         updateCountdown();
         setInterval(updateCountdown, 1000);
 
-        function copyCoupon() {
-            const code = document.getElementById('couponCode').textContent;
+        function copyCoupon(btn) {
+            const codeEl = btn.closest('.coupon-code-box').querySelector('.coupon-code');
+            const code = codeEl.getAttribute('data-code') || codeEl.textContent;
             navigator.clipboard.writeText(code).then(() => {
-                document.getElementById('copyText').textContent = 'Copied!';
-                document.getElementById('copyIcon').className = 'fas fa-check';
+                const textEl = btn.querySelector('.copy-text');
+                const iconEl = btn.querySelector('.copy-icon');
+                textEl.textContent = 'Copied!';
+                iconEl.className = 'fas fa-check copy-icon';
                 setTimeout(() => {
-                    document.getElementById('copyText').textContent = 'Copy';
-                    document.getElementById('copyIcon').className = 'fas fa-copy';
+                    textEl.textContent = 'Copy';
+                    iconEl.className = 'fas fa-copy copy-icon';
                 }, 2000);
             });
         }
