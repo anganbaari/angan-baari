@@ -154,21 +154,48 @@
             transform: translateY(-2px);
         }
 
+        .btn-row {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn-shop {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            background: #4a7c59;
+            color: white;
+            padding: 13px 20px;
+            border-radius: 50px;
+            font-size: 0.88rem;
+            font-weight: 600;
+            text-decoration: none;
+            border: 1.5px solid #4a7c59;
+            transition: all 0.3s ease;
+            flex: 1;
+        }
+
+        .btn-shop:hover {
+            background: #3b6349;
+            border-color: #3b6349;
+        }
+
         .btn-home {
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            gap: 10px;
+            gap: 8px;
             background: transparent;
             color: #4a7c59;
-            padding: 13px 28px;
+            padding: 13px 20px;
             border-radius: 50px;
-            font-size: 0.9rem;
+            font-size: 0.88rem;
             font-weight: 500;
             text-decoration: none;
             border: 1.5px solid #4a7c59;
             transition: all 0.3s ease;
-            width: 100%;
+            flex: 1;
         }
 
         .btn-home:hover {
@@ -238,9 +265,14 @@
             <i class="fab fa-whatsapp"></i> Confirm via WhatsApp
         </a>
 
-        <a href="/" class="btn-home">
-            <i class="fas fa-home"></i> Back to Homepage
-        </a>
+        <div class="btn-row">
+            <a href="{% url 'shop' %}" class="btn-shop">
+                <i class="fas fa-store"></i> Continue Shopping
+            </a>
+            <a href="/" class="btn-home">
+                <i class="fas fa-home"></i> Website
+            </a>
+        </div>
 
         <!-- Cancellation Notice -->
         <div style="
@@ -286,7 +318,7 @@
 
         <div class="footer-text">
             <strong>Angan Baari · आँगन बारी</strong><br>
-            Bhulka Danda, Rupandehi, Nepal 🇳🇵
+            Bhulka Danda, Rupandehi, JAY Nepal 🇳🇵
         </div>
 
     </div>
