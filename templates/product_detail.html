@@ -309,11 +309,20 @@
             </a>
             <nav class="desktop-nav">
                 <div class="nav-links">
-                    <a href="/#about">About</a>
-                    <a href="/#products">Products</a>
-                    <a href="/#delivery">Delivery</a>
-                    <a href="/#contact">Contact</a>
-                    <a href="/#delivery" class="nav-cta">Order Now</a>
+                    <a href="/">Website</a>
+                    <a href="{% url 'shop' %}">Shop</a>
+                    <a href="{% url 'offers' %}">🔥 Offers</a>
+                    <a href="{% url 'cart' %}" style="position:relative;">
+                        🛒 Cart
+                        {% with total_qty=request.session.cart.values|length %}
+                        {% if total_qty > 0 %}<span style="position:absolute;top:-6px;right:-6px;background:#c0392b;color:white;font-size:0.6rem;width:16px;height:16px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;">{{ total_qty }}</span>{% endif %}
+                        {% endwith %}
+                    </a>
+                    {% if user.is_authenticated %}
+                    <a href="{% url 'profile' %}" class="nav-cta">{{ user.first_name }}</a>
+                    {% else %}
+                    <a href="{% url 'login' %}" class="nav-cta">Login</a>
+                    {% endif %}
                 </div>
             </nav>
         </div>
@@ -325,7 +334,7 @@
         <div class="breadcrumb">
             <a href="/"><i class="fas fa-home"></i> Home</a>
             <i class="fas fa-chevron-right"></i>
-            <a href="/#products">Products</a>
+            <a href="{% url 'shop' %}">Shop</a>
             <i class="fas fa-chevron-right"></i>
             <span>{{ product.name }}</span>
         </div>
@@ -415,16 +424,19 @@
 
                 <div class="order-buttons">
                     {% if product.is_available %}
+                    <form method="POST" action="{% url 'add_to_cart' product.id %}" style="width:100%;">
+                        {% csrf_token %}
+                        <button type="submit" class="btn-wa-product" style="width:100%;background:var(--forest);border:none;cursor:pointer;font-family:var(--font-body);">
+                            <i class="fas fa-cart-plus"></i> Add to Cart
+                        </button>
+                    </form>
                     <a href="https://wa.me/9779821025084?text={{ product.whatsapp_message|urlencode }}"
                        class="btn-wa-product" target="_blank" rel="noopener noreferrer">
                         <i class="fab fa-whatsapp"></i> Order via WhatsApp
                     </a>
                     {% endif %}
-                    <a href="/#delivery" class="btn-wa-product" style="background: var(--forest);">
-                        <i class="fas fa-clipboard-list"></i> Place Order Online
-                    </a>
-                    <a href="/#products" class="btn-back">
-                        <i class="fas fa-arrow-left"></i> Back to All Products
+                    <a href="{% url 'shop' %}" class="btn-back">
+                        <i class="fas fa-arrow-left"></i> Back to Shop
                     </a>
                 </div>
             </div>
