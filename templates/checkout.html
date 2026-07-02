@@ -275,8 +275,8 @@
                         </div>
                     </div>
                     <div class="form-group">
-                        <label>Email (optional)</label>
-                        <input type="email" name="email" value="{{ initial.email }}" placeholder="your@email.com">
+                        <label>Email *</label>
+                        <input type="email" name="email" value="{{ initial.email }}" placeholder="your@email.com" required>
                     </div>
                     <div class="form-group">
                         <label>Delivery Address *</label>
@@ -320,20 +320,14 @@
                 <!-- Coupon code -->
                 <div class="coupon-box">
                     <label><i class="fas fa-tag"></i> Have a coupon?</label>
-                    <form method="GET" class="coupon-input-row">
-                        <input type="text" name="coupon" placeholder="Enter code" value="{{ coupon_code|default:'' }}">
-                        <button type="submit"><i class="fas fa-check"></i> Apply</button>
-                    </form>
+                    <div class="coupon-input-row">
+                        <input type="text" id="couponInput" placeholder="Enter code" value="{{ coupon_code|default:'' }}">
+                        <button type="button" onclick="applyCoupon()"><i class="fas fa-check"></i> Apply</button>
+                    </div>
                     {% if coupon_error %}
                     <div class="coupon-msg error"><i class="fas fa-exclamation-circle"></i> {{ coupon_error }}</div>
                     {% elif coupon_applied %}
-                    <div class="coupon-msg success">
-                        <i class="fas fa-check-circle"></i>
-                        "{{ coupon_code }}" applied — you saved Rs. {{ discount_amount|floatformat:0 }}
-                        {% if has_offer_items %}
-                        <span style="display:block;font-size:0.72rem;margin-top:4px;opacity:0.8;">* Coupon applied only to non-offer items</span>
-                        {% endif %}
-                    </div>
+                    <div class="coupon-msg success"><i class="fas fa-check-circle"></i> "{{ coupon_code }}" applied — you saved Rs. {{ discount_amount|floatformat:0 }}</div>
                     {% endif %}
                 </div>
 
@@ -427,6 +421,44 @@
         const bottomNavPath = window.location.pathname;
         document.querySelectorAll('.mobile-bottom-nav .nav-item').forEach(item => {
             if (item.getAttribute('href') === bottomNavPath) item.classList.add('active');
+        });
+    </script>
+    <script>
+        function applyCoupon() {
+            const code = document.getElementById('couponInput').value.trim();
+            if (!code) return;
+
+            // Save all form field values before redirect
+            const name = document.querySelector('[name=name]')?.value || '';
+            const phone = document.querySelector('[name=phone]')?.value || '';
+            const email = document.querySelector('[name=email]')?.value || '';
+            const address = document.querySelector('[name=address]')?.value || '';
+            const message = document.querySelector('[name=message]')?.value || '';
+
+            // Store in sessionStorage so we can restore after redirect
+            sessionStorage.setItem('co_name', name);
+            sessionStorage.setItem('co_phone', phone);
+            sessionStorage.setItem('co_email', email);
+            sessionStorage.setItem('co_address', address);
+            sessionStorage.setItem('co_message', message);
+
+            window.location.href = `/checkout/?coupon=${encodeURIComponent(code)}`;
+        }
+
+        // Restore form fields if coming back from coupon apply
+        document.addEventListener('DOMContentLoaded', () => {
+            const fields = ['name','phone','email','address','message'];
+            fields.forEach(f => {
+                const val = sessionStorage.getItem('co_' + f);
+                if (val) {
+                    const el = document.querySelector(`[name=${f}]`);
+                    if (el && !el.value) el.value = val;
+                }
+            });
+            // Clear after restoring
+            if (sessionStorage.getItem('co_name')) {
+                fields.forEach(f => sessionStorage.removeItem('co_' + f));
+            }
         });
     </script>
 </body>
