@@ -209,7 +209,14 @@
                     </div>
                     <div class="cart-item-info">
                         <div class="cart-item-name">{{ item.name }}</div>
-                        <div class="cart-item-price">Rs. {{ item.price }} <span style="font-weight:400;color:var(--text-muted);font-size:0.78rem;">{{ item.price_unit }}</span></div>
+                        <div class="cart-item-price">
+                            Rs. {{ item.price }}
+                            {% if item.is_offer and item.original_price %}
+                            <span style="text-decoration:line-through;color:var(--text-muted);font-size:0.78rem;font-weight:400;margin-left:4px;">Rs. {{ item.original_price }}</span>
+                            <span style="background:#c0392b;color:white;font-size:0.6rem;padding:1px 6px;border-radius:50px;margin-left:4px;font-weight:700;">OFFER</span>
+                            {% endif %}
+                            <span style="font-weight:400;color:var(--text-muted);font-size:0.78rem;margin-left:4px;">{{ item.price_unit }}</span>
+                        </div>
                         <form method="POST" action="{% url 'update_cart' item.id %}" style="display:inline;">
                             {% csrf_token %}
                             <div class="qty-control">
