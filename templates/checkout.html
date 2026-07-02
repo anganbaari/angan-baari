@@ -327,7 +327,13 @@
                     {% if coupon_error %}
                     <div class="coupon-msg error"><i class="fas fa-exclamation-circle"></i> {{ coupon_error }}</div>
                     {% elif coupon_applied %}
-                    <div class="coupon-msg success"><i class="fas fa-check-circle"></i> "{{ coupon_code }}" applied — you saved Rs. {{ discount_amount|floatformat:0 }}</div>
+                    <div class="coupon-msg success">
+                        <i class="fas fa-check-circle"></i>
+                        "{{ coupon_code }}" applied — you saved Rs. {{ discount_amount|floatformat:0 }}
+                        {% if has_offer_items %}
+                        <span style="display:block;font-size:0.72rem;margin-top:4px;opacity:0.8;">* Coupon applied only to non-offer items</span>
+                        {% endif %}
+                    </div>
                     {% endif %}
                 </div>
 

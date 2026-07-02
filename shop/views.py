@@ -339,33 +339,43 @@ def checkout(request):
 
     items = []
     subtotal = 0
+    non_offer_subtotal = 0  # coupon applies only to non-offer items
     for pid, item in cart.items():
         try:
             item_subtotal = float(item['price']) * item['qty']
         except Exception:
             item_subtotal = 0
         subtotal += item_subtotal
+        if not item.get('is_offer'):
+            non_offer_subtotal += item_subtotal
         items.append({**item, 'id': pid, 'subtotal': item_subtotal})
 
     # ── Coupon handling ──────────────────────────────────────
     # Coupon can arrive via ?coupon=CODE (Apply button) or the hidden
     # field carried through on the POST (Place Order button).
+    # NOTE: Coupons only apply to non-offer items to prevent double discounting.
     coupon_code = (request.GET.get('coupon') or request.POST.get('coupon_code') or '').strip().upper()
     coupon_applied = False
     coupon_error = None
     discount_amount = Decimal('0')
     coupon_obj = None
+    has_offer_items = any(item.get('is_offer') for item in items)
 
     if coupon_code:
         try:
             coupon_obj = Coupon.objects.get(code=coupon_code)
             if not coupon_obj.is_live():
                 coupon_error = "This coupon has expired or is no longer active."
+            elif non_offer_subtotal <= 0 and has_offer_items:
+                coupon_error = "Coupon cannot be applied — all items already have offer prices."
             elif Decimal(str(subtotal)) < coupon_obj.min_order_amount:
                 coupon_error = f"Minimum order of Rs. {coupon_obj.min_order_amount:.0f} required for this coupon."
             else:
-                discount_amount = coupon_obj.calculate_discount(subtotal)
+                # Apply coupon only to non-offer items
+                discount_amount = coupon_obj.calculate_discount(non_offer_subtotal)
                 coupon_applied = True
+                if has_offer_items:
+                    coupon_error = None  # clear any error, but add info
         except Coupon.DoesNotExist:
             coupon_error = "Invalid coupon code."
 
@@ -423,6 +433,7 @@ def checkout(request):
         'coupon_applied': coupon_applied,
         'coupon_error': coupon_error,
         'discount_amount': discount_amount,
+        'has_offer_items': has_offer_items,
         'recommended_products': recommended_products,
     })
 
