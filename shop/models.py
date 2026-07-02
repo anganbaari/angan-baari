@@ -207,6 +207,37 @@ class Offer(models.Model):
             return max(round(original_price - self.discount_value, 2), Decimal('0'))
         return original_price
 
+    def get_bundle_natural_total(self):
+        """Sum of quantity x product price for all bundle items (only relevant for combo offers)."""
+        from decimal import Decimal
+        return sum([item.line_total() for item in self.bundle_items.all()], Decimal('0'))
+
+
+class BundleItem(models.Model):
+    """One line inside a combo/bundle Offer — a product plus how much of it
+    is included (e.g. 1.9 kg Local Chicken, 2 kg Mango, 3 pcs Lemon).
+    Price for this line is calculated automatically as quantity x product.price,
+    which matters for products sold by weight (chicken, goat, veggies)."""
+
+    offer = models.ForeignKey(Offer, on_delete=models.CASCADE, related_name='bundle_items')
+    product = models.ForeignKey(Product, on_delete=models.CASCADE)
+    quantity = models.DecimalField(
+        max_digits=6, decimal_places=2, default=1,
+        help_text='Amount of this product in the bundle. E.g. 1.9 for 1.9 kg chicken, 3 for 3 pieces of lemon.'
+    )
+
+    class Meta:
+        ordering = ['id']
+
+    def line_total(self):
+        from decimal import Decimal
+        if not self.product.price:
+            return Decimal('0')
+        return Decimal(str(self.quantity)) * Decimal(str(self.product.price))
+
+    def __str__(self):
+        return f"{self.quantity} x {self.product.name}"
+
 
 class Coupon(models.Model):
     """Festival coupon codes (Dashain, Tihar, Holi, etc).

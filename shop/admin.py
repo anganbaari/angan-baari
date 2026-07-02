@@ -1,6 +1,6 @@
 from django.contrib import admin
 from .models import ContactMessage, ProductOrder, NewsletterSubscriber, Product, Review, Category
-from .models import Offer, Coupon
+from .models import Offer, Coupon, BundleItem
 
 
 @admin.register(Category)
@@ -76,18 +76,33 @@ class ReviewAdmin(admin.ModelAdmin):
     search_fields = ('name', 'comment', 'product__name')
     ordering = ('-created_at',)
 
+class BundleItemInline(admin.TabularInline):
+    model = BundleItem
+    extra = 1
+    autocomplete_fields = ['product']
+    fields = ['product', 'quantity']
+
+
 @admin.register(Offer)
 class OfferAdmin(admin.ModelAdmin):
-    list_display = ['title', 'discount_type', 'discount_value', 'category', 'start_date', 'end_date', 'is_active', 'live_status']
+    list_display = ['title', 'discount_type', 'discount_value', 'category', 'start_date', 'end_date', 'is_active', 'live_status', 'bundle_total_display']
     list_filter = ['discount_type', 'is_active', 'category']
     list_editable = ['is_active']
     filter_horizontal = ['products']
     search_fields = ['title']
     date_hierarchy = 'start_date'
- 
+    inlines = [BundleItemInline]
+
     def live_status(self, obj):
         return '🟢 Live' if obj.is_live() else '🔴 Not Live'
     live_status.short_description = 'Status'
+
+    def bundle_total_display(self, obj):
+        if obj.discount_type != 'combo':
+            return '—'
+        total = obj.get_bundle_natural_total()
+        return f'Rs. {total:.0f}' if total else '—'
+    bundle_total_display.short_description = 'Bundle Natural Total'
 
 
 @admin.register(Coupon)

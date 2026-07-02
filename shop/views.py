@@ -541,16 +541,22 @@ def offers(request):
 
     bundle_deals = []
     for offer in combo_offers:
-        products = list(offer.get_products())
-        if not products:
+        bundle_items = list(offer.bundle_items.select_related('product').all())
+        if not bundle_items:
             continue
-        original_total = sum([p.price for p in products if p.price])
+
+        original_total = offer.get_bundle_natural_total()
         bundle_price = offer.combo_price or original_total
         savings_percent = 0
         if original_total > 0:
             savings_percent = int(round((1 - (float(bundle_price) / float(original_total))) * 100))
 
-        items = [{'name': p.name, 'qty': p.price_unit or '1 unit'} for p in products]
+        items = []
+        for bi in bundle_items:
+            unit_label = (bi.product.price_unit or '').replace('per ', '').strip() or 'unit'
+            qty_str = f"{float(bi.quantity):g} {unit_label}"
+            items.append({'name': bi.product.name, 'qty': qty_str})
+
         whatsapp_msg = f"Hello Angan Baari! I want to order the {offer.title} Bundle."
 
         bundle_deals.append({
