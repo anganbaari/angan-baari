@@ -202,6 +202,19 @@ def cart_count(request):
     cart = get_cart(request)
     return sum(item['qty'] for item in cart.values())
 
+def cart_total(request):
+    cart = get_cart(request)
+    total = 0
+    for item in cart.values():
+        try:
+            total += float(item['price']) * item['qty']
+        except Exception:
+            pass
+    return total
+
+def is_ajax(request):
+    return request.headers.get('x-requested-with') == 'XMLHttpRequest'
+
 def add_to_cart(request, product_id):
     from .models import Product
     product = get_object_or_404(Product, id=product_id)
@@ -219,7 +232,7 @@ def add_to_cart(request, product_id):
             'qty': 1,
         }
     save_cart(request, cart)
-    if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+    if is_ajax(request):
         return JsonResponse({'status': 'ok', 'count': cart_count(request)})
     return redirect(request.META.get('HTTP_REFERER', '/shop/'))
 
@@ -229,19 +242,42 @@ def remove_from_cart(request, product_id):
     if pid in cart:
         del cart[pid]
         save_cart(request, cart)
+    if is_ajax(request):
+        return JsonResponse({
+            'status': 'ok',
+            'removed_id': pid,
+            'cart_total': cart_total(request),
+            'cart_count': cart_count(request),
+        })
     return redirect('cart')
 
 def update_cart(request, product_id):
     cart = get_cart(request)
     pid = str(product_id)
     qty = int(request.POST.get('qty', 1))
+    removed = False
+    subtotal = 0
     if qty <= 0:
         if pid in cart:
             del cart[pid]
+        removed = True
     else:
         if pid in cart:
             cart[pid]['qty'] = qty
+            try:
+                subtotal = float(cart[pid]['price']) * qty
+            except Exception:
+                subtotal = 0
     save_cart(request, cart)
+    if is_ajax(request):
+        return JsonResponse({
+            'status': 'ok',
+            'removed': removed,
+            'qty': qty if not removed else 0,
+            'subtotal': subtotal,
+            'cart_total': cart_total(request),
+            'cart_count': cart_count(request),
+        })
     return redirect('cart')
 
 
@@ -279,22 +315,39 @@ def toggle_save_for_later(request, product_id):
 
     save_saved(request, saved)
 
-    if request.headers.get('x-requested-with') == 'XMLHttpRequest':
-        return JsonResponse({'status': 'ok', 'saved': is_saved})
+    if is_ajax(request):
+        return JsonResponse({
+            'status': 'ok',
+            'saved': is_saved,
+            'removed_from_cart': pid not in cart,
+            'cart_total': cart_total(request),
+            'cart_count': cart_count(request),
+            'item': saved.get(pid),
+        })
     return redirect(request.META.get('HTTP_REFERER', '/shop/'))
 
 def move_to_cart(request, product_id):
     saved = get_saved(request)
     cart = get_cart(request)
     pid = str(product_id)
+    item_data = None
     if pid in saved:
         item = saved.pop(pid)
         if pid in cart:
             cart[pid]['qty'] += 1
         else:
             cart[pid] = {**item, 'qty': 1}
+        item_data = cart[pid]
         save_saved(request, saved)
         save_cart(request, cart)
+    if is_ajax(request):
+        return JsonResponse({
+            'status': 'ok',
+            'moved_id': pid,
+            'item': item_data,
+            'cart_total': cart_total(request),
+            'cart_count': cart_count(request),
+        })
     return redirect('cart')
 
 def remove_saved(request, product_id):
@@ -303,15 +356,20 @@ def remove_saved(request, product_id):
     if pid in saved:
         del saved[pid]
         save_saved(request, saved)
+    if is_ajax(request):
+        return JsonResponse({'status': 'ok', 'removed_id': pid})
     return redirect('cart')
 
 
 def cart_view(request):
+    from .models import Product
+    import random
     cart = get_cart(request)
     saved = get_saved(request)
 
     items = []
     total = 0
+    cart_product_ids = set(cart.keys())
     for pid, item in cart.items():
         try:
             subtotal = float(item['price']) * item['qty']
@@ -322,11 +380,20 @@ def cart_view(request):
 
     saved_items = [{**item, 'id': pid} for pid, item in saved.items()]
 
+    # Recommendations — exclude items already in cart/saved
+    saved_ids = set(saved.keys())
+    excluded = cart_product_ids | saved_ids
+    all_products = list(Product.objects.filter(is_available=True).exclude(
+        id__in=[int(i) for i in excluded if i.isdigit()]
+    ))
+    recommended_products = random.sample(all_products, min(6, len(all_products)))
+
     return render(request, 'cart.html', {
         'items': items,
         'total': total,
         'count': cart_count(request),
         'saved_items': saved_items,
+        'recommended_products': recommended_products,
     })
 
 
@@ -339,43 +406,36 @@ def checkout(request):
 
     items = []
     subtotal = 0
-    non_offer_subtotal = 0  # coupon applies only to non-offer items
+    has_offer_items = False
     for pid, item in cart.items():
         try:
             item_subtotal = float(item['price']) * item['qty']
         except Exception:
             item_subtotal = 0
         subtotal += item_subtotal
-        if not item.get('is_offer'):
-            non_offer_subtotal += item_subtotal
+        if item.get('is_offer'):
+            has_offer_items = True
         items.append({**item, 'id': pid, 'subtotal': item_subtotal})
 
     # ── Coupon handling ──────────────────────────────────────
     # Coupon can arrive via ?coupon=CODE (Apply button) or the hidden
     # field carried through on the POST (Place Order button).
-    # NOTE: Coupons only apply to non-offer items to prevent double discounting.
     coupon_code = (request.GET.get('coupon') or request.POST.get('coupon_code') or '').strip().upper()
     coupon_applied = False
     coupon_error = None
     discount_amount = Decimal('0')
     coupon_obj = None
-    has_offer_items = any(item.get('is_offer') for item in items)
 
     if coupon_code:
         try:
             coupon_obj = Coupon.objects.get(code=coupon_code)
             if not coupon_obj.is_live():
                 coupon_error = "This coupon has expired or is no longer active."
-            elif non_offer_subtotal <= 0 and has_offer_items:
-                coupon_error = "Coupon cannot be applied — all items already have offer prices."
             elif Decimal(str(subtotal)) < coupon_obj.min_order_amount:
                 coupon_error = f"Minimum order of Rs. {coupon_obj.min_order_amount:.0f} required for this coupon."
             else:
-                # Apply coupon only to non-offer items
-                discount_amount = coupon_obj.calculate_discount(non_offer_subtotal)
+                discount_amount = coupon_obj.calculate_discount(subtotal)
                 coupon_applied = True
-                if has_offer_items:
-                    coupon_error = None  # clear any error, but add info
         except Coupon.DoesNotExist:
             coupon_error = "Invalid coupon code."
 
@@ -442,7 +502,7 @@ def checkout(request):
 
 def shop(request):
     from .models import Product, Category, Offer
- 
+
     def get_all_ids(cat):
         ids = [cat.id]
         for sub in cat.subcategories.all():
@@ -450,43 +510,43 @@ def shop(request):
             for subsub in sub.subcategories.all():
                 ids.append(subsub.id)
         return ids
- 
+
     def get_count(cat):
         return Product.objects.filter(category__id__in=get_all_ids(cat)).count()
- 
+
     cat_id = request.GET.get('cat')
     selected_category = None
     products = Product.objects.all().order_by('name')
- 
+
     if cat_id:
         try:
             selected_category = Category.objects.get(id=cat_id)
             products = products.filter(category__id__in=get_all_ids(selected_category))
         except Category.DoesNotExist:
             pass
- 
+
     main_categories = Category.objects.filter(parent=None).prefetch_related(
         'subcategories__subcategories'
     )
- 
+
     cat_tree = []
     for cat in main_categories:
         subs = []
         for sub in cat.subcategories.all():
-            subsubs = [{'obj': ss, 'count': ss.products.count()} 
+            subsubs = [{'obj': ss, 'count': ss.products.count()}
                        for ss in sub.subcategories.all()]
             subs.append({'obj': sub, 'count': get_count(sub), 'children': subsubs})
         cat_tree.append({'obj': cat, 'count': get_count(cat), 'children': subs})
- 
+
     saved_ids = list(get_saved(request).keys())
- 
+
     # Check for active offers
     from django.utils import timezone
     now = timezone.now()
     has_active_offers = Offer.objects.filter(
         is_active=True, start_date__lte=now, end_date__gte=now
     ).exists()
- 
+
     return render(request, 'shop.html', {
         'products': products,
         'cat_tree': cat_tree,
@@ -495,7 +555,7 @@ def shop(request):
         'saved_ids': saved_ids,
         'has_active_offers': has_active_offers,
     })
- 
+
 
 def offers(request):
     from .models import Offer, Coupon
