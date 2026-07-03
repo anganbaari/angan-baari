@@ -9,7 +9,11 @@ from .emails import (
 )
 
 def home(request):
-    return render(request, 'index.html')
+    from .models import Product
+    featured_products = Product.objects.filter(
+        is_available=True
+    ).exclude(main_image='').order_by('?')[:4]
+    return render(request, 'index.html', {'featured_products': featured_products})
 
 def contact(request):
     if request.method == 'POST':
