@@ -881,88 +881,34 @@
                 <!-- LEFT — Form Panel + Quote -->
                 <div class="fs-left">
 
-                    <!-- Order Form -->
-                    <div class="fs-form-panel">
-                        <div class="fs-form-icon">
-                            <i class="fas fa-clipboard-list"></i>
+                    <!-- Shop CTA Panel (replaces the old free-text order form) -->
+                    <div class="fs-form-panel fs-shop-cta">
+                        <div class="fs-shop-icon-wrap">
+                            <span class="fs-shop-icon-ring"></span>
+                            <div class="fs-shop-icon">
+                                <i class="fas fa-store"></i>
+                            </div>
                         </div>
-                        <h3 class="fs-form-title">Place an Order</h3>
-                        <p class="fs-form-sub">Fill in the details and we'll confirm shortly</p>
+                        <h3 class="fs-form-title">Ready to Order?</h3>
+                        <p class="fs-form-sub">Browse our full catalog with real prices, add items to your cart, and checkout in minutes.</p>
 
-                        <form id="order-form" method="POST" action="{% url 'order' %}" novalidate>
-                            {% csrf_token %}
-                            <div class="form-row-2">
-                                <div class="form-group fs-fg">
-                                    <label for="product"><i class="fas fa-seedling"></i> Product</label>
-                                    <input type="text" id="product" name="product"
-                                           placeholder="e.g., Mango, Honey" required aria-label="Product Name">
-                                </div>
-                                <div class="form-group fs-fg">
-                                    <label for="quantity"><i class="fas fa-weight-hanging"></i> Quantity</label>
-                                    <input type="text" id="quantity" name="quantity"
-                                           placeholder="e.g., 5 kg" required aria-label="Quantity">
-                                </div>
-                            </div>
-                            <div class="form-row-2">
-                                <div class="form-group fs-fg">
-                                    <label for="name"><i class="fas fa-user"></i> Your Name</label>
-                                    <input type="text" id="name" name="name"
-                                           placeholder="Your Full Name" required aria-label="Your Name">
-                                </div>
-                                <div class="form-group fs-fg">
-                                    <label for="phone"><i class="fas fa-phone"></i> Phone Number</label>
-                                    <input type="tel" id="phone" name="phone"
-                                           placeholder="e.g., 9821025084" required aria-label="Your Phone Number">
-                                </div>
-                            </div>
-                            <div class="form-group fs-fg">
-                                <label for="customer-email"><i class="fas fa-at"></i> Email (optional)</label>
-                                <input type="email" id="customer-email" name="customer-email"
-                                       placeholder="Your Email" aria-label="Your Email">
-                            </div>
-                            <div class="form-group fs-fg">
-                                <label for="delivery-address"><i class="fas fa-map-marker-alt"></i> Delivery Address</label>
-                                <input type="text" id="delivery-address" name="delivery-address"
-                                       placeholder="Your address or area" aria-label="Delivery Address">
-                            </div>
-                            <div class="form-group fs-fg">
-                                <label for="message"><i class="fas fa-comment-dots"></i> Message / Special Requests</label>
-                                <textarea id="message" name="message" rows="3"
-                                          placeholder="Any special requests or instructions?"
-                                          aria-label="Special Requests"></textarea>
-                            </div>
+                        <ul class="fs-shop-perks">
+                            <li><i class="fas fa-tags"></i> See exact prices for every product</li>
+                            <li><i class="fas fa-shopping-basket"></i> Add multiple items to one cart</li>
+                            <li><i class="fas fa-ticket-alt"></i> Apply festival coupons at checkout</li>
+                            <li><i class="fas fa-receipt"></i> Know your total before you pay</li>
+                        </ul>
 
-                            <div class="fs-form-divider"></div>
+                        <a href="{% url 'shop' %}" class="fs-shop-btn">
+                            <i class="fas fa-store"></i>
+                            <span>Browse the Shop</span>
+                            <i class="fas fa-arrow-right fs-shop-btn-arrow"></i>
+                        </a>
 
-                            <button type="submit" class="fs-btn-submit">
-                                <i class="fas fa-paper-plane"></i> Submit Order
-                            </button>
-                            <a href="https://wa.me/9779821025084?text=Hello%20Angan%20Baari!%20I%20would%20like%20to%20place%20an%20order."
-                               class="fs-btn-wa" target="_blank" rel="noopener noreferrer">
-                                <i class="fab fa-whatsapp"></i> Order via WhatsApp
-                            </a>
-                        </form>
-
-                        <!-- Cancellation Notice -->
-                        <div style="
-                            margin-top: 16px;
-                            background: #faeeda;
-                            border: 1px solid #f0d4a0;
-                            border-radius: 12px;
-                            padding: 14px 18px;
-                            display: flex;
-                            align-items: flex-start;
-                            gap: 12px;
-                            font-size: 0.85rem;
-                            color: #7a5a1a;
-                            line-height: 1.6;
-                        ">
-                            <i class="fas fa-clock" style="margin-top:3px; color:#c9a84c; flex-shrink:0;"></i>
-                            <span>
-                                <strong style="color:#1a2f1e;">Free Cancellation within 30 minutes.</strong><br>
-                                After submitting, you'll receive a cancellation link in your confirmation email. Orders can be cancelled within <strong>30 minutes</strong> of placing them.
-                            </span>
-                        </div>
+                        <a href="https://wa.me/9779821025084?text=Hello%20Angan%20Baari!%20I%20would%20like%20to%20place%20an%20order."
+                           class="fs-btn-wa" target="_blank" rel="noopener noreferrer">
+                            <i class="fab fa-whatsapp"></i> Or Order via WhatsApp
+                        </a>
                     </div>
 
                     <!-- Quote Block -->
