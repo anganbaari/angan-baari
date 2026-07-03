@@ -5257,35 +5257,76 @@ ul { list-style: none; }
     100% { transform: scale(1.55); opacity: 0; }
 }
 
-/* Trust perks list */
-.fs-shop-perks {
-    text-align: left;
+/* Mini-shop preview grid — real products, real prices */
+.fs-mini-shop-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
     width: 100%;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    background: rgba(74,124,89,0.06);
-    border: 1px solid rgba(74,124,89,0.15);
-    border-radius: var(--radius-sm);
-    padding: 16px 18px;
     margin: 20px 0 22px;
 }
 
-.fs-shop-perks li {
+.fs-mini-card {
+    background: var(--white);
+    border: 1px solid rgba(74,124,89,0.15);
+    border-radius: var(--radius-sm);
+    padding: 10px;
     display: flex;
-    align-items: center;
-    gap: 10px;
-    font-size: 0.85rem;
-    color: var(--text-body);
-    line-height: 1.4;
+    flex-direction: column;
+    gap: 6px;
+    text-decoration: none;
+    transition: transform 0.25s var(--ease-smooth), box-shadow 0.25s ease, border-color 0.25s ease;
 }
 
-.fs-shop-perks li i {
-    width: 22px;
+.fs-mini-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 24px rgba(26,47,30,0.12);
+    border-color: var(--gold);
+}
+
+.fs-mini-card-img {
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--mist);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.fs-mini-card-img img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.fs-mini-card-img i {
+    font-size: 1.4rem;
+    color: var(--sage);
+}
+
+.fs-mini-card-name {
+    font-family: var(--font-body);
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--forest);
+    line-height: 1.25;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.fs-mini-card-price {
+    font-size: 0.78rem;
+    font-weight: 700;
     color: var(--moss);
-    font-size: 0.9rem;
-    flex-shrink: 0;
-    text-align: center;
+}
+
+.fs-mini-card-tbd {
+    color: var(--text-muted);
+    font-weight: 500;
+    font-style: italic;
 }
 
 /* Primary CTA: gradient shimmer + soft glow pulse */
@@ -5331,6 +5372,8 @@ ul { list-style: none; }
 }
 
 @media (max-width: 480px) {
-    .fs-shop-perks { padding: 14px 16px; }
-    .fs-shop-perks li { font-size: 0.8rem; }
+    .fs-mini-shop-grid { gap: 8px; }
+    .fs-mini-card { padding: 8px; }
+    .fs-mini-card-name { font-size: 0.76rem; }
+    .fs-mini-card-price { font-size: 0.72rem; }
 }
