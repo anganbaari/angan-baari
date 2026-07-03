@@ -5260,8 +5260,8 @@ ul { list-style: none; }
 /* Mini-shop preview grid — real products, real prices */
 .fs-mini-shop-grid {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 12px;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
     width: 100%;
     margin: 20px 0 22px;
 }
@@ -5323,6 +5323,12 @@ ul { list-style: none; }
     color: var(--moss);
 }
 
+.fs-mini-card-unit {
+    font-size: 0.68rem;
+    font-weight: 500;
+    color: var(--text-muted);
+}
+
 .fs-mini-card-tbd {
     color: var(--text-muted);
     font-weight: 500;
@@ -5372,7 +5378,7 @@ ul { list-style: none; }
 }
 
 @media (max-width: 480px) {
-    .fs-mini-shop-grid { gap: 8px; }
+    .fs-mini-shop-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
     .fs-mini-card { padding: 8px; }
     .fs-mini-card-name { font-size: 0.76rem; }
     .fs-mini-card-price { font-size: 0.72rem; }

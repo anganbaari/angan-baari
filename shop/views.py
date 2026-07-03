@@ -12,7 +12,7 @@ def home(request):
     from .models import Product
     featured_products = Product.objects.filter(
         is_available=True
-    ).exclude(main_image='').order_by('?')[:4]
+    ).exclude(main_image='').order_by('?')[:6]
     return render(request, 'index.html', {'featured_products': featured_products})
 
 def contact(request):
