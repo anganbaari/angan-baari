@@ -222,6 +222,20 @@ ul { list-style: none; }
     border-bottom-color: rgba(255,255,255,0.06);
 }
 
+/* Interior pages (shop, cart, offers, profile, checkout...) have no hero
+   behind them, so they opt into a fully solid header instead of the
+   homepage's glass/blur transition — no transparency at any scroll
+   position or screen size, and no flash before JS runs since this is
+   pure CSS, not dependent on a 'scrolled' class being toggled. */
+.navbar[data-nav-mode="solid"] {
+    background: rgb(16, 28, 18) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    padding: 13px 5vw;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
 .navbar-inner {
     display: flex;
     align-items: center;
