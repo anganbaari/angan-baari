@@ -658,32 +658,32 @@
             <nav class="desktop-nav">
                 <div class="nav-links">
                     <!-- Shop -->
-                    <a href="{% url 'shop' %}" style="display:flex;align-items:center;gap:6px;padding:8px 14px;border-radius:50px;color:var(--gold);font-size:0.85rem;font-weight:500;">
+                    <a href="{% url 'shop' %}">
                         <i class="fas fa-store"></i> Shop
                     </a>
                     <!-- Cart -->
-                    <a href="{% url 'cart' %}" style="display:flex;align-items:center;gap:6px;padding:8px 16px;border-radius:50px;border:1.5px solid var(--gold);color:var(--gold);font-size:0.82rem;font-weight:500;position:relative;">
+                    <a href="{% url 'cart' %}" style="position:relative;">
                         <i class="fas fa-shopping-cart"></i> Cart
                         {% with total_qty=request.session.cart.values|length %}
                         {% if total_qty > 0 %}<span style="position:absolute;top:-6px;right:-6px;background:#c0392b;color:white;font-size:0.65rem;width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;">{{ total_qty }}</span>{% endif %}
                         {% endwith %}
                     </a>
                     <!-- Offers -->
-                    <a href="{% url 'offers' %}" class="offer-nav-link" style="display:flex;align-items:center;gap:5px;padding:8px 14px;border-radius:50px;background:#c0392b;color:white;font-size:0.8rem;font-weight:600;position:relative;">
+                    <a href="{% url 'offers' %}" class="offer-nav-link active">
                         <i class="fas fa-fire offer-flame"></i> Offers
                     </a>
                     <!-- Login / Profile -->
                     {% if user.is_authenticated %}
-                    <a href="{% url 'profile' %}" style="display:flex;align-items:center;gap:6px;padding:8px 16px;border-radius:50px;background:var(--moss);color:white;font-size:0.82rem;font-weight:500;">
+                    <a href="{% url 'profile' %}">
                         <i class="fas fa-user-circle"></i> {{ user.first_name }}
                     </a>
                     {% else %}
-                    <a href="{% url 'login' %}" style="display:flex;align-items:center;gap:6px;padding:8px 16px;border-radius:50px;border:1.5px solid var(--moss);color:var(--moss);font-size:0.82rem;font-weight:500;">
+                    <a href="{% url 'login' %}">
                         <i class="fas fa-user-circle"></i> Login
                     </a>
                     {% endif %}
                     <!-- Website -->
-                    <a href="/" style="display:flex;align-items:center;gap:6px;padding:8px 16px;border-radius:50px;color:var(--moss);font-size:0.82rem;font-weight:500;">
+                    <a href="/">
                         <i class="fas fa-globe"></i> Website
                     </a>
                 </div>
@@ -1085,6 +1085,31 @@
                 }, 2000);
             });
         }
+
+        // Sliding active-page pill in the top nav
+        (function () {
+            const navLinksWrap = document.querySelector('#navbar .nav-links');
+            if (!navLinksWrap) return;
+            let pill = navLinksWrap.querySelector('.nav-pill');
+            if (!pill) {
+                pill = document.createElement('span');
+                pill.className = 'nav-pill';
+                navLinksWrap.prepend(pill);
+            }
+            const pillLinks = Array.from(navLinksWrap.querySelectorAll('a:not(.offer-nav-link)'));
+            function movePill(el) {
+                if (!el) { pill.style.opacity = '0'; return; }
+                pill.style.opacity = '1';
+                pill.style.width = el.offsetWidth + 'px';
+                pill.style.transform = 'translateX(' + el.offsetLeft + 'px)';
+            }
+            function currentActive() { return pillLinks.find(a => a.classList.contains('active')); }
+            movePill(currentActive());
+            pillLinks.forEach(a => a.addEventListener('mouseenter', () => movePill(a)));
+            navLinksWrap.addEventListener('mouseleave', () => movePill(currentActive()));
+            window.addEventListener('resize', () => movePill(currentActive()));
+            if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => movePill(currentActive()));
+        })();
     </script>
 </body>
 </html>

@@ -365,6 +365,66 @@ ul { list-style: none; }
     .mobile-cart-icon { display: none !important; }
 }
 
+/* ─── Offers nav link — animated CTA, consistent on every page ───
+   (previously only shop.html had this animation; now it's shared
+   so it looks and behaves identically on shop/cart/offers/profile) */
+.offer-flame { animation: flicker 1.2s infinite alternate; }
+@keyframes flicker {
+    0% { transform: scale(1) rotate(-3deg); opacity: 0.85; }
+    100% { transform: scale(1.15) rotate(3deg); opacity: 1; }
+}
+
+.nav-links a.offer-nav-link {
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 9px 18px;
+    border-radius: 50px;
+    background: linear-gradient(90deg, #c0392b, #e67e22, #c0392b);
+    background-size: 220% 100%;
+    color: #fff;
+    font-weight: 600;
+    font-size: 0.85rem;
+    animation: offer-gradient 3s linear infinite, offer-pulse 2.4s infinite;
+}
+.nav-links a.offer-nav-link:hover { color: #fff; }
+
+/* Persistent ring when you're actually on the Offers page —
+   uses outline (not box-shadow) so it doesn't fight the pulse animation */
+.nav-links a.offer-nav-link.active {
+    outline: 2px solid rgba(255,255,255,0.8);
+    outline-offset: 2px;
+}
+
+/* Shine sweep — a light streak glides across the pill every ~3.4s */
+.nav-links a.offer-nav-link::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -60%;
+    width: 40%;
+    height: 100%;
+    background: linear-gradient(115deg, transparent, rgba(255,255,255,0.55), transparent);
+    transform: skewX(-20deg);
+    animation: offer-shine 3.4s ease-in-out infinite;
+}
+
+@keyframes offer-gradient {
+    0% { background-position: 0% 50%; }
+    100% { background-position: 200% 50%; }
+}
+@keyframes offer-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(192,57,43,0.5); }
+    50% { box-shadow: 0 0 0 6px rgba(192,57,43,0); }
+}
+@keyframes offer-shine {
+    0% { left: -60%; }
+    35% { left: 130%; }
+    100% { left: 130%; }
+}
+
 /* ================================================================
    HAMBURGER BUTTON
 ================================================================ */
