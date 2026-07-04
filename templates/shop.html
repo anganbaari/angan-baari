@@ -594,9 +594,28 @@
             .mobile-bottom-nav { display: none !important; }
             .hamburger { display: none !important; }
         }
+
+        /* Utility: hide a cart badge without assuming its display value */
+        .badge-hidden { display: none !important; }
+
+        /* Add-to-cart button feedback state */
+        .btn-order.is-added { background: #2d5a3d; }
+        .btn-order:disabled { opacity: 0.85; cursor: default; }
+
+        /* Toast */
+        #shopToast {
+            position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px);
+            background: #1a2f1e; color: #c9a84c; padding: 12px 22px; border-radius: 50px;
+            font-family: 'DM Sans', sans-serif; font-size: 0.85rem; font-weight: 600;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2); opacity: 0; pointer-events: none;
+            transition: opacity 0.25s, transform 0.25s; z-index: 900; display: flex; align-items: center; gap: 8px;
+        }
+        #shopToast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+        @media (max-width: 1024px) { #shopToast { bottom: 90px; } }
     </style>
 </head>
 <body>
+    {% csrf_token %}
 
     <!-- NAVBAR -->
     <header class="navbar" id="navbar">
@@ -611,32 +630,32 @@
             <nav class="desktop-nav">
                 <div class="nav-links">
                     <!-- Shop -->
-                    <a href="{% url 'shop' %}" style="display:flex;align-items:center;gap:6px;padding:8px 14px;border-radius:50px;color:var(--gold);font-size:0.85rem;font-weight:500;">
+                    <a href="{% url 'shop' %}" class="active">
                         <i class="fas fa-store"></i> Shop
                     </a>
                     <!-- Cart -->
-                    <a href="{% url 'cart' %}" style="display:flex;align-items:center;gap:6px;padding:8px 16px;border-radius:50px;border:1.5px solid var(--gold);color:var(--gold);font-size:0.82rem;font-weight:500;position:relative;">
+                    <a href="{% url 'cart' %}" style="position:relative;">
                         <i class="fas fa-shopping-cart"></i> Cart
                         {% with total_qty=request.session.cart.values|length %}
-                        {% if total_qty > 0 %}<span style="position:absolute;top:-6px;right:-6px;background:#c0392b;color:white;font-size:0.65rem;width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;">{{ total_qty }}</span>{% endif %}
+                        <span id="cartBadgeDesktop" class="{% if total_qty == 0 %}badge-hidden{% endif %}" style="position:absolute;top:-6px;right:-6px;background:#c0392b;color:white;font-size:0.65rem;width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;">{{ total_qty }}</span>
                         {% endwith %}
                     </a>
                     <!-- Offers -->
-                    <a href="{% url 'offers' %}" class="offer-nav-link" style="display:flex;align-items:center;gap:5px;padding:8px 14px;border-radius:50px;background:#c0392b;color:white;font-size:0.8rem;font-weight:600;position:relative;">
+                    <a href="{% url 'offers' %}" class="offer-nav-link">
                         <i class="fas fa-fire offer-flame"></i> Offers
                     </a>
                     <!-- Login / Profile -->
                     {% if user.is_authenticated %}
-                    <a href="{% url 'profile' %}" style="display:flex;align-items:center;gap:6px;padding:8px 16px;border-radius:50px;background:var(--moss);color:white;font-size:0.82rem;font-weight:500;">
+                    <a href="{% url 'profile' %}">
                         <i class="fas fa-user-circle"></i> {{ user.first_name }}
                     </a>
                     {% else %}
-                    <a href="{% url 'login' %}" style="display:flex;align-items:center;gap:6px;padding:8px 16px;border-radius:50px;border:1.5px solid var(--moss);color:var(--moss);font-size:0.82rem;font-weight:500;">
+                    <a href="{% url 'login' %}">
                         <i class="fas fa-user-circle"></i> Login
                     </a>
                     {% endif %}
                     <!-- Website -->
-                    <a href="/" style="display:flex;align-items:center;gap:6px;padding:8px 16px;border-radius:50px;color:var(--moss);font-size:0.82rem;font-weight:500;">
+                    <a href="/">
                         <i class="fas fa-globe"></i> Website
                     </a>
                 </div>
@@ -644,7 +663,7 @@
             <a href="{% url 'cart' %}" style="display:none;" id="mobile-cart-btn" class="mobile-cart-icon">
                 <i class="fas fa-shopping-cart"></i>
                 {% with total_qty=request.session.cart.values|length %}
-                {% if total_qty > 0 %}<span class="mobile-cart-badge">{{ total_qty }}</span>{% endif %}
+                <span id="cartBadgeMobileTop" class="mobile-cart-badge {% if total_qty == 0 %}badge-hidden{% endif %}">{{ total_qty }}</span>
                 {% endwith %}
             </a>
             <button class="hamburger" id="mobile-menu" aria-label="Open menu" aria-expanded="false">
@@ -845,12 +864,12 @@
                                 <i class="fas fa-eye"></i> View
                             </a>
                             {% if product.is_available %}
-                            <form method="POST" action="{% url 'add_to_cart' product.id %}" style="flex:1;">
-                                {% csrf_token %}
-                                <button type="submit" class="btn-order" style="width:100%;border:none;cursor:pointer;">
-                                    <i class="fas fa-cart-plus"></i> Add
-                                </button>
-                            </form>
+                            <button type="button" class="btn-order" style="flex:1;border:none;cursor:pointer;"
+                                    data-action="add-to-cart"
+                                    data-url="{% url 'add_to_cart' product.id %}"
+                                    data-name="{{ product.name }}">
+                                <i class="fas fa-cart-plus"></i> Add
+                            </button>
                             {% else %}
                             <button class="btn-order disabled">
                                 <i class="fas fa-clock"></i> Unavailable
@@ -895,14 +914,21 @@
         </div>
     </footer>
 
+    <div id="shopToast"><i class="fas fa-check-circle"></i> <span id="shopToastText"></span></div>
+
     <!-- MOBILE / TABLET BOTTOM NAV (hidden on desktop) -->
     <nav class="mobile-bottom-nav" id="bottomNav" aria-label="Mobile navigation">
         <div class="nav-items">
+            <!-- Home — goes to Shop home -->
+            <a href="{% url 'shop' %}" class="nav-item home-btn">
+                <i class="fas fa-store"></i>
+                <span>Shop</span>
+            </a>
             <!-- Cart -->
             <a href="{% url 'cart' %}" class="nav-item">
                 <i class="fas fa-shopping-cart"></i>
                 {% with total_qty=request.session.cart.values|length %}
-                {% if total_qty > 0 %}<span class="cart-badge">{{ total_qty }}</span>{% endif %}
+                <span id="cartBadgeBottomNav" class="cart-badge {% if total_qty == 0 %}badge-hidden{% endif %}">{{ total_qty }}</span>
                 {% endwith %}
                 <span>Cart</span>
             </a>
@@ -911,11 +937,6 @@
                 <i class="fas fa-tag"></i>
                 <span class="offer-dot"></span>
                 <span>Offers</span>
-            </a>
-            <!-- Shop — centered FAB -->
-            <a href="{% url 'shop' %}" class="nav-item home-btn">
-                <i class="fas fa-store"></i>
-                <span>Shop</span>
             </a>
             <!-- Profile -->
             {% if user.is_authenticated %}
@@ -938,16 +959,69 @@
     </nav>
 
     <script>
-        // Save for Later toggle
-        function toggleSaveLater(productId, btn) {
-            fetch(`/cart/save-for-later/${productId}/`, {
+        // ─── CSRF + shared fetch helper ───────────────────────
+        function getCookie(name) {
+            const match = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+            return match ? decodeURIComponent(match[2]) : null;
+        }
+        function postJSON(url) {
+            return fetch(url, {
                 method: 'POST',
                 headers: {
                     'X-Requested-With': 'XMLHttpRequest',
-                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
-                }
-            })
-            .then(res => res.json())
+                    'X-CSRFToken': getCookie('csrftoken'),
+                },
+            }).then(res => res.json());
+        }
+
+        // ─── Cart badges (desktop nav, mobile header icon, bottom nav) ───
+        function updateCartBadges(count) {
+            ['cartBadgeDesktop', 'cartBadgeMobileTop', 'cartBadgeBottomNav'].forEach(id => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                el.textContent = count;
+                el.classList.toggle('badge-hidden', count === 0);
+            });
+        }
+
+        // ─── Toast ───
+        function showShopToast(text) {
+            const toast = document.getElementById('shopToast');
+            document.getElementById('shopToastText').textContent = text;
+            toast.classList.add('show');
+            clearTimeout(showShopToast._t);
+            showShopToast._t = setTimeout(() => toast.classList.remove('show'), 1600);
+        }
+
+        // ─── Add to cart (instant, no reload) ───
+        document.querySelectorAll('[data-action="add-to-cart"]').forEach(function (btn) {
+            btn.addEventListener('click', function (e) {
+                e.stopPropagation();
+                if (btn.disabled) return;
+                btn.disabled = true;
+                const originalHTML = btn.innerHTML;
+                postJSON(btn.dataset.url)
+                    .then(data => {
+                        updateCartBadges(data.count);
+                        btn.innerHTML = '<i class="fas fa-check"></i> Added';
+                        btn.classList.add('is-added');
+                        showShopToast(btn.dataset.name + ' added to cart');
+                        setTimeout(() => {
+                            btn.innerHTML = originalHTML;
+                            btn.classList.remove('is-added');
+                            btn.disabled = false;
+                        }, 1200);
+                    })
+                    .catch(() => {
+                        btn.innerHTML = originalHTML;
+                        btn.disabled = false;
+                    });
+            });
+        });
+
+        // Save for Later toggle
+        function toggleSaveLater(productId, btn) {
+            postJSON(`/cart/save-for-later/${productId}/`)
             .then(data => {
                 const icon = btn.querySelector('i');
                 if (data.saved) {
@@ -959,6 +1033,7 @@
                     icon.classList.remove('fas');
                     icon.classList.add('far');
                 }
+                if (typeof data.cart_count === 'number') updateCartBadges(data.cart_count);
             })
             .catch(err => console.error('Save error:', err));
         }
@@ -1057,6 +1132,31 @@
         document.querySelectorAll('.mobile-bottom-nav .nav-item').forEach(item => {
             if (item.getAttribute('href') === path) item.classList.add('active');
         });
+
+        // Sliding active-page pill in the top nav
+        (function () {
+            const navLinksWrap = document.querySelector('#navbar .nav-links');
+            if (!navLinksWrap) return;
+            let pill = navLinksWrap.querySelector('.nav-pill');
+            if (!pill) {
+                pill = document.createElement('span');
+                pill.className = 'nav-pill';
+                navLinksWrap.prepend(pill);
+            }
+            const pillLinks = Array.from(navLinksWrap.querySelectorAll('a:not(.offer-nav-link)'));
+            function movePill(el) {
+                if (!el) { pill.style.opacity = '0'; return; }
+                pill.style.opacity = '1';
+                pill.style.width = el.offsetWidth + 'px';
+                pill.style.transform = 'translateX(' + el.offsetLeft + 'px)';
+            }
+            function currentActive() { return pillLinks.find(a => a.classList.contains('active')); }
+            movePill(currentActive());
+            pillLinks.forEach(a => a.addEventListener('mouseenter', () => movePill(a)));
+            navLinksWrap.addEventListener('mouseleave', () => movePill(currentActive()));
+            window.addEventListener('resize', () => movePill(currentActive()));
+            if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => movePill(currentActive()));
+        })();
     </script>
 </body>
 </html>
