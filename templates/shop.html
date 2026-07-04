@@ -994,28 +994,29 @@
         }
 
         // ─── Add to cart (instant, no reload) ───
-        document.addEventListener('click', function (e) {
-            const btn = e.target.closest('[data-action="add-to-cart"]');
-            if (!btn) return;
-            e.stopPropagation();
-            btn.disabled = true;
-            const originalHTML = btn.innerHTML;
-            postJSON(btn.dataset.url)
-                .then(data => {
-                    updateCartBadges(data.count);
-                    btn.innerHTML = '<i class="fas fa-check"></i> Added';
-                    btn.classList.add('is-added');
-                    showShopToast(btn.dataset.name + ' added to cart');
-                    setTimeout(() => {
+        document.querySelectorAll('[data-action="add-to-cart"]').forEach(function (btn) {
+            btn.addEventListener('click', function (e) {
+                e.stopPropagation();
+                if (btn.disabled) return;
+                btn.disabled = true;
+                const originalHTML = btn.innerHTML;
+                postJSON(btn.dataset.url)
+                    .then(data => {
+                        updateCartBadges(data.count);
+                        btn.innerHTML = '<i class="fas fa-check"></i> Added';
+                        btn.classList.add('is-added');
+                        showShopToast(btn.dataset.name + ' added to cart');
+                        setTimeout(() => {
+                            btn.innerHTML = originalHTML;
+                            btn.classList.remove('is-added');
+                            btn.disabled = false;
+                        }, 1200);
+                    })
+                    .catch(() => {
                         btn.innerHTML = originalHTML;
-                        btn.classList.remove('is-added');
                         btn.disabled = false;
-                    }, 1200);
-                })
-                .catch(() => {
-                    btn.innerHTML = originalHTML;
-                    btn.disabled = false;
-                });
+                    });
+            });
         });
 
         // Save for Later toggle
