@@ -22,19 +22,71 @@ document.addEventListener('DOMContentLoaded', () => {
  
  
     // ============================================================
-    // 2. NAVBAR — Scroll effect + glassmorphism
+    // 2. NAVBAR — Scroll effect + sliding active-link pill
     // ============================================================
     const navbar = document.getElementById('navbar');
     if (navbar) {
-        const onScroll = () => {
-            if (window.scrollY > 60) {
-                navbar.classList.add('scrolled');
+        if (navbar.dataset.navMode === 'solid') {
+            // Interior pages (shop, cart, checkout) want a permanently
+            // solid navbar — no hero behind it, so skip the scroll logic.
+            navbar.classList.add('scrolled');
+        } else {
+            const sentinel = document.getElementById('navbar-sentinel');
+            if (sentinel && 'IntersectionObserver' in window) {
+                // Toggles exactly when the hero scrolls out of view —
+                // works the same regardless of hero height, so it behaves
+                // consistently on phone, tablet, and desktop alike.
+                const io = new IntersectionObserver(
+                    ([entry]) => navbar.classList.toggle('scrolled', !entry.isIntersecting),
+                    { threshold: 0 }
+                );
+                io.observe(sentinel);
             } else {
-                navbar.classList.remove('scrolled');
+                // Fallback for older browsers without IntersectionObserver
+                const onScroll = () => navbar.classList.toggle('scrolled', window.scrollY > 60);
+                window.addEventListener('scroll', onScroll, { passive: true });
+                onScroll();
             }
-        };
-        window.addEventListener('scroll', onScroll, { passive: true });
-        onScroll(); // run on load
+        }
+
+        // Sliding pill that highlights the active section link
+        const navLinksWrap = navbar.querySelector('.nav-links');
+        if (navLinksWrap) {
+            let pill = navLinksWrap.querySelector('.nav-pill');
+            if (!pill) {
+                pill = document.createElement('span');
+                pill.className = 'nav-pill';
+                navLinksWrap.prepend(pill);
+            }
+            const linkEls = Array.from(navLinksWrap.querySelectorAll('a:not(.nav-cta)'));
+
+            function movePill(el) {
+                if (!el) { pill.style.opacity = '0'; return; }
+                pill.style.opacity = '1';
+                pill.style.width = el.offsetWidth + 'px';
+                pill.style.transform = `translateX(${el.offsetLeft}px)`;
+            }
+
+            function currentActive() {
+                return linkEls.find(a => a.classList.contains('active'));
+            }
+
+            function setActiveByHash() {
+                const hash = window.location.hash || linkEls[0]?.getAttribute('href');
+                const match = linkEls.find(a => a.getAttribute('href') === hash) || linkEls[0];
+                linkEls.forEach(a => a.classList.toggle('active', a === match));
+                movePill(match);
+            }
+
+            linkEls.forEach(a => {
+                a.addEventListener('mouseenter', () => movePill(a));
+                a.addEventListener('click', () => setTimeout(setActiveByHash, 60));
+            });
+            navLinksWrap.addEventListener('mouseleave', () => movePill(currentActive()));
+            window.addEventListener('resize', () => movePill(currentActive()));
+
+            setActiveByHash();
+        }
     }
  
  

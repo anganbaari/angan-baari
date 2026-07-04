@@ -208,18 +208,20 @@ ul { list-style: none; }
     left: 0;
     right: 0;
     z-index: 1000;
-    padding: 22px 5vw;
-    transition: all 0.4s var(--ease-smooth);
+    padding: 20px 5vw;
+    transition: padding 0.35s var(--ease-smooth), background 0.35s var(--ease-smooth), box-shadow 0.35s var(--ease-smooth), border-color 0.35s var(--ease-smooth);
+    border-bottom: 1px solid transparent;
 }
- 
+
 .navbar.scrolled {
-    background: rgba(20, 35, 22, 0.92);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    padding: 14px 5vw;
-    box-shadow: 0 4px 30px rgba(0,0,0,0.25);
+    background: rgba(16, 28, 18, 0.82);
+    backdrop-filter: blur(18px) saturate(160%);
+    -webkit-backdrop-filter: blur(18px) saturate(160%);
+    padding: 13px 5vw;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+    border-bottom-color: rgba(255,255,255,0.06);
 }
- 
+
 .navbar-inner {
     display: flex;
     align-items: center;
@@ -227,7 +229,7 @@ ul { list-style: none; }
     max-width: 1400px;
     margin: 0 auto;
 }
- 
+
 /* Brand */
 .brand {
     display: flex;
@@ -236,9 +238,9 @@ ul { list-style: none; }
     color: var(--white);
     transition: opacity var(--trans-base);
 }
- 
+
 .brand:hover { opacity: 0.85; }
- 
+
 .brand-icon {
     width: 42px;
     height: 42px;
@@ -251,20 +253,20 @@ ul { list-style: none; }
     color: var(--cream);
     flex-shrink: 0;
 }
- 
+
 .brand-text {
     display: flex;
     flex-direction: column;
     line-height: 1.2;
 }
- 
+
 .brand-name {
     font-family: var(--font-display);
     font-size: 1.15rem;
     font-weight: 600;
     color: var(--white);
 }
- 
+
 .brand-tagline {
     font-size: 0.7rem;
     letter-spacing: 0.12em;
@@ -272,62 +274,97 @@ ul { list-style: none; }
     color: var(--sage-light);
     font-family: var(--font-accent);
 }
- 
-/* Nav Links */
+
+/* Nav Links — sliding active-page pill */
 .nav-links {
+    position: relative;
     display: flex;
     align-items: center;
-    gap: clamp(0.8rem, 1.5vw, 2rem);
+    gap: clamp(0.4rem, 1vw, 0.9rem);
 }
- 
-.nav-links a {
-    color: rgba(255,255,255,0.85);
-    font-size: 0.88rem;
-    font-weight: 500;
-    letter-spacing: 0.04em;
-    position: relative;
-    padding: 4px 0;
-    transition: color var(--trans-base);
-}
- 
-.nav-links a::after {
-    content: '';
+
+.nav-pill {
     position: absolute;
-    bottom: -3px;
+    top: 0;
     left: 0;
-    width: 0;
-    height: 1px;
-    background: var(--gold);
-    transition: width var(--trans-base);
+    height: 100%;
+    border-radius: 50px;
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.08);
+    opacity: 0;
+    pointer-events: none;
+    transition: transform 0.35s var(--ease-spring), width 0.35s var(--ease-spring), opacity 0.25s ease;
+    z-index: 0;
 }
- 
+
+.nav-links a {
+    position: relative;
+    z-index: 1;
+    color: rgba(255,255,255,0.78);
+    font-size: 0.86rem;
+    font-weight: 500;
+    letter-spacing: 0.03em;
+    padding: 9px 16px;
+    border-radius: 50px;
+    transition: color var(--trans-base);
+    white-space: nowrap;
+}
+
 .nav-links a:hover,
 .nav-links a.active {
     color: var(--white);
 }
- 
-.nav-links a:hover::after,
-.nav-links a.active::after {
-    width: 100%;
-}
- 
+
 .nav-cta {
     background: var(--moss) !important;
     color: var(--white) !important;
-    padding: 9px 22px !important;
-    border-radius: 50px !important;
     letter-spacing: 0.05em !important;
-    font-size: 0.82rem !important;
     transition: background var(--trans-base), transform 0.2s !important;
 }
- 
-.nav-cta::after { display: none !important; }
- 
+
 .nav-cta:hover {
     background: var(--forest-mid) !important;
     transform: translateY(-1px);
 }
- 
+
+/* Mobile cart icon (header, next to hamburger) */
+.mobile-cart-icon {
+    display: none;
+    position: relative;
+    align-items: center;
+    justify-content: center;
+    color: var(--white);
+    font-size: 1.15rem;
+    margin-right: 10px;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.08);
+}
+
+.mobile-cart-badge {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    background: #c0392b;
+    color: #fff;
+    font-size: 0.6rem;
+    width: 17px;
+    height: 17px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+}
+
+@media (max-width: 1024px) {
+    .mobile-cart-icon { display: flex !important; }
+}
+@media (min-width: 1025px) {
+    .mobile-cart-icon { display: none !important; }
+}
+
 /* ================================================================
    HAMBURGER BUTTON
 ================================================================ */
