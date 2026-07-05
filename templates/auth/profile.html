@@ -327,6 +327,24 @@
             if (item.getAttribute('href') === bottomNavPath) item.classList.add('active');
         });
 
+        // Sliding highlight pill for the bottom nav (skips the raised Shop button)
+        (function () {
+            const navItems = document.querySelector('.mobile-bottom-nav .nav-items');
+            if (!navItems) return;
+            let bnPill = navItems.querySelector('.bottom-nav-pill');
+            if (!bnPill) {
+                bnPill = document.createElement('span');
+                bnPill.className = 'bottom-nav-pill';
+                navItems.prepend(bnPill);
+            }
+            const activeItem = navItems.querySelector('.nav-item.active:not(.home-btn)');
+            if (activeItem) {
+                bnPill.style.opacity = '1';
+                bnPill.style.width = activeItem.offsetWidth + 'px';
+                bnPill.style.transform = 'translateX(' + activeItem.offsetLeft + 'px)';
+            }
+        })();
+
         // Sliding active-page pill in the top nav
         (function () {
             const navLinksWrap = document.querySelector('#navbar .nav-links');
