@@ -365,8 +365,11 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
  
-    window.addEventListener('scroll', scrollSpy, { passive: true });
- 
+   window.addEventListener('scroll', () => {
+    scrollSpy();
+    const active = navLinksWrap?.querySelector('.nav-links a.active');
+    if (active) movePill(active);
+}, { passive: true });
  
     // ============================================================
     // 8. ANIMATED COUNTERS
