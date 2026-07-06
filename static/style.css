@@ -456,7 +456,6 @@ ul { list-style: none; }
     z-index: 0;
 }
 .mobile-bottom-nav .nav-item { position: relative; z-index: 1; }
-.mobile-bottom-nav .nav-item.home-btn { z-index: 2; }
 
 .mobile-bottom-nav .offer-dot {
     animation: offer-dot-pulse 1.6s ease-in-out infinite;

@@ -77,25 +77,21 @@
             font-weight: 500;
             padding: 4px 12px;
             border-radius: 10px;
-            transition: color 0.2s;
+            transition: color 0.2s ease, transform 0.15s ease;
             position: relative;
             cursor: pointer;
             background: none;
             border: none;
         }
-        .mobile-bottom-nav .nav-item i { font-size: 1.25rem; }
+        .mobile-bottom-nav .nav-item:active { transform: scale(0.88); }
+        .mobile-bottom-nav .nav-item i {
+            font-size: 1.25rem;
+            opacity: 0.72;
+            transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.2s ease;
+        }
+        .mobile-bottom-nav .nav-item.active i { opacity: 1; transform: scale(1.15); }
         .mobile-bottom-nav .nav-item:hover,
         .mobile-bottom-nav .nav-item.active { color: #2d5a3d; }
-        .mobile-bottom-nav .nav-item.home-btn {
-            background: #1a2f1e;
-            color: #c9a84c;
-            border-radius: 16px;
-            padding: 8px 20px;
-            margin-bottom: 6px;
-            box-shadow: 0 4px 16px rgba(26,47,30,0.35);
-        }
-        .mobile-bottom-nav .nav-item.home-btn i { color: #c9a84c; font-size: 1.3rem; }
-        .mobile-bottom-nav .nav-item.home-btn:hover { background: #2d5a3d; }
         .mobile-bottom-nav .cart-badge {
             position: absolute;
             top: 0px;
@@ -276,12 +272,12 @@
             <!-- Profile -->
             {% if user.is_authenticated %}
             <a href="{% url 'profile' %}" class="nav-item">
-                <i class="fas fa-user-circle"></i>
+                <i class="far fa-user-circle"></i>
                 <span>Profile</span>
             </a>
             {% else %}
             <a href="{% url 'login' %}" class="nav-item">
-                <i class="fas fa-user-circle"></i>
+                <i class="far fa-user-circle"></i>
                 <span>Login</span>
             </a>
             {% endif %}
@@ -327,7 +323,16 @@
             if (item.getAttribute('href') === bottomNavPath) item.classList.add('active');
         });
 
-        // Sliding highlight pill for the bottom nav (skips the raised Shop button)
+        // Swap the Profile/Login icon outline -> filled when it's the active page
+        document.querySelectorAll('.mobile-bottom-nav .nav-item i.fa-user-circle').forEach(icon => {
+            const item = icon.closest('.nav-item');
+            if (item && item.classList.contains('active')) {
+                icon.classList.remove('far');
+                icon.classList.add('fas');
+            }
+        });
+
+        // Sliding highlight pill for the bottom nav
         (function () {
             const navItems = document.querySelector('.mobile-bottom-nav .nav-items');
             if (!navItems) return;
@@ -337,7 +342,7 @@
                 bnPill.className = 'bottom-nav-pill';
                 navItems.prepend(bnPill);
             }
-            const activeItem = navItems.querySelector('.nav-item.active:not(.home-btn)');
+            const activeItem = navItems.querySelector('.nav-item.active');
             if (activeItem) {
                 bnPill.style.opacity = '1';
                 bnPill.style.width = activeItem.offsetWidth + 'px';
