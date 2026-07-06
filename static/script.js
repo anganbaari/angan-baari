@@ -346,30 +346,46 @@ document.addEventListener('DOMContentLoaded', () => {
  
  
     // ============================================================
-    // 7. SCROLLSPY — Active nav link highlighting
+    // 7. SCROLLSPY — Active nav link highlighting + pill sync
     // ============================================================
     const sections   = document.querySelectorAll('section[id], div[id]');
     const navAnchors = document.querySelectorAll('.nav-links a[href^="#"], .drawer-link[href^="#"]');
- 
+    // Re-query pill and navLinksWrap here so ScrollSpy can access them
+    const _navLinksWrap = navbar ? navbar.querySelector('.nav-links') : null;
+    const _pill = _navLinksWrap ? _navLinksWrap.querySelector('.nav-pill') : null;
+
+    function _movePill(el) {
+        if (!_pill || !el) { if (_pill) _pill.style.opacity = '0'; return; }
+        _pill.style.opacity = '1';
+        _pill.style.width = el.offsetWidth + 'px';
+        _pill.style.transform = `translateX(${el.offsetLeft}px)`;
+    }
+
     const scrollSpy = () => {
         const scrollPos = window.scrollY + 120;
+        let matched = false;
         sections.forEach(sec => {
             if (scrollPos >= sec.offsetTop && scrollPos < sec.offsetTop + sec.offsetHeight) {
+                matched = true;
                 navAnchors.forEach(link => {
                     link.classList.remove('active');
                     if (link.getAttribute('href') === `#${sec.id}`) {
                         link.classList.add('active');
                     }
                 });
+                // Move pill to matching desktop nav link
+                if (_navLinksWrap) {
+                    const activeLink = _navLinksWrap.querySelector(`a[href="#${sec.id}"]`);
+                    if (activeLink) _movePill(activeLink);
+                }
             }
         });
     };
+
+    window.addEventListener('scroll', scrollSpy, { passive: true });
+    scrollSpy(); // run once on load
  
-   window.addEventListener('scroll', () => {
-    scrollSpy();
-    const active = navLinksWrap?.querySelector('.nav-links a.active');
-    if (active) movePill(active);
-}, { passive: true });
+    // scroll handled below in ScrollSpy section
  
     // ============================================================
     // 8. ANIMATED COUNTERS
