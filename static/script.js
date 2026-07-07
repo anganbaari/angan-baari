@@ -338,8 +338,8 @@ document.addEventListener('DOMContentLoaded', () => {
  
     // Mark out-of-stock cards for dimmed styling
     shopCards.forEach(card => {
-        const stockBadge = card.querySelector('.shop-stock');
-        if (stockBadge && stockBadge.classList.contains('out-of-stock')) {
+        const stockText = card.querySelector('.shop-stock-text');
+        if (stockText && stockText.classList.contains('out-of-stock')) {
             card.classList.add('out-of-stock-card');
         }
     });
