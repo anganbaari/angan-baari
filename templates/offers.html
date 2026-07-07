@@ -534,6 +534,17 @@
             transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.2s ease;
         }
         .mobile-bottom-nav .nav-item.active i { opacity: 1; transform: scale(1.15); }
+        .mobile-bottom-nav .nav-item.active:not(.home-btn)::after {
+            content: '';
+            position: absolute;
+            bottom: 1px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 4px;
+            height: 4px;
+            border-radius: 50%;
+            background: #2d5a3d;
+        }
         .mobile-bottom-nav .nav-item.active,
         .mobile-bottom-nav .nav-item:hover { color: #2d5a3d; }
         .cart-badge {
@@ -978,13 +989,8 @@
 
     <nav class="mobile-bottom-nav" id="bottomNav" aria-label="Mobile navigation">
         <div class="nav-items">
-            <!-- Shop -->
-            <a href="{% url 'shop' %}" class="nav-item home-btn">
-                <i class="fas fa-store"></i>
-                <span>Shop</span>
-            </a>
             <!-- Cart -->
-            <a href="{% url 'cart' %}" class="nav-item">
+            <a href="{% url 'cart' %}" class="nav-item {% if request.resolver_match.url_name == 'cart' %}active{% endif %}">
                 <i class="fas fa-shopping-cart"></i>
                 {% with total_qty=request.session.cart.values|length %}
                 {% if total_qty > 0 %}<span class="cart-badge">{{ total_qty }}</span>{% endif %}
@@ -992,25 +998,30 @@
                 <span>Cart</span>
             </a>
             <!-- Offers -->
-            <a href="{% url 'offers' %}" class="nav-item">
+            <a href="{% url 'offers' %}" class="nav-item {% if request.resolver_match.url_name == 'offers' %}active{% endif %}">
                 <i class="fas fa-tag"></i>
                 <span class="offer-dot"></span>
                 <span>Offers</span>
             </a>
+            <!-- Shop — centered FAB -->
+            <a href="{% url 'shop' %}" class="nav-item home-btn">
+                <i class="fas fa-store"></i>
+                <span>Shop</span>
+            </a>
             <!-- Profile / Login -->
             {% if user.is_authenticated %}
-            <a href="{% url 'profile' %}" class="nav-item">
+            <a href="{% url 'profile' %}" class="nav-item {% if request.resolver_match.url_name == 'profile' %}active{% endif %}">
                 <i class="far fa-user-circle"></i>
                 <span>Profile</span>
             </a>
             {% else %}
-            <a href="{% url 'login' %}" class="nav-item">
+            <a href="{% url 'login' %}" class="nav-item {% if request.resolver_match.url_name == 'login' %}active{% endif %}">
                 <i class="far fa-user-circle"></i>
                 <span>Login</span>
             </a>
             {% endif %}
             <!-- Website -->
-            <a href="/" class="nav-item">
+            <a href="/" class="nav-item {% if request.resolver_match.url_name == 'home' %}active{% endif %}">
                 <i class="fas fa-globe"></i>
                 <span>Website</span>
             </a>
@@ -1041,11 +1052,8 @@
         if (drawerClose) drawerClose.addEventListener('click', closeDrawer);
         if (overlay) overlay.addEventListener('click', closeDrawer);
 
-        // Highlight active bottom nav (same as shop page)
-        const path = window.location.pathname;
-        document.querySelectorAll('.mobile-bottom-nav .nav-item').forEach(item => {
-            if (item.getAttribute('href') === path) item.classList.add('active');
-        });
+        // Active bottom-nav state is now rendered server-side (see template),
+        // so no JS path-matching is needed here.
 
         // Swap the Profile/Login icon outline -> filled when it's the active page
         document.querySelectorAll('.mobile-bottom-nav .nav-item i.fa-user-circle').forEach(icon => {
