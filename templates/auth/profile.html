@@ -44,7 +44,7 @@
         .btn-shop { display: inline-flex; align-items: center; gap: 8px; background: var(--forest); color: white; padding: 12px 24px; border-radius: 50px; font-size: 0.9rem; font-weight: 500; text-decoration: none; margin-top: 16px; }
 
         /* ══════════════════════════════════════════
-           MOBILE / TABLET BOTTOM NAV
+           MOBILE / TABLET BOTTOM NAV — modern glass bar
         ══════════════════════════════════════════ */
         .mobile-bottom-nav {
             display: none;
@@ -53,80 +53,124 @@
             left: 0;
             right: 0;
             z-index: 500;
-            background: #fff;
-            border-top: 1.5px solid #e8e2d8;
-            padding: 6px 0 env(safe-area-inset-bottom, 6px);
-            box-shadow: 0 -4px 20px rgba(0,0,0,0.08);
+            background: rgba(255, 255, 255, 0.94);
+            backdrop-filter: blur(18px) saturate(160%);
+            -webkit-backdrop-filter: blur(18px) saturate(160%);
+            border-top: 1px solid rgba(232, 226, 216, 0.9);
+            padding: 8px 6px calc(6px + env(safe-area-inset-bottom, 6px));
+            box-shadow: 0 -10px 30px rgba(26, 47, 30, 0.10);
         }
         .mobile-bottom-nav .nav-items {
+            position: relative;
             display: flex;
             justify-content: space-around;
-            align-items: flex-end;
+            align-items: center;
             max-width: 600px;
             margin: 0 auto;
         }
+        .mobile-bottom-nav .nav-indicator {
+            position: absolute;
+            top: 0;
+            height: 100%;
+            border-radius: 16px;
+            background: linear-gradient(135deg, #2d5a3d, #4a7c59);
+            opacity: 0;
+            transition: transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1),
+                        width 0.45s cubic-bezier(0.34, 1.56, 0.64, 1),
+                        opacity 0.25s ease;
+            z-index: 0;
+            pointer-events: none;
+        }
         .mobile-bottom-nav .nav-item {
+            position: relative;
+            z-index: 1;
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 2px;
+            justify-content: center;
+            gap: 3px;
+            flex: 1;
             text-decoration: none;
             color: #8a9e8e;
-            font-size: 0.6rem;
+            font-size: 0.63rem;
             font-family: 'DM Sans', sans-serif;
             font-weight: 500;
-            padding: 4px 12px;
-            border-radius: 10px;
-            transition: color 0.2s ease, transform 0.15s ease;
-            position: relative;
+            padding: 8px 4px;
+            border-radius: 16px;
             cursor: pointer;
             background: none;
             border: none;
+            transition: color 0.3s ease;
         }
-        .mobile-bottom-nav .nav-item:active { transform: scale(0.88); }
+        .mobile-bottom-nav .nav-icon-wrap {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 24px;
+            height: 24px;
+        }
         .mobile-bottom-nav .nav-item i {
-            font-size: 1.25rem;
-            opacity: 0.72;
-            transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.2s ease;
+            font-size: 1.18rem;
+            transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), color 0.3s ease;
         }
-        .mobile-bottom-nav .nav-item.active i { opacity: 1; transform: scale(1.15); }
-        .mobile-bottom-nav .nav-item.active:not(.home-btn)::after {
-            content: '';
-            position: absolute;
-            bottom: 1px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 4px;
-            height: 4px;
-            border-radius: 50%;
-            background: #2d5a3d;
-        }
-        .mobile-bottom-nav .nav-item:hover,
-        .mobile-bottom-nav .nav-item.active { color: #2d5a3d; }
+        .mobile-bottom-nav .nav-item:active .nav-icon-wrap { transform: scale(0.85); }
+        .mobile-bottom-nav .nav-item.active { color: #fff; }
+        .mobile-bottom-nav .nav-item.active i { transform: translateY(-1px) scale(1.1); }
+        .mobile-bottom-nav .nav-label { transition: color 0.3s ease, font-weight 0.3s ease; }
+        .mobile-bottom-nav .nav-item.active .nav-label { color: #fff; font-weight: 600; }
+        /* Cart badge */
         .mobile-bottom-nav .cart-badge {
             position: absolute;
-            top: 0px;
-            right: 6px;
+            top: -5px;
+            right: -9px;
             background: #c0392b;
             color: #fff;
-            font-size: 0.58rem;
-            width: 16px;
+            font-size: 0.56rem;
+            min-width: 16px;
             height: 16px;
+            padding: 0 3px;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
             font-weight: 700;
+            border: 2px solid #fff;
+        }
+        /* Offers — a periodic wiggle draws the eye without being annoying; pauses when active */
+        .mobile-bottom-nav .nav-item-offers .nav-icon-wrap i {
+            animation: navOfferWiggle 2.8s ease-in-out infinite;
+        }
+        .mobile-bottom-nav .nav-item-offers.active .nav-icon-wrap i { animation: none; }
+        @keyframes navOfferWiggle {
+            0%, 92%, 100% { transform: rotate(0deg); }
+            93% { transform: rotate(-13deg); }
+            94.5% { transform: rotate(10deg); }
+            96% { transform: rotate(-7deg); }
+            97.5% { transform: rotate(4deg); }
+            99% { transform: rotate(0deg); }
         }
         .mobile-bottom-nav .offer-dot {
             position: absolute;
-            top: 2px;
-            right: 8px;
-            width: 7px;
-            height: 7px;
+            top: -3px;
+            right: -7px;
+            width: 8px;
+            height: 8px;
             border-radius: 50%;
             background: #e67e22;
             border: 1.5px solid #fff;
+        }
+        .mobile-bottom-nav .offer-dot::after {
+            content: '';
+            position: absolute;
+            inset: -3px;
+            border-radius: 50%;
+            border: 1.5px solid #e67e22;
+            animation: navOfferPing 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
+        }
+        @keyframes navOfferPing {
+            0% { transform: scale(1); opacity: 0.8; }
+            75%, 100% { transform: scale(2.4); opacity: 0; }
         }
         @media (min-width: 1025px) {
             .mobile-bottom-nav { display: none !important; }
@@ -260,41 +304,46 @@
     <!-- MOBILE / TABLET BOTTOM NAV (hidden on desktop) -->
     <nav class="mobile-bottom-nav" id="bottomNav" aria-label="Mobile navigation">
         <div class="nav-items">
+            <span class="nav-indicator" aria-hidden="true"></span>
+            <!-- Shop -->
+            <a href="{% url 'shop' %}" class="nav-item {% if request.resolver_match.url_name == 'shop' %}active{% endif %}">
+                <span class="nav-icon-wrap"><i class="fas fa-store"></i></span>
+                <span class="nav-label">Shop</span>
+            </a>
             <!-- Cart -->
             <a href="{% url 'cart' %}" class="nav-item {% if request.resolver_match.url_name == 'cart' %}active{% endif %}">
-                <i class="fas fa-shopping-cart"></i>
-                {% with total_qty=request.session.cart.values|length %}
-                {% if total_qty > 0 %}<span class="cart-badge">{{ total_qty }}</span>{% endif %}
-                {% endwith %}
-                <span>Cart</span>
+                <span class="nav-icon-wrap">
+                    <i class="fas fa-shopping-cart"></i>
+                    {% with total_qty=request.session.cart.values|length %}
+                    {% if total_qty > 0 %}<span class="cart-badge">{{ total_qty }}</span>{% endif %}
+                    {% endwith %}
+                </span>
+                <span class="nav-label">Cart</span>
             </a>
             <!-- Offers -->
-            <a href="{% url 'offers' %}" class="nav-item {% if request.resolver_match.url_name == 'offers' %}active{% endif %}">
-                <i class="fas fa-tag"></i>
-                <span class="offer-dot"></span>
-                <span>Offers</span>
+            <a href="{% url 'offers' %}" class="nav-item nav-item-offers {% if request.resolver_match.url_name == 'offers' %}active{% endif %}">
+                <span class="nav-icon-wrap">
+                    <i class="fas fa-tag"></i>
+                    <span class="offer-dot"></span>
+                </span>
+                <span class="nav-label">Offers</span>
             </a>
-            <!-- Shop — centered FAB -->
-            <a href="{% url 'shop' %}" class="nav-item home-btn">
-                <i class="fas fa-store"></i>
-                <span>Shop</span>
-            </a>
-            <!-- Profile -->
+            <!-- Profile / Login -->
             {% if user.is_authenticated %}
             <a href="{% url 'profile' %}" class="nav-item {% if request.resolver_match.url_name == 'profile' %}active{% endif %}">
-                <i class="far fa-user-circle"></i>
-                <span>Profile</span>
+                <span class="nav-icon-wrap"><i class="far fa-user-circle"></i></span>
+                <span class="nav-label">Profile</span>
             </a>
             {% else %}
             <a href="{% url 'login' %}" class="nav-item {% if request.resolver_match.url_name == 'login' %}active{% endif %}">
-                <i class="far fa-user-circle"></i>
-                <span>Login</span>
+                <span class="nav-icon-wrap"><i class="far fa-user-circle"></i></span>
+                <span class="nav-label">Login</span>
             </a>
             {% endif %}
             <!-- Website (back to main site) -->
             <a href="/" class="nav-item {% if request.resolver_match.url_name == 'home' %}active{% endif %}">
-                <i class="fas fa-globe"></i>
-                <span>Website</span>
+                <span class="nav-icon-wrap"><i class="fas fa-globe"></i></span>
+                <span class="nav-label">Website</span>
             </a>
         </div>
     </nav>
@@ -339,22 +388,22 @@
             }
         });
 
-        // Sliding highlight pill for the bottom nav
+        // Sliding indicator for the bottom nav — glides to the active tab
         (function () {
             const navItems = document.querySelector('.mobile-bottom-nav .nav-items');
             if (!navItems) return;
-            let bnPill = navItems.querySelector('.bottom-nav-pill');
-            if (!bnPill) {
-                bnPill = document.createElement('span');
-                bnPill.className = 'bottom-nav-pill';
-                navItems.prepend(bnPill);
+            const indicator = navItems.querySelector('.nav-indicator');
+            function moveIndicator() {
+                const activeItem = navItems.querySelector('.nav-item.active');
+                if (!indicator) return;
+                if (!activeItem) { indicator.style.opacity = '0'; return; }
+                indicator.style.opacity = '1';
+                indicator.style.width = activeItem.offsetWidth + 'px';
+                indicator.style.transform = 'translateX(' + activeItem.offsetLeft + 'px)';
             }
-            const activeItem = navItems.querySelector('.nav-item.active');
-            if (activeItem) {
-                bnPill.style.opacity = '1';
-                bnPill.style.width = activeItem.offsetWidth + 'px';
-                bnPill.style.transform = 'translateX(' + activeItem.offsetLeft + 'px)';
-            }
+            moveIndicator();
+            window.addEventListener('resize', moveIndicator);
+            if (document.fonts && document.fonts.ready) document.fonts.ready.then(moveIndicator);
         })();
 
         // Sliding active-page pill in the top nav

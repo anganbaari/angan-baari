@@ -1,5 +1,5 @@
 /* ================================================================
-   ANGAN BAARI — Premium Redesign
+   THE HIMALAYAN SUSTAINABLE FARM — Premium Redesign
    Style: Cinematic · Luxury Eco · Himalayan Natural
    Fonts: Cormorant Garamond (serif) + DM Sans (body) + Cinzel (accent)
 ================================================================ */
@@ -1599,11 +1599,20 @@ ul { list-style: none; }
  
 .shop-body h3 {
     font-family: var(--font-display);
-    font-size: 1.35rem;
+    font-size: 1.4rem;
     font-weight: 600;
+    font-style: italic;
     color: var(--forest);
-    margin-bottom: 6px;
+    margin-bottom: 8px;
     line-height: 1.2;
+    letter-spacing: 0.01em;
+}
+ 
+.shop-title-rule {
+    width: 28px;
+    height: 1.5px;
+    background: var(--gold);
+    margin-bottom: 10px;
 }
  
 /* Stock line — replaces the old floating badge */
@@ -1655,7 +1664,7 @@ ul { list-style: none; }
     transition: all 0.3s var(--ease-smooth);
     border: none;
     cursor: pointer;
-    flex: 0 0 60%;
+    flex: 1;
     min-width: 0;
 }
  
@@ -1683,7 +1692,7 @@ ul { list-style: none; }
     letter-spacing: 0.02em;
     border: 1.5px solid var(--sage-light);
     cursor: not-allowed;
-    flex: 0 0 60%;
+    flex: 1;
     min-width: 0;
     opacity: 0.75;
     font-family: var(--font-body);
@@ -1705,7 +1714,8 @@ ul { list-style: none; }
     .shop-img-wrap { height: 110px; }
     .shop-body { padding: 12px 12px 14px; }
     .shop-meta { font-size: 0.55rem; gap: 4px; margin-bottom: 6px; }
-    .shop-body h3 { font-size: 1.02rem; margin-bottom: 4px; }
+    .shop-body h3 { font-size: 1.02rem; margin-bottom: 6px; }
+    .shop-title-rule { margin-bottom: 6px; }
     .shop-stock-text { font-size: 0.65rem; margin-bottom: 6px; }
     .shop-body p {
         font-size: 0.7rem;
@@ -1719,8 +1729,8 @@ ul { list-style: none; }
     .shop-cta-row { gap: 6px; }
     .btn-whatsapp, .btn-unavailable { font-size: 0.66rem; padding: 8px 4px; }
     .btn-whatsapp i, .btn-unavailable i { font-size: 0.82rem; }
-    .btn-details { font-size: 0.66rem; padding: 8px 4px; }
-    .btn-details i { font-size: 0.7rem; }
+    .btn-details { width: 36px; height: 36px; }
+    .btn-details i { font-size: 0.85rem; }
 }
  
 /* ================================================================

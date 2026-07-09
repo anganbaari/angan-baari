@@ -128,19 +128,16 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 6px;
+    flex-shrink: 0;
+    width: 42px;
+    height: 42px;
     background: transparent;
     color: var(--moss);
-    padding: 12px 8px;
-    border-radius: 50px;
-    font-size: 0.8rem;
-    font-weight: 500;
-    letter-spacing: 0.02em;
+    border-radius: 50%;
+    font-size: 0.95rem;
     text-decoration: none;
     transition: all 0.3s ease;
     border: 1.5px solid var(--moss);
-    flex: 1;
-    min-width: 0;
 }
 .btn-details:hover {
     background: var(--moss);
@@ -148,7 +145,7 @@
     transform: translateY(-2px);
     box-shadow: 0 6px 20px rgba(74,124,89,0.25);
 }
-.btn-details i { font-size: 0.78rem; }
+.btn-details i { font-size: 0.95rem; }
 
 .shop-hint {
     text-align: center;
@@ -610,6 +607,7 @@
                 <div class="shop-body">
                     <div class="shop-meta"><i class="fas fa-apple-alt"></i> Fruits &middot; Seasonal, May&ndash;July</div>
                     <h3>Mangoes</h3>
+                    <div class="shop-title-rule"></div>
                     <div class="shop-stock-text available"><i class="fas fa-check"></i> Available</div>
                     <p>गुलियो, रसिलो र १००% Organic— हाम्रो बगैँचाबाट पूर्ण रूपमा पाकेको अवस्थामा टिपिएको।</p>
                     <div class="shop-cta-row">
@@ -618,8 +616,8 @@
                            target="_blank" rel="noopener noreferrer">
                             <i class="fab fa-whatsapp"></i> WhatsApp
                         </a>
-                        <a href="/products/mangoes/" class="btn-details">
-                            <i class="fas fa-info-circle"></i> Details
+                        <a href="/products/mangoes/" class="btn-details" aria-label="View Mangoes details">
+                            <i class="fas fa-info-circle"></i>
                         </a>
                     </div>
                 </div>
@@ -633,14 +631,15 @@
                 <div class="shop-body">
                     <div class="shop-meta"><i class="fas fa-apple-alt"></i> Fruits &middot; Seasonal, June&ndash;July</div>
                     <h3>Litchi</h3>
+                    <div class="shop-title-rule"></div>
                     <div class="shop-stock-text out-of-stock"><i class="fas fa-times"></i> Out of Stock</div>
                     <p>पातलो बोक्रा र सानो बियाँ भएको ताजा र रसिलो लीची (असार–साउनमा उपलब्ध): गर्मी भगाउने एक प्राकृतिक मिठास।</p>
                     <div class="shop-cta-row">
                         <button class="btn-unavailable" disabled>
                             <i class="fas fa-times-circle"></i> Out of Stock
                         </button>
-                        <a href="/products/litchi/" class="btn-details">
-                            <i class="fas fa-info-circle"></i> Details
+                        <a href="/products/litchi/" class="btn-details" aria-label="View Litchi details">
+                            <i class="fas fa-info-circle"></i>
                         </a>
                     </div>
                 </div>
@@ -654,6 +653,7 @@
                 <div class="shop-body">
                     <div class="shop-meta"><i class="fas fa-apple-alt"></i> Fruits &middot; Seasonal</div>
                     <h3>Jackfruit</h3>
+                    <div class="shop-title-rule"></div>
                     <div class="shop-stock-text available"><i class="fas fa-check"></i> Available</div>
                     <p>बहुउपयोगी र पौष्टिक ताजा कटहर — तरकारी, बुइँगल (अचार) बनाउन वा पाकेको खानका लागि एकदमै उपयुक्त।</p>
                     <div class="shop-cta-row">
@@ -662,8 +662,8 @@
                            target="_blank" rel="noopener noreferrer">
                             <i class="fab fa-whatsapp"></i> WhatsApp
                         </a>
-                        <a href="/products/jackfruit/" class="btn-details">
-                            <i class="fas fa-info-circle"></i> Details
+                        <a href="/products/jackfruit/" class="btn-details" aria-label="View Jackfruit details">
+                            <i class="fas fa-info-circle"></i>
                         </a>
                     </div>
                 </div>
@@ -677,6 +677,7 @@
                 <div class="shop-body">
                     <div class="shop-meta"><i class="fas fa-apple-alt"></i> Fruits &middot; Year-round</div>
                     <h3>Papaya</h3>
+                    <div class="shop-title-rule"></div>
                     <div class="shop-stock-text available"><i class="fas fa-check"></i> Available</div>
                     <p>Vitamin ले भरिपूर्ण शत-प्रतिशत प्राकृतिक मेवा — बाह्रै महिना ताजा र उपलब्ध।</p>
                     <div class="shop-cta-row">
@@ -685,8 +686,8 @@
                            target="_blank" rel="noopener noreferrer">
                             <i class="fab fa-whatsapp"></i> WhatsApp
                         </a>
-                        <a href="/products/papaya/" class="btn-details">
-                            <i class="fas fa-info-circle"></i> Details
+                        <a href="/products/papaya/" class="btn-details" aria-label="View Papaya details">
+                            <i class="fas fa-info-circle"></i>
                         </a>
                     </div>
                 </div>
@@ -700,6 +701,7 @@
                 <div class="shop-body">
                     <div class="shop-meta"><i class="fas fa-apple-alt"></i> Fruits &middot; Year-round</div>
                     <h3>Bananas</h3>
+                    <div class="shop-title-rule"></div>
                     <div class="shop-stock-text available"><i class="fas fa-check"></i> Available</div>
                     <p>जैविक Compost माटोमा फलेको गुलियो र गुणकारी फल: Healthy खाजाका लागि उत्तम रोजाइ।</p>
                     <div class="shop-cta-row">
@@ -708,8 +710,8 @@
                            target="_blank" rel="noopener noreferrer">
                             <i class="fab fa-whatsapp"></i> WhatsApp
                         </a>
-                        <a href="/products/banana/" class="btn-details">
-                            <i class="fas fa-info-circle"></i> Details
+                        <a href="/products/banana/" class="btn-details" aria-label="View Banana details">
+                            <i class="fas fa-info-circle"></i>
                         </a>
                     </div>
                 </div>
@@ -723,6 +725,7 @@
                 <div class="shop-body">
                     <div class="shop-meta"><i class="fas fa-apple-alt"></i> Fruits &middot; Year-round</div>
                     <h3>Lemons</h3>
+                    <div class="shop-title-rule"></div>
                     <div class="shop-stock-text available"><i class="fas fa-check"></i> Available</div>
                     <p>Vitamin C सीले भरिपूर्ण अर्गानिक उत्पादन: पोषिलो जूस र खाना पकाउनका लागि एकदमै उपयुक्त।</p>
                     <div class="shop-cta-row">
@@ -731,8 +734,8 @@
                            target="_blank" rel="noopener noreferrer">
                             <i class="fab fa-whatsapp"></i> WhatsApp
                         </a>
-                        <a href="/products/lemons/" class="btn-details">
-                            <i class="fas fa-info-circle"></i> Details
+                        <a href="/products/lemons/" class="btn-details" aria-label="View Lemons details">
+                            <i class="fas fa-info-circle"></i>
                         </a>
                     </div>
                 </div>
@@ -747,6 +750,7 @@
                 <div class="shop-body">
                     <div class="shop-meta"><i class="fas fa-carrot"></i> Vegetables &middot; Seasonal</div>
                     <h3>Seasonal Vegetables</h3>
+                    <div class="shop-title-rule"></div>
                     <div class="shop-stock-text available"><i class="fas fa-check"></i> Available</div>
                     <p>100% रसायनमुक्त र प्राकृतिक रूपमा फलाइएका, ताजा मौसमी अर्गानिक तरकारीहरू।</p>
                     <div class="shop-cta-row">
@@ -755,8 +759,8 @@
                            target="_blank" rel="noopener noreferrer">
                             <i class="fab fa-whatsapp"></i> WhatsApp
                         </a>
-                        <a href="/products/vegetables/" class="btn-details">
-                            <i class="fas fa-info-circle"></i> Details
+                        <a href="/products/vegetables/" class="btn-details" aria-label="View Vegetables details">
+                            <i class="fas fa-info-circle"></i>
                         </a>
                     </div>
                 </div>
@@ -770,14 +774,15 @@
                 <div class="shop-body">
                     <div class="shop-meta"><i class="fas fa-carrot"></i> Vegetables &middot; Seasonal</div>
                     <h3>Mushrooms</h3>
+                    <div class="shop-title-rule"></div>
                     <div class="shop-stock-text out-of-stock"><i class="fas fa-times"></i> Out of Stock</div>
                     <p>ताजा संकलन गरिएका पोषकतत्वयुक्त च्याउ: १००% रसायनमुक्त र प्राकृतिक उत्पादन।</p>
                     <div class="shop-cta-row">
                         <button class="btn-unavailable" disabled>
                             <i class="fas fa-times-circle"></i> Out of Stock
                         </button>
-                        <a href="/products/mushroom/" class="btn-details">
-                            <i class="fas fa-info-circle"></i> Details
+                        <a href="/products/mushroom/" class="btn-details" aria-label="View Mushroom details">
+                            <i class="fas fa-info-circle"></i>
                         </a>
                     </div>
                 </div>
@@ -792,6 +797,7 @@
                 <div class="shop-body">
                     <div class="shop-meta"><i class="fas fa-jar"></i> Honey &middot; Signature</div>
                     <h3>Pure Angan Baari Gold Honey</h3>
+                    <div class="shop-title-rule"></div>
                     <div class="shop-stock-text available"><i class="fas fa-check"></i> Available</div>
                     <p>हाम्रो आफ्नै मौरीको घारबाट प्राकृतिक रूपमा निकालिएको काँचो मह — स्वादिलो र पोषक तत्वले भरिपूर्ण।</p>
                     <div class="shop-cta-row">
@@ -800,8 +806,8 @@
                            target="_blank" rel="noopener noreferrer">
                             <i class="fab fa-whatsapp"></i> WhatsApp
                         </a>
-                        <a href="/products/honey/" class="btn-details">
-                            <i class="fas fa-info-circle"></i> Details
+                        <a href="/products/honey/" class="btn-details" aria-label="View Honey details">
+                            <i class="fas fa-info-circle"></i>
                         </a>
                     </div>
                 </div>
@@ -816,6 +822,7 @@
                 <div class="shop-body">
                     <div class="shop-meta"><i class="fas fa-paw"></i> Animals &middot; Free-range</div>
                     <h3>Goats</h3>
+                    <div class="shop-title-rule"></div>
                     <div class="shop-stock-text available"><i class="fas fa-check"></i> Available</div>
                     <p>उत्कृष्ट मासु र प्रजनन्का लागि स्वस्थ लोकल बाख्राहरू: अर्गानिक दाना र विशेष रेखदेखमा पालिएका।</p>
                     <div class="shop-cta-row">
@@ -824,8 +831,8 @@
                            target="_blank" rel="noopener noreferrer">
                             <i class="fab fa-whatsapp"></i> WhatsApp
                         </a>
-                        <a href="/products/goats/" class="btn-details">
-                            <i class="fas fa-info-circle"></i> Details
+                        <a href="/products/goats/" class="btn-details" aria-label="View Goats details">
+                            <i class="fas fa-info-circle"></i>
                         </a>
                     </div>
                 </div>
@@ -839,6 +846,7 @@
                 <div class="shop-body">
                     <div class="shop-meta"><i class="fas fa-paw"></i> Animals &middot; Free-range</div>
                     <h3>Free-range Hens</h3>
+                    <div class="shop-title-rule"></div>
                     <div class="shop-stock-text available"><i class="fas fa-check"></i> Available</div>
                     <p>खुला मैदानमा चरेका, पोषिला र स्वस्थ Local कुखुरा: शत-प्रतिशत प्राकृतिक र Healthy रोजाइ।</p>
                     <div class="shop-cta-row">
@@ -847,8 +855,8 @@
                            target="_blank" rel="noopener noreferrer">
                             <i class="fab fa-whatsapp"></i> WhatsApp
                         </a>
-                        <a href="/products/local-chickens/" class="btn-details">
-                            <i class="fas fa-info-circle"></i> Details
+                        <a href="/products/local-chickens/" class="btn-details" aria-label="View Local Chickens details">
+                            <i class="fas fa-info-circle"></i>
                         </a>
                     </div>
                 </div>
@@ -863,6 +871,7 @@
                 <div class="shop-body">
                     <div class="shop-meta"><i class="fas fa-pepper-hot"></i> Pickles &middot; Handmade</div>
                     <h3>Homemade Mango Pickle</h3>
+                    <div class="shop-title-rule"></div>
                     <div class="shop-stock-text available"><i class="fas fa-check"></i> Available</div>
                     <p>Farm को ताजा आँपबाट बनेको स्वादिष्ट र अमिलो-पिरो अचार: हरेक खानाको स्वाद झन् बढाउने उत्कृष्ट तिहुन।</p>
                     <div class="shop-cta-row">
@@ -871,8 +880,8 @@
                            target="_blank" rel="noopener noreferrer">
                             <i class="fab fa-whatsapp"></i> WhatsApp
                         </a>
-                        <a href="/products/mango-pickles/" class="btn-details">
-                            <i class="fas fa-info-circle"></i> Details
+                        <a href="/products/mango-pickles/" class="btn-details" aria-label="View Mango Pickles details">
+                            <i class="fas fa-info-circle"></i>
                         </a>
                     </div>
                 </div>
