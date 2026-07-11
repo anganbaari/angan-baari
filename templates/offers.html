@@ -634,7 +634,7 @@
         }
 
         @media (max-width: 1024px) { .mobile-bottom-nav { display: block; } }
-        @media (min-width: 1025px) { .mobile-bottom-nav { display: none !important; } .hamburger { display: none !important; } }
+        @media (min-width: 1025px) { .mobile-bottom-nav { display: none !important; } }
 
         @media (max-width: 600px) {
             .discount-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
@@ -644,92 +644,11 @@
             .steps-grid { grid-template-columns: 1fr 1fr; }
             .dashain-hero { padding: 36px 16px 44px; margin-top: 56px; }
         }
-        /* ══════════════════════════════════════════
-           MOBILE DRAWER (same as shop page)
-        ══════════════════════════════════════════ */
-        .drawer-backdrop {
-            display: none;
-            position: fixed;
-            inset: 0;
-            background: rgba(0,0,0,0.45);
-            z-index: 1000;
-        }
-        .drawer-backdrop.active { display: block; }
-        .side-drawer {
-            position: fixed;
-            top: 0;
-            right: 0;
-            width: 62%;
-            max-width: 300px;
-            height: 100vh;
-            background: #1a2f1e;
-            z-index: 1001;
-            transform: translateX(100%);
-            transition: transform 0.35s cubic-bezier(0.4,0,0.2,1);
-            display: flex;
-            flex-direction: column;
-            overflow-y: auto;
-        }
-        .side-drawer.open { transform: translateX(0); }
-        .drawer-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 20px 20px 16px;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-        }
-        .drawer-brand {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            color: #f7f2ea;
-            font-family: "Cormorant Garamond", serif;
-            font-size: 1.1rem;
-        }
-        .drawer-close {
-            background: none;
-            border: none;
-            color: #f7f2ea;
-            font-size: 1.2rem;
-            cursor: pointer;
-            padding: 4px;
-            opacity: 0.7;
-        }
-        .drawer-close:hover { opacity: 1; }
-        .drawer-section { padding: 16px 20px 8px; }
-        .drawer-section-title {
-            font-size: 0.65rem;
-            font-family: "Cinzel", serif;
-            letter-spacing: 0.15em;
-            text-transform: uppercase;
-            color: #c9a84c;
-            margin-bottom: 8px;
-        }
-        .drawer-link {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 10px 12px;
-            border-radius: 10px;
-            color: #c9a84c !important;
-            font-size: 0.88rem;
-            text-decoration: none;
-            transition: background 0.2s;
-            margin-bottom: 2px;
-            opacity: 1 !important;
-            transform: none !important;
-        }
-        .drawer-link:hover { background: rgba(255,255,255,0.1); }
-        .drawer-link i { width: 16px; text-align: center; }
-        .drawer-link.active { background: #4a7c59; }
-        .drawer-link.whatsapp { background: #25D366; color: #fff !important; }
-        .drawer-link.whatsapp:hover { background: #1da851; }
-        .drawer-divider { height: 1px; background: rgba(255,255,255,0.1); margin: 8px 20px; }
     </style>
 </head>
 <body>
 
-    <header class="navbar scrolled" id="navbar" data-nav-mode="solid">
+    <header class="navbar scrolled navbar-app" id="navbar" data-nav-mode="solid">
         <div class="navbar-inner">
             <a href="/" class="brand" aria-label="Angan Baari Home">
                 <span class="brand-icon"><i class="fas fa-seedling"></i></span>
@@ -771,41 +690,16 @@
                     </a>
                 </div>
             </nav>
-            <button class="hamburger" id="mobile-menu" aria-label="Open menu">
-                <span class="ham-line ham-top"></span>
-                <span class="ham-line ham-mid"></span>
-                <span class="ham-line ham-bot"></span>
-            </button>
+            <!-- Mobile cart icon — bottom nav already covers primary navigation,
+                 so no hamburger/drawer is needed here (was fully redundant). -->
+            <a href="{% url 'cart' %}" class="mobile-cart-icon" aria-label="View cart">
+                <i class="fas fa-shopping-cart"></i>
+                {% with total_qty=request.session.cart.values|length %}
+                {% if total_qty > 0 %}<span class="mobile-cart-badge">{{ total_qty }}</span>{% endif %}
+                {% endwith %}
+            </a>
         </div>
     </header>
-
-    <!-- DRAWER BACKDROP -->
-    <div class="drawer-backdrop" id="drawerOverlay"></div>
-
-    <!-- MOBILE DRAWER (same as shop page) -->
-    <div class="side-drawer" id="mobileDrawer">
-        <div class="drawer-header">
-            <div class="drawer-brand">
-                <i class="fas fa-seedling" style="color:var(--moss);"></i>
-                आँगन बारी
-            </div>
-            <button class="drawer-close" id="drawerClose"><i class="fas fa-times"></i></button>
-        </div>
-        <div class="drawer-section">
-            <div class="drawer-section-title">Quick Links</div>
-            <a href="/" class="drawer-link revealed"><i class="fas fa-globe"></i> Website</a>
-            <a href="{% url 'shop' %}" class="drawer-link revealed"><i class="fas fa-store"></i> Shop</a>
-            <a href="{% url 'cart' %}" class="drawer-link revealed"><i class="fas fa-shopping-cart"></i> Cart</a>
-            <a href="{% url 'offers' %}" class="drawer-link revealed active"><i class="fas fa-tag"></i> Offers</a>
-            {% if user.is_authenticated %}
-            <a href="{% url 'profile' %}" class="drawer-link revealed"><i class="fas fa-user"></i> My Profile ({{ user.first_name }})</a>
-            <a href="{% url 'logout' %}" class="drawer-link revealed"><i class="fas fa-sign-out-alt"></i> Logout</a>
-            {% else %}
-            <a href="{% url 'login' %}" class="drawer-link revealed"><i class="fas fa-sign-in-alt"></i> Login / Sign Up</a>
-            {% endif %}
-            <a href="https://wa.me/9779821025084" class="drawer-link revealed whatsapp" target="_blank"><i class="fab fa-whatsapp"></i> Order via WhatsApp</a>
-        </div>
-    </div>
 
     <section class="dashain-hero">
         <div class="hero-tikas">🪔 ᳕ 🌼</div>
@@ -1111,26 +1005,6 @@
     <script>
         const navbar = document.getElementById('navbar');
         if (navbar) navbar.classList.add('scrolled');
-
-        // Mobile drawer (same behavior as shop page)
-        const hamburger = document.getElementById('mobile-menu');
-        const drawer = document.getElementById('mobileDrawer');
-        const overlay = document.getElementById('drawerOverlay');
-        const drawerClose = document.getElementById('drawerClose');
-
-        function openDrawer() {
-            drawer.classList.add('open');
-            overlay.classList.add('active');
-            document.body.style.overflow = 'hidden';
-        }
-        function closeDrawer() {
-            drawer.classList.remove('open');
-            overlay.classList.remove('active');
-            document.body.style.overflow = '';
-        }
-        if (hamburger) hamburger.addEventListener('click', openDrawer);
-        if (drawerClose) drawerClose.addEventListener('click', closeDrawer);
-        if (overlay) overlay.addEventListener('click', closeDrawer);
 
         // Active bottom-nav state is now rendered server-side (see template),
         // so no JS path-matching is needed here.

@@ -269,10 +269,10 @@
             0% { transform: scale(1); opacity: 0.8; }
             75%, 100% { transform: scale(2.4); opacity: 0; }
         }
-        @media (min-width: 1025px) {
+        @media (min-width: 881px) {
             .mobile-bottom-nav { display: none !important; }
         }
-        @media (max-width: 1024px) {
+        @media (max-width: 880px) {
             .mobile-bottom-nav { display: block; }
             .cart-page { margin-bottom: 90px; }
         }
@@ -280,7 +280,7 @@
 </head>
 <body>
     {% csrf_token %}
-    <header class="navbar scrolled" id="navbar" data-nav-mode="solid">
+    <header class="navbar scrolled navbar-app" id="navbar" data-nav-mode="solid">
         <div class="navbar-inner">
             <a href="/" class="brand">
                 <span class="brand-icon"><i class="fas fa-seedling"></i></span>
