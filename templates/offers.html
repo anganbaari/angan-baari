@@ -960,12 +960,12 @@
         <div class="nav-items">
             <span class="nav-indicator" aria-hidden="true"></span>
             <!-- Shop -->
-            <a href="{% url 'shop' %}" class="nav-item {% if request.resolver_match.url_name == 'shop' %}active{% endif %}">
+            <a href="{% url 'shop' %}" class="nav-item">
                 <span class="nav-icon-wrap"><i class="fas fa-store"></i></span>
                 <span class="nav-label">Shop</span>
             </a>
             <!-- Cart -->
-            <a href="{% url 'cart' %}" class="nav-item {% if request.resolver_match.url_name == 'cart' %}active{% endif %}">
+            <a href="{% url 'cart' %}" class="nav-item">
                 <span class="nav-icon-wrap">
                     <i class="fas fa-shopping-cart"></i>
                     {% with total_qty=request.session.cart.values|length %}
@@ -974,8 +974,10 @@
                 </span>
                 <span class="nav-label">Cart</span>
             </a>
-            <!-- Offers -->
-            <a href="{% url 'offers' %}" class="nav-item nav-item-offers {% if request.resolver_match.url_name == 'offers' %}active{% endif %}">
+            <!-- Offers — this template only ever renders the offers page, so
+                 its own tab is hardcoded active rather than relying on
+                 request.resolver_match.url_name. -->
+            <a href="{% url 'offers' %}" class="nav-item nav-item-offers active">
                 <span class="nav-icon-wrap">
                     <i class="fas fa-tag"></i>
                     <span class="offer-dot"></span>
@@ -984,18 +986,18 @@
             </a>
             <!-- Profile / Login -->
             {% if user.is_authenticated %}
-            <a href="{% url 'profile' %}" class="nav-item {% if request.resolver_match.url_name == 'profile' %}active{% endif %}">
+            <a href="{% url 'profile' %}" class="nav-item">
                 <span class="nav-icon-wrap"><i class="far fa-user-circle"></i></span>
                 <span class="nav-label">Profile</span>
             </a>
             {% else %}
-            <a href="{% url 'login' %}" class="nav-item {% if request.resolver_match.url_name == 'login' %}active{% endif %}">
+            <a href="{% url 'login' %}" class="nav-item">
                 <span class="nav-icon-wrap"><i class="far fa-user-circle"></i></span>
                 <span class="nav-label">Login</span>
             </a>
             {% endif %}
             <!-- Website (back to main site) -->
-            <a href="/" class="nav-item {% if request.resolver_match.url_name == 'home' %}active{% endif %}">
+            <a href="/" class="nav-item">
                 <span class="nav-icon-wrap"><i class="fas fa-globe"></i></span>
                 <span class="nav-label">Website</span>
             </a>
