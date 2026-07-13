@@ -3492,6 +3492,80 @@ ul { list-style: none; }
    24. FLOATING WHATSAPP + BACK TO TOP
 ================================================================ */
 
+/* Floating Shop button — sits just above the WhatsApp button */
+.float-shop {
+    position: fixed;
+    bottom: 152px;
+    right: 24px;
+    width: 56px;
+    height: 56px;
+    background: linear-gradient(135deg, var(--moss), var(--forest));
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.4rem;
+    color: var(--gold-light);
+    z-index: 999;
+    box-shadow: 0 6px 24px rgba(26,47,30,0.45);
+    transition: all 0.35s var(--ease-spring);
+    text-decoration: none;
+    animation: floatShopBounce 6s ease-in-out infinite;
+}
+
+.float-shop:hover {
+    transform: scale(1.12) translateY(-3px);
+    box-shadow: 0 12px 32px rgba(26,47,30,0.55);
+    color: var(--gold-light);
+    animation-play-state: paused;
+}
+
+/* A gentle, occasional bounce — draws the eye without being distracting */
+@keyframes floatShopBounce {
+    0%, 85%, 100% { transform: translateY(0); }
+    88% { transform: translateY(-8px); }
+    91% { transform: translateY(0); }
+    94% { transform: translateY(-4px); }
+    97% { transform: translateY(0); }
+}
+
+.float-shop-tooltip {
+    position: absolute;
+    right: 66px;
+    background: var(--forest);
+    color: var(--white);
+    font-size: 0.75rem;
+    font-weight: 500;
+    padding: 6px 12px;
+    border-radius: 8px;
+    white-space: nowrap;
+    opacity: 0;
+    transform: translateX(8px);
+    transition: all 0.3s ease;
+    pointer-events: none;
+    font-family: var(--font-body);
+}
+
+.float-shop-tooltip::after {
+    content: '';
+    position: absolute;
+    right: -5px;
+    top: 50%;
+    transform: translateY(-50%);
+    border: 5px solid transparent;
+    border-left-color: var(--forest);
+    border-right: none;
+}
+
+.float-shop:hover .float-shop-tooltip {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+@media (max-width: 480px) {
+    .float-shop { bottom: 140px; width: 50px; height: 50px; font-size: 1.25rem; }
+}
+
 /* Floating WhatsApp */
 .float-wa {
     position: fixed;

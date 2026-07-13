@@ -200,7 +200,7 @@
                     <a href="#about">About</a>
                     <a href="#services">Offerings</a>
                     <a href="#products">Produce</a>
-                    <a href="#delivery">Shop</a>
+                    <a href="{% url 'shop' %}">Shop</a>
                     <a href="#gallery">Gallery</a>
                     <a href="#news-updates">News</a>
                     <a href="#contact">Contact</a>
@@ -244,7 +244,7 @@
             <a href="#about"        class="drawer-link" data-index="0"><span class="drawer-link-num">01</span><span class="drawer-link-text">About</span><i class="fas fa-arrow-right"></i></a>
             <a href="#services"     class="drawer-link" data-index="1"><span class="drawer-link-num">02</span><span class="drawer-link-text">Offerings</span><i class="fas fa-arrow-right"></i></a>
             <a href="#products"     class="drawer-link" data-index="2"><span class="drawer-link-num">03</span><span class="drawer-link-text">Produce</span><i class="fas fa-arrow-right"></i></a>
-            <a href="#delivery"     class="drawer-link" data-index="3"><span class="drawer-link-num">04</span><span class="drawer-link-text">Shop</span><i class="fas fa-arrow-right"></i></a>
+            <a href="{% url 'shop' %}" class="drawer-link" data-index="3"><span class="drawer-link-num">04</span><span class="drawer-link-text">Shop</span><i class="fas fa-arrow-right"></i></a>
             <a href="#gallery"      class="drawer-link" data-index="4"><span class="drawer-link-num">05</span><span class="drawer-link-text">Gallery</span><i class="fas fa-arrow-right"></i></a>
             <a href="#news-updates" class="drawer-link" data-index="5"><span class="drawer-link-num">06</span><span class="drawer-link-text">News</span><i class="fas fa-arrow-right"></i></a>
             <a href="#contact"      class="drawer-link" data-index="6"><span class="drawer-link-num">07</span><span class="drawer-link-text">Contact</span><i class="fas fa-arrow-right"></i></a>
@@ -299,7 +299,7 @@
                 <h1 class="slide-heading">From Our Farm<br><em>to Your Table</em></h1>
                 <p class="slide-sub">शुद्घ, ताजा र अर्गानिक उत्पादनको फरक स्वाद लिनुहोस्।</p>
                 <div class="slide-actions">
-                    <a href="#products" class="btn-hero-primary">Shop Now</a>
+                    <a href="{% url 'shop' %}" class="btn-hero-primary">Shop Now</a>
                     <a href="#delivery" class="btn-hero-ghost">Place an Order</a>
                 </div>
             </div>
@@ -2090,7 +2090,7 @@
                 <a href="#about">About</a>
                 <a href="#services">Offerings</a>
                 <a href="#products">Produce</a>
-                <a href="#delivery">Shop</a>
+                <a href="{% url 'shop' %}">Shop</a>
                 <a href="#gallery">Gallery</a>
                 <a href="#news-updates">News</a>
                 <a href="#contact">Contact</a>
@@ -2117,6 +2117,12 @@
     <!-- ============================================================
          FLOATING BUTTONS — WhatsApp + Back to Top
     ============================================================ -->
+
+    <!-- Floating Shop button -->
+    <a href="{% url 'shop' %}" class="float-shop" aria-label="Visit our online shop" title="Shop Now">
+        <i class="fas fa-shopping-bag"></i>
+        <span class="float-shop-tooltip">Visit Our Shop</span>
+    </a>
 
     <!-- Floating WhatsApp -->
     <a href="https://wa.me/9779821025084?text=Hello%20Angan%20Baari!%20I%20would%20like%20to%20enquire%20about%20your%20products."
