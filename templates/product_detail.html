@@ -104,6 +104,7 @@
         header#navbar .brand-tagline { font-size: 0.68rem; color: rgba(255,255,255,0.55); letter-spacing: 0.03em; }
 
         header#navbar .nav-links { display: flex; align-items: center; gap: 6px; }
+        header#navbar .site-nav { display: block !important; }
         header#navbar .nav-link {
             display: flex; align-items: center; gap: 8px;
             color: rgba(255,255,255,0.78);
@@ -322,6 +323,38 @@
             color: var(--text-body);
             line-height: 1.8;
             margin-bottom: 24px;
+        }
+        .desc-block { line-height: 1.85; margin: 0; }
+        .desc-en {
+            font-size: 1.02rem;
+            color: var(--text-body);
+        }
+        .desc-en::first-letter {
+            font-family: var(--font-display, 'Cormorant Garamond'), serif;
+            font-size: 3.1rem;
+            font-weight: 700;
+            color: var(--gold);
+            float: left;
+            line-height: 0.8;
+            padding-right: 10px;
+            padding-top: 6px;
+        }
+        .desc-divider {
+            display: flex; align-items: center; gap: 12px;
+            margin: 22px 0;
+            color: var(--moss);
+            font-size: 0.8rem;
+        }
+        .desc-divider span { flex: 1; height: 1px; background: var(--mist); }
+        .desc-ne {
+            font-family: var(--font-devanagari), serif;
+            font-size: 1.05rem;
+            line-height: 2;
+            color: var(--text-body);
+            background: var(--cream-warm);
+            border-left: 3px solid var(--gold);
+            border-radius: 0 14px 14px 0;
+            padding: 18px 22px;
         }
 
         .product-details-grid {
@@ -637,7 +670,7 @@
                     <span class="brand-tagline">Baari · आँगन बारी</span>
                 </div>
             </a>
-            <nav class="desktop-nav">
+            <nav class="site-nav">
                 <div class="nav-links">
                     <a href="{% url 'shop' %}" class="nav-link">
                         <i class="fas fa-store"></i><span>Shop</span>
@@ -767,7 +800,7 @@
                     {% if product.price_unit %}<span class="price-unit">{{ product.price_unit }}</span>{% endif %}
                 </div>
 
-                <p class="product-desc">{{ product.description }}</p>
+                <p class="product-desc auto-split-desc">{{ product.description }}</p>
 
                 <div class="product-details-grid">
                     {% if product.season %}
@@ -846,11 +879,11 @@
                 {% if product.detail_description %}
                 <div class="product-features">
                     <h3 class="features-title">About this Product</h3>
-                    <p style="font-size:1rem; color:var(--text-body); line-height:1.85;">{{ product.detail_description }}</p>
+                    <p class="auto-split-desc" style="font-size:1rem; color:var(--text-body); line-height:1.85;">{{ product.detail_description }}</p>
                 </div>
                 {% else %}
                 <div class="product-features">
-                    <p style="font-size:1rem; color:var(--text-body); line-height:1.85;">{{ product.description }}</p>
+                    <p class="auto-split-desc" style="font-size:1rem; color:var(--text-body); line-height:1.85;">{{ product.description }}</p>
                 </div>
                 {% endif %}
             </div>
@@ -1033,6 +1066,36 @@
     </footer>
 
     <script>
+        /* ---------------- Bilingual description auto-split ----------------
+           Your description fields store English + Nepali as one continuous
+           string. This detects where Devanagari script begins and splits
+           it into two properly styled paragraphs, breaking at the nearest
+           word boundary so no word gets cut in half.
+           Long-term, cleaner fix: add separate description_en /
+           description_ne fields on Product so this isn't needed at all. */
+        function escapeHtml(str) {
+            const d = document.createElement('div');
+            d.textContent = str;
+            return d.innerHTML;
+        }
+        function splitBilingualText(el) {
+            const text = el.textContent.trim();
+            const match = text.match(/[\u0900-\u097F]/);
+            if (!match) return; // no Nepali script found, leave untouched
+            let idx = match.index;
+            let boundary = text.lastIndexOf('. ', idx);
+            if (boundary === -1) boundary = text.lastIndexOf(' ', idx);
+            boundary = boundary === -1 ? idx : boundary + 1;
+            const enPart = text.slice(0, boundary).trim();
+            const nePart = text.slice(boundary).trim();
+            if (!enPart || !nePart) return;
+            el.innerHTML =
+                `<p class="desc-block desc-en">${escapeHtml(enPart)}</p>` +
+                `<div class="desc-divider"><span></span><i class="fas fa-leaf"></i><span></span></div>` +
+                `<p class="desc-block desc-ne">${escapeHtml(nePart)}</p>`;
+        }
+        document.querySelectorAll('.auto-split-desc').forEach(splitBilingualText);
+
         /* ---------------- Gallery + lightbox ---------------- */
         const images = [
             {% if product.main_image %}"{% static product.main_image %}",{% endif %}
