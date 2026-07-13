@@ -1078,21 +1078,51 @@
             d.textContent = str;
             return d.innerHTML;
         }
-        function splitBilingualText(el) {
-            const text = el.textContent.trim();
-            const match = text.match(/[\u0900-\u097F]/);
-            if (!match) return; // no Nepali script found, leave untouched
-            let idx = match.index;
-            let boundary = text.lastIndexOf('. ', idx);
-            if (boundary === -1) boundary = text.lastIndexOf(' ', idx);
-            boundary = boundary === -1 ? idx : boundary + 1;
-            const enPart = text.slice(0, boundary).trim();
-            const nePart = text.slice(boundary).trim();
-            if (!enPart || !nePart) return;
+        function renderSplit(el, enPart, nePart) {
             el.innerHTML =
                 `<p class="desc-block desc-en">${escapeHtml(enPart)}</p>` +
                 `<div class="desc-divider"><span></span><i class="fas fa-leaf"></i><span></span></div>` +
                 `<p class="desc-block desc-ne">${escapeHtml(nePart)}</p>`;
+        }
+        function splitBilingualText(el) {
+            const raw = el.textContent;
+            if (!/[\u0900-\u097F]/.test(raw)) return; // no Nepali present, leave untouched
+
+            // Preferred path: your fields are written as separate English and
+            // Nepali paragraphs with a line break between them. Split on any
+            // line break run first — this is the reliable, intended boundary.
+            const paragraphs = raw.split(/\n+/).map(p => p.trim()).filter(Boolean);
+            if (paragraphs.length > 1) {
+                let enParas = [], neParas = [], seenNepali = false;
+                paragraphs.forEach(p => {
+                    if (/[\u0900-\u097F]/.test(p)) seenNepali = true;
+                    (seenNepali ? neParas : enParas).push(p);
+                });
+                if (enParas.length && neParas.length) {
+                    renderSplit(el, enParas.join(' '), neParas.join(' '));
+                    return;
+                }
+            }
+
+            // Fallback for a single continuous blob with no line breaks at
+            // all: find the last sentence-ending punctuation (any kind of
+            // whitespace after it, not just a literal space) before the
+            // first Devanagari character.
+            const text = raw.replace(/\s+/g, ' ').trim();
+            const match = text.match(/[\u0900-\u097F]/);
+            if (!match) return;
+            const idx = match.index;
+            const boundaryRegex = /[.!?।]\s+/g;
+            let m, boundary = -1;
+            while ((m = boundaryRegex.exec(text)) !== null) {
+                const endPos = m.index + m[0].length;
+                if (endPos <= idx) boundary = endPos; else break;
+            }
+            if (boundary === -1) boundary = idx;
+            const enPart = text.slice(0, boundary).trim();
+            const nePart = text.slice(boundary).trim();
+            if (!enPart || !nePart) return;
+            renderSplit(el, enPart, nePart);
         }
         document.querySelectorAll('.auto-split-desc').forEach(splitBilingualText);
 
