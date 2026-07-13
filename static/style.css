@@ -3495,7 +3495,7 @@ ul { list-style: none; }
 /* Floating Shop button — sits just above the WhatsApp button */
 .float-shop {
     position: fixed;
-    bottom: 152px;
+    bottom: 176px;
     right: 24px;
     width: 56px;
     height: 56px;
@@ -3562,9 +3562,8 @@ ul { list-style: none; }
     transform: translateX(0);
 }
 
-@media (max-width: 480px) {
-    .float-shop { bottom: 140px; width: 50px; height: 50px; font-size: 1.25rem; }
-}
+/* Mobile position is handled in the shared @media (max-width: 768px)
+   block below, alongside .float-wa, so both buttons stay aligned. */
 
 /* Floating WhatsApp */
 .float-wa {
@@ -3678,9 +3677,10 @@ ul { list-style: none; }
 }
 
 @media (max-width: 768px) {
+    .float-shop { bottom: 160px; right: 18px; width: 50px; height: 50px; font-size: 1.25rem; }
     .float-wa { bottom: 80px; right: 18px; width: 50px; height: 50px; font-size: 1.4rem; }
     .back-to-top { bottom: 20px; right: 18px; width: 40px; height: 40px; }
-    .float-wa-tooltip { display: none; }
+    .float-wa-tooltip, .float-shop-tooltip { display: none; }
 }
 /* ================================================================
    DELIVERY — Feature Split Layout
