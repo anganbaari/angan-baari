@@ -3499,34 +3499,49 @@ ul { list-style: none; }
     right: 24px;
     width: 56px;
     height: 56px;
-    background: linear-gradient(135deg, var(--moss), var(--forest));
+    background: linear-gradient(135deg, var(--gold), #a8873a);
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 1.4rem;
-    color: var(--gold-light);
+    color: var(--forest);
     z-index: 999;
-    box-shadow: 0 6px 24px rgba(26,47,30,0.45);
+    box-shadow: 0 6px 24px rgba(92,71,20,0.4);
     transition: all 0.35s var(--ease-spring);
     text-decoration: none;
-    animation: floatShopBounce 6s ease-in-out infinite;
+    overflow: hidden;
 }
 
 .float-shop:hover {
     transform: scale(1.12) translateY(-3px);
-    box-shadow: 0 12px 32px rgba(26,47,30,0.55);
-    color: var(--gold-light);
+    box-shadow: 0 12px 32px rgba(92,71,20,0.5);
+    color: var(--forest);
+}
+
+.float-shop:hover::after {
     animation-play-state: paused;
 }
 
-/* A gentle, occasional bounce — draws the eye without being distracting */
-@keyframes floatShopBounce {
-    0%, 85%, 100% { transform: translateY(0); }
-    88% { transform: translateY(-8px); }
-    91% { transform: translateY(0); }
-    94% { transform: translateY(-4px); }
-    97% { transform: translateY(0); }
+/* Shine sweep — a light streak glides across periodically, a quieter,
+   more "premium" cue than a pulsing ring, and visually distinct from
+   the WhatsApp button's own pulse animation. */
+.float-shop::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -75%;
+    width: 50%;
+    height: 100%;
+    background: linear-gradient(120deg, transparent, rgba(255,255,255,0.6), transparent);
+    transform: skewX(-20deg);
+    animation: floatShopShine 3.6s ease-in-out infinite;
+}
+
+@keyframes floatShopShine {
+    0% { left: -75%; }
+    35% { left: 130%; }
+    100% { left: 130%; }
 }
 
 .float-shop-tooltip {
