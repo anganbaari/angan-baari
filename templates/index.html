@@ -200,12 +200,12 @@
                     <a href="#about">About</a>
                     <a href="#services">Offerings</a>
                     <a href="#products">Produce</a>
-                    <a href="{% url 'shop' %}">Shop</a>
+                    <a href="#delivery">Shop</a>
                     <a href="#gallery">Gallery</a>
                     <a href="#news-updates">News</a>
                     <a href="#contact">Contact</a>
                     <a href="#location">Location</a>
-                    <a href="#delivery" class="nav-cta">Order Now</a>
+                    <a href="{% url 'shop' %}" class="nav-cta">Order Now</a>
                 </div>
             </nav>
  
@@ -244,7 +244,7 @@
             <a href="#about"        class="drawer-link" data-index="0"><span class="drawer-link-num">01</span><span class="drawer-link-text">About</span><i class="fas fa-arrow-right"></i></a>
             <a href="#services"     class="drawer-link" data-index="1"><span class="drawer-link-num">02</span><span class="drawer-link-text">Offerings</span><i class="fas fa-arrow-right"></i></a>
             <a href="#products"     class="drawer-link" data-index="2"><span class="drawer-link-num">03</span><span class="drawer-link-text">Produce</span><i class="fas fa-arrow-right"></i></a>
-            <a href="{% url 'shop' %}" class="drawer-link" data-index="3"><span class="drawer-link-num">04</span><span class="drawer-link-text">Shop</span><i class="fas fa-arrow-right"></i></a>
+            <a href="#delivery" class="drawer-link" data-index="3"><span class="drawer-link-num">04</span><span class="drawer-link-text">Shop</span><i class="fas fa-arrow-right"></i></a>
             <a href="#gallery"      class="drawer-link" data-index="4"><span class="drawer-link-num">05</span><span class="drawer-link-text">Gallery</span><i class="fas fa-arrow-right"></i></a>
             <a href="#news-updates" class="drawer-link" data-index="5"><span class="drawer-link-num">06</span><span class="drawer-link-text">News</span><i class="fas fa-arrow-right"></i></a>
             <a href="#contact"      class="drawer-link" data-index="6"><span class="drawer-link-num">07</span><span class="drawer-link-text">Contact</span><i class="fas fa-arrow-right"></i></a>
@@ -253,7 +253,7 @@
  
         <!-- Drawer CTA -->
         <div class="drawer-cta">
-            <a href="#delivery" class="drawer-order-btn">
+            <a href="{% url 'shop' %}" class="drawer-order-btn">
                 <i class="fas fa-leaf"></i> Place an Order
             </a>
         </div>
@@ -299,8 +299,8 @@
                 <h1 class="slide-heading">From Our Farm<br><em>to Your Table</em></h1>
                 <p class="slide-sub">शुद्घ, ताजा र अर्गानिक उत्पादनको फरक स्वाद लिनुहोस्।</p>
                 <div class="slide-actions">
-                    <a href="{% url 'shop' %}" class="btn-hero-primary">Shop Now</a>
-                    <a href="#delivery" class="btn-hero-ghost">Place an Order</a>
+                    <a href="#delivery" class="btn-hero-primary">Shop Now</a>
+                    <a href="{% url 'shop' %}" class="btn-hero-ghost">Place an Order</a>
                 </div>
             </div>
         </div>
@@ -2090,12 +2090,12 @@
                 <a href="#about">About</a>
                 <a href="#services">Offerings</a>
                 <a href="#products">Produce</a>
-                <a href="{% url 'shop' %}">Shop</a>
+                <a href="#delivery">Shop</a>
                 <a href="#gallery">Gallery</a>
                 <a href="#news-updates">News</a>
                 <a href="#contact">Contact</a>
                 <a href="#location">Location</a>
-                <a href="#delivery">Order Now</a>
+                <a href="{% url 'shop' %}">Order Now</a>
             </div>
  
             <div class="footer-social">
