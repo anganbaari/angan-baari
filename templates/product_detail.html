@@ -6,292 +6,536 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ product.name }} — Angan Baari</title>
     <link rel="shortcut icon" href="{% static 'favicon.ico' %}">
-    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,400&family=DM+Sans:wght@300;400;500;600&family=Cinzel:wght@400;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;0,700;1,400&family=DM+Sans:wght@300;400;500;600;700&family=Cinzel:wght@400;600&family=Noto+Serif+Devanagari:wght@400;500;600;700&family=Noto+Sans+Devanagari:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
     <link rel="stylesheet" href="{% static 'style.css' %}">
     <style>
+        /* ============================================================
+           EXTENDED TOKENS — bolder accents layered on top of the
+           existing brand palette (--forest / --moss / --gold / --mist
+           / --cream are assumed defined in style.css)
+        ============================================================ */
+        :root {
+            --forest-deep: #142118;
+            --turmeric: #C9A227;
+            --terai-clay: #B5651D;
+            --terai-clay-light: rgba(181,101,29,0.12);
+            --rice-cream: #F4F1EA;
+            --font-devanagari: 'Noto Serif Devanagari', serif;
+            --font-devanagari-sans: 'Noto Sans Devanagari', sans-serif;
+        }
+
+        * { box-sizing: border-box; }
+
+        /* Devanagari glyphs automatically fall through to a proper
+           Devanagari face instead of a generic system font, since
+           Cormorant/DM Sans don't cover that script. */
+        .product-page, .product-page * {
+            font-family: var(--font-body, 'DM Sans'), var(--font-devanagari-sans), sans-serif;
+        }
+        .product-name, .features-title, .related-title, .tab-panel h3 {
+            font-family: var(--font-display, 'Cormorant Garamond'), var(--font-devanagari), serif;
+        }
+
         .product-page {
             max-width: 1200px;
-            margin: 100px auto 60px;
-            padding: 0 5vw;
+            margin: 100px auto 0;
+            padding: 0 5vw 40px;
         }
+
+        /* ---------------- Breadcrumb ---------------- */
         .breadcrumb {
             display: flex;
             align-items: center;
             gap: 8px;
             font-size: 0.82rem;
             color: var(--text-muted);
-            margin-bottom: 32px;
+            margin-bottom: 28px;
+            flex-wrap: wrap;
         }
-        .breadcrumb a {
-            color: var(--moss);
-            text-decoration: none;
-        }
+        .breadcrumb a { color: var(--moss); text-decoration: none; }
         .breadcrumb a:hover { text-decoration: underline; }
+        .breadcrumb i { font-size: 0.65rem; opacity: 0.6; }
+
+        /* ---------------- Hero grid ---------------- */
         .product-grid {
             display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 60px;
+            grid-template-columns: 1.05fr 1fr;
+            gap: 56px;
             align-items: start;
-            margin-bottom: 60px;
+            margin-bottom: 56px;
+            position: relative;
         }
-        .product-images { position: relative; }
+
+        /* Gallery */
+        .product-images { position: sticky; top: 100px; }
+        .gallery-blob {
+            position: absolute;
+            top: -40px; left: -40px;
+            width: 260px; height: 260px;
+            background: radial-gradient(circle at 30% 30%, rgba(74,124,89,0.16), transparent 70%);
+            border-radius: 50%;
+            z-index: 0;
+            pointer-events: none;
+        }
         .main-image {
-            border-radius: var(--radius-card);
+            position: relative;
+            border-radius: 28px;
             overflow: hidden;
-            height: 420px;
-            margin-bottom: 12px;
+            height: 460px;
+            margin-bottom: 14px;
             background: var(--forest);
+            cursor: zoom-in;
+            box-shadow: 0 20px 50px -20px rgba(20,33,24,0.35);
+            z-index: 1;
         }
         .main-image img {
             width: 100%; height: 100%;
             object-fit: cover;
-            transition: transform 0.5s ease;
+            transition: transform 0.6s cubic-bezier(0.16,1,0.3,1);
         }
-        .main-image:hover img { transform: scale(1.04); }
+        .main-image:hover img { transform: scale(1.05); }
+        .zoom-hint {
+            position: absolute;
+            bottom: 14px; right: 14px;
+            background: rgba(20,33,24,0.55);
+            backdrop-filter: blur(6px);
+            color: white;
+            width: 38px; height: 38px;
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 0.85rem;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        .main-image:hover .zoom-hint { opacity: 1; }
+
+        /* Thumbnails: grid on desktop, scroll-snap row on mobile */
         .thumb-grid {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
             gap: 10px;
         }
         .thumb {
-            border-radius: 10px;
+            border-radius: 14px;
             overflow: hidden;
-            height: 80px;
+            height: 84px;
             cursor: pointer;
             border: 2px solid transparent;
             transition: all 0.3s ease;
+            scroll-snap-align: start;
         }
-        .thumb.active { border-color: var(--gold); }
-        .thumb img {
-            width: 100%; height: 100%;
-            object-fit: cover;
+        .thumb:hover { transform: translateY(-3px); }
+        .thumb.active { border-color: var(--turmeric); box-shadow: 0 4px 14px rgba(201,162,39,0.35); }
+        .thumb img { width: 100%; height: 100%; object-fit: cover; }
+        .thumb-dots {
+            display: none;
+            justify-content: center;
+            gap: 6px;
+            margin-top: 12px;
         }
-        .product-info { padding-top: 8px; }
-        .product-badges {
+        .thumb-dot {
+            width: 6px; height: 6px;
+            border-radius: 50%;
+            background: var(--mist);
+            transition: all 0.3s ease;
+        }
+        .thumb-dot.active { background: var(--turmeric); width: 18px; border-radius: 4px; }
+
+        /* ---------------- Info column ---------------- */
+        .product-info { padding-top: 4px; }
+        .info-top-row {
             display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 12px;
             margin-bottom: 16px;
         }
-        .badge-season {
-            background: rgba(26,47,30,0.08);
-            color: var(--forest);
+        .product-badges { display: flex; gap: 8px; flex-wrap: wrap; }
+        .badge-season, .badge-available, .badge-unavailable, .badge-discount {
             font-size: 0.72rem;
-            font-family: var(--font-accent);
-            letter-spacing: 0.1em;
+            font-family: var(--font-accent, 'DM Sans');
+            letter-spacing: 0.08em;
             text-transform: uppercase;
-            padding: 5px 14px;
+            padding: 6px 14px;
             border-radius: 50px;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-weight: 600;
         }
-        .badge-available {
-            background: rgba(74,124,89,0.12);
-            color: var(--moss);
-            font-size: 0.72rem;
-            font-family: var(--font-accent);
-            letter-spacing: 0.1em;
-            text-transform: uppercase;
-            padding: 5px 14px;
-            border-radius: 50px;
+        .badge-season { background: rgba(26,47,30,0.08); color: var(--forest); }
+        .badge-available { background: rgba(74,124,89,0.14); color: var(--moss); }
+        .badge-unavailable { background: rgba(180,50,50,0.1); color: #c0392b; }
+        .badge-discount { background: var(--terai-clay); color: white; }
+
+        .wishlist-btn {
+            width: 42px; height: 42px;
+            border-radius: 50%;
+            border: 1.5px solid var(--mist);
+            background: white;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer;
+            color: var(--text-muted);
+            font-size: 1rem;
+            transition: all 0.25s ease;
+            flex-shrink: 0;
         }
-        .badge-unavailable {
-            background: rgba(180,50,50,0.1);
-            color: #c0392b;
-            font-size: 0.72rem;
-            font-family: var(--font-accent);
-            letter-spacing: 0.1em;
-            text-transform: uppercase;
-            padding: 5px 14px;
-            border-radius: 50px;
-        }
+        .wishlist-btn:hover { border-color: var(--terai-clay); color: var(--terai-clay); transform: scale(1.06); }
+        .wishlist-btn.active { background: var(--terai-clay); border-color: var(--terai-clay); color: white; }
+        .wishlist-btn.active i { font-weight: 900; }
+
         .product-name {
-            font-family: var(--font-display);
-            font-size: clamp(2rem, 4vw, 3rem);
+            font-size: clamp(2rem, 4vw, 3.1rem);
             font-weight: 600;
             color: var(--forest);
-            line-height: 1.15;
-            margin-bottom: 16px;
+            line-height: 1.12;
+            margin-bottom: 6px;
         }
+
+        /* Rating summary chip under the title */
+        .rating-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-bottom: 18px;
+        }
+        .rating-chip .stars { color: var(--turmeric); letter-spacing: 1px; }
+        .rating-chip a { color: var(--moss); text-decoration: none; }
+        .rating-chip a:hover { text-decoration: underline; }
+
+        /* Price block */
+        .price-block {
+            display: flex;
+            align-items: baseline;
+            gap: 12px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .price-current {
+            font-family: var(--font-display, 'Cormorant Garamond'), serif;
+            font-size: 2.1rem;
+            font-weight: 700;
+            color: var(--forest-deep);
+        }
+        .price-unit {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+        .price-original {
+            font-size: 1.1rem;
+            color: var(--text-muted);
+            text-decoration: line-through;
+        }
+
         .product-desc {
             font-size: 1rem;
             color: var(--text-body);
             line-height: 1.8;
-            margin-bottom: 28px;
+            margin-bottom: 24px;
         }
+
         .product-details-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 12px;
-            margin-bottom: 28px;
+            margin-bottom: 26px;
         }
         .detail-card {
             background: var(--cream);
-            border-radius: var(--radius-sm);
+            border-radius: 16px;
             padding: 14px 16px;
             border: 1px solid var(--mist);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            transition: all 0.25s ease;
         }
+        .detail-card:hover { border-color: var(--turmeric); transform: translateY(-2px); }
+        .detail-card i { color: var(--moss); font-size: 1rem; width: 20px; text-align: center; flex-shrink: 0; }
         .detail-label {
-            font-size: 0.7rem;
-            font-family: var(--font-accent);
-            letter-spacing: 0.15em;
+            font-size: 0.68rem;
+            font-family: var(--font-accent, 'DM Sans');
+            letter-spacing: 0.13em;
             text-transform: uppercase;
             color: var(--text-muted);
-            margin-bottom: 4px;
-        }
-        .detail-value {
-            font-size: 0.92rem;
-            font-weight: 500;
-            color: var(--forest);
-        }
-        .order-buttons {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-        .btn-wa-product {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-            background: #25d366;
-            color: white;
-            padding: 15px;
-            border-radius: 50px;
-            font-size: 0.95rem;
-            font-weight: 600;
-            text-decoration: none;
-            transition: all 0.3s ease;
-        }
-        .btn-wa-product:hover {
-            background: #1da851;
-            transform: translateY(-2px);
-            box-shadow: 0 10px 28px rgba(37,211,102,0.35);
-            color: white;
-        }
-        .btn-back {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-            background: transparent;
-            color: var(--moss);
-            padding: 14px;
-            border-radius: 50px;
-            font-size: 0.95rem;
-            font-weight: 500;
-            text-decoration: none;
-            border: 1.5px solid var(--moss);
-            transition: all 0.3s ease;
-        }
-        .btn-back:hover {
-            background: var(--moss);
-            color: white;
-        }
-        .product-features {
-            background: var(--cream-warm);
-            border-radius: var(--radius-card);
-            padding: 36px;
-            margin-bottom: 48px;
-        }
-        .features-title {
-            font-family: var(--font-display);
-            font-size: 1.6rem;
-            font-weight: 600;
-            color: var(--forest);
-            margin-bottom: 24px;
-        }
-        .features-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 20px;
-        }
-        .feature-item {
-            display: flex;
-            align-items: flex-start;
-            gap: 12px;
-        }
-        .feature-icon {
-            width: 40px; height: 40px;
-            background: var(--mist);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.9rem;
-            color: var(--moss);
-            flex-shrink: 0;
-        }
-        .feature-title {
-            font-size: 0.88rem;
-            font-weight: 600;
-            color: var(--forest);
             margin-bottom: 3px;
         }
-        .feature-desc {
-            font-size: 0.8rem;
-            color: var(--text-muted);
-            line-height: 1.5;
-        }
-        .related-section { margin-bottom: 48px; }
-        .related-title {
-            font-family: var(--font-display);
-            font-size: 1.8rem;
-            font-weight: 600;
-            color: var(--forest);
-            margin-bottom: 24px;
-        }
-        .related-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 20px;
-        }
-        .related-card {
-            background: white;
-            border-radius: var(--radius-card);
-            overflow: hidden;
-            box-shadow: var(--shadow-card);
-            text-decoration: none;
-            transition: all 0.3s ease;
-            display: block;
-        }
-        .related-card:hover {
-            transform: translateY(-6px);
-            box-shadow: var(--shadow-hover);
-        }
-        .related-img {
-            height: 160px;
-            overflow: hidden;
-        }
-        .related-img img {
-            width: 100%; height: 100%;
-            object-fit: cover;
-            transition: transform 0.5s ease;
-        }
-        .related-card:hover .related-img img { transform: scale(1.06); }
-        .related-body { padding: 16px; }
-        .related-name {
-            font-family: var(--font-display);
-            font-size: 1.1rem;
-            font-weight: 600;
-            color: var(--forest);
-            margin-bottom: 6px;
-        }
-        .related-link {
-            font-size: 0.82rem;
-            color: var(--moss);
+        .detail-value { font-size: 0.9rem; font-weight: 600; color: var(--forest); }
+
+        /* Quantity stepper */
+        .qty-row {
             display: flex;
             align-items: center;
-            gap: 5px;
+            gap: 14px;
+            margin-bottom: 16px;
         }
-        @media (max-width: 768px) {
+        .qty-label {
+            font-size: 0.7rem;
+            font-family: var(--font-accent, 'DM Sans');
+            letter-spacing: 0.13em;
+            text-transform: uppercase;
+            color: var(--text-muted);
+        }
+        .qty-stepper {
+            display: inline-flex;
+            align-items: center;
+            border: 1.5px solid var(--mist);
+            border-radius: 50px;
+            overflow: hidden;
+        }
+        .qty-stepper button {
+            width: 38px; height: 38px;
+            border: none;
+            background: white;
+            color: var(--forest);
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .qty-stepper button:hover { background: var(--cream); }
+        .qty-stepper input {
+            width: 44px;
+            text-align: center;
+            border: none;
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: var(--forest);
+            -moz-appearance: textfield;
+        }
+        .qty-stepper input::-webkit-outer-spin-button,
+        .qty-stepper input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+
+        .order-buttons { display: flex; flex-direction: column; gap: 10px; }
+        .btn-cart-product {
+            display: flex; align-items: center; justify-content: center; gap: 10px;
+            background: var(--forest-deep);
+            color: white; padding: 16px; border-radius: 50px;
+            font-size: 0.95rem; font-weight: 600; border: none; cursor: pointer;
+            font-family: var(--font-body, 'DM Sans');
+            transition: all 0.3s ease;
+            width: 100%;
+        }
+        .btn-cart-product:hover { transform: translateY(-2px); box-shadow: 0 12px 28px -8px rgba(20,33,24,0.5); }
+        .btn-wa-product {
+            display: flex; align-items: center; justify-content: center; gap: 10px;
+            background: #25d366; color: white; padding: 15px; border-radius: 50px;
+            font-size: 0.95rem; font-weight: 600; text-decoration: none;
+            transition: all 0.3s ease;
+        }
+        .btn-wa-product:hover { background: #1da851; transform: translateY(-2px); box-shadow: 0 10px 28px rgba(37,211,102,0.35); color: white; }
+        .btn-back {
+            display: flex; align-items: center; justify-content: center; gap: 10px;
+            background: transparent; color: var(--moss); padding: 14px; border-radius: 50px;
+            font-size: 0.92rem; font-weight: 500; text-decoration: none;
+            border: 1.5px solid var(--moss); transition: all 0.3s ease;
+        }
+        .btn-back:hover { background: var(--moss); color: white; }
+        .back-links-row { display: flex; gap: 10px; }
+        .back-links-row .btn-back { flex: 1; }
+
+        .trust-mini-row {
+            display: flex;
+            gap: 18px;
+            margin-top: 18px;
+            flex-wrap: wrap;
+        }
+        .trust-mini {
+            display: flex; align-items: center; gap: 6px;
+            font-size: 0.76rem; color: var(--text-muted);
+        }
+        .trust-mini i { color: var(--moss); }
+
+        /* ---------------- Tabs ---------------- */
+        .tabs-wrap { margin-bottom: 48px; }
+        .tabs-nav {
+            display: flex;
+            gap: 4px;
+            border-bottom: 1.5px solid var(--mist);
+            margin-bottom: 28px;
+            overflow-x: auto;
+            scrollbar-width: none;
+        }
+        .tabs-nav::-webkit-scrollbar { display: none; }
+        .tab-btn {
+            background: none; border: none;
+            padding: 12px 20px;
+            font-size: 0.92rem;
+            font-weight: 600;
+            font-family: var(--font-body, 'DM Sans');
+            color: var(--text-muted);
+            cursor: pointer;
+            border-bottom: 2.5px solid transparent;
+            white-space: nowrap;
+            transition: all 0.25s ease;
+        }
+        .tab-btn:hover { color: var(--forest); }
+        .tab-btn.active { color: var(--forest); border-bottom-color: var(--turmeric); }
+        .tab-panel { display: none; animation: fadeIn 0.35s ease; }
+        .tab-panel.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+        .product-features {
+            background: var(--cream-warm, var(--cream));
+            border-radius: 24px;
+            padding: 32px;
+            margin-bottom: 24px;
+        }
+        .features-title { font-size: 1.5rem; font-weight: 600; color: var(--forest); margin-bottom: 20px; }
+        .features-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+        .feature-item { display: flex; align-items: flex-start; gap: 12px; }
+        .feature-icon {
+            width: 42px; height: 42px; background: white; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 0.9rem; color: var(--moss); flex-shrink: 0;
+            box-shadow: 0 4px 10px rgba(20,33,24,0.08);
+        }
+        .feature-title { font-size: 0.88rem; font-weight: 600; color: var(--forest); margin-bottom: 3px; }
+        .feature-desc { font-size: 0.8rem; color: var(--text-muted); line-height: 1.5; }
+
+        /* ---------------- Rating summary ---------------- */
+        .rating-summary {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 32px;
+            align-items: center;
+            background: var(--cream);
+            border-radius: 20px;
+            padding: 28px;
+            margin-bottom: 32px;
+        }
+        .rating-avg { text-align: center; }
+        .rating-avg-num { font-family: var(--font-display, 'Cormorant Garamond'), serif; font-size: 3rem; font-weight: 700; color: var(--forest); line-height: 1; }
+        .rating-avg .stars { color: var(--turmeric); font-size: 0.9rem; margin: 6px 0 4px; }
+        .rating-avg-count { font-size: 0.78rem; color: var(--text-muted); }
+        .rating-bars { display: flex; flex-direction: column; gap: 7px; }
+        .rating-bar-row { display: flex; align-items: center; gap: 10px; font-size: 0.78rem; color: var(--text-muted); }
+        .rating-bar-row span:first-child { width: 40px; flex-shrink: 0; }
+        .rating-bar-track { flex: 1; height: 7px; background: white; border-radius: 10px; overflow: hidden; }
+        .rating-bar-fill { height: 100%; background: var(--turmeric); border-radius: 10px; }
+        .rating-bar-row span:last-child { width: 30px; text-align: right; flex-shrink: 0; }
+
+        .review-card {
+            background: var(--cream); border: 1px solid var(--mist); border-radius: 16px;
+            padding: 20px 24px; margin-bottom: 14px;
+        }
+        .review-card-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 6px; }
+        .review-card-name { color: var(--forest); font-size: 0.95rem; font-weight: 600; }
+        .review-card-stars { color: var(--turmeric); font-size: 0.95rem; }
+        .review-card-text { color: var(--text-body); font-size: 0.92rem; line-height: 1.7; margin: 0; }
+        .review-card-date { font-size: 0.74rem; color: var(--text-muted); margin-top: 8px; }
+
+        .review-form input[type="text"], .review-form textarea {
+            width: 100%; padding: 13px 16px; border: 1px solid var(--mist); border-radius: 12px;
+            font-size: 0.95rem; font-family: var(--font-body, 'DM Sans'); background: white;
+            color: var(--forest); outline: none; box-sizing: border-box; transition: border-color 0.25s;
+        }
+        .review-form input[type="text"]:focus, .review-form textarea:focus { border-color: var(--turmeric); }
+        .review-form label {
+            font-size: 0.78rem; font-family: var(--font-accent, 'DM Sans'); letter-spacing: 0.1em;
+            text-transform: uppercase; color: var(--text-muted); display: block; margin-bottom: 7px;
+        }
+        .star-btn {
+            display: inline-block; padding: 9px 15px; border: 1.5px solid var(--mist);
+            border-radius: 50px; font-size: 0.85rem; transition: all 0.2s; cursor: pointer;
+        }
+        .review-submit-btn {
+            background: var(--forest-deep); color: white; border: none; padding: 15px 30px;
+            border-radius: 50px; font-size: 0.95rem; font-weight: 600; cursor: pointer;
+            transition: all 0.3s; align-self: flex-start;
+        }
+        .review-submit-btn:hover { transform: translateY(-2px); box-shadow: 0 10px 24px -8px rgba(20,33,24,0.4); }
+
+        /* ---------------- Related ---------------- */
+        .related-section { margin-bottom: 24px; }
+        .related-title { font-size: 1.7rem; font-weight: 600; color: var(--forest); margin-bottom: 22px; }
+        .related-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+        .related-card {
+            background: white; border-radius: 20px; overflow: hidden;
+            box-shadow: var(--shadow-card, 0 8px 24px -12px rgba(20,33,24,0.15));
+            text-decoration: none; transition: all 0.3s ease; display: block;
+        }
+        .related-card:hover { transform: translateY(-6px); box-shadow: var(--shadow-hover, 0 16px 36px -12px rgba(20,33,24,0.25)); }
+        .related-img { height: 160px; overflow: hidden; }
+        .related-img img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.5s ease; }
+        .related-card:hover .related-img img { transform: scale(1.06); }
+        .related-body { padding: 16px; }
+        .related-name { font-family: var(--font-display, 'Cormorant Garamond'), var(--font-devanagari), serif; font-size: 1.1rem; font-weight: 600; color: var(--forest); margin-bottom: 6px; }
+        .related-link { font-size: 0.82rem; color: var(--moss); display: flex; align-items: center; gap: 5px; }
+
+        /* ---------------- Lightbox ---------------- */
+        .lightbox-overlay {
+            position: fixed; inset: 0; background: rgba(20,33,24,0.94);
+            z-index: 999; display: none; align-items: center; justify-content: center;
+            padding: 40px;
+        }
+        .lightbox-overlay.open { display: flex; }
+        .lightbox-overlay img { max-width: 100%; max-height: 85vh; border-radius: 12px; object-fit: contain; }
+        .lightbox-close {
+            position: absolute; top: 24px; right: 24px;
+            width: 44px; height: 44px; border-radius: 50%;
+            background: rgba(255,255,255,0.12); color: white; border: none;
+            font-size: 1.2rem; cursor: pointer; display: flex; align-items: center; justify-content: center;
+        }
+        .lightbox-nav {
+            position: absolute; top: 50%; transform: translateY(-50%);
+            width: 48px; height: 48px; border-radius: 50%;
+            background: rgba(255,255,255,0.12); color: white; border: none;
+            font-size: 1.1rem; cursor: pointer;
+        }
+        .lightbox-prev { left: 20px; }
+        .lightbox-next { right: 20px; }
+
+        /* ---------------- Sticky mobile CTA ---------------- */
+        .sticky-mobile-bar {
+            display: none;
+            position: fixed; bottom: 0; left: 0; right: 0;
+            background: white; border-top: 1px solid var(--mist);
+            padding: 12px 16px; z-index: 500;
+            box-shadow: 0 -8px 24px -12px rgba(20,33,24,0.2);
+            align-items: center; gap: 12px;
+            transform: translateY(100%);
+            transition: transform 0.3s ease;
+        }
+        .sticky-mobile-bar.visible { transform: translateY(0); }
+        .sticky-bar-price { flex-shrink: 0; }
+        .sticky-bar-price .cur { font-weight: 700; color: var(--forest-deep); font-size: 1.05rem; }
+        .sticky-bar-price .unit { font-size: 0.68rem; color: var(--text-muted); display: block; }
+        .sticky-bar-btn {
+            flex: 1; background: var(--forest-deep); color: white; border: none;
+            padding: 13px; border-radius: 50px; font-size: 0.88rem; font-weight: 600;
+            font-family: var(--font-body, 'DM Sans');
+        }
+
+        /* ---------------- Responsive ---------------- */
+        @media (max-width: 900px) {
             .product-grid { grid-template-columns: 1fr; gap: 32px; }
-            .product-page { margin-top: 80px; }
-            .features-grid { grid-template-columns: 1fr; }
+            .product-page { margin-top: 84px; padding-bottom: 90px; }
+            .product-images { position: static; }
+            .gallery-blob { display: none; }
+            .main-image { height: 360px; }
+            .features-grid { grid-template-columns: 1fr 1fr; }
             .related-grid { grid-template-columns: 1fr 1fr; }
-            .product-details-grid { grid-template-columns: 1fr 1fr; }
+            .rating-summary { grid-template-columns: 1fr; text-align: center; }
+            .rating-avg { display: flex; flex-direction: column; align-items: center; }
         }
-        @media (max-width: 480px) {
+        @media (max-width: 600px) {
+            .thumb-grid {
+                display: flex; overflow-x: auto; scroll-snap-type: x mandatory;
+                gap: 10px; padding-bottom: 4px;
+            }
+            .thumb { min-width: 76px; height: 76px; flex-shrink: 0; }
+            .thumb-dots { display: flex; }
+            .features-grid { grid-template-columns: 1fr; }
             .related-grid { grid-template-columns: 1fr; }
+            .product-details-grid { grid-template-columns: 1fr 1fr; }
+            .sticky-mobile-bar { display: flex; }
+            .back-links-row { flex-direction: column; }
+            .rating-summary { padding: 22px; }
+            .tabs-nav { gap: 0; }
+            .tab-btn { padding: 10px 14px; font-size: 0.85rem; }
         }
     </style>
 </head>
@@ -344,7 +588,8 @@
 
             <!-- Images -->
             <div class="product-images">
-                <div class="main-image" id="mainImage">
+                <div class="gallery-blob"></div>
+                <div class="main-image" id="mainImage" onclick="openLightbox()">
                     {% if product.main_image %}
                         <img src="{% static product.main_image %}" alt="{{ product.name }}" id="mainImg">
                     {% else %}
@@ -352,81 +597,123 @@
                             <i class="fas fa-seedling" style="font-size:4rem;color:var(--sage);"></i>
                         </div>
                     {% endif %}
+                    <div class="zoom-hint"><i class="fas fa-expand"></i></div>
                 </div>
-                <div class="thumb-grid">
+                <div class="thumb-grid" id="thumbRow">
                     {% if product.main_image %}
-                    <div class="thumb active" onclick="changeImage('{% static product.main_image %}', this)">
+                    <div class="thumb active" onclick="changeImage(event, '{% static product.main_image %}', this)">
                         <img src="{% static product.main_image %}" alt="{{ product.name }}">
                     </div>
                     {% endif %}
                     {% if product.image2 %}
-                    <div class="thumb" onclick="changeImage('{% static product.image2 %}', this)">
+                    <div class="thumb" onclick="changeImage(event, '{% static product.image2 %}', this)">
                         <img src="{% static product.image2 %}" alt="{{ product.name }}">
                     </div>
                     {% endif %}
                     {% if product.image3 %}
-                    <div class="thumb" onclick="changeImage('{% static product.image3 %}', this)">
+                    <div class="thumb" onclick="changeImage(event, '{% static product.image3 %}', this)">
                         <img src="{% static product.image3 %}" alt="{{ product.name }}">
                     </div>
                     {% endif %}
                     {% if product.image4 %}
-                    <div class="thumb" onclick="changeImage('{% static product.image4 %}', this)">
+                    <div class="thumb" onclick="changeImage(event, '{% static product.image4 %}', this)">
                         <img src="{% static product.image4 %}" alt="{{ product.name }}">
                     </div>
                     {% endif %}
                 </div>
+                <div class="thumb-dots" id="thumbDots"></div>
             </div>
 
             <!-- Info -->
             <div class="product-info">
-                <div class="product-badges">
-                    {% if product.season %}
-                    <span class="badge-season">
-                        <i class="fas fa-calendar-alt"></i> {{ product.season }}
-                    </span>
-                    {% endif %}
-                    {% if product.is_available %}
-                    <span class="badge-available">
-                        <i class="fas fa-check"></i> Available
-                    </span>
-                    {% else %}
-                    <span class="badge-unavailable">
-                        <i class="fas fa-times"></i> Out of Stock
-                    </span>
-                    {% endif %}
+                <div class="info-top-row">
+                    <div class="product-badges">
+                        {% if product.season %}
+                        <span class="badge-season"><i class="fas fa-calendar-alt"></i> {{ product.season }}</span>
+                        {% endif %}
+                        {% if product.is_available %}
+                        <span class="badge-available"><i class="fas fa-check"></i> Available</span>
+                        {% else %}
+                        <span class="badge-unavailable"><i class="fas fa-times"></i> Out of Stock</span>
+                        {% endif %}
+                        {% if active_offer %}
+                        <span class="badge-discount"><i class="fas fa-tag"></i>
+                            {% if active_offer.discount_type == 'percent' %}{{ active_offer.discount_value|floatformat:0 }}% OFF
+                            {% elif active_offer.discount_type == 'fixed' %}Rs.{{ active_offer.discount_value|floatformat:0 }} OFF
+                            {% else %}Combo Deal{% endif %}
+                        </span>
+                        {% endif %}
+                    </div>
+                    <!-- Wishlist toggle: client-side (localStorage) for now.
+                         Wire to your backend by POSTing to your own toggle
+                         endpoint inside toggleWishlist() below, once you add one. -->
+                    <button type="button" class="wishlist-btn" id="wishlistBtn" data-product-id="{{ product.id }}" onclick="toggleWishlist(this)" aria-label="Add to wishlist">
+                        <i class="far fa-heart"></i>
+                    </button>
                 </div>
 
                 <h1 class="product-name">{{ product.name }}</h1>
+
+                {% if review_count %}
+                <div class="rating-chip">
+                    <span class="stars">{% for i in "12345" %}{% if forloop.counter <= avg_rating|floatformat:0|add:0 %}★{% else %}☆{% endif %}{% endfor %}</span>
+                    <span>{{ avg_rating }}/5</span>
+                    <a href="#tab-reviews" onclick="switchTab('reviews')">({{ review_count }} review{{ review_count|pluralize }})</a>
+                </div>
+                {% endif %}
+
+                <div class="price-block">
+                    {% if active_offer %}
+                        <span class="price-current">Rs. {{ active_offer.discounted_price|default:product.price|floatformat:0 }}</span>
+                        <span class="price-original">Rs. {{ product.price|floatformat:0 }}</span>
+                    {% else %}
+                        <span class="price-current">Rs. {{ product.price|floatformat:0 }}</span>
+                    {% endif %}
+                    {% if product.price_unit %}<span class="price-unit">{{ product.price_unit }}</span>{% endif %}
+                </div>
+
                 <p class="product-desc">{{ product.description }}</p>
 
                 <div class="product-details-grid">
                     {% if product.season %}
                     <div class="detail-card">
-                        <div class="detail-label">Season</div>
-                        <div class="detail-value">{{ product.season }}</div>
+                        <i class="fas fa-calendar-alt"></i>
+                        <div><div class="detail-label">Season</div><div class="detail-value">{{ product.season }}</div></div>
                     </div>
                     {% endif %}
                     {% if product.farming_method %}
                     <div class="detail-card">
-                        <div class="detail-label">Farming</div>
-                        <div class="detail-value">{{ product.farming_method }}</div>
+                        <i class="fas fa-tractor"></i>
+                        <div><div class="detail-label">Farming</div><div class="detail-value">{{ product.farming_method }}</div></div>
                     </div>
                     {% endif %}
                     <div class="detail-card">
-                        <div class="detail-label">Location</div>
-                        <div class="detail-value">Bhulka Danda, Rupandehi</div>
+                        <i class="fas fa-map-marker-alt"></i>
+                        <div><div class="detail-label">Location</div><div class="detail-value">Bhulka Danda, Rupandehi</div></div>
                     </div>
                     <div class="detail-card">
-                        <div class="detail-label">Delivery</div>
-                        <div class="detail-value">2–3.5 hours</div>
+                        <i class="fas fa-truck"></i>
+                        <div><div class="detail-label">Delivery</div><div class="detail-value">2–3.5 hours</div></div>
                     </div>
                 </div>
 
-                <div class="order-buttons">
+                {% if product.is_available %}
+                <div class="qty-row">
+                    <span class="qty-label">Quantity</span>
+                    <div class="qty-stepper">
+                        <button type="button" onclick="stepQty(-1)" aria-label="Decrease quantity">−</button>
+                        <input type="number" id="qtyInput" value="1" min="1" readonly>
+                        <button type="button" onclick="stepQty(1)" aria-label="Increase quantity">+</button>
+                    </div>
+                </div>
+                {% endif %}
+
+                <div class="order-buttons" id="orderButtons">
                     {% if product.is_available %}
-                    <form method="POST" action="{% url 'add_to_cart' product.id %}" style="width:100%;">
+                    <form method="POST" action="{% url 'add_to_cart' product.id %}" style="width:100%;" id="cartForm">
                         {% csrf_token %}
-                        <button type="submit" class="btn-wa-product" style="width:100%;background:var(--forest);border:none;cursor:pointer;font-family:var(--font-body);">
+                        <input type="hidden" name="quantity" id="cartQtyField" value="1">
+                        <button type="submit" class="btn-cart-product">
                             <i class="fas fa-cart-plus"></i> Add to Cart
                         </button>
                     </form>
@@ -435,69 +722,154 @@
                         <i class="fab fa-whatsapp"></i> Order via WhatsApp
                     </a>
                     {% endif %}
-                    <a href="{% url 'shop' %}" class="btn-back">
-                        <i class="fas fa-arrow-left"></i> Back to Shop
-                    </a>
-                    <a href="/" class="btn-back">
-                        <i class="fas fa-arrow-left"></i> Back to Website
-                    </a>
+                    <div class="back-links-row">
+                        <a href="{% url 'shop' %}" class="btn-back"><i class="fas fa-arrow-left"></i> Shop</a>
+                        <a href="/" class="btn-back"><i class="fas fa-arrow-left"></i> Website</a>
+                    </div>
+                </div>
+
+                <div class="trust-mini-row">
+                    <span class="trust-mini"><i class="fas fa-flask"></i> No chemicals</span>
+                    <span class="trust-mini"><i class="fas fa-leaf"></i> Eco packaging</span>
+                    <span class="trust-mini"><i class="fas fa-shield-alt"></i> Quality assured</span>
                 </div>
             </div>
         </div>
 
-        <!-- More Details -->
-        {% if product.detail_description %}
-        <div class="product-features">
-            <h2 class="features-title">About this Product</h2>
-            <p style="font-size:1rem; color:var(--text-body); line-height:1.8;">{{ product.detail_description }}</p>
-        </div>
-        {% endif %}
+        <!-- ============================================================
+             TABBED CONTENT
+        ============================================================ -->
+        <div class="tabs-wrap">
+            <div class="tabs-nav">
+                <button class="tab-btn active" data-tab="description" onclick="switchTab('description')">Description</button>
+                <button class="tab-btn" data-tab="why-us" onclick="switchTab('why-us')">Why Choose Us</button>
+                <button class="tab-btn" data-tab="reviews" onclick="switchTab('reviews')">Reviews {% if review_count %}({{ review_count }}){% endif %}</button>
+            </div>
 
-        <!-- Features -->
-        <div class="product-features">
-            <h2 class="features-title">Why Choose Angan Baari?</h2>
-            <div class="features-grid">
-                <div class="feature-item">
-                    <div class="feature-icon"><i class="fas fa-flask"></i></div>
-                    <div>
-                        <div class="feature-title">No Chemicals</div>
-                        <div class="feature-desc">100% natural farming, zero synthetic pesticides or fertilizers.</div>
+            <!-- Description panel -->
+            <div class="tab-panel active" data-panel="description">
+                {% if product.detail_description %}
+                <div class="product-features">
+                    <h3 class="features-title">About this Product</h3>
+                    <p style="font-size:1rem; color:var(--text-body); line-height:1.85;">{{ product.detail_description }}</p>
+                </div>
+                {% else %}
+                <div class="product-features">
+                    <p style="font-size:1rem; color:var(--text-body); line-height:1.85;">{{ product.description }}</p>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Why choose us panel -->
+            <div class="tab-panel" data-panel="why-us">
+                <div class="product-features">
+                    <h3 class="features-title">Why Choose Angan Baari?</h3>
+                    <div class="features-grid">
+                        <div class="feature-item">
+                            <div class="feature-icon"><i class="fas fa-flask"></i></div>
+                            <div><div class="feature-title">No Chemicals</div><div class="feature-desc">100% natural farming, zero synthetic pesticides or fertilizers.</div></div>
+                        </div>
+                        <div class="feature-item">
+                            <div class="feature-icon"><i class="fas fa-sun"></i></div>
+                            <div><div class="feature-title">Naturally Ripened</div><div class="feature-desc">Harvested only when fully ripe — no artificial ripening.</div></div>
+                        </div>
+                        <div class="feature-item">
+                            <div class="feature-icon"><i class="fas fa-truck"></i></div>
+                            <div><div class="feature-title">Farm Fresh</div><div class="feature-desc">Picked fresh and delivered to your door within hours.</div></div>
+                        </div>
+                        <div class="feature-item">
+                            <div class="feature-icon"><i class="fas fa-leaf"></i></div>
+                            <div><div class="feature-title">Eco Packaging</div><div class="feature-desc">Packed in biodegradable, eco-friendly packaging.</div></div>
+                        </div>
+                        <div class="feature-item">
+                            <div class="feature-icon"><i class="fas fa-heart"></i></div>
+                            <div><div class="feature-title">Grown with Love</div><div class="feature-desc">Every product is grown with care and dedication since 2015.</div></div>
+                        </div>
+                        <div class="feature-item">
+                            <div class="feature-icon"><i class="fas fa-shield-alt"></i></div>
+                            <div><div class="feature-title">Quality Assured</div><div class="feature-desc">Carefully selected and inspected before delivery.</div></div>
+                        </div>
                     </div>
                 </div>
-                <div class="feature-item">
-                    <div class="feature-icon"><i class="fas fa-sun"></i></div>
-                    <div>
-                        <div class="feature-title">Naturally Ripened</div>
-                        <div class="feature-desc">Harvested only when fully ripe — no artificial ripening.</div>
+            </div>
+
+            <!-- Reviews panel -->
+            <div class="tab-panel" data-panel="reviews" id="tab-reviews">
+
+                {% if request.GET.reviewed %}
+                <div style="background:rgba(74,124,89,0.1);border:1px solid var(--moss);border-radius:14px;padding:16px 24px;margin-bottom:28px;color:var(--forest);font-size:0.95rem;">
+                    <i class="fas fa-check-circle" style="color:var(--moss);margin-right:8px;"></i>
+                    <strong>Thank you for your review!</strong> It will appear after approval.
+                </div>
+                {% endif %}
+
+                {% if review_count %}
+                <div class="rating-summary">
+                    <div class="rating-avg">
+                        <div class="rating-avg-num">{{ avg_rating }}</div>
+                        <div class="stars">{% for i in "12345" %}{% if forloop.counter <= avg_rating|floatformat:0|add:0 %}★{% else %}☆{% endif %}{% endfor %}</div>
+                        <div class="rating-avg-count">{{ review_count }} review{{ review_count|pluralize }}</div>
+                    </div>
+                    <div class="rating-bars">
+                        {% regroup reviews by rating as rating_groups %}
+                        {% for star in "54321" %}
+                        <div class="rating-bar-row">
+                            <span>{{ star }} ★</span>
+                            <div class="rating-bar-track">
+                                <div class="rating-bar-fill" style="width:
+                                    {% for group in rating_groups %}{% if group.grouper|stringformat:'s' == star %}{% widthratio group.list|length review_count 100 %}{% endif %}{% endfor %}%;"></div>
+                            </div>
+                            <span>{% for group in rating_groups %}{% if group.grouper|stringformat:'s' == star %}{{ group.list|length }}{% endif %}{% endfor %}</span>
+                        </div>
+                        {% endfor %}
                     </div>
                 </div>
-                <div class="feature-item">
-                    <div class="feature-icon"><i class="fas fa-truck"></i></div>
+                {% endif %}
+
+                <div style="margin-bottom:40px;">
+                    {% if reviews %}
                     <div>
-                        <div class="feature-title">Farm Fresh</div>
-                        <div class="feature-desc">Picked fresh and delivered to your door within hours.</div>
+                        {% for review in reviews %}
+                        <div class="review-card">
+                            <div class="review-card-head">
+                                <strong class="review-card-name">{{ review.name }}</strong>
+                                <span class="review-card-stars">{% for i in "12345" %}{% if forloop.counter <= review.rating %}★{% else %}☆{% endif %}{% endfor %}</span>
+                            </div>
+                            <p class="review-card-text">{{ review.comment }}</p>
+                            <div class="review-card-date">{{ review.created_at|date:"F j, Y" }}</div>
+                        </div>
+                        {% endfor %}
                     </div>
+                    {% else %}
+                    <p style="color:var(--text-muted);font-size:0.92rem;">No reviews yet. Be the first to share your experience!</p>
+                    {% endif %}
                 </div>
-                <div class="feature-item">
-                    <div class="feature-icon"><i class="fas fa-leaf"></i></div>
-                    <div>
-                        <div class="feature-title">Eco Packaging</div>
-                        <div class="feature-desc">Packed in biodegradable, eco-friendly packaging.</div>
-                    </div>
-                </div>
-                <div class="feature-item">
-                    <div class="feature-icon"><i class="fas fa-heart"></i></div>
-                    <div>
-                        <div class="feature-title">Grown with Love</div>
-                        <div class="feature-desc">Every product is grown with care and dedication since 2015.</div>
-                    </div>
-                </div>
-                <div class="feature-item">
-                    <div class="feature-icon"><i class="fas fa-shield-alt"></i></div>
-                    <div>
-                        <div class="feature-title">Quality Assured</div>
-                        <div class="feature-desc">Carefully selected and inspected before delivery.</div>
-                    </div>
+
+                <div class="product-features">
+                    <h3 class="features-title">Leave a Review</h3>
+                    <form method="POST" action="{% url 'submit_review' product.slug %}" class="review-form" style="display:flex;flex-direction:column;gap:18px;">
+                        {% csrf_token %}
+                        <div>
+                            <label>Your Name</label>
+                            <input type="text" name="name" required placeholder="e.g. Ramesh Thapa">
+                        </div>
+                        <div>
+                            <label>Rating</label>
+                            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                                {% for val, label in ratings %}
+                                <label style="cursor:pointer;text-align:center;">
+                                    <input type="radio" name="rating" value="{{ val }}" required style="display:none;">
+                                    <span class="star-btn">{{ val }} ⭐</span>
+                                </label>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        <div>
+                            <label>Your Review</label>
+                            <textarea name="comment" required rows="4" placeholder="Tell us about your experience with this product..."></textarea>
+                        </div>
+                        <button type="submit" class="review-submit-btn"><i class="fas fa-paper-plane"></i> Submit Review</button>
+                    </form>
                 </div>
             </div>
         </div>
@@ -520,9 +892,7 @@
                     </div>
                     <div class="related-body">
                         <div class="related-name">{{ related.name }}</div>
-                        <div class="related-link">
-                            <i class="fas fa-arrow-right"></i> Learn more
-                        </div>
+                        <div class="related-link"><i class="fas fa-arrow-right"></i> Learn more</div>
                     </div>
                 </a>
                 {% endfor %}
@@ -532,107 +902,26 @@
 
     </div>
 
-    <!-- ============================================================
-         REVIEWS SECTION
-    ============================================================ -->
-    <div class="product-page" style="margin-top:0;">
-
-        <!-- Success message after submitting review -->
-        {% if request.GET.reviewed %}
-        <div style="background:rgba(74,124,89,0.1);border:1px solid var(--moss);border-radius:12px;padding:16px 24px;margin-bottom:32px;color:var(--forest);font-size:0.95rem;">
-            <i class="fas fa-check-circle" style="color:var(--moss);margin-right:8px;"></i>
-            <strong>Thank you for your review!</strong> It will appear after approval.
-        </div>
-        {% endif %}
-
-        <!-- Existing Reviews -->
-        <div style="margin-bottom:48px;">
-            <h2 class="features-title" style="margin-bottom:8px;">
-                Customer Reviews
-                {% if review_count %}
-                <span style="font-size:1rem;font-weight:400;color:var(--text-muted);font-family:var(--font-body);margin-left:12px;">
-                    {{ review_count }} review{{ review_count|pluralize }}
-                    {% if avg_rating %}· ⭐ {{ avg_rating }}/5{% endif %}
-                </span>
-                {% endif %}
-            </h2>
-
-            {% if reviews %}
-            <div style="display:flex;flex-direction:column;gap:16px;margin-top:24px;">
-                {% for review in reviews %}
-                <div style="background:var(--cream);border:1px solid var(--mist);border-radius:14px;padding:20px 24px;">
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-                        <strong style="color:var(--forest);font-size:0.95rem;">{{ review.name }}</strong>
-                        <span style="color:var(--gold);font-size:1rem;">
-                            {% for i in "12345" %}
-                                {% if forloop.counter <= review.rating %}⭐{% endif %}
-                            {% endfor %}
-                        </span>
-                    </div>
-                    <p style="color:var(--text-body);font-size:0.92rem;line-height:1.7;margin:0;">{{ review.comment }}</p>
-                    <div style="font-size:0.75rem;color:var(--text-muted);margin-top:8px;">{{ review.created_at|date:"F j, Y" }}</div>
-                </div>
-                {% endfor %}
-            </div>
-            {% else %}
-            <p style="color:var(--text-muted);font-size:0.92rem;margin-top:16px;">No reviews yet. Be the first to share your experience!</p>
-            {% endif %}
-        </div>
-
-        <!-- Submit Review Form -->
-        <div class="product-features">
-            <h2 class="features-title">Leave a Review</h2>
-            <form method="POST" action="{% url 'submit_review' product.slug %}" style="display:flex;flex-direction:column;gap:16px;margin-top:24px;">
-                {% csrf_token %}
-
-                <div>
-                    <label style="font-size:0.8rem;font-family:var(--font-accent);letter-spacing:0.1em;text-transform:uppercase;color:var(--text-muted);display:block;margin-bottom:6px;">Your Name</label>
-                    <input type="text" name="name" required placeholder="e.g. Ramesh Thapa"
-                        style="width:100%;padding:12px 16px;border:1px solid var(--mist);border-radius:10px;font-size:0.95rem;font-family:var(--font-body);background:var(--white);color:var(--forest);outline:none;box-sizing:border-box;">
-                </div>
-
-                <div>
-                    <label style="font-size:0.8rem;font-family:var(--font-accent);letter-spacing:0.1em;text-transform:uppercase;color:var(--text-muted);display:block;margin-bottom:10px;">Rating</label>
-                    <div style="display:flex;gap:8px;">
-                        {% for val, label in ratings %}
-                        <label style="cursor:pointer;text-align:center;">
-                            <input type="radio" name="rating" value="{{ val }}" required style="display:none;">
-                            <span class="star-btn" style="display:inline-block;padding:8px 14px;border:1.5px solid var(--mist);border-radius:50px;font-size:0.85rem;transition:all 0.2s;">{{ val }} ⭐</span>
-                        </label>
-                        {% endfor %}
-                    </div>
-                </div>
-
-                <div>
-                    <label style="font-size:0.8rem;font-family:var(--font-accent);letter-spacing:0.1em;text-transform:uppercase;color:var(--text-muted);display:block;margin-bottom:6px;">Your Review</label>
-                    <textarea name="comment" required rows="4" placeholder="Tell us about your experience with this product..."
-                        style="width:100%;padding:12px 16px;border:1px solid var(--mist);border-radius:10px;font-size:0.95rem;font-family:var(--font-body);background:var(--white);color:var(--forest);outline:none;resize:vertical;box-sizing:border-box;"></textarea>
-                </div>
-
-                <button type="submit"
-                    style="background:var(--moss);color:white;border:none;padding:14px 28px;border-radius:50px;font-size:0.95rem;font-weight:600;cursor:pointer;transition:all 0.3s;align-self:flex-start;">
-                    <i class="fas fa-paper-plane"></i> Submit Review
-                </button>
-            </form>
-        </div>
-
+    <!-- Lightbox -->
+    <div class="lightbox-overlay" id="lightbox" onclick="if(event.target===this) closeLightbox()">
+        <button class="lightbox-close" onclick="closeLightbox()" aria-label="Close"><i class="fas fa-times"></i></button>
+        <button class="lightbox-nav lightbox-prev" onclick="lightboxStep(-1)" aria-label="Previous image"><i class="fas fa-chevron-left"></i></button>
+        <img id="lightboxImg" src="" alt="{{ product.name }}">
+        <button class="lightbox-nav lightbox-next" onclick="lightboxStep(1)" aria-label="Next image"><i class="fas fa-chevron-right"></i></button>
     </div>
 
-    <script>
-        // Star rating highlight effect
-        document.querySelectorAll('input[name="rating"]').forEach(radio => {
-            radio.addEventListener('change', function() {
-                document.querySelectorAll('.star-btn').forEach(btn => {
-                    btn.style.background = '';
-                    btn.style.color = '';
-                    btn.style.borderColor = 'var(--mist)';
-                });
-                this.nextElementSibling.style.background = 'var(--moss)';
-                this.nextElementSibling.style.color = 'white';
-                this.nextElementSibling.style.borderColor = 'var(--moss)';
-            });
-        });
-    </script>
+    <!-- Sticky mobile add-to-cart bar -->
+    {% if product.is_available %}
+    <div class="sticky-mobile-bar" id="stickyBar">
+        <div class="sticky-bar-price">
+            <span class="cur">Rs. {% if active_offer %}{{ active_offer.discounted_price|default:product.price|floatformat:0 }}{% else %}{{ product.price|floatformat:0 }}{% endif %}</span>
+            <span class="unit">{{ product.price_unit }}</span>
+        </div>
+        <button type="button" class="sticky-bar-btn" onclick="document.getElementById('cartForm').requestSubmit()">
+            <i class="fas fa-cart-plus"></i> Add to Cart
+        </button>
+    </div>
+    {% endif %}
 
     <!-- Footer -->
     <footer class="site-footer">
@@ -649,11 +938,129 @@
     </footer>
 
     <script>
-        function changeImage(src, thumb) {
+        /* ---------------- Gallery + lightbox ---------------- */
+        const images = [
+            {% if product.main_image %}"{% static product.main_image %}",{% endif %}
+            {% if product.image2 %}"{% static product.image2 %}",{% endif %}
+            {% if product.image3 %}"{% static product.image3 %}",{% endif %}
+            {% if product.image4 %}"{% static product.image4 %}",{% endif %}
+        ];
+        let currentIndex = 0;
+
+        function buildDots() {
+            const dotsWrap = document.getElementById('thumbDots');
+            if (!dotsWrap || images.length < 2) return;
+            dotsWrap.innerHTML = images.map((_, i) =>
+                `<span class="thumb-dot${i === 0 ? ' active' : ''}" data-i="${i}"></span>`
+            ).join('');
+        }
+        buildDots();
+
+        function syncDots() {
+            document.querySelectorAll('.thumb-dot').forEach((d, i) => {
+                d.classList.toggle('active', i === currentIndex);
+            });
+        }
+
+        function changeImage(evt, src, thumbEl) {
+            evt.stopPropagation();
             document.getElementById('mainImg').src = src;
             document.querySelectorAll('.thumb').forEach(t => t.classList.remove('active'));
-            thumb.classList.add('active');
+            thumbEl.classList.add('active');
+            currentIndex = images.indexOf(src);
+            syncDots();
         }
+
+        function openLightbox() {
+            if (!images.length) return;
+            document.getElementById('lightboxImg').src = images[currentIndex];
+            document.getElementById('lightbox').classList.add('open');
+            document.body.style.overflow = 'hidden';
+        }
+        function closeLightbox() {
+            document.getElementById('lightbox').classList.remove('open');
+            document.body.style.overflow = '';
+        }
+        function lightboxStep(dir) {
+            currentIndex = (currentIndex + dir + images.length) % images.length;
+            document.getElementById('lightboxImg').src = images[currentIndex];
+            document.getElementById('mainImg').src = images[currentIndex];
+            document.querySelectorAll('.thumb').forEach((t, i) => t.classList.toggle('active', i === currentIndex));
+            syncDots();
+        }
+        document.addEventListener('keydown', (e) => {
+            if (!document.getElementById('lightbox').classList.contains('open')) return;
+            if (e.key === 'Escape') closeLightbox();
+            if (e.key === 'ArrowLeft') lightboxStep(-1);
+            if (e.key === 'ArrowRight') lightboxStep(1);
+        });
+
+        /* ---------------- Tabs ---------------- */
+        function switchTab(name) {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
+            document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.dataset.panel === name));
+        }
+
+        /* ---------------- Quantity stepper ---------------- */
+        function stepQty(delta) {
+            const input = document.getElementById('qtyInput');
+            const cartField = document.getElementById('cartQtyField');
+            let val = Math.max(1, parseInt(input.value || '1', 10) + delta);
+            input.value = val;
+            if (cartField) cartField.value = val;
+        }
+
+        /* ---------------- Wishlist (client-side placeholder) ----------------
+           TODO: replace localStorage logic with a real fetch() call to your
+           own wishlist toggle endpoint once you build one, e.g.:
+           fetch(`/wishlist/toggle/${productId}/`, { method: 'POST', headers: {...} })
+        */
+        function toggleWishlist(btn) {
+            const id = btn.dataset.productId;
+            const key = 'ab_wishlist';
+            let saved = JSON.parse(localStorage.getItem(key) || '[]');
+            const isActive = saved.includes(id);
+            saved = isActive ? saved.filter(x => x !== id) : [...saved, id];
+            localStorage.setItem(key, JSON.stringify(saved));
+            btn.classList.toggle('active', !isActive);
+            btn.querySelector('i').className = !isActive ? 'fas fa-heart' : 'far fa-heart';
+        }
+        (function initWishlist() {
+            const btn = document.getElementById('wishlistBtn');
+            if (!btn) return;
+            const saved = JSON.parse(localStorage.getItem('ab_wishlist') || '[]');
+            if (saved.includes(btn.dataset.productId)) {
+                btn.classList.add('active');
+                btn.querySelector('i').className = 'fas fa-heart';
+            }
+        })();
+
+        /* ---------------- Sticky mobile bar ---------------- */
+        (function initStickyBar() {
+            const target = document.getElementById('orderButtons');
+            const bar = document.getElementById('stickyBar');
+            if (!target || !bar) return;
+            const observer = new IntersectionObserver(entries => {
+                entries.forEach(entry => {
+                    bar.classList.toggle('visible', !entry.isIntersecting);
+                });
+            }, { threshold: 0 });
+            observer.observe(target);
+        })();
+
+        /* ---------------- Review star highlight ---------------- */
+        document.querySelectorAll('input[name="rating"]').forEach(radio => {
+            radio.addEventListener('change', function () {
+                document.querySelectorAll('.star-btn').forEach(btn => {
+                    btn.style.background = '';
+                    btn.style.color = '';
+                    btn.style.borderColor = 'var(--mist)';
+                });
+                this.nextElementSibling.style.background = 'var(--turmeric)';
+                this.nextElementSibling.style.color = 'white';
+                this.nextElementSibling.style.borderColor = 'var(--turmeric)';
+            });
+        });
     </script>
 
 </body>
