@@ -165,19 +165,6 @@
             max-width: 600px;
             margin: 0 auto;
         }
-        .mobile-bottom-nav .nav-indicator {
-            position: absolute;
-            top: 0;
-            height: 100%;
-            border-radius: 16px;
-            background: linear-gradient(135deg, #2d5a3d, #4a7c59);
-            opacity: 0;
-            transition: transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1),
-                        width 0.45s cubic-bezier(0.34, 1.56, 0.64, 1),
-                        opacity 0.25s ease;
-            z-index: 0;
-            pointer-events: none;
-        }
         .mobile-bottom-nav .nav-item {
             position: relative;
             z-index: 1;
@@ -197,7 +184,7 @@
             cursor: pointer;
             background: none;
             border: none;
-            transition: color 0.3s ease;
+            transition: color 0.3s ease, background 0.3s ease;
         }
         .mobile-bottom-nav .nav-icon-wrap {
             position: relative;
@@ -211,8 +198,23 @@
             font-size: 1.18rem;
             transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), color 0.3s ease;
         }
-        .mobile-bottom-nav .nav-item:active .nav-icon-wrap { transform: scale(0.85); }
-        .mobile-bottom-nav .nav-item.active { color: #fff; }
+        /* Tap feedback — icon pops up on press so the customer sees their
+           tap registered, even before the page navigates. */
+        .mobile-bottom-nav .nav-item:active .nav-icon-wrap,
+        .mobile-bottom-nav .nav-item.tap-pop .nav-icon-wrap {
+            animation: navItemPop 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        @keyframes navItemPop {
+            0%   { transform: scale(1); }
+            45%  { transform: scale(1.28); }
+            100% { transform: scale(1); }
+        }
+        /* Active tab — background lives directly on the element that has
+           .active, so it is always painted on the correct icon. */
+        .mobile-bottom-nav .nav-item.active {
+            background: linear-gradient(135deg, #2d5a3d, #4a7c59);
+            color: #fff;
+        }
         .mobile-bottom-nav .nav-item.active i { transform: translateY(-1px) scale(1.1); }
         .mobile-bottom-nav .nav-label { transition: color 0.3s ease, font-weight 0.3s ease; }
         .mobile-bottom-nav .nav-item.active .nav-label { color: #fff; font-weight: 600; }
@@ -460,7 +462,6 @@
     <!-- MOBILE / TABLET BOTTOM NAV (hidden on desktop) -->
     <nav class="mobile-bottom-nav" id="bottomNav" aria-label="Mobile navigation">
         <div class="nav-items">
-            <span class="nav-indicator" aria-hidden="true"></span>
             <a href="{% url 'shop' %}" class="nav-item">
                 <span class="nav-icon-wrap"><i class="fas fa-store"></i></span>
                 <span class="nav-label">Shop</span>
@@ -863,22 +864,20 @@
             }
         });
 
-        // Sliding indicator for the bottom nav — glides to the active tab
+        // Tap-pop feedback for the bottom nav — :active in CSS already
+        // handles this on most browsers, but iOS Safari frequently ignores
+        // :active on <a> elements unless a touch listener is present, so
+        // this guarantees the pop is visible everywhere on tap.
         (function () {
-            const navItems = document.querySelector('.mobile-bottom-nav .nav-items');
-            if (!navItems) return;
-            const indicator = navItems.querySelector('.nav-indicator');
-            function moveIndicator() {
-                const activeItem = navItems.querySelector('.nav-item.active');
-                if (!indicator) return;
-                if (!activeItem) { indicator.style.opacity = '0'; return; }
-                indicator.style.opacity = '1';
-                indicator.style.width = activeItem.offsetWidth + 'px';
-                indicator.style.transform = 'translateX(' + activeItem.offsetLeft + 'px)';
-            }
-            moveIndicator();
-            window.addEventListener('resize', moveIndicator);
-            if (document.fonts && document.fonts.ready) document.fonts.ready.then(moveIndicator);
+            const navItems = document.querySelectorAll('.mobile-bottom-nav .nav-item');
+            navItems.forEach(function (item) {
+                item.addEventListener('touchstart', function () {
+                    item.classList.add('tap-pop');
+                }, { passive: true });
+                item.addEventListener('touchend', function () {
+                    setTimeout(function () { item.classList.remove('tap-pop'); }, 320);
+                }, { passive: true });
+            });
         })();
 
         // Sliding active-page pill in the top nav
