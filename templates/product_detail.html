@@ -37,6 +37,15 @@
             font-family: var(--font-display, 'Cormorant Garamond'), var(--font-devanagari), serif;
         }
 
+        /* Icons must NOT inherit the body/Devanagari font stack above —
+           this is what was breaking every icon on the page. */
+        .product-page .fas, .product-page .far, .product-page .fab, .product-page .fa {
+            font-family: "Font Awesome 6 Free", "Font Awesome 6 Brands", sans-serif !important;
+        }
+        .product-page .fas { font-weight: 900 !important; }
+        .product-page .far { font-weight: 400 !important; }
+        .product-page .fab { font-family: "Font Awesome 6 Brands" !important; font-weight: 400 !important; }
+
         .product-page {
             max-width: 1200px;
             margin: 100px auto 0;
@@ -215,7 +224,7 @@
             flex-wrap: wrap;
         }
         .price-current {
-            font-family: var(--font-display, 'Cormorant Garamond'), serif;
+            font-family: var(--font-body, 'DM Sans'), sans-serif;
             font-size: 2.1rem;
             font-weight: 700;
             color: var(--forest-deep);
