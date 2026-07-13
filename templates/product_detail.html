@@ -165,15 +165,6 @@
 
         /* Gallery */
         .product-images { position: sticky; top: 100px; }
-        .gallery-blob {
-            position: absolute;
-            top: -40px; left: -40px;
-            width: 260px; height: 260px;
-            background: radial-gradient(circle at 30% 30%, rgba(74,124,89,0.16), transparent 70%);
-            border-radius: 50%;
-            z-index: 0;
-            pointer-events: none;
-        }
         .main-image {
             position: relative;
             border-radius: 28px;
@@ -610,7 +601,6 @@
             .product-grid { grid-template-columns: 1fr; gap: 32px; }
             .product-page { padding-top: 96px; padding-bottom: 90px; }
             .product-images { position: static; }
-            .gallery-blob { display: none; }
             .main-image { height: 360px; }
             .features-grid { grid-template-columns: 1fr 1fr; }
             .related-grid { grid-template-columns: 1fr 1fr; }
@@ -694,7 +684,6 @@
 
             <!-- Images -->
             <div class="product-images">
-                <div class="gallery-blob"></div>
                 <div class="main-image" id="mainImage" onclick="openLightbox()">
                     {% if product.main_image %}
                         <img src="{% static product.main_image %}" alt="{{ product.name }}" id="mainImg">
