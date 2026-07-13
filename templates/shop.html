@@ -749,13 +749,6 @@
                     </a>
                 </div>
             </nav>
-            <!-- Mobile cart icon (bottom nav covers primary navigation) -->
-            <a href="{% url 'cart' %}" class="mobile-cart-icon" aria-label="View cart">
-                <i class="fas fa-shopping-cart"></i>
-                {% with total_qty=request.session.cart.values|length %}
-                <span class="mobile-cart-badge {% if total_qty == 0 %}badge-hidden{% endif %}">{{ total_qty }}</span>
-                {% endwith %}
-            </a>
             <!-- This trigger opens the category FILTER drawer, not a duplicate
                  nav menu — the bottom nav already handles primary navigation
                  on mobile. Styled distinctly (filter icon + label) so it

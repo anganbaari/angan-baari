@@ -341,44 +341,6 @@ ul { list-style: none; }
     transform: translateY(-1px);
 }
 
-/* Mobile cart icon (header, next to hamburger) */
-.mobile-cart-icon {
-    display: none;
-    position: relative;
-    align-items: center;
-    justify-content: center;
-    color: var(--white);
-    font-size: 1.15rem;
-    margin-right: 10px;
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    background: rgba(255,255,255,0.08);
-}
-
-.mobile-cart-badge {
-    position: absolute;
-    top: -4px;
-    right: -4px;
-    background: #c0392b;
-    color: #fff;
-    font-size: 0.6rem;
-    width: 17px;
-    height: 17px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 700;
-}
-
-@media (max-width: 880px) {
-    .mobile-cart-icon { display: flex !important; }
-}
-@media (min-width: 881px) {
-    .mobile-cart-icon { display: none !important; }
-}
-
 /* ─── Offers nav link — animated CTA, consistent on every page ───
    (previously only shop.html had this animation; now it's shared
    so it looks and behaves identically on shop/cart/offers/profile) */

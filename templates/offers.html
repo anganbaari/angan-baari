@@ -692,14 +692,6 @@
                     </a>
                 </div>
             </nav>
-            <!-- Mobile cart icon — bottom nav already covers primary navigation,
-                 so no hamburger/drawer is needed here (was fully redundant). -->
-            <a href="{% url 'cart' %}" class="mobile-cart-icon" aria-label="View cart">
-                <i class="fas fa-shopping-cart"></i>
-                {% with total_qty=request.session.cart.values|length %}
-                {% if total_qty > 0 %}<span class="mobile-cart-badge">{{ total_qty }}</span>{% endif %}
-                {% endwith %}
-            </a>
         </div>
     </header>
 
