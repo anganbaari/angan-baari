@@ -3537,9 +3537,18 @@ ul { list-style: none; }
     color: var(--forest);
     z-index: 999;
     box-shadow: 0 6px 24px rgba(92,71,20,0.4);
-    transition: all 0.35s var(--ease-spring);
+    transition: opacity 0.4s var(--ease-spring), visibility 0.4s var(--ease-spring), transform 0.4s var(--ease-spring), box-shadow 0.35s var(--ease-spring);
     text-decoration: none;
     overflow: hidden;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(16px) scale(0.85);
+}
+
+.float-shop.visible {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0) scale(1);
 }
 
 .float-shop:hover {
@@ -3625,8 +3634,17 @@ ul { list-style: none; }
     color: var(--white);
     z-index: 999;
     box-shadow: 0 6px 24px rgba(37,211,102,0.5);
-    transition: all 0.35s var(--ease-spring);
+    transition: opacity 0.4s var(--ease-spring) 0.08s, visibility 0.4s var(--ease-spring) 0.08s, transform 0.4s var(--ease-spring) 0.08s, box-shadow 0.35s var(--ease-spring);
     text-decoration: none;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(16px) scale(0.85);
+}
+
+.float-wa.visible {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0) scale(1);
 }
 
 .float-wa:hover {

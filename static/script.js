@@ -1,5 +1,5 @@
 /* ================================================================
-   Angan Baari— Premium JavaScript
+   THE HIMALAYAN SUSTAINABLE FARM — Premium JavaScript
    Features: Loader, Navbar scroll, Carousel, Lightbox,
              ScrollSpy, AOS init, Animated Counters, Mobile Menu
 ================================================================ */
@@ -964,4 +964,31 @@ document.addEventListener('DOMContentLoaded', () => {
         el.addEventListener('mousemove', onMove);
         el.addEventListener('mouseleave', onLeave);
     });
+});
+
+// ================================================================
+// FLOAT BUTTONS REVEAL — Shop + WhatsApp fade in once the hero
+// carousel scrolls out of view (i.e. right as the About section
+// begins), instead of sitting there from the very first paint.
+// ================================================================
+document.addEventListener('DOMContentLoaded', () => {
+    const floatShop = document.querySelector('.float-shop');
+    const floatWa    = document.querySelector('.float-wa');
+    const hero       = document.getElementById('hero');
+    if (!floatShop || !floatWa) return;
+
+    if (!hero || !('IntersectionObserver' in window)) {
+        // No hero on this page, or old browser — just show them.
+        floatShop.classList.add('visible');
+        floatWa.classList.add('visible');
+        return;
+    }
+
+    const io = new IntersectionObserver(([entry]) => {
+        const show = !entry.isIntersecting;
+        floatShop.classList.toggle('visible', show);
+        floatWa.classList.toggle('visible', show);
+    }, { threshold: 0 });
+
+    io.observe(hero);
 });
