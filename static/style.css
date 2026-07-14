@@ -1,5 +1,5 @@
 /* ================================================================
-   THE HIMALAYAN SUSTAINABLE FARM — Premium Redesign
+   Angan Baari — Premium Redesign
    Style: Cinematic · Luxury Eco · Himalayan Natural
    Fonts: Cormorant Garamond (serif) + DM Sans (body) + Cinzel (accent)
 ================================================================ */
@@ -374,7 +374,9 @@ ul { list-style: none; }
     outline-offset: 2px;
 }
 
-/* Shine sweep — a light streak glides across the pill every ~3.4s */
+/* Shine sweep — a light streak glides across the pill every ~3.4s.
+   z-index:-1 keeps it behind the icon/text (plain in-flow content),
+   instead of painting over them as a positioned element normally would. */
 .nav-links a.offer-nav-link::after {
     content: '';
     position: absolute;
@@ -385,6 +387,7 @@ ul { list-style: none; }
     background: linear-gradient(115deg, transparent, rgba(255,255,255,0.55), transparent);
     transform: skewX(-20deg);
     animation: offer-shine 3.4s ease-in-out infinite;
+    z-index: -1;
 }
 
 @keyframes offer-gradient {
@@ -3574,6 +3577,7 @@ ul { list-style: none; }
     background: linear-gradient(120deg, transparent, rgba(255,255,255,0.6), transparent);
     transform: skewX(-20deg);
     animation: floatShopShine 3.6s ease-in-out infinite;
+    z-index: -1;
 }
 
 @keyframes floatShopShine {
