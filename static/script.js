@@ -1,5 +1,5 @@
 /* ================================================================
-   THE HIMALAYAN SUSTAINABLE FARM — Premium JavaScript
+   Angan Baari — Premium JavaScript
    Features: Loader, Navbar scroll, Carousel, Lightbox,
              ScrollSpy, AOS init, Animated Counters, Mobile Menu
 ================================================================ */
@@ -276,6 +276,61 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
  
+    // ============================================================
+    // ANIMATED FILTER HELPER — shared by Gallery + Shop filters
+    // Fades out items leaving the set, waits, then reveals the new
+    // set with a staggered entrance instead of an instant snap.
+    // ============================================================
+    function animateFilterChange(items, matchFn, onCount) {
+        const OUT_MS = 220;
+        const toHide = [];
+        const toShow = [];
+
+        items.forEach(item => {
+            const shouldShow = matchFn(item);
+            const isHidden = item.classList.contains('hidden');
+            if (!shouldShow && !isHidden) toHide.push(item);
+            else if (shouldShow && isHidden) toShow.push(item);
+        });
+
+        if (onCount) {
+            let count = 0;
+            items.forEach(item => { if (matchFn(item)) count++; });
+            onCount(count);
+        }
+
+        function revealItems(list) {
+            if (!list.length) return;
+            list.forEach(item => item.classList.remove('hidden'));
+            // Force a reflow so the entrance animation restarts cleanly
+            void list[0].offsetWidth;
+            list.forEach((item, i) => {
+                item.style.animationDelay = `${Math.min(i * 40, 280)}ms`;
+                item.classList.add('filter-in');
+                item.addEventListener('animationend', function handler() {
+                    item.classList.remove('filter-in');
+                    item.style.animationDelay = '';
+                    item.removeEventListener('animationend', handler);
+                });
+            });
+        }
+
+        if (!toHide.length) {
+            revealItems(toShow);
+            return;
+        }
+
+        toHide.forEach(item => item.classList.add('filter-out'));
+
+        setTimeout(() => {
+            toHide.forEach(item => {
+                item.classList.remove('filter-out');
+                item.classList.add('hidden');
+            });
+            revealItems(toShow);
+        }, OUT_MS);
+    }
+
     // Gallery Filter
     const filterBtns    = document.querySelectorAll('.gf-btn');
     const galleryItems  = document.querySelectorAll('.gm-item');
@@ -293,15 +348,11 @@ document.addEventListener('DOMContentLoaded', () => {
             btn.classList.add('active');
  
             const filter = btn.dataset.filter;
-            let count = 0;
- 
-            galleryItems.forEach(item => {
-                const show = filter === 'all' || item.dataset.cat === filter;
-                item.classList.toggle('hidden', !show);
-                if (show) count++;
-            });
- 
-            if (visibleCount) visibleCount.textContent = count;
+            animateFilterChange(
+                galleryItems,
+                item => filter === 'all' || item.dataset.cat === filter,
+                count => { if (visibleCount) visibleCount.textContent = count; }
+            );
         });
     });
  
@@ -324,15 +375,11 @@ document.addEventListener('DOMContentLoaded', () => {
             tab.classList.add('active');
  
             const cat = tab.dataset.cat;
-            let count = 0;
- 
-            shopCards.forEach(card => {
-                const show = cat === 'all' || card.dataset.cat === cat;
-                card.classList.toggle('hidden', !show);
-                if (show) count++;
-            });
- 
-            if (shopVisible) shopVisible.textContent = count;
+            animateFilterChange(
+                shopCards,
+                card => cat === 'all' || card.dataset.cat === cat,
+                count => { if (shopVisible) shopVisible.textContent = count; }
+            );
         });
     });
  
@@ -837,3 +884,73 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 })();
+// ================================================================
+// SCROLL PROGRESS VINE — Offerings → Location journey indicator
+// ================================================================
+document.addEventListener('DOMContentLoaded', () => {
+    const vine = document.getElementById('scrollVine');
+    const fill = document.getElementById('scrollVineFill');
+    const leaf = document.getElementById('scrollVineLeaf');
+    const startEl = document.getElementById('services');
+    const endEl = document.getElementById('location');
+    if (!vine || !fill || !leaf || !startEl || !endEl) return;
+
+    let ticking = false;
+
+    function update() {
+        ticking = false;
+        const startTop = startEl.getBoundingClientRect().top + window.scrollY;
+        const endBottom = endEl.getBoundingClientRect().bottom + window.scrollY;
+        const total = Math.max(endBottom - startTop, 1);
+        const scrolled = window.scrollY + window.innerHeight * 0.5 - startTop;
+        const progress = Math.min(Math.max(scrolled / total, 0), 1);
+
+        const inRange = window.scrollY + window.innerHeight > startTop && window.scrollY < endBottom;
+        vine.classList.toggle('visible', inRange);
+
+        fill.style.height = (progress * 100) + '%';
+        leaf.style.bottom = (progress * 100) + '%';
+    }
+
+    function onScroll() {
+        if (!ticking) {
+            requestAnimationFrame(update);
+            ticking = true;
+        }
+    }
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll, { passive: true });
+    update();
+});
+
+// ================================================================
+// CURSOR TILT — Offering & Gallery images (desktop / mouse only)
+// Skipped entirely on touch devices so it never interferes with
+// tap targets or scroll gestures on mobile.
+// ================================================================
+document.addEventListener('DOMContentLoaded', () => {
+    const supportsHover = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+    if (!supportsHover) return;
+
+    const MAX_TILT = 6; // degrees
+    const tiltTargets = document.querySelectorAll('.offering-item, .gm-item');
+
+    tiltTargets.forEach(el => {
+        function onMove(e) {
+            const rect = el.getBoundingClientRect();
+            const x = (e.clientX - rect.left) / rect.width;
+            const y = (e.clientY - rect.top) / rect.height;
+            const rotateY = (x - 0.5) * MAX_TILT * 2;
+            const rotateX = (0.5 - y) * MAX_TILT * 2;
+            el.style.transform = `perspective(800px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
+        }
+
+        function onLeave() {
+            el.style.transform = '';
+        }
+
+        el.addEventListener('mousemove', onMove);
+        el.addEventListener('mouseleave', onLeave);
+    });
+});

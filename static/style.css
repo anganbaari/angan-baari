@@ -1,5 +1,5 @@
 /* ================================================================
-   THE HIMALAYAN SUSTAINABLE FARM — Premium Redesign
+   Angan Baari — Premium Redesign
    Style: Cinematic · Luxury Eco · Himalayan Natural
    Fonts: Cormorant Garamond (serif) + DM Sans (body) + Cinzel (accent)
 ================================================================ */
@@ -1335,6 +1335,9 @@ ul { list-style: none; }
     cursor: pointer;
     background: var(--forest);
     aspect-ratio: 4/3;
+    transition: transform 0.15s ease-out;
+    transform-style: preserve-3d;
+    will-change: transform;
 }
  
 .offering-wide {
@@ -1517,6 +1520,22 @@ ul { list-style: none; }
  
 .shop-card.hidden {
     display: none;
+}
+
+/* Filter reflow animation — used when switching category tabs */
+.shop-card.filter-out {
+    opacity: 0;
+    transform: scale(0.9) translateY(8px);
+    pointer-events: none;
+}
+
+.shop-card.filter-in {
+    animation: filterCardIn 0.45s var(--ease-smooth) both;
+}
+
+@keyframes filterCardIn {
+    from { opacity: 0; transform: scale(0.92) translateY(12px); }
+    to   { opacity: 1; transform: scale(1) translateY(0); }
 }
  
 /* Featured card gold border */
@@ -1802,11 +1821,23 @@ ul { list-style: none; }
     overflow: hidden;
     position: relative;
     cursor: pointer;
-    transition: opacity 0.4s ease, transform 0.4s ease;
+    transition: opacity 0.4s ease, transform 0.15s ease-out;
 }
  
 .gm-item.hidden {
     display: none;
+}
+
+/* Filter reflow animation - used when switching gallery filters */
+.gm-item.filter-out {
+    opacity: 0;
+    transform: scale(0.9);
+    pointer-events: none;
+    transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.gm-item.filter-in {
+    animation: filterCardIn 0.45s var(--ease-smooth) both;
 }
  
 .gm-item img {
@@ -5609,4 +5640,86 @@ ul { list-style: none; }
     .fs-mini-card { padding: 8px; }
     .fs-mini-card-name { font-size: 0.76rem; }
     .fs-mini-card-price { font-size: 0.72rem; }
+}
+/* ================================================================
+   SCROLL PROGRESS VINE — Offerings to Location journey indicator
+   Desktop only; hidden on tablets/phones to avoid clutter.
+================================================================ */
+.scroll-vine {
+    position: fixed;
+    left: 22px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 3px;
+    height: 240px;
+    z-index: 40;
+    opacity: 0;
+    transition: opacity 0.4s ease;
+    pointer-events: none;
+}
+
+.scroll-vine.visible {
+    opacity: 1;
+}
+
+.scroll-vine-track {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    background: rgba(74, 124, 89, 0.18);
+    border-radius: 3px;
+    overflow: visible;
+}
+
+.scroll-vine-fill {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 0%;
+    background: linear-gradient(to top, var(--moss), var(--gold));
+    border-radius: 3px;
+    transition: height 0.1s linear;
+}
+
+.scroll-vine-leaf {
+    position: absolute;
+    left: 50%;
+    bottom: 0%;
+    transform: translate(-50%, 50%) rotate(0deg);
+    width: 20px;
+    height: 20px;
+    background: var(--gold);
+    color: var(--forest);
+    border-radius: 50% 50% 50% 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.6rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+    transition: bottom 0.1s linear;
+}
+
+@media (max-width: 1024px) {
+    .scroll-vine {
+        display: none;
+    }
+}
+
+/* Respect reduced motion preference across all new animations */
+@media (prefers-reduced-motion: reduce) {
+    .shop-card.filter-in,
+    .gm-item.filter-in {
+        animation: none !important;
+        opacity: 1 !important;
+        transform: none !important;
+    }
+    .offering-item,
+    .gm-item {
+        transition: none !important;
+    }
+    .scroll-vine-fill,
+    .scroll-vine-leaf {
+        transition: none !important;
+    }
 }
