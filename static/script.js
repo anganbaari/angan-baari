@@ -1,5 +1,5 @@
 /* ================================================================
-   Angan Baari — Premium JavaScript
+   Angan Baari— Premium JavaScript
    Features: Loader, Navbar scroll, Carousel, Lightbox,
              ScrollSpy, AOS init, Animated Counters, Mobile Menu
 ================================================================ */
@@ -937,6 +937,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const tiltTargets = document.querySelectorAll('.offering-item, .gm-item');
 
     tiltTargets.forEach(el => {
+        function onEnter() {
+            // Only promote a GPU layer while actually mid-tilt, not
+            // permanently — avoids paint/composite issues on devices
+            // that never even trigger this (this listener itself is
+            // desktop+mouse only, but keeping the CSS side conditional
+            // too is the safer, cheaper default).
+            el.style.willChange = 'transform';
+        }
+
         function onMove(e) {
             const rect = el.getBoundingClientRect();
             const x = (e.clientX - rect.left) / rect.width;
@@ -948,8 +957,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         function onLeave() {
             el.style.transform = '';
+            el.style.willChange = '';
         }
 
+        el.addEventListener('mouseenter', onEnter);
         el.addEventListener('mousemove', onMove);
         el.addEventListener('mouseleave', onLeave);
     });

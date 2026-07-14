@@ -1,5 +1,5 @@
 /* ================================================================
-   Angan Baari — Premium Redesign
+   THE HIMALAYAN SUSTAINABLE FARM — Premium Redesign
    Style: Cinematic · Luxury Eco · Himalayan Natural
    Fonts: Cormorant Garamond (serif) + DM Sans (body) + Cinzel (accent)
 ================================================================ */
@@ -1336,8 +1336,6 @@ ul { list-style: none; }
     background: var(--forest);
     aspect-ratio: 4/3;
     transition: transform 0.15s ease-out;
-    transform-style: preserve-3d;
-    will-change: transform;
 }
  
 .offering-wide {
@@ -5679,7 +5677,6 @@ ul { list-style: none; }
     height: 0%;
     background: linear-gradient(to top, var(--moss), var(--gold));
     border-radius: 3px;
-    transition: height 0.1s linear;
 }
 
 .scroll-vine-leaf {
@@ -5697,7 +5694,6 @@ ul { list-style: none; }
     justify-content: center;
     font-size: 0.6rem;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
-    transition: bottom 0.1s linear;
 }
 
 @media (max-width: 1024px) {
