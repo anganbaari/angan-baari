@@ -104,7 +104,6 @@
         header#navbar .brand-tagline { font-size: 0.68rem; color: rgba(255,255,255,0.55); letter-spacing: 0.03em; }
 
         header#navbar .nav-links { display: flex; align-items: center; gap: 6px; }
-        header#navbar .site-nav { display: block !important; }
         header#navbar .nav-link {
             display: flex; align-items: center; gap: 8px;
             color: rgba(255,255,255,0.78);
@@ -130,10 +129,8 @@
             width: 16px; height: 16px; border-radius: 50%;
             display: flex; align-items: center; justify-content: center;
         }
-        @media (max-width: 780px) {
-            header#navbar .nav-link span { display: none; }
-            header#navbar .nav-link { padding: 10px 12px; }
-            header#navbar .nav-link i { font-size: 1.05rem; }
+        @media (max-width: 880px) {
+            header#navbar .site-nav { display: none !important; }
         }
         @media (max-width: 480px) {
             header#navbar { height: 64px; }
@@ -611,9 +608,9 @@
         /* ---------------- Sticky mobile CTA ---------------- */
         .sticky-mobile-bar {
             display: none;
-            position: fixed; bottom: 0; left: 0; right: 0;
+            position: fixed; bottom: 66px; left: 0; right: 0;
             background: white; border-top: 1px solid var(--mist);
-            padding: 12px 16px; z-index: 500;
+            padding: 12px 16px; z-index: 900;
             box-shadow: 0 -8px 24px -12px rgba(20,33,24,0.2);
             align-items: center; gap: 12px;
             transform: translateY(100%);
@@ -629,10 +626,62 @@
             font-family: var(--font-body, 'DM Sans');
         }
 
+        /* ============================================================
+           MOBILE BOTTOM NAV — reuses your shared .mobile-bottom-nav /
+           .bottom-nav-pill / .offer-dot classes from style.css (the
+           pill-slide and pulse animations come from there automatically).
+           Structural layout is defined here since it isn't in style.css.
+        ============================================================ */
+        .mobile-bottom-nav {
+            display: none;
+            position: fixed; bottom: 0; left: 0; right: 0;
+            background: var(--white);
+            border-top: 1px solid var(--mist);
+            z-index: 1000;
+            height: 66px;
+            box-shadow: 0 -6px 20px -8px rgba(20,33,24,0.15);
+        }
+        .mobile-bottom-nav .nav-items {
+            display: flex;
+            height: 100%;
+            max-width: 520px;
+            margin: 0 auto;
+        }
+        .mobile-bottom-nav .nav-item {
+            flex: 1;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            gap: 3px;
+            text-decoration: none;
+            color: var(--text-muted);
+            font-size: 0.62rem;
+            font-weight: 600;
+            font-family: var(--font-body, 'DM Sans');
+        }
+        .mobile-bottom-nav .nav-item i { font-size: 1.15rem; }
+        .mobile-bottom-nav .nav-item.active { color: var(--forest); }
+        .mobile-bottom-nav .nav-item .offer-dot {
+            position: absolute;
+            width: 7px; height: 7px; border-radius: 50%;
+            background: var(--terai-clay);
+            transform: translate(10px, -10px);
+        }
+
+        /* Floating Shop / WhatsApp / Back-to-top come from style.css —
+           just shifting them up on this page so they clear the bottom
+           nav bar (and the sticky add-to-cart bar when it's visible). */
+        @media (max-width: 880px) {
+            .mobile-bottom-nav { display: block; }
+        }
+        @media (max-width: 768px) {
+            .float-shop { bottom: 224px !important; }
+            .float-wa { bottom: 148px !important; }
+            .back-to-top { bottom: 84px !important; }
+        }
+
         /* ---------------- Responsive ---------------- */
         @media (max-width: 900px) {
             .product-grid { grid-template-columns: 1fr; gap: 32px; }
-            .product-page { padding-top: 96px; padding-bottom: 90px; }
+            .product-page { padding-top: 96px; padding-bottom: 130px; }
             .product-images { position: static; }
             .main-image { height: 360px; }
             .features-grid { grid-template-columns: 1fr 1fr; }
@@ -661,7 +710,7 @@
 <body>
 
     <!-- Navbar -->
-    <header class="navbar scrolled" id="navbar">
+    <header class="navbar scrolled navbar-app" id="navbar">
         <div class="navbar-inner">
             <a href="/" class="brand">
                 <span class="brand-icon"><i class="fas fa-seedling"></i></span>
@@ -1065,7 +1114,86 @@
         </div>
     </footer>
 
+    <!-- ============================================================
+         MOBILE BOTTOM NAV — Shop, Cart, Offers, Profile, Website.
+         Uses your shared .mobile-bottom-nav / .bottom-nav-pill /
+         .offer-dot classes so the pill-slide + pulse animations from
+         style.css apply automatically.
+    ============================================================ -->
+    <nav class="mobile-bottom-nav">
+        <div class="nav-items" id="bottomNavItems">
+            <div class="bottom-nav-pill" id="bottomNavPill"></div>
+            <a href="{% url 'shop' %}" class="nav-item active">
+                <i class="fas fa-store"></i><span>Shop</span>
+            </a>
+            <a href="{% url 'cart' %}" class="nav-item" style="position:relative;">
+                <i class="fas fa-shopping-cart"></i><span>Cart</span>
+            </a>
+            <a href="{% url 'offers' %}" class="nav-item" style="position:relative;">
+                <i class="fas fa-fire"></i><span>Offers</span>
+                <span class="offer-dot"></span>
+            </a>
+            {% if user.is_authenticated %}
+            <a href="{% url 'profile' %}" class="nav-item">
+                <i class="fas fa-user-circle"></i><span>Profile</span>
+            </a>
+            {% else %}
+            <a href="{% url 'login' %}" class="nav-item">
+                <i class="fas fa-user-circle"></i><span>Login</span>
+            </a>
+            {% endif %}
+            <a href="/" class="nav-item">
+                <i class="fas fa-globe"></i><span>Website</span>
+            </a>
+        </div>
+    </nav>
+
+    <!-- Floating Shop button -->
+    <a href="{% url 'shop' %}" class="float-shop" aria-label="Visit our online shop" title="Shop Now">
+        <i class="fas fa-shopping-bag"></i>
+        <span class="float-shop-tooltip">Visit Our Shop</span>
+    </a>
+
+    <!-- Floating WhatsApp -->
+    <a href="https://wa.me/9779821025084?text={{ product.whatsapp_message|urlencode }}"
+       class="float-wa" target="_blank" rel="noopener noreferrer"
+       aria-label="Chat with us on WhatsApp" title="Order via WhatsApp">
+        <i class="fab fa-whatsapp"></i>
+        <span class="float-wa-tooltip">Order via WhatsApp</span>
+    </a>
+
+    <!-- Back to Top -->
+    <button class="back-to-top" id="backToTop" aria-label="Back to top" title="Back to top">
+        <i class="fas fa-chevron-up"></i>
+    </button>
+
     <script>
+        /* ---------------- Bottom nav pill + back to top ---------------- */
+        (function initBottomNavPill() {
+            const items = document.getElementById('bottomNavItems');
+            const pill = document.getElementById('bottomNavPill');
+            const active = items ? items.querySelector('.nav-item.active') : null;
+            if (!items || !pill || !active) return;
+            function positionPill() {
+                const itemRect = active.getBoundingClientRect();
+                const wrapRect = items.getBoundingClientRect();
+                pill.style.width = itemRect.width - 12 + 'px';
+                pill.style.transform = `translateX(${itemRect.left - wrapRect.left + 6}px)`;
+                pill.style.opacity = '1';
+            }
+            positionPill();
+            window.addEventListener('resize', positionPill);
+        })();
+
+        (function initBackToTop() {
+            const btn = document.getElementById('backToTop');
+            if (!btn) return;
+            window.addEventListener('scroll', () => {
+                btn.classList.toggle('visible', window.scrollY > 400);
+            });
+            btn.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
+        })();
+
         /* ---------------- Bilingual description auto-split ----------------
            Your description fields store English + Nepali as one continuous
            string. This detects where Devanagari script begins and splits
