@@ -970,6 +970,12 @@ document.addEventListener('DOMContentLoaded', () => {
 // FLOAT BUTTONS REVEAL — Shop + WhatsApp fade in once the hero
 // carousel scrolls out of view (i.e. right as the About section
 // begins), instead of sitting there from the very first paint.
+//
+// Uses a direct scroll-position check rather than IntersectionObserver:
+// it measures the hero's actual rendered pixel height (via
+// getBoundingClientRect, recalculated on every scroll) instead of
+// relying on the CSS 100vh value, which mobile browsers can measure
+// inconsistently as their address bar collapses/expands.
 // ================================================================
 document.addEventListener('DOMContentLoaded', () => {
     const floatShop = document.querySelector('.float-shop');
@@ -977,18 +983,34 @@ document.addEventListener('DOMContentLoaded', () => {
     const hero       = document.getElementById('hero');
     if (!floatShop || !floatWa) return;
 
-    if (!hero || !('IntersectionObserver' in window)) {
-        // No hero on this page, or old browser — just show them.
+    if (!hero) {
+        // No hero on this page — just show them.
         floatShop.classList.add('visible');
         floatWa.classList.add('visible');
         return;
     }
 
-    const io = new IntersectionObserver(([entry]) => {
-        const show = !entry.isIntersecting;
+    let ticking = false;
+
+    function updateVisibility() {
+        // getBoundingClientRect().bottom is relative to the current
+        // viewport, so this is always accurate regardless of how tall
+        // 100vh actually rendered on this device.
+        const heroBottom = hero.getBoundingClientRect().bottom;
+        const show = heroBottom <= 0;
         floatShop.classList.toggle('visible', show);
         floatWa.classList.toggle('visible', show);
-    }, { threshold: 0 });
+        ticking = false;
+    }
 
-    io.observe(hero);
+    function onScroll() {
+        if (!ticking) {
+            window.requestAnimationFrame(updateVisibility);
+            ticking = true;
+        }
+    }
+
+    updateVisibility(); // run once immediately in case the page loads mid-scroll
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll);
 });
