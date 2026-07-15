@@ -59,6 +59,19 @@
         .qty-btn:disabled { opacity: 0.5; cursor: default; }
         .qty-num { font-weight: 700; color: var(--forest); min-width: 26px; text-align: center; font-size: 0.9rem; }
 
+        /* ─── Weight selector ─── */
+        .weight-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+        .weight-label { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.03em; }
+        .weight-select { font-family: 'DM Sans', sans-serif; font-size: 0.8rem; font-weight: 600; color: var(--forest); background: var(--mist); border: 1px solid transparent; border-radius: 50px; padding: 6px 12px; cursor: pointer; transition: border-color 0.2s; }
+        .weight-select:hover, .weight-select:focus { border-color: var(--sage); outline: none; }
+        .weight-custom-wrap { display: none; align-items: center; gap: 6px; }
+        .weight-custom-wrap.show { display: inline-flex; }
+        .weight-custom-input { width: 62px; font-family: 'DM Sans', sans-serif; font-size: 0.8rem; font-weight: 600; color: var(--forest); background: var(--mist); border: 1px solid transparent; border-radius: 50px; padding: 6px 10px; text-align: center; }
+        .weight-custom-input:focus { border-color: var(--sage); outline: none; }
+        .weight-custom-unit { font-size: 0.72rem; color: var(--text-muted); }
+        .weight-custom-confirm { width: 26px; height: 26px; border-radius: 50%; border: none; background: var(--forest); color: var(--gold); cursor: pointer; font-size: 0.75rem; display: flex; align-items: center; justify-content: center; }
+        .weight-custom-confirm:hover { background: var(--moss); }
+
         .cart-item-actions-row { display: flex; gap: 4px; align-items: center; }
         .icon-action-btn { width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--mist); background: var(--white); color: var(--text-muted); cursor: pointer; font-size: 0.85rem; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
         .icon-action-btn.remove:hover { border-color: #c0392b; color: #c0392b; background: #fdf0ee; }
@@ -66,6 +79,7 @@
 
         .cart-item-subtotal { font-weight: 700; color: var(--forest); font-size: 1rem; text-align: right; flex-shrink: 0; min-width: 76px; }
         .cart-item-subtotal .label { display: block; font-weight: 400; font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 2px; }
+
 
         /* ─── Summary sidebar ─── */
         .cart-summary { background: var(--white); border-radius: 20px; border: 1px solid var(--mist); padding: 26px; position: sticky; top: 20px; }
@@ -330,7 +344,7 @@
         <div class="cart-layout" id="cartLayout" style="display:{% if items %}grid{% else %}none{% endif %};">
             <div class="cart-items" id="cartItemsList">
                 {% for item in items %}
-                <div class="cart-item" id="cart-item-{{ item.id }}" data-id="{{ item.id }}" data-price="{{ item.price }}">
+                <div class="cart-item" id="cart-item-{{ item.id }}" data-id="{{ item.id }}" data-price="{{ item.price }}" data-weighted="{% if item.weight %}1{% else %}0{% endif %}" data-weight="{{ item.weight|default:'' }}">
                     <div class="cart-item-img">
                         {% if item.image %}
                         <img src="{% static item.image %}" alt="{{ item.name }}">
@@ -347,6 +361,23 @@
                             <span class="offer-chip">Offer</span>
                             {% endif %}
                         </div>
+                        {% if item.weight %}
+                        <div class="weight-row">
+                            <span class="weight-label">Weight</span>
+                            <select class="weight-select" data-action="weight-select">
+                                <option value="0.50" {% if item.weight == "0.50" %}selected{% endif %}>500 g</option>
+                                <option value="1.00" {% if item.weight == "1.00" %}selected{% endif %}>1 kg</option>
+                                <option value="1.50" {% if item.weight == "1.50" %}selected{% endif %}>1.5 kg</option>
+                                <option value="2.50" {% if item.weight == "2.50" %}selected{% endif %}>2.5 kg</option>
+                                <option value="custom" {% if item.weight != "0.50" and item.weight != "1.00" and item.weight != "1.50" and item.weight != "2.50" %}selected{% endif %}>Custom…</option>
+                            </select>
+                            <div class="weight-custom-wrap {% if item.weight != "0.50" and item.weight != "1.00" and item.weight != "1.50" and item.weight != "2.50" %}show{% endif %}">
+                                <input type="number" class="weight-custom-input" data-action="weight-custom-input" min="0.1" step="0.1" value="{{ item.weight }}">
+                                <span class="weight-custom-unit">kg</span>
+                                <button type="button" class="weight-custom-confirm" data-action="weight-custom-confirm" aria-label="Confirm weight"><i class="fas fa-check"></i></button>
+                            </div>
+                        </div>
+                        {% endif %}
                         <div class="cart-item-controls">
                             <div class="qty-control">
                                 <button type="button" class="qty-btn" data-action="update" data-delta="-1">−</button>
@@ -505,6 +536,7 @@
     <script id="urlTemplates" type="application/json">
         {
             "update_cart": "{% url 'update_cart' 0 %}",
+            "update_cart_weight": "{% url 'update_cart_weight' 0 %}",
             "remove_from_cart": "{% url 'remove_from_cart' 0 %}",
             "toggle_save_for_later": "{% url 'toggle_save_for_later' 0 %}",
             "move_to_cart": "{% url 'move_to_cart' 0 %}",
@@ -595,12 +627,42 @@
             document.getElementById('savedCount').textContent = savedCount;
         }
 
+        const WEIGHT_PRESETS = ['0.50', '1.00', '1.50', '2.50'];
+
+        function lineSubtotal(item) {
+            const weight = item.weight ? parseFloat(item.weight) : 1;
+            return parseFloat(item.price) * parseFloat(item.qty) * weight;
+        }
+
+        function weightRowHTML(weight) {
+            if (!weight) return '';
+            const isPreset = WEIGHT_PRESETS.includes(weight);
+            const opts = [
+                ['0.50', '500 g'], ['1.00', '1 kg'], ['1.50', '1.5 kg'], ['2.50', '2.5 kg'],
+            ].map(([val, label]) => `<option value="${val}" ${weight === val ? 'selected' : ''}>${label}</option>`).join('');
+            return `
+                <div class="weight-row">
+                    <span class="weight-label">Weight</span>
+                    <select class="weight-select" data-action="weight-select">
+                        ${opts}
+                        <option value="custom" ${isPreset ? '' : 'selected'}>Custom…</option>
+                    </select>
+                    <div class="weight-custom-wrap ${isPreset ? '' : 'show'}">
+                        <input type="number" class="weight-custom-input" data-action="weight-custom-input" min="0.1" step="0.1" value="${weight}">
+                        <span class="weight-custom-unit">kg</span>
+                        <button type="button" class="weight-custom-confirm" data-action="weight-custom-confirm" aria-label="Confirm weight"><i class="fas fa-check"></i></button>
+                    </div>
+                </div>`;
+        }
+
         function buildCartItemNode(item) {
             const wrap = document.createElement('div');
             wrap.className = 'cart-item';
             wrap.id = 'cart-item-' + item.id;
             wrap.dataset.id = item.id;
             wrap.dataset.price = item.price;
+            wrap.dataset.weighted = item.weight ? '1' : '0';
+            wrap.dataset.weight = item.weight || '';
             const imgHtml = item.image
                 ? `<img src="/static/${item.image}" alt="${item.name}">`
                 : `<div class="img-fallback"><i class="fas fa-seedling"></i></div>`;
@@ -611,6 +673,7 @@
                     <div class="cart-item-price-row">
                         <span class="cart-item-price">Rs. ${item.price}<span class="unit"> ${item.price_unit || ''}</span></span>
                     </div>
+                    ${weightRowHTML(item.weight)}
                     <div class="cart-item-controls">
                         <div class="qty-control">
                             <button type="button" class="qty-btn" data-action="update" data-delta="-1">−</button>
@@ -625,7 +688,7 @@
                 </div>
                 <div class="cart-item-subtotal">
                     <span class="label">Subtotal</span>
-                    <span id="subtotal-${item.id}">${money(item.price * item.qty)}</span>
+                    <span id="subtotal-${item.id}">${money(lineSubtotal(item))}</span>
                 </div>`;
             return wrap;
         }
@@ -634,7 +697,7 @@
             const row = document.createElement('div');
             row.className = 'summary-row';
             row.id = 'summaryrow-' + item.id;
-            row.innerHTML = `<span id="summaryname-${item.id}">${item.name} × ${item.qty}</span><span id="summaryamt-${item.id}">${money(item.price * item.qty)}</span>`;
+            row.innerHTML = `<span id="summaryname-${item.id}">${item.name} × ${item.qty}</span><span id="summaryamt-${item.id}">${money(lineSubtotal(item))}</span>`;
             return row;
         }
 
@@ -661,6 +724,51 @@
         function ensureCartLayoutSkeleton() {
             // If cart was empty, the items list / summary rows containers already exist
             // in the DOM (just hidden) — toggleEmptyState() reveals them.
+        }
+
+        // Change the weight on a cart line. Handles both outcomes the
+        // server can return: the line simply gets re-keyed (new weight,
+        // still its own row), or it gets merged into an already-existing
+        // line at that weight (so we remove this row and top up the other).
+        async function applyWeightChange(row, newWeightStr) {
+            const oldId = row.dataset.id;
+            row.classList.add('is-updating');
+            try {
+                const data = await post(urlFor('update_cart_weight', oldId), { weight: newWeightStr });
+                document.getElementById('summaryrow-' + oldId)?.remove();
+
+                if (data.merged) {
+                    row.remove();
+                    const targetQty = document.getElementById('qtynum-' + data.new_line_key);
+                    const targetSubtotal = document.getElementById('subtotal-' + data.new_line_key);
+                    if (targetQty) targetQty.textContent = data.qty;
+                    if (targetSubtotal) targetSubtotal.textContent = money(data.subtotal);
+                    const sumName = document.getElementById('summaryname-' + data.new_line_key);
+                    const sumAmt = document.getElementById('summaryamt-' + data.new_line_key);
+                    if (sumName) sumName.textContent = sumName.textContent.replace(/×\s*\d+/, '× ' + data.qty);
+                    if (sumAmt) sumAmt.textContent = money(data.subtotal);
+                } else {
+                    const item = {
+                        id: data.new_line_key,
+                        name: row.querySelector('.cart-item-name').textContent,
+                        price: row.dataset.price,
+                        price_unit: row.querySelector('.unit')?.textContent.trim() || '',
+                        image: row.querySelector('img')?.getAttribute('src')?.replace('/static/', '') || '',
+                        weight: data.weight,
+                        qty: data.qty,
+                    };
+                    row.replaceWith(buildCartItemNode(item));
+                    document.getElementById('summaryRows').appendChild(buildSummaryRow(item));
+                }
+                updateTotal(data.cart_total);
+                updateBadges(data.cart_count);
+                updateCountPill();
+                showToast('Weight updated');
+            } catch (err) {
+                showToast('Could not update weight');
+            } finally {
+                row.classList.remove('is-updating');
+            }
         }
 
         // ─── Event delegation ───────────────────────────────
@@ -794,6 +902,16 @@
                 return;
             }
 
+            // Confirm a custom weight typed into the cart line
+            if (action === 'weight-custom-confirm') {
+                const row = btn.closest('.cart-item');
+                const input = row.querySelector('.weight-custom-input');
+                let val = parseFloat(input.value);
+                if (!val || val <= 0) val = 1;
+                await applyWeightChange(row, val.toFixed(2));
+                return;
+            }
+
             // Remove saved item permanently
             if (action === 'remove-saved') {
                 const card = btn.closest('.saved-card');
@@ -814,19 +932,21 @@
             // Add recommended product to cart
             if (action === 'add') {
                 btn.disabled = true;
-                const id = btn.dataset.id;
+                const productId = btn.dataset.id;
                 try {
-                    const data = await post(urlFor('add_to_cart', id), {});
+                    const data = await post(urlFor('add_to_cart', productId), {});
                     updateBadges(data.count);
-                    const existingRow = document.getElementById('cart-item-' + id);
+                    const lineKey = data.line_key || productId;
+                    const existingRow = document.getElementById('cart-item-' + lineKey);
                     const item = {
-                        id, name: btn.dataset.name, price: btn.dataset.price,
+                        id: lineKey, name: btn.dataset.name, price: btn.dataset.price,
                         price_unit: btn.dataset.unit, image: btn.dataset.image,
-                        qty: existingRow ? parseInt(document.getElementById('qtynum-' + id).textContent) + 1 : 1,
+                        weight: data.weight || null,
+                        qty: data.qty,
                     };
                     if (existingRow) {
                         existingRow.replaceWith(buildCartItemNode(item));
-                        document.getElementById('summaryrow-' + id)?.remove();
+                        document.getElementById('summaryrow-' + lineKey)?.remove();
                     } else {
                         document.getElementById('cartItemsList').appendChild(buildCartItemNode(item));
                     }
@@ -836,7 +956,8 @@
                     document.querySelectorAll('#cartItemsList .cart-item').forEach(row => {
                         const price = parseFloat(row.dataset.price);
                         const qty = parseInt(document.getElementById('qtynum-' + row.dataset.id).textContent);
-                        total += price * qty;
+                        const weight = row.dataset.weight ? parseFloat(row.dataset.weight) : 1;
+                        total += price * qty * weight;
                     });
                     updateTotal(total);
                     updateCountPill();
@@ -849,6 +970,30 @@
                     btn.disabled = false;
                 }
                 return;
+            }
+        });
+
+        // Weight dropdown: presets apply immediately; "Custom…" reveals
+        // the inline kg input instead of submitting right away.
+        document.addEventListener('change', async function (e) {
+            const select = e.target.closest('select[data-action="weight-select"]');
+            if (!select) return;
+            const row = select.closest('.cart-item');
+            const customWrap = row.querySelector('.weight-custom-wrap');
+            if (select.value === 'custom') {
+                customWrap.classList.add('show');
+                row.querySelector('.weight-custom-input')?.focus();
+                return;
+            }
+            customWrap.classList.remove('show');
+            await applyWeightChange(row, select.value);
+        });
+
+        // Let Enter in the custom-weight box act like clicking the confirm ✓
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' && e.target.matches('.weight-custom-input')) {
+                e.preventDefault();
+                e.target.closest('.cart-item')?.querySelector('[data-action="weight-custom-confirm"]')?.click();
             }
         });
 

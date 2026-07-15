@@ -202,19 +202,62 @@ def save_cart(request, cart):
     request.session['cart'] = cart
     request.session.modified = True
 
+
+# ─── WEIGHT HELPERS ─────────────────────────────────────────────
+# Products whose price_unit mentions "kg" are sold by weight: Product.price
+# is treated as the price PER KG, and the customer picks how many kg they
+# want (500g, 1kg, 1.5kg, 2.5kg, or a custom amount). Everything else
+# (price_unit like "per piece", "per bunch", etc.) keeps the old
+# quantity-only behaviour untouched.
+
+def is_weighted_product(product):
+    return 'kg' in (product.price_unit or '').lower()
+
+def format_weight(raw):
+    """Normalize any incoming weight value to a 2-decimal string, e.g.
+    '1', '1.5', '2.50' -> '1.00', '1.50', '2.50'. Falls back to 1.00 kg
+    on bad input so a cart line is never silently dropped."""
+    from decimal import Decimal, InvalidOperation
+    try:
+        weight = Decimal(str(raw))
+        if weight <= 0:
+            weight = Decimal('1')
+        return f"{weight:.2f}"
+    except (InvalidOperation, TypeError, ValueError):
+        return '1.00'
+
+def make_line_key(product_id, weight_str):
+    """Weighted lines get a composite key so the same product at two
+    different weights becomes two separate cart lines. Non-weighted
+    lines keep the plain product id, unchanged from before."""
+    if weight_str:
+        return f"{product_id}_{weight_str}"
+    return str(product_id)
+
+def parse_line_key(line_key):
+    """Returns (product_id_str, weight_str_or_None)."""
+    if '_' in line_key:
+        pid, weight_str = line_key.split('_', 1)
+        return pid, weight_str
+    return line_key, None
+
+def line_subtotal(item):
+    try:
+        price = float(item['price'])
+        qty = item['qty']
+        weight = float(item['weight']) if item.get('weight') else 1
+        return price * qty * weight
+    except (KeyError, TypeError, ValueError):
+        return 0
+
+
 def cart_count(request):
     cart = get_cart(request)
     return sum(item['qty'] for item in cart.values())
 
 def cart_total(request):
     cart = get_cart(request)
-    total = 0
-    for item in cart.values():
-        try:
-            total += float(item['price']) * item['qty']
-        except Exception:
-            pass
-    return total
+    return sum(line_subtotal(item) for item in cart.values())
 
 def is_ajax(request):
     return request.headers.get('x-requested-with') == 'XMLHttpRequest'
@@ -223,55 +266,63 @@ def add_to_cart(request, product_id):
     from .models import Product
     product = get_object_or_404(Product, id=product_id)
     cart = get_cart(request)
-    pid = str(product_id)
-    if pid in cart:
-        cart[pid]['qty'] += 1
+
+    weighted = is_weighted_product(product)
+    weight_str = format_weight(request.POST.get('weight', '1')) if weighted else None
+    line_key = make_line_key(product_id, weight_str)
+
+    if line_key in cart:
+        cart[line_key]['qty'] += 1
     else:
-        cart[pid] = {
+        cart[line_key] = {
+            'product_id': product_id,
             'name': product.name,
             'price': str(product.price),
             'price_unit': product.price_unit,
             'image': product.main_image,
             'slug': product.slug,
             'qty': 1,
+            'weight': weight_str,
         }
     save_cart(request, cart)
     if is_ajax(request):
-        return JsonResponse({'status': 'ok', 'count': cart_count(request)})
+        return JsonResponse({
+            'status': 'ok',
+            'count': cart_count(request),
+            'line_key': line_key,
+            'weight': weight_str,
+            'qty': cart[line_key]['qty'],
+            'subtotal': line_subtotal(cart[line_key]),
+        })
     return redirect(request.META.get('HTTP_REFERER', '/shop/'))
 
-def remove_from_cart(request, product_id):
+def remove_from_cart(request, line_key):
     cart = get_cart(request)
-    pid = str(product_id)
-    if pid in cart:
-        del cart[pid]
+    if line_key in cart:
+        del cart[line_key]
         save_cart(request, cart)
     if is_ajax(request):
         return JsonResponse({
             'status': 'ok',
-            'removed_id': pid,
+            'removed_id': line_key,
             'cart_total': cart_total(request),
             'cart_count': cart_count(request),
         })
     return redirect('cart')
 
-def update_cart(request, product_id):
+def update_cart(request, line_key):
     cart = get_cart(request)
-    pid = str(product_id)
     qty = int(request.POST.get('qty', 1))
     removed = False
     subtotal = 0
     if qty <= 0:
-        if pid in cart:
-            del cart[pid]
+        if line_key in cart:
+            del cart[line_key]
         removed = True
     else:
-        if pid in cart:
-            cart[pid]['qty'] = qty
-            try:
-                subtotal = float(cart[pid]['price']) * qty
-            except Exception:
-                subtotal = 0
+        if line_key in cart:
+            cart[line_key]['qty'] = qty
+            subtotal = line_subtotal(cart[line_key])
     save_cart(request, cart)
     if is_ajax(request):
         return JsonResponse({
@@ -279,6 +330,49 @@ def update_cart(request, product_id):
             'removed': removed,
             'qty': qty if not removed else 0,
             'subtotal': subtotal,
+            'cart_total': cart_total(request),
+            'cart_count': cart_count(request),
+        })
+    return redirect('cart')
+
+def update_cart_weight(request, line_key):
+    """Change the weight on an existing weighted cart line. Because weight
+    is part of the line's identity, this re-keys the line — and if another
+    line already exists at that new weight, merges quantities into it
+    rather than creating a duplicate row."""
+    cart = get_cart(request)
+    if line_key not in cart:
+        if is_ajax(request):
+            return JsonResponse({'status': 'error', 'message': 'Line not found'}, status=404)
+        return redirect('cart')
+
+    item = cart[line_key]
+    product_id, _old_weight = parse_line_key(line_key)
+    new_weight_str = format_weight(request.POST.get('weight', '1'))
+    new_line_key = make_line_key(product_id, new_weight_str)
+    merged = False
+
+    if new_line_key != line_key:
+        if new_line_key in cart:
+            cart[new_line_key]['qty'] += item['qty']
+            del cart[line_key]
+            merged = True
+        else:
+            item['weight'] = new_weight_str
+            cart[new_line_key] = item
+            del cart[line_key]
+
+    save_cart(request, cart)
+    final_item = cart[new_line_key]
+    if is_ajax(request):
+        return JsonResponse({
+            'status': 'ok',
+            'old_line_key': line_key,
+            'new_line_key': new_line_key,
+            'merged': merged,
+            'qty': final_item['qty'],
+            'weight': final_item['weight'],
+            'subtotal': line_subtotal(final_item),
             'cart_total': cart_total(request),
             'cart_count': cart_count(request),
         })
@@ -294,26 +388,31 @@ def save_saved(request, saved):
     request.session['saved'] = saved
     request.session.modified = True
 
-def toggle_save_for_later(request, product_id):
+def toggle_save_for_later(request, key):
+    """`key` is either a plain product id (saving straight from a shop/product
+    card, no weight involved) or a composite line_key (saving a weighted
+    line from the cart, e.g. '14_1.50') — parse_line_key() handles both."""
     from .models import Product
+    product_id, weight_str = parse_line_key(key)
     product = get_object_or_404(Product, id=product_id)
     cart = get_cart(request)
     saved = get_saved(request)
-    pid = str(product_id)
 
-    if pid in saved:
-        del saved[pid]
+    if key in saved:
+        del saved[key]
         is_saved = False
     else:
-        if pid in cart:
-            del cart[pid]
+        if key in cart:
+            del cart[key]
             save_cart(request, cart)
-        saved[pid] = {
+        saved[key] = {
+            'product_id': product_id,
             'name': product.name,
             'price': str(product.price),
             'price_unit': product.price_unit,
             'image': product.main_image,
             'slug': product.slug,
+            'weight': weight_str,
         }
         is_saved = True
 
@@ -323,45 +422,43 @@ def toggle_save_for_later(request, product_id):
         return JsonResponse({
             'status': 'ok',
             'saved': is_saved,
-            'removed_from_cart': pid not in cart,
+            'removed_from_cart': key not in cart,
             'cart_total': cart_total(request),
             'cart_count': cart_count(request),
-            'item': saved.get(pid),
+            'item': saved.get(key),
         })
     return redirect(request.META.get('HTTP_REFERER', '/shop/'))
 
-def move_to_cart(request, product_id):
+def move_to_cart(request, key):
     saved = get_saved(request)
     cart = get_cart(request)
-    pid = str(product_id)
     item_data = None
-    if pid in saved:
-        item = saved.pop(pid)
-        if pid in cart:
-            cart[pid]['qty'] += 1
+    if key in saved:
+        item = saved.pop(key)
+        if key in cart:
+            cart[key]['qty'] += 1
         else:
-            cart[pid] = {**item, 'qty': 1}
-        item_data = cart[pid]
+            cart[key] = {**item, 'qty': 1}
+        item_data = cart[key]
         save_saved(request, saved)
         save_cart(request, cart)
     if is_ajax(request):
         return JsonResponse({
             'status': 'ok',
-            'moved_id': pid,
+            'moved_id': key,
             'item': item_data,
             'cart_total': cart_total(request),
             'cart_count': cart_count(request),
         })
     return redirect('cart')
 
-def remove_saved(request, product_id):
+def remove_saved(request, key):
     saved = get_saved(request)
-    pid = str(product_id)
-    if pid in saved:
-        del saved[pid]
+    if key in saved:
+        del saved[key]
         save_saved(request, saved)
     if is_ajax(request):
-        return JsonResponse({'status': 'ok', 'removed_id': pid})
+        return JsonResponse({'status': 'ok', 'removed_id': key})
     return redirect('cart')
 
 
@@ -373,23 +470,22 @@ def cart_view(request):
 
     items = []
     total = 0
-    cart_product_ids = set(cart.keys())
-    for pid, item in cart.items():
-        try:
-            subtotal = float(item['price']) * item['qty']
-        except Exception:
-            subtotal = 0
+    for line_key, item in cart.items():
+        subtotal = line_subtotal(item)
         total += subtotal
-        items.append({**item, 'id': pid, 'subtotal': subtotal})
+        items.append({**item, 'id': line_key, 'subtotal': subtotal})
 
-    saved_items = [{**item, 'id': pid} for pid, item in saved.items()]
+    saved_items = [{**item, 'id': key} for key, item in saved.items()]
 
-    # Recommendations — exclude items already in cart/saved
-    saved_ids = set(saved.keys())
-    excluded = cart_product_ids | saved_ids
-    all_products = list(Product.objects.filter(is_available=True).exclude(
-        id__in=[int(i) for i in excluded if i.isdigit()]
-    ))
+    # Recommendations — exclude products already in cart/saved (weighted
+    # lines have a composite key like "14_1.50", so pull the real
+    # product id back out via parse_line_key before excluding).
+    excluded_ids = set()
+    for key in list(cart.keys()) + list(saved.keys()):
+        pid, _weight = parse_line_key(key)
+        if pid.isdigit():
+            excluded_ids.add(int(pid))
+    all_products = list(Product.objects.filter(is_available=True).exclude(id__in=excluded_ids))
     recommended_products = random.sample(all_products, min(6, len(all_products)))
 
     return render(request, 'cart.html', {
@@ -411,15 +507,12 @@ def checkout(request):
     items = []
     subtotal = 0
     has_offer_items = False
-    for pid, item in cart.items():
-        try:
-            item_subtotal = float(item['price']) * item['qty']
-        except Exception:
-            item_subtotal = 0
+    for line_key, item in cart.items():
+        item_subtotal = line_subtotal(item)
         subtotal += item_subtotal
         if item.get('is_offer'):
             has_offer_items = True
-        items.append({**item, 'id': pid, 'subtotal': item_subtotal})
+        items.append({**item, 'id': line_key, 'subtotal': item_subtotal})
 
     # ── Coupon handling ──────────────────────────────────────
     # Coupon can arrive via ?coupon=CODE (Apply button) or the hidden
@@ -452,7 +545,10 @@ def checkout(request):
         address = request.POST.get('address', '').strip()
         message = request.POST.get('message', '').strip()
 
-        product_list = ', '.join([f"{i['name']} x{i['qty']}" for i in items])
+        product_list = ', '.join([
+            f"{i['name']} ({i['weight']}kg) x{i['qty']}" if i.get('weight') else f"{i['name']} x{i['qty']}"
+            for i in items
+        ])
         if coupon_applied:
             product_list += f" | Coupon: {coupon_code} (-Rs.{discount_amount:.0f})"
 
@@ -485,7 +581,11 @@ def checkout(request):
         initial['email'] = request.user.email
 
     # Simple recommendations: products not already in the cart
-    cart_ids = [int(pid) for pid in cart.keys()]
+    cart_ids = set()
+    for key in cart.keys():
+        pid, _weight = parse_line_key(key)
+        if pid.isdigit():
+            cart_ids.add(int(pid))
     recommended_products = Product.objects.exclude(id__in=cart_ids).order_by('?')[:8]
 
     return render(request, 'checkout.html', {
@@ -542,7 +642,13 @@ def shop(request):
             subs.append({'obj': sub, 'count': get_count(sub), 'children': subsubs})
         cat_tree.append({'obj': cat, 'count': get_count(cat), 'children': subs})
 
-    saved_ids = list(get_saved(request).keys())
+    # Underlying product ids only (composite weight keys like "14_1.50"
+    # would never match `product.id in saved_ids` on the shop template).
+    saved_ids = []
+    for key in get_saved(request).keys():
+        pid, _weight = parse_line_key(key)
+        if pid.isdigit():
+            saved_ids.append(int(pid))
 
     # Check for active offers
     from django.utils import timezone
@@ -645,19 +751,23 @@ def add_to_cart_offer(request, product_id):
     from .models import Product
     product = get_object_or_404(Product, id=product_id)
     cart = get_cart(request)
-    pid = str(product_id)
+
+    weighted = is_weighted_product(product)
+    weight_str = format_weight(request.POST.get('weight', '1')) if weighted else None
+    line_key = make_line_key(product_id, weight_str)
 
     offer_price = request.POST.get('offer_price', None)
     price_to_use = offer_price if offer_price else str(product.price)
 
-    if pid in cart:
-        cart[pid]['qty'] += 1
-        if offer_price and float(offer_price) < float(cart[pid]['price']):
-            cart[pid]['price'] = price_to_use
-            cart[pid]['original_price'] = str(product.price)
-            cart[pid]['is_offer'] = True
+    if line_key in cart:
+        cart[line_key]['qty'] += 1
+        if offer_price and float(offer_price) < float(cart[line_key]['price']):
+            cart[line_key]['price'] = price_to_use
+            cart[line_key]['original_price'] = str(product.price)
+            cart[line_key]['is_offer'] = True
     else:
-        cart[pid] = {
+        cart[line_key] = {
+            'product_id': product_id,
             'name': product.name,
             'price': price_to_use,
             'original_price': str(product.price),
@@ -665,6 +775,7 @@ def add_to_cart_offer(request, product_id):
             'image': product.main_image,
             'slug': product.slug,
             'qty': 1,
+            'weight': weight_str,
             'is_offer': bool(offer_price),
         }
     save_cart(request, cart)
