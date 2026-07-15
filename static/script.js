@@ -504,6 +504,24 @@ document.addEventListener('DOMContentLoaded', () => {
             offset: 60,
             disableMutationObserver: false,
         });
+
+        // AOS calculates each element's trigger position once, at init.
+        // This page has many loading="lazy" images (produce cards,
+        // gallery, about section, etc.) that finish loading afterward
+        // and shift the page's layout/height — which silently makes
+        // AOS's cached positions wrong for everything below wherever
+        // the shift happened, so those elements never get their
+        // "aos-animate" class and stay stuck at their pre-animation
+        // offset forever. Re-running AOS.refresh() after images finish
+        // loading fixes this by re-measuring the real, final layout.
+        window.addEventListener('load', () => {
+            AOS.refresh();
+            // A couple of follow-up refreshes catch any lazy images
+            // that were still below the fold (and hadn't started
+            // loading yet) at the moment the 'load' event fired.
+            setTimeout(() => AOS.refresh(), 1000);
+            setTimeout(() => AOS.refresh(), 2500);
+        });
     }
 
     // Force contact form visible after AOS init
