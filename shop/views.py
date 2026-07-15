@@ -214,14 +214,19 @@ def is_weighted_product(product):
     return 'kg' in (product.price_unit or '').lower()
 
 def format_weight(raw):
-    """Normalize any incoming weight value to a 2-decimal string, e.g.
-    '1', '1.5', '2.50' -> '1.00', '1.50', '2.50'. Falls back to 1.00 kg
-    on bad input so a cart line is never silently dropped."""
+    """Normalize any incoming weight value to a 2-decimal string, rounded
+    to the nearest 0.5 kg (500g increments only — 1.1 or 2.7 aren't valid
+    pack sizes here). Falls back to 1.00 kg on bad input so a cart line
+    is never silently dropped."""
     from decimal import Decimal, InvalidOperation
     try:
         weight = Decimal(str(raw))
         if weight <= 0:
             weight = Decimal('1')
+        # Round to the nearest 0.5
+        weight = (weight * 2).to_integral_value(rounding='ROUND_HALF_UP') / 2
+        if weight <= 0:
+            weight = Decimal('0.5')
         return f"{weight:.2f}"
     except (InvalidOperation, TypeError, ValueError):
         return '1.00'
