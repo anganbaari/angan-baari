@@ -351,7 +351,8 @@ def add_to_cart(request, product_id):
         })
     return redirect(request.META.get('HTTP_REFERER', '/shop/'))
 
-def remove_from_cart(request, line_key):
+def remove_from_cart(request, key):
+    line_key = key
     cart = get_cart(request)
     if line_key in cart:
         del cart[line_key]
@@ -365,7 +366,8 @@ def remove_from_cart(request, line_key):
         })
     return redirect('cart')
 
-def update_cart(request, line_key):
+def update_cart(request, key):
+    line_key = key
     cart = get_cart(request)
     try:
         qty = int(request.POST.get('qty', 1))
