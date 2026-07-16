@@ -338,6 +338,12 @@
         .p-price { font-size: 1rem; font-weight: 700; color: #c0392b; margin-bottom: 1px; }
         .p-price-unit { font-size: 0.7rem; color: #8a9e8e; margin-bottom: 8px; }
         .p-price-tbd { font-size: 0.76rem; color: #8a9e8e; font-style: italic; margin-bottom: 8px; }
+        .card-variant-select {
+            width: 100%; font-family: 'DM Sans', sans-serif; font-size: 0.76rem; font-weight: 600;
+            color: #2d4a32; background: #f4f1ea; border: 1px solid #e4e0d6; border-radius: 8px;
+            padding: 6px 8px; margin-bottom: 8px; cursor: pointer;
+        }
+        .card-variant-select:focus { outline: none; border-color: #8fa88a; }
         .p-organic-badge {
             display: inline-flex;
             align-items: center;
@@ -947,6 +953,13 @@
                         <div class="p-price-tbd">Price on request</div>
                         {% endif %}
                         <span class="p-organic-badge"><i class="fas fa-leaf"></i> Organic</span>
+                        {% if product.pricing_mode == "fixed_weight" and product.variant_count > 1 %}
+                        <select class="card-variant-select" onclick="event.stopPropagation()" data-product-id="{{ product.id }}">
+                            {% for v in product.available_variants %}
+                            <option value="{{ v.id }}">{{ v.weight|floatformat:2 }} kg — Rs. {{ v.total_price|floatformat:0 }}{% if v.label %} ({{ v.label }}){% endif %}</option>
+                            {% endfor %}
+                        </select>
+                        {% endif %}
                         <div class="p-card-actions" onclick="event.stopPropagation()">
                             <a href="{% url 'product_detail' product.slug %}" class="btn-detail">
                                 <i class="fas fa-eye"></i> View
@@ -1059,13 +1072,15 @@
             const match = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
             return match ? decodeURIComponent(match[2]) : null;
         }
-        function postJSON(url) {
+        function postJSON(url, params) {
             return fetch(url, {
                 method: 'POST',
                 headers: {
                     'X-Requested-With': 'XMLHttpRequest',
                     'X-CSRFToken': getCookie('csrftoken'),
+                    'Content-Type': 'application/x-www-form-urlencoded',
                 },
+                body: params ? new URLSearchParams(params) : null,
             }).then(res => res.json());
         }
 
@@ -1095,7 +1110,10 @@
                 if (btn.disabled) return;
                 btn.disabled = true;
                 const originalHTML = btn.innerHTML;
-                postJSON(btn.dataset.url)
+                const card = btn.closest('.p-card');
+                const variantSelect = card ? card.querySelector('.card-variant-select') : null;
+                const params = variantSelect ? { variant_id: variantSelect.value } : null;
+                postJSON(btn.dataset.url, params)
                     .then(data => {
                         updateCartBadges(data.count);
                         btn.innerHTML = '<i class="fas fa-check"></i> Added';
