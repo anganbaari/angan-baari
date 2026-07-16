@@ -67,20 +67,13 @@ class Product(models.Model):
     )
     fixed_weight = models.DecimalField(
         max_digits=6, decimal_places=2, null=True, blank=True,
-        help_text='Only used for "Fixed weight" products. The actual weight of THIS specific '
-                   'animal/item in kg, e.g. 20 for a 20kg goat. Total price = price (per kg) x this weight, '
-                   'and the customer cannot change it.'
+        help_text='FALLBACK ONLY — used if you add no weight rows below. Once you add at least one '
+                   'row in "Weight variants", that takes over and this field is ignored.'
     )
     weight_unit_label = models.CharField(
         max_length=20, default='kg',
         help_text='Unit shown next to the weight/quantity stepper for "Variable weight" products, '
                    'e.g. "kg" for fruit, "dozen" for banana. The price field is always per ONE of this unit.'
-    )
-    variant_group = models.CharField(
-        max_length=100, blank=True,
-        help_text='Only used for "Fixed weight" products (goat, chicken). Give all size listings of '
-                   'the same animal the exact same text here (e.g. "goat", "chicken") to group them '
-                   'together as one card with a size-picker, instead of separate cards.'
     )
 
     def __str__(self):
@@ -99,8 +92,12 @@ class Product(models.Model):
     def is_fixed_weight(self):
         return self.pricing_mode == 'fixed_weight'
 
+    def available_variants(self):
+        return [v for v in self.variants.all() if v.is_available]
+
     def locked_total_price(self):
-        """For fixed-weight products only: the locked total price (rate x actual weight)."""
+        """For fixed-weight products with NO variant rows added (fallback only):
+        the locked total price (rate x product.fixed_weight)."""
         from decimal import Decimal
         if self.pricing_mode == 'fixed_weight' and self.fixed_weight:
             return round(Decimal(str(self.price)) * Decimal(str(self.fixed_weight)), 2)
@@ -126,6 +123,37 @@ class Product(models.Model):
         if unit.lower() == 'kg' and step < 1:
             return f"{int(round(step * 1000))}g"
         return f"{step:g} {unit}"
+
+
+class ProductVariant(models.Model):
+    """One specific weight listing under a 'Fixed weight' product — e.g. one
+    particular goat or chicken currently available. Lets you keep ONE Product
+    record (name, photos, description, category) and just add or remove
+    weight rows here as new animals become available or sell out, instead of
+    creating a brand new product every time."""
+
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='variants')
+    weight = models.DecimalField(max_digits=6, decimal_places=2, help_text='Actual weight of this specific animal in kg, e.g. 20')
+    price_override = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True,
+        help_text='Leave blank to auto-calculate as product.price x weight. '
+                   'Only set this if THIS particular animal is priced differently than the usual per-kg rate.'
+    )
+    label = models.CharField(max_length=100, blank=True, help_text='Optional note, e.g. "Male, ~1 year old"')
+    is_available = models.BooleanField(default=True, help_text='Uncheck once this specific animal is sold, instead of deleting the row.')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['weight']
+
+    def __str__(self):
+        return f"{self.product.name} — {self.weight}kg"
+
+    def total_price(self):
+        from decimal import Decimal
+        if self.price_override is not None:
+            return self.price_override
+        return round(Decimal(str(self.product.price)) * Decimal(str(self.weight)), 2)
 
 
 class NewsletterSubscriber(models.Model):

@@ -860,24 +860,27 @@
                         <span class="price-current">From Rs. {{ product.starting_price|floatformat:0 }}</span>
                         <span class="price-unit">per {{ product.starting_weight_label }} (Rs. {{ product.price|floatformat:0 }}/{{ product.weight_unit_label }})</span>
                     {% elif product.pricing_mode == "fixed_weight" %}
-                        <span class="price-current">Rs. {{ product.locked_total_price|floatformat:0 }}</span>
-                        <span class="price-unit">{{ product.fixed_weight|floatformat:2 }} kg, fixed price</span>
+                        <span class="price-current" id="fixedPriceDisplay">Rs. {% if variants %}{{ variants.0.total_price|floatformat:0 }}{% else %}{{ product.locked_total_price|floatformat:0 }}{% endif %}</span>
+                        <span class="price-unit" id="fixedWeightDisplay">{% if variants %}{{ variants.0.weight|floatformat:2 }}{% else %}{{ product.fixed_weight|floatformat:2 }}{% endif %} kg, fixed price</span>
                     {% else %}
                         <span class="price-current">Rs. {{ product.price|floatformat:0 }}</span>
                         {% if product.price_unit %}<span class="price-unit">{{ product.price_unit }}</span>{% endif %}
                     {% endif %}
                 </div>
 
-                {% if sibling_variants %}
-                <div class="size-picker">
-                    <span class="size-picker-label">Choose a size</span>
+                {% if variants %}
+                <div class="size-picker" id="sizePicker">
+                    <span class="size-picker-label">Choose this animal's weight</span>
                     <div class="size-picker-pills">
-                        {% for variant in sibling_variants %}
-                        <a href="{% url 'product_detail' variant.slug %}"
-                           class="size-pill {% if variant.id == product.id %}active{% endif %}">
-                            {{ variant.fixed_weight|floatformat:2 }} kg
-                            <span class="size-pill-price">Rs. {{ variant.locked_total_price|floatformat:0 }}</span>
-                        </a>
+                        {% for variant in variants %}
+                        <button type="button" class="size-pill {% if forloop.first %}active{% endif %}"
+                                data-variant-id="{{ variant.id }}"
+                                data-weight="{{ variant.weight|floatformat:2 }}"
+                                data-price="{{ variant.total_price|floatformat:0 }}"
+                                onclick="selectVariant(this)">
+                            {{ variant.weight|floatformat:2 }} kg{% if variant.label %} <small>({{ variant.label }})</small>{% endif %}
+                            <span class="size-pill-price">Rs. {{ variant.total_price|floatformat:0 }}</span>
+                        </button>
                         {% endfor %}
                     </div>
                 </div>
@@ -921,7 +924,7 @@
                     </div>
                     {% elif product.pricing_mode == "fixed_weight" %}
                     <div class="qty-row">
-                        <span class="qty-label"><i class="fas fa-lock"></i> {{ product.fixed_weight|floatformat:2 }} kg — Rs. {{ product.locked_total_price|floatformat:0 }} total</span>
+                        <span class="qty-label"><i class="fas fa-lock"></i> Weight & price are fixed per animal{% if variants %} — pick a size above{% endif %}</span>
                     </div>
                     {% else %}
                     <div class="qty-row">
@@ -941,6 +944,8 @@
                         {% csrf_token %}
                         {% if product.pricing_mode == "variable_weight" %}
                         <input type="hidden" name="weight" id="cartWeightField" value="{{ product.weight_step|floatformat:2 }}">
+                        {% elif product.pricing_mode == "fixed_weight" %}
+                        <input type="hidden" name="variant_id" id="cartVariantField" value="{{ variants.0.id|default:'' }}">
                         {% else %}
                         <input type="hidden" name="quantity" id="cartQtyField" value="1">
                         {% endif %}
@@ -1152,8 +1157,8 @@
             <span class="cur">From Rs. {{ product.starting_price|floatformat:0 }}</span>
             <span class="unit">per {{ product.starting_weight_label }}</span>
             {% elif product.pricing_mode == "fixed_weight" %}
-            <span class="cur">Rs. {{ product.locked_total_price|floatformat:0 }}</span>
-            <span class="unit">{{ product.fixed_weight|floatformat:2 }} kg, fixed</span>
+            <span class="cur" id="stickyFixedPrice">Rs. {% if variants %}{{ variants.0.total_price|floatformat:0 }}{% else %}{{ product.locked_total_price|floatformat:0 }}{% endif %}</span>
+            <span class="unit" id="stickyFixedWeight">{% if variants %}{{ variants.0.weight|floatformat:2 }}{% else %}{{ product.fixed_weight|floatformat:2 }}{% endif %} kg, fixed</span>
             {% else %}
             <span class="cur">Rs. {{ product.price|floatformat:0 }}</span>
             <span class="unit">{{ product.price_unit }}</span>
@@ -1402,6 +1407,25 @@
             val = Math.round(val / PRODUCT_WEIGHT_STEP) * PRODUCT_WEIGHT_STEP;
             input.value = val.toFixed(2);
             if (cartField) cartField.value = val.toFixed(2);
+        }
+
+        /* ---------------- Size picker (fixed_weight products, e.g. goat/chicken) ---------------- */
+        function selectVariant(btn) {
+            document.querySelectorAll('.size-pill').forEach(p => p.classList.remove('active'));
+            btn.classList.add('active');
+
+            const variantField = document.getElementById('cartVariantField');
+            if (variantField) variantField.value = btn.dataset.variantId;
+
+            const priceEl = document.getElementById('fixedPriceDisplay');
+            const weightEl = document.getElementById('fixedWeightDisplay');
+            if (priceEl) priceEl.textContent = 'Rs. ' + btn.dataset.price;
+            if (weightEl) weightEl.textContent = btn.dataset.weight + ' kg, fixed price';
+
+            const stickyPrice = document.getElementById('stickyFixedPrice');
+            const stickyWeight = document.getElementById('stickyFixedWeight');
+            if (stickyPrice) stickyPrice.textContent = 'Rs. ' + btn.dataset.price;
+            if (stickyWeight) stickyWeight.textContent = btn.dataset.weight + ' kg, fixed';
         }
 
         /* ---------------- Wishlist (client-side placeholder) ----------------

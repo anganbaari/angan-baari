@@ -3,6 +3,10 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
 
+    # If you already ran the PREVIOUS version of this same-named file (the one
+    # with variant_group), delete this migration file, run:
+    #   python manage.py migrate shop 0011
+    # to unapply it first, then drop this corrected version in and migrate again.
     dependencies = [
         ('shop', '0011_product_pricing_mode'),
     ]
@@ -18,15 +22,16 @@ class Migration(migrations.Migration):
                 max_length=20,
             ),
         ),
-        migrations.AddField(
+        migrations.AlterField(
             model_name='product',
-            name='variant_group',
-            field=models.CharField(
+            name='fixed_weight',
+            field=models.DecimalField(
                 blank=True,
-                help_text='Only used for "Fixed weight" products (goat, chicken). Give all size listings of '
-                           'the same animal the exact same text here (e.g. "goat", "chicken") to group them '
-                           'together as one card with a size-picker, instead of separate cards.',
-                max_length=100,
+                decimal_places=2,
+                help_text='FALLBACK ONLY — used if you add no weight rows below. Once you add at least one '
+                           'row in "Weight variants", that takes over and this field is ignored.',
+                max_digits=6,
+                null=True,
             ),
         ),
     ]

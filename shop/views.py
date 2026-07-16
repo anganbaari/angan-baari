@@ -166,15 +166,9 @@ def product_detail(request, slug):
     review_count = reviews.count()
     avg_rating = round(sum(r.rating for r in reviews) / review_count, 1) if review_count else None
 
-    sibling_variants = []
-    if product.pricing_mode == 'fixed_weight' and product.variant_group:
-        sibling_variants = list(
-            Product.objects.filter(
-                variant_group=product.variant_group,
-                pricing_mode='fixed_weight',
-                is_available=True,
-            ).order_by('fixed_weight')
-        )
+    variants = []
+    if product.pricing_mode == 'fixed_weight':
+        variants = product.variants.filter(is_available=True).order_by('weight')
 
     return render(request, 'product_detail.html', {
         'product': product,
@@ -183,7 +177,7 @@ def product_detail(request, slug):
         'review_count': review_count,
         'avg_rating': avg_rating,
         'ratings': Review.RATING_CHOICES,
-        'sibling_variants': sibling_variants,
+        'variants': variants,
     })
 
 def submit_review(request, slug):
@@ -251,19 +245,44 @@ def format_weight(raw, step='0.50'):
 def resolve_cart_line(request, product):
     """Given the POST data and a product, figure out how this add-to-cart
     should behave based on the product's pricing_mode. Returns
-    (line_key, weight_str, qty_to_add)."""
+    (line_key, weight_str, qty_to_add, fixed_total_price).
+    fixed_total_price is only set (not None) for fixed_weight products —
+    it's the locked total for the SPECIFIC animal/variant chosen, already
+    computed, so the cart never has to multiply price x weight for these."""
     mode = product.pricing_mode
 
     if mode == 'variable_weight':
         step = product.weight_step or '0.50'
         weight_str = format_weight(request.POST.get('weight', step), step)
         line_key = make_line_key(product.id, weight_str)
-        return line_key, weight_str, 1
+        return line_key, weight_str, 1, None
 
     if mode == 'fixed_weight':
-        weight_str = format_weight(product.fixed_weight, '0.01') if product.fixed_weight else None
-        line_key = make_line_key(product.id, weight_str)
-        return line_key, weight_str, 1
+        variant = None
+        variant_id = request.POST.get('variant_id')
+        if variant_id:
+            variant = product.variants.filter(id=variant_id, is_available=True).first()
+        if not variant:
+            # No variant chosen (e.g. one-click add from the shop grid) —
+            # default to the cheapest available size.
+            variant = sorted(product.available_variants(), key=lambda v: v.total_price())[:1]
+            variant = variant[0] if variant else None
+
+        if variant:
+            weight_str = f"{variant.weight:.2f}"
+            fixed_total = variant.total_price()
+            line_key = f"{product.id}_v{variant.id}"
+        elif product.fixed_weight:
+            # Fallback for a fixed_weight product with no variant rows added yet.
+            from decimal import Decimal
+            weight_str = f"{Decimal(str(product.fixed_weight)):.2f}"
+            fixed_total = round(Decimal(str(product.price)) * Decimal(str(product.fixed_weight)), 2)
+            line_key = make_line_key(product.id, weight_str)
+        else:
+            weight_str = None
+            fixed_total = product.price
+            line_key = make_line_key(product.id, None)
+        return line_key, weight_str, 1, fixed_total
 
     # fixed_quantity (also the safe default for legacy/unset products)
     try:
@@ -271,7 +290,7 @@ def resolve_cart_line(request, product):
     except (TypeError, ValueError):
         qty_to_add = 1
     line_key = make_line_key(product.id, None)
-    return line_key, None, qty_to_add
+    return line_key, None, qty_to_add, None
 
 def make_line_key(product_id, weight_str):
     """Weighted lines get a composite key so the same product at two
@@ -294,6 +313,10 @@ def line_subtotal(item):
             return 0
         price = float(item.get('price', 0) or 0)
         qty = int(item.get('qty', 0) or 0)
+        if item.get('pricing_mode') == 'fixed_weight':
+            # price is already the locked TOTAL for this specific animal —
+            # weight here is informational only, not a multiplier.
+            return price * qty
         weight = float(item['weight']) if item.get('weight') else 1
         return price * qty * weight
     except (KeyError, TypeError, ValueError):
@@ -328,8 +351,9 @@ def add_to_cart(request, product_id):
     product = get_object_or_404(Product, id=product_id)
     cart = get_cart(request)
 
-    line_key, weight_str, qty_to_add = resolve_cart_line(request, product)
+    line_key, weight_str, qty_to_add, fixed_total = resolve_cart_line(request, product)
     mode = product.pricing_mode
+    price_to_store = str(fixed_total) if fixed_total is not None else str(product.price)
 
     if line_key in cart:
         # Fixed-weight items are a single unique animal/listing — clicking
@@ -340,8 +364,8 @@ def add_to_cart(request, product_id):
         cart[line_key] = {
             'product_id': product_id,
             'name': product.name,
-            'price': str(product.price),
-            'price_unit': product.price_unit,
+            'price': price_to_store,
+            'price_unit': '(fixed price)' if mode == 'fixed_weight' else product.price_unit,
             'image': product.main_image,
             'slug': product.slug,
             'qty': 1 if mode == 'fixed_weight' else qty_to_add,
@@ -773,32 +797,23 @@ def shop(request):
         is_active=True, start_date__lte=now, end_date__gte=now
     ).exists()
 
-    # Fixed-weight products (goat/chicken) sharing the same variant_group
-    # should appear as ONE card with a size-picker, not one card per animal.
-    # Products with no variant_group (or any other pricing_mode) pass through untouched.
-    display_products = []
-    seen_groups = set()
+    # For fixed-weight products (goat/chicken), each Product can now have
+    # several weight rows (ProductVariant) instead of needing a separate
+    # Product per size. Attach a price range computed from those rows so the
+    # shop card can show "Rs. 9,750–13,000 · 2 sizes available".
+    products = products.prefetch_related('variants')
     for p in products:
-        if p.pricing_mode == 'fixed_weight' and p.variant_group:
-            if p.variant_group in seen_groups:
-                continue
-            seen_groups.add(p.variant_group)
-            siblings = list(
-                products.filter(variant_group=p.variant_group, pricing_mode='fixed_weight')
-                         .order_by('fixed_weight')
-            )
-            representative = siblings[0]
-            prices = [s.locked_total_price() for s in siblings if s.locked_total_price()]
-            representative.variant_count = len(siblings)
-            representative.price_range_low = min(prices) if prices else representative.price
-            representative.price_range_high = max(prices) if prices else representative.price
-            display_products.append(representative)
-        else:
-            p.variant_count = 0
-            display_products.append(p)
+        p.variant_count = 0
+        if p.pricing_mode == 'fixed_weight':
+            avail = p.available_variants()
+            if avail:
+                prices = [v.total_price() for v in avail]
+                p.variant_count = len(avail)
+                p.price_range_low = min(prices)
+                p.price_range_high = max(prices)
 
     return render(request, 'shop.html', {
-        'products': display_products,
+        'products': products,
         'cat_tree': cat_tree,
         'selected_category': selected_category,
         'total_count': Product.objects.count(),
@@ -892,11 +907,12 @@ def add_to_cart_offer(request, product_id):
     product = get_object_or_404(Product, id=product_id)
     cart = get_cart(request)
 
-    line_key, weight_str, qty_to_add = resolve_cart_line(request, product)
+    line_key, weight_str, qty_to_add, fixed_total = resolve_cart_line(request, product)
     mode = product.pricing_mode
+    base_price = str(fixed_total) if fixed_total is not None else str(product.price)
 
     offer_price = request.POST.get('offer_price', None)
-    price_to_use = offer_price if offer_price else str(product.price)
+    price_to_use = offer_price if offer_price else base_price
 
     if line_key in cart:
         if mode != 'fixed_weight':
@@ -904,7 +920,7 @@ def add_to_cart_offer(request, product_id):
         try:
             if offer_price and float(offer_price) < float(cart[line_key].get('price', 0) or 0):
                 cart[line_key]['price'] = price_to_use
-                cart[line_key]['original_price'] = str(product.price)
+                cart[line_key]['original_price'] = base_price
                 cart[line_key]['is_offer'] = True
         except (TypeError, ValueError):
             pass
@@ -913,8 +929,8 @@ def add_to_cart_offer(request, product_id):
             'product_id': product_id,
             'name': product.name,
             'price': price_to_use,
-            'original_price': str(product.price),
-            'price_unit': product.price_unit,
+            'original_price': base_price,
+            'price_unit': '(fixed price)' if mode == 'fixed_weight' else product.price_unit,
             'image': product.main_image,
             'slug': product.slug,
             'qty': 1 if mode == 'fixed_weight' else qty_to_add,

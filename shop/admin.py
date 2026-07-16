@@ -1,6 +1,6 @@
 from django.contrib import admin
 from .models import ContactMessage, ProductOrder, NewsletterSubscriber, Product, Review, Category
-from .models import Offer, Coupon, BundleItem
+from .models import Offer, Coupon, BundleItem, ProductVariant
 
 
 @admin.register(Category)
@@ -16,29 +16,37 @@ class CategoryAdmin(admin.ModelAdmin):
     product_count.short_description = '# Products'
 
 
+class ProductVariantInline(admin.TabularInline):
+    model = ProductVariant
+    extra = 1
+    fields = ['weight', 'price_override', 'label', 'is_available']
+
+
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
-    list_display = ['name', 'category', 'price', 'price_unit', 'pricing_mode', 'weight_step', 'fixed_weight', 'is_available', 'season']
+    list_display = ['name', 'category', 'price', 'price_unit', 'pricing_mode', 'weight_step', 'is_available', 'season']
     list_filter = ['category', 'is_available', 'pricing_mode']
     list_editable = ['is_available', 'price', 'price_unit']
     prepopulated_fields = {'slug': ('name',)}
     search_fields = ['name']
+    inlines = [ProductVariantInline]
 
     fieldsets = (
         (None, {
             'fields': ('name', 'slug', 'category', 'description', 'detail_description')
         }),
         ('Pricing & cart behaviour', {
-            'fields': ('price', 'price_unit', 'pricing_mode', 'weight_step', 'fixed_weight'),
+            'fields': ('price', 'price_unit', 'pricing_mode', 'weight_step', 'weight_unit_label', 'fixed_weight'),
             'description': (
                 'pricing_mode controls how this product behaves in the cart: '
-                '<b>Variable weight</b> — customer picks the weight in steps of "weight_step" '
-                '(e.g. 0.50 for fruit, 0.25 for pickle jars). Leave fixed_weight blank. '
-                '<b>Fixed quantity</b> — plain quantity stepper, no weight (banana/dozen, jars). '
-                'Leave weight_step and fixed_weight as-is, they\'re ignored. '
-                '<b>Fixed weight</b> — one specific animal (goat/chicken): set fixed_weight to its '
-                'actual weight in kg, price stays the per-kg rate, and the total is locked '
-                'automatically. weight_step is ignored for this mode.'
+                '<b>Variable weight</b> — customer picks the amount in steps of "weight_step", labeled '
+                'with "weight_unit_label" (e.g. 0.50 "kg" for fruit, 0.25 "kg" for pickle jars, 0.5 "dozen" for banana). '
+                '<b>Fixed quantity</b> — plain quantity stepper, no weight (jars, eggs by piece). '
+                'weight_step/weight_unit_label/fixed_weight are all ignored for this mode. '
+                '<b>Fixed weight</b> — one specific animal (goat/chicken): scroll down to '
+                '"Weight variants" below and add a row for each size/animal currently available '
+                '(e.g. 15kg, 20kg) — no need to create a new product for each one. The old '
+                '"fixed_weight" field above is only used as a fallback if you add NO rows below.'
             ),
         }),
         ('Images & details', {
