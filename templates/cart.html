@@ -59,18 +59,17 @@
         .qty-btn:disabled { opacity: 0.5; cursor: default; }
         .qty-num { font-weight: 700; color: var(--forest); min-width: 26px; text-align: center; font-size: 0.9rem; }
 
-        /* ─── Weight selector ─── */
+        /* ─── Weight stepper ─── */
         .weight-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
         .weight-label { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.03em; }
-        .weight-select { font-family: 'DM Sans', sans-serif; font-size: 0.8rem; font-weight: 600; color: var(--forest); background: var(--mist); border: 1px solid transparent; border-radius: 50px; padding: 6px 12px; cursor: pointer; transition: border-color 0.2s; }
-        .weight-select:hover, .weight-select:focus { border-color: var(--sage); outline: none; }
-        .weight-custom-wrap { display: none; align-items: center; gap: 6px; }
-        .weight-custom-wrap.show { display: inline-flex; }
-        .weight-custom-input { width: 62px; font-family: 'DM Sans', sans-serif; font-size: 0.8rem; font-weight: 600; color: var(--forest); background: var(--mist); border: 1px solid transparent; border-radius: 50px; padding: 6px 10px; text-align: center; }
-        .weight-custom-input:focus { border-color: var(--sage); outline: none; }
-        .weight-custom-unit { font-size: 0.72rem; color: var(--text-muted); }
-        .weight-custom-confirm { width: 26px; height: 26px; border-radius: 50%; border: none; background: var(--forest); color: var(--gold); cursor: pointer; font-size: 0.75rem; display: flex; align-items: center; justify-content: center; }
-        .weight-custom-confirm:hover { background: var(--moss); }
+        .weight-stepper { display: inline-flex; align-items: center; background: var(--mist); border-radius: 50px; padding: 3px; gap: 2px; }
+        .weight-step-btn { width: 26px; height: 26px; border-radius: 50%; border: none; background: var(--white); cursor: pointer; font-size: 0.85rem; color: var(--forest); display: flex; align-items: center; justify-content: center; transition: background 0.2s, color 0.2s; }
+        .weight-step-btn:hover { background: var(--forest); color: var(--gold); }
+        .weight-step-btn:disabled { opacity: 0.5; cursor: default; }
+        .weight-num { font-weight: 700; color: var(--forest); min-width: 56px; text-align: center; font-size: 0.82rem; }
+        .weight-locked { font-size: 0.8rem; font-weight: 600; color: var(--forest); background: var(--mist); border-radius: 50px; padding: 6px 12px; display: inline-flex; align-items: center; gap: 6px; }
+        .weight-locked i { font-size: 0.7rem; color: var(--text-muted); }
+        .qty-locked { font-size: 0.8rem; font-weight: 600; color: var(--text-muted); background: var(--mist); border-radius: 50px; padding: 6px 14px; }
 
         .cart-item-actions-row { display: flex; gap: 4px; align-items: center; }
         .icon-action-btn { width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--mist); background: var(--white); color: var(--text-muted); cursor: pointer; font-size: 0.85rem; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
@@ -344,7 +343,7 @@
         <div class="cart-layout" id="cartLayout" style="display:{% if items %}grid{% else %}none{% endif %};">
             <div class="cart-items" id="cartItemsList">
                 {% for item in items %}
-                <div class="cart-item" id="cart-item-{{ item.id }}" data-id="{{ item.id }}" data-price="{{ item.price }}" data-weighted="{% if item.weight %}1{% else %}0{% endif %}" data-weight="{{ item.weight|default:'' }}">
+                <div class="cart-item" id="cart-item-{{ item.id }}" data-id="{{ item.id }}" data-price="{{ item.price }}" data-mode="{{ item.pricing_mode|default:'fixed_quantity' }}" data-weight="{{ item.weight|default:'' }}" data-step="{{ item.weight_step|default:'0.50' }}">
                     <div class="cart-item-img">
                         {% if item.image %}
                         <img src="{% static item.image %}" alt="{{ item.name }}">
@@ -361,29 +360,31 @@
                             <span class="offer-chip">Offer</span>
                             {% endif %}
                         </div>
-                        {% if item.weight %}
+                        {% if item.pricing_mode == "fixed_weight" %}
                         <div class="weight-row">
                             <span class="weight-label">Weight</span>
-                            <select class="weight-select" data-action="weight-select">
-                                <option value="0.50" {% if item.weight == "0.50" %}selected{% endif %}>500 g</option>
-                                <option value="1.00" {% if item.weight == "1.00" %}selected{% endif %}>1 kg</option>
-                                <option value="1.50" {% if item.weight == "1.50" %}selected{% endif %}>1.5 kg</option>
-                                <option value="2.50" {% if item.weight == "2.50" %}selected{% endif %}>2.5 kg</option>
-                                <option value="custom" {% if item.weight != "0.50" and item.weight != "1.00" and item.weight != "1.50" and item.weight != "2.50" %}selected{% endif %}>Custom…</option>
-                            </select>
-                            <div class="weight-custom-wrap {% if item.weight != "0.50" and item.weight != "1.00" and item.weight != "1.50" and item.weight != "2.50" %}show{% endif %}">
-                                <input type="number" class="weight-custom-input" data-action="weight-custom-input" min="0.5" step="0.5" value="{{ item.weight }}">
-                                <span class="weight-custom-unit">kg</span>
-                                <button type="button" class="weight-custom-confirm" data-action="weight-custom-confirm" aria-label="Confirm weight"><i class="fas fa-check"></i></button>
+                            <span class="weight-locked"><i class="fas fa-lock"></i> {{ item.weight }} kg (fixed)</span>
+                        </div>
+                        {% elif item.weight %}
+                        <div class="weight-row">
+                            <span class="weight-label">Weight</span>
+                            <div class="weight-stepper">
+                                <button type="button" class="weight-step-btn" data-action="weight-step" data-dir="-1" aria-label="Decrease weight">−</button>
+                                <span class="weight-num" id="weightnum-{{ item.id }}">{{ item.weight }} kg</span>
+                                <button type="button" class="weight-step-btn" data-action="weight-step" data-dir="1" aria-label="Increase weight">+</button>
                             </div>
                         </div>
                         {% endif %}
                         <div class="cart-item-controls">
+                            {% if item.pricing_mode == "fixed_weight" %}
+                            <span class="qty-locked">Qty: 1</span>
+                            {% else %}
                             <div class="qty-control">
                                 <button type="button" class="qty-btn" data-action="update" data-delta="-1">−</button>
                                 <span class="qty-num" id="qtynum-{{ item.id }}">{{ item.qty }}</span>
                                 <button type="button" class="qty-btn" data-action="update" data-delta="1">+</button>
                             </div>
+                            {% endif %}
                             <div class="cart-item-actions-row">
                                 <button type="button" class="icon-action-btn save" data-action="save" aria-label="Save for later"><i class="far fa-heart"></i></button>
                                 <button type="button" class="icon-action-btn remove" data-action="remove" aria-label="Remove item"><i class="fas fa-trash"></i></button>
@@ -627,31 +628,40 @@
             document.getElementById('savedCount').textContent = savedCount;
         }
 
-        const WEIGHT_PRESETS = ['0.50', '1.00', '1.50', '2.50'];
-
         function lineSubtotal(item) {
             const weight = item.weight ? parseFloat(item.weight) : 1;
             return parseFloat(item.price) * parseFloat(item.qty) * weight;
         }
 
-        function weightRowHTML(weight) {
-            if (!weight) return '';
-            const isPreset = WEIGHT_PRESETS.includes(weight);
-            const opts = [
-                ['0.50', '500 g'], ['1.00', '1 kg'], ['1.50', '1.5 kg'], ['2.50', '2.5 kg'],
-            ].map(([val, label]) => `<option value="${val}" ${weight === val ? 'selected' : ''}>${label}</option>`).join('');
+        function weightRowHTML(item) {
+            if (item.pricing_mode === 'fixed_weight') {
+                return `
+                    <div class="weight-row">
+                        <span class="weight-label">Weight</span>
+                        <span class="weight-locked"><i class="fas fa-lock"></i> ${item.weight} kg (fixed)</span>
+                    </div>`;
+            }
+            if (!item.weight) return '';
             return `
                 <div class="weight-row">
                     <span class="weight-label">Weight</span>
-                    <select class="weight-select" data-action="weight-select">
-                        ${opts}
-                        <option value="custom" ${isPreset ? '' : 'selected'}>Custom…</option>
-                    </select>
-                    <div class="weight-custom-wrap ${isPreset ? '' : 'show'}">
-                        <input type="number" class="weight-custom-input" data-action="weight-custom-input" min="0.5" step="0.5" value="${weight}">
-                        <span class="weight-custom-unit">kg</span>
-                        <button type="button" class="weight-custom-confirm" data-action="weight-custom-confirm" aria-label="Confirm weight"><i class="fas fa-check"></i></button>
+                    <div class="weight-stepper">
+                        <button type="button" class="weight-step-btn" data-action="weight-step" data-dir="-1" aria-label="Decrease weight">−</button>
+                        <span class="weight-num" id="weightnum-${item.id}">${item.weight} kg</span>
+                        <button type="button" class="weight-step-btn" data-action="weight-step" data-dir="1" aria-label="Increase weight">+</button>
                     </div>
+                </div>`;
+        }
+
+        function qtyRowHTML(item) {
+            if (item.pricing_mode === 'fixed_weight') {
+                return `<span class="qty-locked">Qty: 1</span>`;
+            }
+            return `
+                <div class="qty-control">
+                    <button type="button" class="qty-btn" data-action="update" data-delta="-1">−</button>
+                    <span class="qty-num" id="qtynum-${item.id}">${item.qty}</span>
+                    <button type="button" class="qty-btn" data-action="update" data-delta="1">+</button>
                 </div>`;
         }
 
@@ -661,8 +671,9 @@
             wrap.id = 'cart-item-' + item.id;
             wrap.dataset.id = item.id;
             wrap.dataset.price = item.price;
-            wrap.dataset.weighted = item.weight ? '1' : '0';
+            wrap.dataset.mode = item.pricing_mode || 'fixed_quantity';
             wrap.dataset.weight = item.weight || '';
+            wrap.dataset.step = item.weight_step || '0.50';
             const imgHtml = item.image
                 ? `<img src="/static/${item.image}" alt="${item.name}">`
                 : `<div class="img-fallback"><i class="fas fa-seedling"></i></div>`;
@@ -673,13 +684,9 @@
                     <div class="cart-item-price-row">
                         <span class="cart-item-price">Rs. ${item.price}<span class="unit"> ${item.price_unit || ''}</span></span>
                     </div>
-                    ${weightRowHTML(item.weight)}
+                    ${weightRowHTML(item)}
                     <div class="cart-item-controls">
-                        <div class="qty-control">
-                            <button type="button" class="qty-btn" data-action="update" data-delta="-1">−</button>
-                            <span class="qty-num" id="qtynum-${item.id}">${item.qty}</span>
-                            <button type="button" class="qty-btn" data-action="update" data-delta="1">+</button>
-                        </div>
+                        ${qtyRowHTML(item)}
                         <div class="cart-item-actions-row">
                             <button type="button" class="icon-action-btn save" data-action="save" aria-label="Save for later"><i class="far fa-heart"></i></button>
                             <button type="button" class="icon-action-btn remove" data-action="remove" aria-label="Remove item"><i class="fas fa-trash"></i></button>
@@ -756,6 +763,8 @@
                         image: row.querySelector('img')?.getAttribute('src')?.replace('/static/', '') || '',
                         weight: data.weight,
                         qty: data.qty,
+                        pricing_mode: row.dataset.mode,
+                        weight_step: row.dataset.step,
                     };
                     row.replaceWith(buildCartItemNode(item));
                     document.getElementById('summaryRows').appendChild(buildSummaryRow(item));
@@ -784,7 +793,9 @@
                 const id = row.dataset.id;
                 const price = parseFloat(row.dataset.price);
                 const numEl = document.getElementById('qtynum-' + id);
-                const newQty = parseInt(numEl.textContent) + parseInt(btn.dataset.delta);
+                const currentQty = parseInt(numEl.textContent);
+                const delta = parseInt(btn.dataset.delta);
+                const newQty = (isNaN(currentQty) ? 1 : currentQty) + (isNaN(delta) ? 0 : delta);
                 if (newQty < 1) {
                     row.classList.add('is-removing');
                     try {
@@ -902,15 +913,16 @@
                 return;
             }
 
-            // Confirm a custom weight typed into the cart line
-            if (action === 'weight-custom-confirm') {
+            // Weight stepper: increase/decrease by this product's own weight_step
+            // (0.5kg for fruit, 0.25kg for pickle jars, etc. — set per-product in admin).
+            if (action === 'weight-step') {
                 const row = btn.closest('.cart-item');
-                const input = row.querySelector('.weight-custom-input');
-                let val = parseFloat(input.value);
-                if (!val || val <= 0) val = 1;
-                val = Math.round(val * 2) / 2; // snap to nearest 500g
-                input.value = val.toFixed(2);
-                await applyWeightChange(row, val.toFixed(2));
+                const step = parseFloat(row.dataset.step) || 0.5;
+                const current = parseFloat(row.dataset.weight) || step;
+                const dir = parseInt(btn.dataset.dir);
+                let next = current + (dir * step);
+                if (next < step) next = step; // never go below one step
+                await applyWeightChange(row, next.toFixed(2));
                 return;
             }
 
@@ -945,6 +957,8 @@
                         price_unit: btn.dataset.unit, image: btn.dataset.image,
                         weight: data.weight || null,
                         qty: data.qty,
+                        pricing_mode: data.pricing_mode,
+                        weight_step: data.weight_step,
                     };
                     if (existingRow) {
                         existingRow.replaceWith(buildCartItemNode(item));
@@ -975,37 +989,7 @@
             }
         });
 
-        // Weight dropdown: presets apply immediately; "Custom…" reveals
-        // the inline kg input instead of submitting right away.
-        document.addEventListener('change', async function (e) {
-            const select = e.target.closest('select[data-action="weight-select"]');
-            if (!select) return;
-            const row = select.closest('.cart-item');
-            const customWrap = row.querySelector('.weight-custom-wrap');
-            if (select.value === 'custom') {
-                customWrap.classList.add('show');
-                row.querySelector('.weight-custom-input')?.focus();
-                return;
-            }
-            customWrap.classList.remove('show');
-            await applyWeightChange(row, select.value);
-        });
 
-        // Let Enter in the custom-weight box act like clicking the confirm ✓
-        document.addEventListener('keydown', function (e) {
-            if (e.key === 'Enter' && e.target.matches('.weight-custom-input')) {
-                e.preventDefault();
-                e.target.closest('.cart-item')?.querySelector('[data-action="weight-custom-confirm"]')?.click();
-            }
-        });
-
-        // Snap the custom weight input to the nearest 500g as soon as focus leaves it
-        document.addEventListener('blur', function (e) {
-            if (!e.target.matches('.weight-custom-input')) return;
-            let val = parseFloat(e.target.value);
-            if (!val || val <= 0) val = 0.5;
-            e.target.value = (Math.round(val * 2) / 2).toFixed(2);
-        }, true);
 
         // Active bottom-nav state is now rendered server-side (see template),
         // so no JS path-matching is needed here.

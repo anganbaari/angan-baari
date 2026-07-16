@@ -51,12 +51,49 @@ class Product(models.Model):
     price_unit = models.CharField(max_length=50, blank=True, default='per kg')
     created_at = models.DateTimeField(auto_now_add=True)
 
+    PRICING_MODE_CHOICES = [
+        ('variable_weight', 'Variable weight — customer picks the weight (fruits, loose pickle)'),
+        ('fixed_quantity', 'Fixed quantity — sold per piece/dozen/jar, no weight (banana, jars)'),
+        ('fixed_weight', 'Fixed weight, locked price — one specific animal (goat, chicken)'),
+    ]
+    pricing_mode = models.CharField(
+        max_length=20, choices=PRICING_MODE_CHOICES, default='fixed_quantity',
+        help_text='Controls how this product behaves in the cart.'
+    )
+    weight_step = models.DecimalField(
+        max_digits=4, decimal_places=2, default=0.50,
+        help_text='Only used for "Variable weight" products. The increment customers can '
+                   'adjust the weight by, e.g. 0.50 for fruit (500g steps), 0.25 for pickle jars.'
+    )
+    fixed_weight = models.DecimalField(
+        max_digits=6, decimal_places=2, null=True, blank=True,
+        help_text='Only used for "Fixed weight" products. The actual weight of THIS specific '
+                   'animal/item in kg, e.g. 20 for a 20kg goat. Total price = price (per kg) x this weight, '
+                   'and the customer cannot change it.'
+    )
+
     def __str__(self):
         return self.name
 
     def get_absolute_url(self):
         from django.urls import reverse
         return reverse('product_detail', kwargs={'slug': self.slug})
+
+    def is_variable_weight(self):
+        return self.pricing_mode == 'variable_weight'
+
+    def is_fixed_quantity(self):
+        return self.pricing_mode == 'fixed_quantity'
+
+    def is_fixed_weight(self):
+        return self.pricing_mode == 'fixed_weight'
+
+    def locked_total_price(self):
+        """For fixed-weight products only: the locked total price (rate x actual weight)."""
+        from decimal import Decimal
+        if self.pricing_mode == 'fixed_weight' and self.fixed_weight:
+            return round(Decimal(str(self.price)) * Decimal(str(self.fixed_weight)), 2)
+        return self.price
 
 
 class NewsletterSubscriber(models.Model):

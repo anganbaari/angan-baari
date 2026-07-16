@@ -875,21 +875,41 @@
                 </div>
 
                 {% if product.is_available %}
-                <div class="qty-row">
-                    <span class="qty-label">Quantity</span>
-                    <div class="qty-stepper">
-                        <button type="button" onclick="stepQty(-1)" aria-label="Decrease quantity">−</button>
-                        <input type="number" id="qtyInput" value="1" min="1" readonly>
-                        <button type="button" onclick="stepQty(1)" aria-label="Increase quantity">+</button>
+                    {% if product.pricing_mode == "variable_weight" %}
+                    <div class="qty-row">
+                        <span class="qty-label">Weight</span>
+                        <div class="qty-stepper">
+                            <button type="button" onclick="stepWeight(-1)" aria-label="Decrease weight">−</button>
+                            <input type="text" id="weightInput" value="{{ product.weight_step|floatformat:2 }}" readonly>
+                            <button type="button" onclick="stepWeight(1)" aria-label="Increase weight">+</button>
+                        </div>
+                        <span style="font-size:0.8rem; color:var(--text-muted); margin-left:6px;">kg</span>
                     </div>
-                </div>
+                    {% elif product.pricing_mode == "fixed_weight" %}
+                    <div class="qty-row">
+                        <span class="qty-label"><i class="fas fa-lock"></i> {{ product.fixed_weight|floatformat:2 }} kg — Rs. {{ product.locked_total_price|floatformat:0 }} total</span>
+                    </div>
+                    {% else %}
+                    <div class="qty-row">
+                        <span class="qty-label">Quantity</span>
+                        <div class="qty-stepper">
+                            <button type="button" onclick="stepQty(-1)" aria-label="Decrease quantity">−</button>
+                            <input type="number" id="qtyInput" value="1" min="1" readonly>
+                            <button type="button" onclick="stepQty(1)" aria-label="Increase quantity">+</button>
+                        </div>
+                    </div>
+                    {% endif %}
                 {% endif %}
 
                 <div class="order-buttons" id="orderButtons">
                     {% if product.is_available %}
                     <form method="POST" action="{% url 'add_to_cart' product.id %}" style="width:100%;" id="cartForm">
                         {% csrf_token %}
+                        {% if product.pricing_mode == "variable_weight" %}
+                        <input type="hidden" name="weight" id="cartWeightField" value="{{ product.weight_step|floatformat:2 }}">
+                        {% else %}
                         <input type="hidden" name="quantity" id="cartQtyField" value="1">
+                        {% endif %}
                         <button type="submit" class="btn-cart-product">
                             <i class="fas fa-cart-plus"></i> Add to Cart
                         </button>
@@ -1324,6 +1344,19 @@
             let val = Math.max(1, parseInt(input.value || '1', 10) + delta);
             input.value = val;
             if (cartField) cartField.value = val;
+        }
+
+        /* ---------------- Weight stepper (variable_weight products) ---------------- */
+        const PRODUCT_WEIGHT_STEP = {{ product.weight_step|default:"0.50" }};
+        function stepWeight(delta) {
+            const input = document.getElementById('weightInput');
+            const cartField = document.getElementById('cartWeightField');
+            if (!input) return;
+            let val = parseFloat(input.value || PRODUCT_WEIGHT_STEP) + (delta * PRODUCT_WEIGHT_STEP);
+            if (val < PRODUCT_WEIGHT_STEP) val = PRODUCT_WEIGHT_STEP;
+            val = Math.round(val / PRODUCT_WEIGHT_STEP) * PRODUCT_WEIGHT_STEP;
+            input.value = val.toFixed(2);
+            if (cartField) cartField.value = val.toFixed(2);
         }
 
         /* ---------------- Wishlist (client-side placeholder) ----------------

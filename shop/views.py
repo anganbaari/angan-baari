@@ -203,33 +203,63 @@ def save_cart(request, cart):
     request.session.modified = True
 
 
-# ─── WEIGHT HELPERS ─────────────────────────────────────────────
-# Products whose price_unit mentions "kg" are sold by weight: Product.price
-# is treated as the price PER KG, and the customer picks how many kg they
-# want (500g, 1kg, 1.5kg, 2.5kg, or a custom amount). Everything else
-# (price_unit like "per piece", "per bunch", etc.) keeps the old
-# quantity-only behaviour untouched.
+# ─── PRICING MODE HELPERS ────────────────────────────────────────
+# Every product has an explicit pricing_mode set in admin:
+#   variable_weight  -> customer picks the weight, snapped to product.weight_step
+#                        (e.g. 0.50 for fruit, 0.25 for pickle jars). Price = rate x weight.
+#   fixed_quantity   -> plain quantity stepper, no weight at all (banana/dozen, jars).
+#   fixed_weight     -> the product's actual weight is fixed by admin (product.fixed_weight,
+#                        e.g. 20kg goat). Customer cannot change qty or weight — one click
+#                        adds it, price is locked at rate x fixed_weight.
 
-def is_weighted_product(product):
-    return 'kg' in (product.price_unit or '').lower()
-
-def format_weight(raw):
-    """Normalize any incoming weight value to a 2-decimal string, rounded
-    to the nearest 0.5 kg (500g increments only — 1.1 or 2.7 aren't valid
-    pack sizes here). Falls back to 1.00 kg on bad input so a cart line
-    is never silently dropped."""
-    from decimal import Decimal, InvalidOperation
+def format_weight(raw, step='0.50'):
+    """Snap any incoming weight value to the nearest multiple of `step` and
+    return it as a 2-decimal string, e.g. with step=0.50: '1.2' -> '1.00',
+    '1.3' -> '1.50'. Falls back to one step on bad/zero/negative input so a
+    cart line is never silently dropped."""
+    from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+    try:
+        step_dec = Decimal(str(step)) if step else Decimal('0.50')
+        if step_dec <= 0:
+            step_dec = Decimal('0.50')
+    except (InvalidOperation, TypeError, ValueError):
+        step_dec = Decimal('0.50')
     try:
         weight = Decimal(str(raw))
         if weight <= 0:
-            weight = Decimal('1')
-        # Round to the nearest 0.5
-        weight = (weight * 2).to_integral_value(rounding='ROUND_HALF_UP') / 2
-        if weight <= 0:
-            weight = Decimal('0.5')
-        return f"{weight:.2f}"
-    except (InvalidOperation, TypeError, ValueError):
-        return '1.00'
+            weight = step_dec
+        snapped = (weight / step_dec).to_integral_value(rounding=ROUND_HALF_UP) * step_dec
+        if snapped <= 0:
+            snapped = step_dec
+        return f"{snapped:.2f}"
+    except (InvalidOperation, TypeError, ValueError, ZeroDivisionError):
+        return f"{step_dec:.2f}"
+
+
+def resolve_cart_line(request, product):
+    """Given the POST data and a product, figure out how this add-to-cart
+    should behave based on the product's pricing_mode. Returns
+    (line_key, weight_str, qty_to_add)."""
+    mode = product.pricing_mode
+
+    if mode == 'variable_weight':
+        step = product.weight_step or '0.50'
+        weight_str = format_weight(request.POST.get('weight', step), step)
+        line_key = make_line_key(product.id, weight_str)
+        return line_key, weight_str, 1
+
+    if mode == 'fixed_weight':
+        weight_str = format_weight(product.fixed_weight, '0.01') if product.fixed_weight else None
+        line_key = make_line_key(product.id, weight_str)
+        return line_key, weight_str, 1
+
+    # fixed_quantity (also the safe default for legacy/unset products)
+    try:
+        qty_to_add = max(1, int(request.POST.get('quantity', 1)))
+    except (TypeError, ValueError):
+        qty_to_add = 1
+    line_key = make_line_key(product.id, None)
+    return line_key, None, qty_to_add
 
 def make_line_key(product_id, weight_str):
     """Weighted lines get a composite key so the same product at two
@@ -248,8 +278,10 @@ def parse_line_key(line_key):
 
 def line_subtotal(item):
     try:
-        price = float(item['price'])
-        qty = item['qty']
+        if not isinstance(item, dict):
+            return 0
+        price = float(item.get('price', 0) or 0)
+        qty = int(item.get('qty', 0) or 0)
         weight = float(item['weight']) if item.get('weight') else 1
         return price * qty * weight
     except (KeyError, TypeError, ValueError):
@@ -257,8 +289,20 @@ def line_subtotal(item):
 
 
 def cart_count(request):
+    # Defensive: a single malformed/stale session cart line (leftover from
+    # an older cart schema) must never take down cart_count, since it's
+    # called on almost every cart action. Any line that doesn't look right
+    # is just skipped instead of crashing the whole request.
     cart = get_cart(request)
-    return sum(item['qty'] for item in cart.values())
+    total = 0
+    for item in cart.values():
+        if not isinstance(item, dict):
+            continue
+        try:
+            total += int(item.get('qty', 0) or 0)
+        except (TypeError, ValueError):
+            continue
+    return total
 
 def cart_total(request):
     cart = get_cart(request)
@@ -272,12 +316,14 @@ def add_to_cart(request, product_id):
     product = get_object_or_404(Product, id=product_id)
     cart = get_cart(request)
 
-    weighted = is_weighted_product(product)
-    weight_str = format_weight(request.POST.get('weight', '1')) if weighted else None
-    line_key = make_line_key(product_id, weight_str)
+    line_key, weight_str, qty_to_add = resolve_cart_line(request, product)
+    mode = product.pricing_mode
 
     if line_key in cart:
-        cart[line_key]['qty'] += 1
+        # Fixed-weight items are a single unique animal/listing — clicking
+        # "Add to Cart" again on the same one shouldn't stack quantity.
+        if mode != 'fixed_weight':
+            cart[line_key]['qty'] = int(cart[line_key].get('qty', 0) or 0) + qty_to_add
     else:
         cart[line_key] = {
             'product_id': product_id,
@@ -286,8 +332,10 @@ def add_to_cart(request, product_id):
             'price_unit': product.price_unit,
             'image': product.main_image,
             'slug': product.slug,
-            'qty': 1,
+            'qty': 1 if mode == 'fixed_weight' else qty_to_add,
             'weight': weight_str,
+            'pricing_mode': mode,
+            'weight_step': str(product.weight_step) if mode == 'variable_weight' else None,
         }
     save_cart(request, cart)
     if is_ajax(request):
@@ -298,6 +346,8 @@ def add_to_cart(request, product_id):
             'weight': weight_str,
             'qty': cart[line_key]['qty'],
             'subtotal': line_subtotal(cart[line_key]),
+            'pricing_mode': mode,
+            'weight_step': str(product.weight_step) if mode == 'variable_weight' else None,
         })
     return redirect(request.META.get('HTTP_REFERER', '/shop/'))
 
@@ -317,13 +367,25 @@ def remove_from_cart(request, line_key):
 
 def update_cart(request, line_key):
     cart = get_cart(request)
-    qty = int(request.POST.get('qty', 1))
+    try:
+        qty = int(request.POST.get('qty', 1))
+    except (TypeError, ValueError):
+        qty = 1  # malformed input (e.g. stray "NaN") should never 500 the request
+
+    existing = cart.get(line_key)
+    is_locked = isinstance(existing, dict) and existing.get('pricing_mode') == 'fixed_weight'
+
     removed = False
     subtotal = 0
     if qty <= 0:
         if line_key in cart:
             del cart[line_key]
         removed = True
+    elif is_locked:
+        # Fixed-weight lines (goat/chicken) can't have their quantity changed —
+        # only removed entirely (handled by the qty<=0 branch above).
+        subtotal = line_subtotal(existing)
+        qty = existing.get('qty', 1)
     else:
         if line_key in cart:
             cart[line_key]['qty'] = qty
@@ -352,8 +414,21 @@ def update_cart_weight(request, line_key):
         return redirect('cart')
 
     item = cart[line_key]
+    if isinstance(item, dict) and item.get('pricing_mode') == 'fixed_weight':
+        # Weight is locked for these — nothing to do.
+        if is_ajax(request):
+            return JsonResponse({'status': 'error', 'message': 'Weight is fixed for this item'}, status=400)
+        return redirect('cart')
+
+    from .models import Product
     product_id, _old_weight = parse_line_key(line_key)
-    new_weight_str = format_weight(request.POST.get('weight', '1'))
+    step = item.get('weight_step') if isinstance(item, dict) else None
+    if not step:
+        try:
+            step = Product.objects.get(id=product_id).weight_step
+        except Product.DoesNotExist:
+            step = '0.50'
+    new_weight_str = format_weight(request.POST.get('weight', step), step)
     new_line_key = make_line_key(product_id, new_weight_str)
     merged = False
 
@@ -407,6 +482,7 @@ def toggle_save_for_later(request, key):
         del saved[key]
         is_saved = False
     else:
+        existing_cart_item = cart.get(key) if isinstance(cart.get(key), dict) else {}
         if key in cart:
             del cart[key]
             save_cart(request, cart)
@@ -418,6 +494,8 @@ def toggle_save_for_later(request, key):
             'image': product.main_image,
             'slug': product.slug,
             'weight': weight_str,
+            'pricing_mode': existing_cart_item.get('pricing_mode', product.pricing_mode),
+            'weight_step': existing_cart_item.get('weight_step'),
         }
         is_saved = True
 
@@ -440,8 +518,8 @@ def move_to_cart(request, key):
     item_data = None
     if key in saved:
         item = saved.pop(key)
-        if key in cart:
-            cart[key]['qty'] += 1
+        if key in cart and isinstance(cart[key], dict):
+            cart[key]['qty'] = int(cart[key].get('qty', 0) or 0) + 1
         else:
             cart[key] = {**item, 'qty': 1}
         item_data = cart[key]
@@ -475,10 +553,19 @@ def cart_view(request):
 
     items = []
     total = 0
-    for line_key, item in cart.items():
+    cleaned_a_bad_line = False
+    for line_key, item in list(cart.items()):
+        if not isinstance(item, dict):
+            # Stale/corrupted line from an older cart schema — drop it
+            # instead of crashing the whole cart page.
+            del cart[line_key]
+            cleaned_a_bad_line = True
+            continue
         subtotal = line_subtotal(item)
         total += subtotal
         items.append({**item, 'id': line_key, 'subtotal': subtotal})
+    if cleaned_a_bad_line:
+        save_cart(request, cart)
 
     saved_items = [{**item, 'id': key} for key, item in saved.items()]
 
@@ -512,12 +599,19 @@ def checkout(request):
     items = []
     subtotal = 0
     has_offer_items = False
-    for line_key, item in cart.items():
+    cleaned_a_bad_line = False
+    for line_key, item in list(cart.items()):
+        if not isinstance(item, dict):
+            del cart[line_key]
+            cleaned_a_bad_line = True
+            continue
         item_subtotal = line_subtotal(item)
         subtotal += item_subtotal
         if item.get('is_offer'):
             has_offer_items = True
         items.append({**item, 'id': line_key, 'subtotal': item_subtotal})
+    if cleaned_a_bad_line:
+        save_cart(request, cart)
 
     # ── Coupon handling ──────────────────────────────────────
     # Coupon can arrive via ?coupon=CODE (Apply button) or the hidden
@@ -757,19 +851,22 @@ def add_to_cart_offer(request, product_id):
     product = get_object_or_404(Product, id=product_id)
     cart = get_cart(request)
 
-    weighted = is_weighted_product(product)
-    weight_str = format_weight(request.POST.get('weight', '1')) if weighted else None
-    line_key = make_line_key(product_id, weight_str)
+    line_key, weight_str, qty_to_add = resolve_cart_line(request, product)
+    mode = product.pricing_mode
 
     offer_price = request.POST.get('offer_price', None)
     price_to_use = offer_price if offer_price else str(product.price)
 
     if line_key in cart:
-        cart[line_key]['qty'] += 1
-        if offer_price and float(offer_price) < float(cart[line_key]['price']):
-            cart[line_key]['price'] = price_to_use
-            cart[line_key]['original_price'] = str(product.price)
-            cart[line_key]['is_offer'] = True
+        if mode != 'fixed_weight':
+            cart[line_key]['qty'] = int(cart[line_key].get('qty', 0) or 0) + qty_to_add
+        try:
+            if offer_price and float(offer_price) < float(cart[line_key].get('price', 0) or 0):
+                cart[line_key]['price'] = price_to_use
+                cart[line_key]['original_price'] = str(product.price)
+                cart[line_key]['is_offer'] = True
+        except (TypeError, ValueError):
+            pass
     else:
         cart[line_key] = {
             'product_id': product_id,
@@ -779,9 +876,11 @@ def add_to_cart_offer(request, product_id):
             'price_unit': product.price_unit,
             'image': product.main_image,
             'slug': product.slug,
-            'qty': 1,
+            'qty': 1 if mode == 'fixed_weight' else qty_to_add,
             'weight': weight_str,
             'is_offer': bool(offer_price),
+            'pricing_mode': mode,
+            'weight_step': str(product.weight_step) if mode == 'variable_weight' else None,
         }
     save_cart(request, cart)
     return redirect(request.META.get('HTTP_REFERER', '/shop/'))

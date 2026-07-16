@@ -1,5 +1,5 @@
 /* ================================================================
-   THE HIMALAYAN SUSTAINABLE FARM — Premium JavaScript
+   Angan Baari — Premium JavaScript
    Features: Loader, Navbar scroll, Carousel, Lightbox,
              ScrollSpy, AOS init, Animated Counters, Mobile Menu
 ================================================================ */
@@ -1000,6 +1000,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const floatWa    = document.querySelector('.float-wa');
     const hero       = document.getElementById('hero');
     if (!floatShop || !floatWa) return;
+
+    // On mobile, CSS forces both buttons to always be visible (see the
+    // @media (max-width: 768px) block in style.css) — the scroll-reveal
+    // system is a desktop-only nicety, so there's no need to run this
+    // scroll listener on phones at all.
+    const isMobile = window.matchMedia('(max-width: 768px)').matches;
+    if (isMobile) {
+        floatShop.classList.add('visible');
+        floatWa.classList.add('visible');
+        return;
+    }
 
     if (!hero) {
         // No hero on this page — just show them.

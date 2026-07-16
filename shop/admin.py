@@ -18,11 +18,36 @@ class CategoryAdmin(admin.ModelAdmin):
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
-    list_display = ['name', 'category', 'price', 'price_unit', 'is_available', 'season']
-    list_filter = ['category', 'is_available']
+    list_display = ['name', 'category', 'price', 'price_unit', 'pricing_mode', 'weight_step', 'fixed_weight', 'is_available', 'season']
+    list_filter = ['category', 'is_available', 'pricing_mode']
     list_editable = ['is_available', 'price', 'price_unit']
     prepopulated_fields = {'slug': ('name',)}
     search_fields = ['name']
+
+    fieldsets = (
+        (None, {
+            'fields': ('name', 'slug', 'category', 'description', 'detail_description')
+        }),
+        ('Pricing & cart behaviour', {
+            'fields': ('price', 'price_unit', 'pricing_mode', 'weight_step', 'fixed_weight'),
+            'description': (
+                'pricing_mode controls how this product behaves in the cart: '
+                '<b>Variable weight</b> — customer picks the weight in steps of "weight_step" '
+                '(e.g. 0.50 for fruit, 0.25 for pickle jars). Leave fixed_weight blank. '
+                '<b>Fixed quantity</b> — plain quantity stepper, no weight (banana/dozen, jars). '
+                'Leave weight_step and fixed_weight as-is, they\'re ignored. '
+                '<b>Fixed weight</b> — one specific animal (goat/chicken): set fixed_weight to its '
+                'actual weight in kg, price stays the per-kg rate, and the total is locked '
+                'automatically. weight_step is ignored for this mode.'
+            ),
+        }),
+        ('Images & details', {
+            'fields': ('main_image', 'image2', 'image3', 'image4', 'season', 'farming_method', 'whatsapp_message')
+        }),
+        ('Availability', {
+            'fields': ('is_available',)
+        }),
+    )
 
 
 @admin.register(ContactMessage)
