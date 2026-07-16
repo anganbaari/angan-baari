@@ -71,6 +71,8 @@
 html {
     scroll-behavior: smooth;
     font-size: 16px;
+    overflow-x: hidden;
+    width: 100%;
 }
  
 body {
@@ -79,6 +81,8 @@ body {
     color: var(--text-body);
     line-height: 1.7;
     overflow-x: hidden;
+    width: 100%;
+    max-width: 100vw;
     -webkit-font-smoothing: antialiased;
 }
  
