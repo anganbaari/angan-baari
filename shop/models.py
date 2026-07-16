@@ -95,6 +95,27 @@ class Product(models.Model):
             return round(Decimal(str(self.price)) * Decimal(str(self.fixed_weight)), 2)
         return self.price
 
+    def starting_price(self):
+        """For variable-weight products: what the SMALLEST purchasable amount
+        actually costs (price-per-kg x weight_step), e.g. Rs.500/kg x 0.25kg
+        step = Rs.125. This is what should be shown on shop/offer cards
+        instead of the full per-kg rate, since a per-kg rate alone reads as
+        much more expensive than what someone would actually pay."""
+        from decimal import Decimal
+        if self.pricing_mode == 'variable_weight' and self.weight_step:
+            return round(Decimal(str(self.price)) * Decimal(str(self.weight_step)), 2)
+        return self.price
+
+    def starting_weight_label(self):
+        """Human label for the smallest step, e.g. '250g' or '1kg'."""
+        if self.pricing_mode != 'variable_weight' or not self.weight_step:
+            return None
+        step = float(self.weight_step)
+        if step < 1:
+            return f"{int(round(step * 1000))}g"
+        # e.g. 1 -> "1kg", 1.5 -> "1.5kg"
+        return f"{step:g}kg"
+
 
 class NewsletterSubscriber(models.Model):
     email = models.EmailField(unique=True)

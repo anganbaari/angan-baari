@@ -843,10 +843,17 @@
                     {% if active_offer %}
                         <span class="price-current">Rs. {{ active_offer.discounted_price|default:product.price|floatformat:0 }}</span>
                         <span class="price-original">Rs. {{ product.price|floatformat:0 }}</span>
+                        {% if product.price_unit %}<span class="price-unit">{{ product.price_unit }}</span>{% endif %}
+                    {% elif product.pricing_mode == "variable_weight" %}
+                        <span class="price-current">From Rs. {{ product.starting_price|floatformat:0 }}</span>
+                        <span class="price-unit">per {{ product.starting_weight_label }} (Rs. {{ product.price|floatformat:0 }}/kg)</span>
+                    {% elif product.pricing_mode == "fixed_weight" %}
+                        <span class="price-current">Rs. {{ product.locked_total_price|floatformat:0 }}</span>
+                        <span class="price-unit">{{ product.fixed_weight|floatformat:2 }} kg, fixed price</span>
                     {% else %}
                         <span class="price-current">Rs. {{ product.price|floatformat:0 }}</span>
+                        {% if product.price_unit %}<span class="price-unit">{{ product.price_unit }}</span>{% endif %}
                     {% endif %}
-                    {% if product.price_unit %}<span class="price-unit">{{ product.price_unit }}</span>{% endif %}
                 </div>
 
                 <p class="product-desc auto-split-desc">{{ product.description }}</p>
@@ -1111,8 +1118,19 @@
     {% if product.is_available %}
     <div class="sticky-mobile-bar" id="stickyBar">
         <div class="sticky-bar-price">
-            <span class="cur">Rs. {% if active_offer %}{{ active_offer.discounted_price|default:product.price|floatformat:0 }}{% else %}{{ product.price|floatformat:0 }}{% endif %}</span>
+            {% if active_offer %}
+            <span class="cur">Rs. {{ active_offer.discounted_price|default:product.price|floatformat:0 }}</span>
             <span class="unit">{{ product.price_unit }}</span>
+            {% elif product.pricing_mode == "variable_weight" %}
+            <span class="cur">From Rs. {{ product.starting_price|floatformat:0 }}</span>
+            <span class="unit">per {{ product.starting_weight_label }}</span>
+            {% elif product.pricing_mode == "fixed_weight" %}
+            <span class="cur">Rs. {{ product.locked_total_price|floatformat:0 }}</span>
+            <span class="unit">{{ product.fixed_weight|floatformat:2 }} kg, fixed</span>
+            {% else %}
+            <span class="cur">Rs. {{ product.price|floatformat:0 }}</span>
+            <span class="unit">{{ product.price_unit }}</span>
+            {% endif %}
         </div>
         <button type="button" class="sticky-bar-btn" onclick="document.getElementById('cartForm').requestSubmit()">
             <i class="fas fa-cart-plus"></i> Add to Cart

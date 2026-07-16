@@ -927,8 +927,16 @@
                     <div class="p-card-body">
                         <div class="p-name">{{ product.name }}</div>
                         {% if product.price and product.price > 0 %}
-                        <div class="p-price">Rs. {{ product.price }}</div>
-                        <div class="p-price-unit">{{ product.price_unit }}</div>
+                            {% if product.pricing_mode == "variable_weight" %}
+                            <div class="p-price">From Rs. {{ product.starting_price|floatformat:0 }}</div>
+                            <div class="p-price-unit">per {{ product.starting_weight_label }}</div>
+                            {% elif product.pricing_mode == "fixed_weight" %}
+                            <div class="p-price">Rs. {{ product.locked_total_price|floatformat:0 }}</div>
+                            <div class="p-price-unit">{{ product.fixed_weight|floatformat:2 }} kg, fixed price</div>
+                            {% else %}
+                            <div class="p-price">Rs. {{ product.price }}</div>
+                            <div class="p-price-unit">{{ product.price_unit }}</div>
+                            {% endif %}
                         {% else %}
                         <div class="p-price-tbd">Price on request</div>
                         {% endif %}
