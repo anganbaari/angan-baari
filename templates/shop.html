@@ -930,6 +930,9 @@
                             {% if product.pricing_mode == "variable_weight" %}
                             <div class="p-price">From Rs. {{ product.starting_price|floatformat:0 }}</div>
                             <div class="p-price-unit">per {{ product.starting_weight_label }}</div>
+                            {% elif product.pricing_mode == "fixed_weight" and product.variant_count > 1 %}
+                            <div class="p-price">Rs. {{ product.price_range_low|floatformat:0 }}–{{ product.price_range_high|floatformat:0 }}</div>
+                            <div class="p-price-unit">{{ product.variant_count }} sizes available</div>
                             {% elif product.pricing_mode == "fixed_weight" %}
                             <div class="p-price">Rs. {{ product.locked_total_price|floatformat:0 }}</div>
                             <div class="p-price-unit">{{ product.fixed_weight|floatformat:2 }} kg, fixed price</div>

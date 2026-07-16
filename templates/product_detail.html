@@ -309,6 +309,18 @@
             font-size: 0.85rem;
             color: var(--text-muted);
         }
+        .size-picker { margin-bottom: 20px; }
+        .size-picker-label { display: block; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); margin-bottom: 8px; }
+        .size-picker-pills { display: flex; flex-wrap: wrap; gap: 8px; }
+        .size-pill {
+            display: flex; flex-direction: column; align-items: center; gap: 2px;
+            padding: 8px 16px; border-radius: 14px; border: 1.5px solid var(--mist, #e4e0d6);
+            background: var(--white, #fff); text-decoration: none; color: var(--forest-deep);
+            font-size: 0.82rem; font-weight: 600; transition: border-color 0.2s, background 0.2s;
+        }
+        .size-pill:hover { border-color: var(--sage, #8fa88a); }
+        .size-pill.active { border-color: var(--forest-deep); background: var(--forest-deep); color: var(--gold, #c9a84c); }
+        .size-pill-price { font-size: 0.72rem; font-weight: 500; opacity: 0.85; }
         .price-original {
             font-size: 1.1rem;
             color: var(--text-muted);
@@ -846,7 +858,7 @@
                         {% if product.price_unit %}<span class="price-unit">{{ product.price_unit }}</span>{% endif %}
                     {% elif product.pricing_mode == "variable_weight" %}
                         <span class="price-current">From Rs. {{ product.starting_price|floatformat:0 }}</span>
-                        <span class="price-unit">per {{ product.starting_weight_label }} (Rs. {{ product.price|floatformat:0 }}/kg)</span>
+                        <span class="price-unit">per {{ product.starting_weight_label }} (Rs. {{ product.price|floatformat:0 }}/{{ product.weight_unit_label }})</span>
                     {% elif product.pricing_mode == "fixed_weight" %}
                         <span class="price-current">Rs. {{ product.locked_total_price|floatformat:0 }}</span>
                         <span class="price-unit">{{ product.fixed_weight|floatformat:2 }} kg, fixed price</span>
@@ -855,6 +867,21 @@
                         {% if product.price_unit %}<span class="price-unit">{{ product.price_unit }}</span>{% endif %}
                     {% endif %}
                 </div>
+
+                {% if sibling_variants %}
+                <div class="size-picker">
+                    <span class="size-picker-label">Choose a size</span>
+                    <div class="size-picker-pills">
+                        {% for variant in sibling_variants %}
+                        <a href="{% url 'product_detail' variant.slug %}"
+                           class="size-pill {% if variant.id == product.id %}active{% endif %}">
+                            {{ variant.fixed_weight|floatformat:2 }} kg
+                            <span class="size-pill-price">Rs. {{ variant.locked_total_price|floatformat:0 }}</span>
+                        </a>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
 
                 <p class="product-desc auto-split-desc">{{ product.description }}</p>
 
@@ -890,7 +917,7 @@
                             <input type="text" id="weightInput" value="{{ product.weight_step|floatformat:2 }}" readonly>
                             <button type="button" onclick="stepWeight(1)" aria-label="Increase weight">+</button>
                         </div>
-                        <span style="font-size:0.8rem; color:var(--text-muted); margin-left:6px;">kg</span>
+                        <span style="font-size:0.8rem; color:var(--text-muted); margin-left:6px;">{{ product.weight_unit_label }}</span>
                     </div>
                     {% elif product.pricing_mode == "fixed_weight" %}
                     <div class="qty-row">

@@ -343,7 +343,7 @@
         <div class="cart-layout" id="cartLayout" style="display:{% if items %}grid{% else %}none{% endif %};">
             <div class="cart-items" id="cartItemsList">
                 {% for item in items %}
-                <div class="cart-item" id="cart-item-{{ item.id }}" data-id="{{ item.id }}" data-price="{{ item.price }}" data-mode="{{ item.pricing_mode|default:'fixed_quantity' }}" data-weight="{{ item.weight|default:'' }}" data-step="{{ item.weight_step|default:'0.50' }}">
+                <div class="cart-item" id="cart-item-{{ item.id }}" data-id="{{ item.id }}" data-price="{{ item.price }}" data-mode="{{ item.pricing_mode|default:'fixed_quantity' }}" data-weight="{{ item.weight|default:'' }}" data-step="{{ item.weight_step|default:'0.50' }}" data-unit="{{ item.weight_unit_label|default:'kg' }}">
                     <div class="cart-item-img">
                         {% if item.image %}
                         <img src="{% static item.image %}" alt="{{ item.name }}">
@@ -370,7 +370,7 @@
                             <span class="weight-label">Weight</span>
                             <div class="weight-stepper">
                                 <button type="button" class="weight-step-btn" data-action="weight-step" data-dir="-1" aria-label="Decrease weight">−</button>
-                                <span class="weight-num" id="weightnum-{{ item.id }}">{{ item.weight }} kg</span>
+                                <span class="weight-num" id="weightnum-{{ item.id }}">{{ item.weight }} {{ item.weight_unit_label|default:"kg" }}</span>
                                 <button type="button" class="weight-step-btn" data-action="weight-step" data-dir="1" aria-label="Increase weight">+</button>
                             </div>
                         </div>
@@ -647,7 +647,7 @@
                     <span class="weight-label">Weight</span>
                     <div class="weight-stepper">
                         <button type="button" class="weight-step-btn" data-action="weight-step" data-dir="-1" aria-label="Decrease weight">−</button>
-                        <span class="weight-num" id="weightnum-${item.id}">${item.weight} kg</span>
+                        <span class="weight-num" id="weightnum-${item.id}">${item.weight} ${item.weight_unit_label || 'kg'}</span>
                         <button type="button" class="weight-step-btn" data-action="weight-step" data-dir="1" aria-label="Increase weight">+</button>
                     </div>
                 </div>`;
@@ -674,6 +674,7 @@
             wrap.dataset.mode = item.pricing_mode || 'fixed_quantity';
             wrap.dataset.weight = item.weight || '';
             wrap.dataset.step = item.weight_step || '0.50';
+            wrap.dataset.unit = item.weight_unit_label || 'kg';
             const imgHtml = item.image
                 ? `<img src="/static/${item.image}" alt="${item.name}">`
                 : `<div class="img-fallback"><i class="fas fa-seedling"></i></div>`;
@@ -765,6 +766,7 @@
                         qty: data.qty,
                         pricing_mode: row.dataset.mode,
                         weight_step: row.dataset.step,
+                        weight_unit_label: row.dataset.unit,
                     };
                     row.replaceWith(buildCartItemNode(item));
                     document.getElementById('summaryRows').appendChild(buildSummaryRow(item));
@@ -959,6 +961,7 @@
                         qty: data.qty,
                         pricing_mode: data.pricing_mode,
                         weight_step: data.weight_step,
+                        weight_unit_label: data.weight_unit_label,
                     };
                     if (existingRow) {
                         existingRow.replaceWith(buildCartItemNode(item));

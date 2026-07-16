@@ -71,6 +71,17 @@ class Product(models.Model):
                    'animal/item in kg, e.g. 20 for a 20kg goat. Total price = price (per kg) x this weight, '
                    'and the customer cannot change it.'
     )
+    weight_unit_label = models.CharField(
+        max_length=20, default='kg',
+        help_text='Unit shown next to the weight/quantity stepper for "Variable weight" products, '
+                   'e.g. "kg" for fruit, "dozen" for banana. The price field is always per ONE of this unit.'
+    )
+    variant_group = models.CharField(
+        max_length=100, blank=True,
+        help_text='Only used for "Fixed weight" products (goat, chicken). Give all size listings of '
+                   'the same animal the exact same text here (e.g. "goat", "chicken") to group them '
+                   'together as one card with a size-picker, instead of separate cards.'
+    )
 
     def __str__(self):
         return self.name
@@ -107,14 +118,14 @@ class Product(models.Model):
         return self.price
 
     def starting_weight_label(self):
-        """Human label for the smallest step, e.g. '250g' or '1kg'."""
+        """Human label for the smallest step, e.g. '250g', '1kg', or '0.5 dozen'."""
         if self.pricing_mode != 'variable_weight' or not self.weight_step:
             return None
         step = float(self.weight_step)
-        if step < 1:
+        unit = (self.weight_unit_label or 'kg').strip()
+        if unit.lower() == 'kg' and step < 1:
             return f"{int(round(step * 1000))}g"
-        # e.g. 1 -> "1kg", 1.5 -> "1.5kg"
-        return f"{step:g}kg"
+        return f"{step:g} {unit}"
 
 
 class NewsletterSubscriber(models.Model):
