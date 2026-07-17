@@ -53,7 +53,25 @@
             margin: 40px 0 18px;
         }
         .side-headline em { font-style: italic; color: var(--gold); }
-        .side-sub { position: relative; z-index: 1; font-size: 0.95rem; color: #cfe0d1; max-width: 380px; line-height: 1.7; }
+
+        .side-highlight {
+            position: relative; z-index: 1;
+            display: flex; align-items: flex-start; gap: 10px;
+            background: linear-gradient(90deg, #c0392b, #e67e22, #c0392b);
+            background-size: 200% 100%;
+            border-radius: 12px;
+            padding: 13px 16px;
+            max-width: 380px;
+            animation: offer-gradient 3s linear infinite, offer-pulse 2s infinite;
+        }
+        @keyframes offer-gradient { 0% { background-position: 0% 50%; } 100% { background-position: 200% 50%; } }
+        @keyframes offer-pulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(192,57,43,0.5); }
+            50% { box-shadow: 0 0 0 8px rgba(192,57,43,0); }
+        }
+        .side-highlight i { color: #fff; font-size: 0.95rem; margin-top: 2px; animation: flicker 1s infinite alternate; flex-shrink: 0; }
+        @keyframes flicker { 0% { transform: scale(1) rotate(-3deg); opacity: 0.85; } 100% { transform: scale(1.15) rotate(3deg); opacity: 1; } }
+        .side-highlight p { margin: 0; font-size: 0.9rem; color: #fff; line-height: 1.6; font-weight: 500; }
 
         /* Growing vine — purely decorative rhythm of the farm, marks time passing down the panel */
         .vine-rail { position: relative; z-index: 1; margin-top: 44px; padding-left: 26px; border-left: 1.5px solid rgba(247,242,234,0.22); }
@@ -130,19 +148,42 @@
         .auth-links a { color: var(--moss); font-weight: 600; text-decoration: none; }
         .auth-links a:hover { text-decoration: underline; }
 
-        @media (max-width: 860px) {
-            .auth-shell { grid-template-columns: 1fr; }
-            .auth-side { padding: 32px 26px; }
-            .side-headline { font-size: 1.7rem; margin: 22px 0 12px; }
-            .side-sub { font-size: 0.86rem; }
+        @media (max-width: 1024px) {
+            .auth-shell { grid-template-columns: 38% 62%; }
+            .side-headline { font-size: clamp(1.9rem, 4vw, 2.6rem); }
+        }
+
+        @media (max-width: 768px) {
+            .auth-shell { grid-template-columns: 1fr; align-items: start; }
+            .auth-side { padding: 30px 24px 26px; }
+            .side-headline { font-size: 1.65rem; margin: 20px 0 14px; }
+            .side-highlight { max-width: 100%; padding: 11px 14px; }
+            .side-highlight p { font-size: 0.84rem; }
             .vine-rail { margin-top: 24px; }
             .vine-item { padding-bottom: 16px; font-size: 0.8rem; }
-            .auth-form-wrap { padding: 36px 22px 56px; }
+            .side-foot { margin-top: 18px; }
+            .auth-form-wrap { padding: 32px 20px 48px; }
+            .auth-title { font-size: 1.7rem; margin-bottom: 26px; }
+        }
+
+        @media (max-width: 420px) {
+            .auth-side { padding: 24px 18px 22px; }
+            .side-logo span { font-size: 0.7rem; }
+            .side-headline { font-size: 1.45rem; }
+            .side-highlight { padding: 10px 12px; }
+            .side-highlight p { font-size: 0.8rem; }
+            .vine-rail { padding-left: 22px; margin-top: 20px; }
+            .vine-item { font-size: 0.76rem; padding-bottom: 14px; }
+            .auth-form-wrap { padding: 26px 16px 40px; }
+            .auth-card { max-width: 100%; }
+            .strength-row { flex-wrap: wrap; }
+            .input-wrap input { padding: 12px 14px 12px 40px; font-size: 0.9rem; }
         }
 
         @media (prefers-reduced-motion: reduce) {
             .auth-card { animation: none; }
             .strength-leaves i, .btn-auth { transition: none; }
+            .side-highlight, .side-highlight i { animation: none; }
         }
     </style>
 </head>
@@ -152,7 +193,7 @@
         <div class="side-top">
             <a href="/" class="side-logo"><i class="fas fa-seedling"></i><span>आँगन बारी · Angan Baari</span></a>
             <h1 class="side-headline">Grow your <em>own</em><br>place at the table.</h1>
-            <p class="side-sub">Create an account to unlock member pricing on seasonal fruit, honey, and festival offers — straight from Bhulka Danda to your door.</p>
+            <div class="side-highlight"><i class="fas fa-fire"></i><p>Create an account to unlock member pricing on seasonal fruit, honey, and festival offers — straight from Bhulka Danda to your door.</p></div>
         </div>
         <div class="vine-rail">
             <div class="vine-item"><b>Fresh, seasonal picks</b>Mango, lychee, papaya & more, harvested to order.</div>
@@ -184,7 +225,7 @@
                     <label for="id_name">Full Name</label>
                     <div class="input-wrap">
                         <i class="fas fa-user field-icon"></i>
-                        <input type="text" id="id_name" name="name" placeholder="Ramesh Thapa" required autofocus autocomplete="name">
+                        <input type="text" id="id_name" name="name" placeholder="Your Name" required autofocus autocomplete="name">
                     </div>
                 </div>
 

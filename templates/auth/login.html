@@ -54,9 +54,26 @@
             margin: 0 0 18px;
         }
         .side-headline em { font-style: italic; color: var(--gold); }
-        .side-sub { position: relative; z-index: 1; font-size: 0.95rem; color: #cfe0d1; max-width: 380px; line-height: 1.7; }
-
-        .side-stats { position: relative; z-index: 1; margin-top: 44px; display: flex; gap: 28px; }
+        .side-highlight {
+            position: relative; z-index: 1;
+            display: flex; align-items: flex-start; gap: 10px;
+            background: linear-gradient(90deg, #c0392b, #e67e22, #c0392b);
+            background-size: 200% 100%;
+            animation: offer-gradient 3s linear infinite;
+            border-radius: 12px;
+            padding: 13px 16px;
+            max-width: 380px;
+            box-shadow: 0 0 0 0 rgba(192,57,43,0.5);
+            animation: offer-gradient 3s linear infinite, offer-pulse 2s infinite;
+        }
+        @keyframes offer-gradient { 0% { background-position: 0% 50%; } 100% { background-position: 200% 50%; } }
+        @keyframes offer-pulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(192,57,43,0.5); }
+            50% { box-shadow: 0 0 0 8px rgba(192,57,43,0); }
+        }
+        .side-highlight i { color: #fff; font-size: 0.95rem; margin-top: 2px; animation: flicker 1s infinite alternate; flex-shrink: 0; }
+        @keyframes flicker { 0% { transform: scale(1) rotate(-3deg); opacity: 0.85; } 100% { transform: scale(1.15) rotate(3deg); opacity: 1; } }
+        .side-highlight p { margin: 0; font-size: 0.9rem; color: #fff; line-height: 1.6; font-weight: 500; }
         .side-stat b { display: block; font-family: var(--font-display, 'Cormorant Garamond'), serif; font-size: 1.7rem; color: var(--cream); }
         .side-stat span { font-size: 0.74rem; color: #a9c2ab; }
 
@@ -118,18 +135,42 @@
         .auth-links a { color: var(--moss); font-weight: 600; text-decoration: none; }
         .auth-links a:hover { text-decoration: underline; }
 
-        @media (max-width: 860px) {
-            .auth-shell { grid-template-columns: 1fr; }
-            .auth-side { padding: 32px 26px; }
-            .side-headline { font-size: 1.7rem; }
-            .side-sub { font-size: 0.86rem; }
-            .side-stats { margin-top: 24px; }
-            .auth-form-wrap { padding: 36px 22px 56px; }
+        @media (max-width: 1024px) {
+            .auth-shell { grid-template-columns: 38% 62%; }
+            .side-headline { font-size: clamp(1.9rem, 4vw, 2.6rem); }
+        }
+
+        @media (max-width: 768px) {
+            .auth-shell { grid-template-columns: 1fr; align-items: start; }
+            .auth-side { padding: 30px 24px 26px; }
+            .side-greeting { margin: 24px 0 6px; }
+            .side-headline { font-size: 1.65rem; margin-bottom: 14px; }
+            .side-highlight { max-width: 100%; padding: 11px 14px; }
+            .side-highlight p { font-size: 0.84rem; }
+            .side-stats { margin-top: 22px; gap: 22px; flex-wrap: wrap; }
+            .side-stat b { font-size: 1.4rem; }
+            .side-foot { margin-top: 18px; }
+            .auth-form-wrap { padding: 32px 20px 48px; }
+            .auth-title { font-size: 1.7rem; margin-bottom: 26px; }
+        }
+
+        @media (max-width: 420px) {
+            .auth-side { padding: 24px 18px 22px; }
+            .side-logo span { font-size: 0.7rem; }
+            .side-headline { font-size: 1.45rem; }
+            .side-highlight { flex-direction: row; padding: 10px 12px; }
+            .side-highlight p { font-size: 0.8rem; }
+            .side-stats { gap: 16px; }
+            .auth-form-wrap { padding: 26px 16px 40px; }
+            .auth-card { max-width: 100%; }
+            .field-row { flex-wrap: wrap; gap: 10px; align-items: flex-start; }
+            .input-wrap input { padding: 12px 14px 12px 40px; font-size: 0.9rem; }
         }
 
         @media (prefers-reduced-motion: reduce) {
             .auth-card { animation: none; }
             .btn-auth { transition: none; }
+            .side-highlight, .side-highlight i { animation: none; }
         }
     </style>
 </head>
@@ -140,7 +181,7 @@
             <a href="/" class="side-logo"><i class="fas fa-seedling"></i><span>आँगन बारी · Angan Baari</span></a>
             <div class="side-greeting" id="sideGreeting"><i class="fas fa-sun"></i> <span></span></div>
             <h1 class="side-headline">Welcome back to<br>the <em>farm</em>.</h1>
-            <p class="side-sub">Sign in for member pricing, festival offers, and to pick up right where your cart left off.</p>
+            <div class="side-highlight"><i class="fas fa-fire"></i><p>Sign in for member pricing, festival offers, and to pick up right where your cart left off.</p></div>
         </div>
         <div class="side-stats">
             <div class="side-stat"><b>5</b><span>Beehive colonies</span></div>
