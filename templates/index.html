@@ -939,24 +939,36 @@
                         <p class="fs-form-sub">A peek at today's picks — real prices, ready to order.</p>
 
                         {% if featured_products %}
-                        <div class="fs-mini-shop-grid">
-                            {% for product in featured_products %}
-                            <a href="{% url 'shop' %}" class="fs-mini-card">
-                                <div class="fs-mini-card-img">
-                                    {% if product.main_image %}
-                                    <img src="{% static product.main_image %}" alt="{{ product.name }}" loading="lazy">
-                                    {% else %}
-                                    <i class="fas fa-seedling"></i>
-                                    {% endif %}
-                                </div>
-                                <div class="fs-mini-card-name">{{ product.name }}</div>
-                                {% if product.price and product.price > 0 %}
-                                <div class="fs-mini-card-price">Rs. {{ product.price }}<span class="fs-mini-card-unit">/{{ product.price_unit|default:"unit"|cut:"per " }}</span></div>
-                                {% else %}
-                                <div class="fs-mini-card-price fs-mini-card-tbd">Ask price</div>
-                                {% endif %}
-                            </a>
-                            {% endfor %}
+                        <div class="carousel-3d-scene" id="miniShopScene">
+                            <div class="carousel-3d" id="miniShopRing">
+                                {% for product in featured_products %}
+                                <a href="{% url 'shop' %}" class="ring-card">
+                                    <div class="ring-card-inner">
+                                        <div class="ring-card-img">
+                                            {% if product.main_image %}
+                                            <img src="{% static product.main_image %}" alt="{{ product.name }}" loading="lazy">
+                                            {% else %}
+                                            <i class="fas fa-seedling"></i>
+                                            {% endif %}
+                                        </div>
+                                        <div class="rc-scrim"></div>
+                                        <div class="rc-content">
+                                            <div class="rc-name">{{ product.name }}</div>
+                                            {% if product.price and product.price > 0 %}
+                                            <div class="rc-price">Rs. {{ product.price }}<span>/{{ product.price_unit|default:"unit"|cut:"per " }}</span></div>
+                                            {% else %}
+                                            <div class="rc-price rc-tbd">Ask price</div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </a>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        <div class="carousel-3d-nav">
+                            <button type="button" class="carousel-3d-arrow" id="miniShopPrev" aria-label="Previous product"><i class="fas fa-chevron-left"></i></button>
+                            <div class="carousel-3d-dots" id="miniShopDots"></div>
+                            <button type="button" class="carousel-3d-arrow" id="miniShopNext" aria-label="Next product"><i class="fas fa-chevron-right"></i></button>
                         </div>
                         {% endif %}
 

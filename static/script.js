@@ -1,5 +1,5 @@
 /* ================================================================
-   THE HIMALAYAN SUSTAINABLE FARM — Premium JavaScript
+   Angan Baari— Premium JavaScript
    Features: Loader, Navbar scroll, Carousel, Lightbox,
              ScrollSpy, AOS init, Animated Counters, Mobile Menu
 ================================================================ */
@@ -1042,4 +1042,155 @@ document.addEventListener('DOMContentLoaded', () => {
     updateVisibility(); // run once immediately in case the page loads mid-scroll
     window.addEventListener('scroll', onScroll, { passive: true });
     window.addEventListener('resize', onScroll);
+});
+
+// ================================================================
+// 3D MINI-SHOP CAROUSEL — Ordering & Delivery "Ready to Order?" panel
+// Cards are rendered server-side by Django (one per featured_product);
+// this just arranges however many actually exist into a rotating 3D
+// ring, with drag/swipe, autoplay, arrows, and dots.
+// ================================================================
+document.addEventListener('DOMContentLoaded', () => {
+    const scene = document.getElementById('miniShopScene');
+    const ring = document.getElementById('miniShopRing');
+    const dotsWrap = document.getElementById('miniShopDots');
+    const prevBtn = document.getElementById('miniShopPrev');
+    const nextBtn = document.getElementById('miniShopNext');
+    if (!scene || !ring || !dotsWrap) return;
+
+    const cards = Array.from(ring.querySelectorAll('.ring-card'));
+    const N = cards.length;
+    if (N === 0) return;
+
+    const angleStep = 360 / N;
+    const radius = 130; // px — matches the .carousel-3d-scene sizing in CSS
+
+    cards.forEach((card, i) => {
+        card.dataset.baseAngle = i * angleStep;
+    });
+
+    // Build one dot per card
+    cards.forEach((_, i) => {
+        const dot = document.createElement('div');
+        dot.className = 'carousel-3d-dot' + (i === 0 ? ' active' : '');
+        dot.addEventListener('click', () => goToDot(i));
+        dotsWrap.appendChild(dot);
+    });
+    const dots = Array.from(dotsWrap.querySelectorAll('.carousel-3d-dot'));
+
+    let currentRotation = 0;
+    let logicalIndex = 0; // unwrapped — keeps counting up/down, never resets/snaps backward
+
+    function activeDotIndex() {
+        return ((logicalIndex % N) + N) % N;
+    }
+
+    function updateCardStates() {
+        cards.forEach((card, i) => {
+            const baseAngle = i * angleStep;
+            const cardAngle = (baseAngle + currentRotation) % 360;
+            const normalized = ((cardAngle % 360) + 360) % 360;
+            const distFromFront = Math.min(normalized, 360 - normalized);
+
+            const t = distFromFront / 180;
+            const scale = 1.15 - t * 0.53;
+            card.style.transform = `rotateY(${baseAngle}deg) translateZ(${radius}px) scale(${scale.toFixed(3)})`;
+
+            card.classList.remove('is-front', 'is-side', 'is-back');
+            if (distFromFront < angleStep / 2) card.classList.add('is-front');
+            else if (distFromFront < 90) card.classList.add('is-side');
+            else card.classList.add('is-back');
+        });
+    }
+
+    function render() {
+        ring.style.transform = `rotateY(${currentRotation}deg)`;
+        updateCardStates();
+        const active = activeDotIndex();
+        dots.forEach((d, i) => d.classList.toggle('active', i === active));
+    }
+
+    function goToStep(delta) {
+        logicalIndex += delta;
+        currentRotation = -logicalIndex * angleStep;
+        render();
+    }
+
+    function goToDot(targetIndex) {
+        const current = activeDotIndex();
+        let diff = targetIndex - current;
+        if (diff > N / 2) diff -= N;
+        if (diff < -N / 2) diff += N;
+        logicalIndex += diff;
+        currentRotation = -logicalIndex * angleStep;
+        render();
+    }
+
+    if (nextBtn) nextBtn.addEventListener('click', () => goToStep(1));
+    if (prevBtn) prevBtn.addEventListener('click', () => goToStep(-1));
+
+    // ── Drag / swipe (mouse + touch) ──
+    let isDragging = false;
+    let startX = 0;
+    let startRotation = 0;
+    let dragDistance = 0; // used to tell an intentional drag apart from a tap
+
+    function dragStart(clientX) {
+        isDragging = true;
+        dragDistance = 0;
+        startX = clientX;
+        startRotation = currentRotation;
+        scene.classList.add('dragging');
+        ring.classList.add('no-transition');
+        stopAutoplay();
+    }
+    function dragMove(clientX) {
+        if (!isDragging) return;
+        const delta = clientX - startX;
+        dragDistance = Math.abs(delta);
+        currentRotation = startRotation + delta * 0.4;
+        ring.style.transform = `rotateY(${currentRotation}deg)`;
+        updateCardStates();
+    }
+    function dragEnd() {
+        if (!isDragging) return;
+        isDragging = false;
+        scene.classList.remove('dragging');
+        ring.classList.remove('no-transition');
+        logicalIndex = Math.round(-currentRotation / angleStep);
+        currentRotation = -logicalIndex * angleStep;
+        render();
+        startAutoplay();
+    }
+
+    scene.addEventListener('mousedown', e => { e.preventDefault(); dragStart(e.clientX); });
+    window.addEventListener('mousemove', e => dragMove(e.clientX));
+    window.addEventListener('mouseup', dragEnd);
+
+    scene.addEventListener('touchstart', e => dragStart(e.touches[0].clientX), { passive: true });
+    scene.addEventListener('touchmove', e => dragMove(e.touches[0].clientX), { passive: true });
+    scene.addEventListener('touchend', dragEnd);
+
+    // Prevent an intentional drag from also firing the card's link —
+    // only a genuine tap (negligible movement) should navigate.
+    cards.forEach(card => {
+        card.addEventListener('click', e => {
+            if (dragDistance > 6) e.preventDefault();
+        });
+    });
+
+    // ── Gentle autoplay when idle ──
+    let autoplayTimer = null;
+    function startAutoplay() {
+        stopAutoplay();
+        autoplayTimer = setInterval(() => {
+            if (!isDragging) goToStep(1);
+        }, 3200);
+    }
+    function stopAutoplay() {
+        if (autoplayTimer) clearInterval(autoplayTimer);
+    }
+
+    render();
+    startAutoplay();
 });
