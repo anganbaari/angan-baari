@@ -889,7 +889,11 @@
 
             <!-- Banner -->
             {% if has_active_offers %}
+            {% if user.is_authenticated %}
             <a href="{% url 'offers' %}" class="offer-strip">
+            {% else %}
+            <a href="{% url 'login' %}?next={% url 'offers' %}" class="offer-strip">
+            {% endif %}
                 <i class="fas fa-fire"></i>
                 <span>🎉 Limited Time Offers Live Now — Save up to big on selected products!</span>
                 <i class="fas fa-arrow-right" style="margin-left:auto;"></i>

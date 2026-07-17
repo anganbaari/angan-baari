@@ -2,6 +2,8 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse
 from django.core.mail import send_mail
 from django.conf import settings
+from django.contrib.auth.decorators import login_required
+from django.urls import reverse
 from .models import NewsletterSubscriber, ContactMessage, ProductOrder, Review
 from .emails import (
     send_order_received_email,
@@ -822,6 +824,7 @@ def shop(request):
     })
 
 
+@login_required(login_url='login')
 def offers(request):
     from .models import Offer, Coupon
     from django.utils import timezone
@@ -902,7 +905,11 @@ def offers(request):
     })
 
 def add_to_cart_offer(request, product_id):
-    """Add to cart with a discounted price from offers page."""
+    """Add to cart with a discounted price from offers page. Offer pricing is
+    a login-only perk — regular (non-offer) shopping stays open to everyone."""
+    if not request.user.is_authenticated:
+        return redirect(f"{reverse('login')}?next={reverse('offers')}")
+
     from .models import Product
     product = get_object_or_404(Product, id=product_id)
     cart = get_cart(request)
