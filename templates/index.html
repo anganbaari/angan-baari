@@ -936,9 +936,9 @@
                         </div>
                         <h3 class="fs-form-title">Ready to Order?</h3>
                         <p class="fs-shop-brand-line">आँगन बारी पसल</p>
-                        <p class="fs-form-sub">A peek at today's picks — real prices, ready to order.</p>
 
                         {% if featured_products %}
+                        <!-- Row 1 — rotates one direction -->
                         <div class="carousel-3d-scene" id="miniShopScene">
                             <div class="carousel-3d" id="miniShopRing">
                                 {% for product in featured_products %}
@@ -970,17 +970,45 @@
                             <div class="carousel-3d-dots" id="miniShopDots"></div>
                             <button type="button" class="carousel-3d-arrow" id="miniShopNext" aria-label="Next product"><i class="fas fa-chevron-right"></i></button>
                         </div>
+
+                        <!-- Row 2 — same products, rotates the opposite direction -->
+                        <div class="carousel-3d-scene carousel-3d-scene-row2" id="miniShopScene2">
+                            <div class="carousel-3d" id="miniShopRing2">
+                                {% for product in featured_products %}
+                                <a href="{% url 'shop' %}" class="ring-card">
+                                    <div class="ring-card-inner">
+                                        <div class="ring-card-img">
+                                            {% if product.main_image %}
+                                            <img src="{% static product.main_image %}" alt="{{ product.name }}" loading="lazy">
+                                            {% else %}
+                                            <i class="fas fa-seedling"></i>
+                                            {% endif %}
+                                        </div>
+                                        <div class="rc-scrim"></div>
+                                        <div class="rc-content">
+                                            <div class="rc-name">{{ product.name }}</div>
+                                            {% if product.price and product.price > 0 %}
+                                            <div class="rc-price">Rs. {{ product.price }}<span>/{{ product.price_unit|default:"unit"|cut:"per " }}</span></div>
+                                            {% else %}
+                                            <div class="rc-price rc-tbd">Ask price</div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </a>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        <div class="carousel-3d-nav">
+                            <button type="button" class="carousel-3d-arrow" id="miniShopPrev2" aria-label="Previous product"><i class="fas fa-chevron-left"></i></button>
+                            <div class="carousel-3d-dots" id="miniShopDots2"></div>
+                            <button type="button" class="carousel-3d-arrow" id="miniShopNext2" aria-label="Next product"><i class="fas fa-chevron-right"></i></button>
+                        </div>
                         {% endif %}
 
                         <a href="{% url 'shop' %}" class="fs-shop-btn">
                             <i class="fas fa-store"></i>
                             <span>View Full Shop</span>
                             <i class="fas fa-arrow-right fs-shop-btn-arrow"></i>
-                        </a>
-
-                        <a href="https://wa.me/9779821025084?text=Hello%20Angan%20Baari!%20I%20would%20like%20to%20place%20an%20order."
-                           class="fs-btn-wa" target="_blank" rel="noopener noreferrer">
-                            <i class="fab fa-whatsapp"></i> Or Order via WhatsApp
                         </a>
                     </div>
 

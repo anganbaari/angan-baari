@@ -11,17 +11,20 @@
     <link rel="stylesheet" href="{% static 'style.css' %}">
     <style>
         * { box-sizing: border-box; }
+        html, body { overflow-x: hidden; }
         body { margin: 0; font-family: var(--font-body, 'DM Sans'), sans-serif; }
 
         .auth-shell {
             min-height: 100vh;
             display: grid;
             grid-template-columns: 42% 58%;
+            overflow-x: hidden;
         }
 
         /* ── Left: living panel ── */
         .auth-side {
             position: relative;
+            min-width: 0;
             background: linear-gradient(165deg, var(--forest) 0%, #24401f 55%, var(--moss) 130%);
             color: var(--cream);
             padding: 48px 44px;
@@ -77,6 +80,7 @@
         /* Glass swipe strip — same component on desktop and mobile */
         .glass-strip {
             position: relative; z-index: 1;
+            min-width: 0;
             display: flex; gap: 12px;
             margin-top: 40px;
             overflow-x: auto;
@@ -142,6 +146,26 @@
         .auth-title { font-family: var(--font-display, 'Cormorant Garamond'), serif; font-size: 2rem; color: var(--forest); margin: 0 0 32px; font-weight: 400; }
 
         .messages { margin-bottom: 18px; }
+
+        .social-buttons { display: flex; flex-direction: column; gap: 10px; margin-bottom: 22px; }
+        .social-btn {
+            display: flex; align-items: center; justify-content: center; gap: 10px;
+            padding: 12px 16px; border-radius: 14px; font-size: 0.88rem; font-weight: 600;
+            text-decoration: none; border: 1.5px solid var(--mist); transition: transform 0.15s, box-shadow 0.2s, border-color 0.2s;
+        }
+        .social-btn:active { transform: scale(0.98); }
+        .social-google { background: #fff; color: #3c4043; }
+        .social-google:hover { border-color: #4285F4; box-shadow: 0 2px 10px rgba(66,133,244,0.15); }
+        .social-google i { color: #4285F4; }
+        .social-facebook { background: #1877F2; color: #fff; border-color: #1877F2; }
+        .social-facebook:hover { background: #1564d1; }
+        .social-phone { background: #fff; color: var(--forest); }
+        .social-phone:hover { border-color: var(--moss); box-shadow: 0 2px 10px rgba(74,124,89,0.15); }
+        .social-phone i { color: var(--moss); }
+
+        .divider-or { display: flex; align-items: center; gap: 12px; margin: 4px 0 22px; }
+        .divider-or::before, .divider-or::after { content: ''; flex: 1; height: 1px; background: var(--mist); }
+        .divider-or span { font-size: 0.74rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap; }
         .msg { padding: 11px 14px; border-radius: 12px; font-size: 0.84rem; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
         .msg-error { background: #fef2f2; color: #c0392b; border: 1px solid #fecaca; }
         .msg-success { background: #f0fdf4; color: var(--moss); border: 1px solid #bbf7d0; }
@@ -225,6 +249,8 @@
             .auth-card { max-width: 100%; padding: 22px 18px; border-radius: 20px; }
             .strength-row { flex-wrap: wrap; }
             .input-wrap input { padding: 12px 14px 12px 40px; font-size: 0.9rem; }
+            .social-btn { font-size: 0.82rem; padding: 11px 14px; }
+            .divider-or { margin: 2px 0 18px; }
         }
 
         @media (prefers-reduced-motion: reduce) {
@@ -264,6 +290,20 @@
                 {% endfor %}
             </div>
             {% endif %}
+
+            <div class="social-buttons">
+                <a href="#" class="social-btn social-google" data-provider="google">
+                    <i class="fab fa-google"></i> Continue with Google
+                </a>
+                <a href="#" class="social-btn social-facebook" data-provider="facebook">
+                    <i class="fab fa-facebook-f"></i> Continue with Facebook
+                </a>
+                <a href="#" class="social-btn social-phone" data-provider="phone">
+                    <i class="fas fa-phone"></i> Continue with Phone Number
+                </a>
+            </div>
+
+            <div class="divider-or"><span>or sign up with email</span></div>
 
             <form method="POST" id="signupForm" novalidate>
                 {% csrf_token %}

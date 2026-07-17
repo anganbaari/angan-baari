@@ -11,17 +11,20 @@
     <link rel="stylesheet" href="{% static 'style.css' %}">
     <style>
         * { box-sizing: border-box; }
+        html, body { overflow-x: hidden; }
         body { margin: 0; font-family: var(--font-body, 'DM Sans'), sans-serif; }
 
         .auth-shell {
             min-height: 100vh;
             display: grid;
             grid-template-columns: 42% 58%;
+            overflow-x: hidden;
         }
 
         /* ── Left: living panel ── */
         .auth-side {
             position: relative;
+            min-width: 0;
             background: linear-gradient(165deg, var(--forest) 0%, #24401f 55%, var(--moss) 130%);
             color: var(--cream);
             padding: 48px 44px;
@@ -81,6 +84,7 @@
         /* Glass swipe strip — same component on desktop and mobile */
         .glass-strip {
             position: relative; z-index: 1;
+            min-width: 0;
             display: flex; gap: 12px;
             margin-top: 40px;
             overflow-x: auto;

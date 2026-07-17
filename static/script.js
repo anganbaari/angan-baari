@@ -1,5 +1,5 @@
 /* ================================================================
-   Angan Baari— Premium JavaScript
+   Angan Baari — Premium JavaScript
    Features: Loader, Navbar scroll, Carousel, Lightbox,
              ScrollSpy, AOS init, Animated Counters, Mobile Menu
 ================================================================ */
@@ -1047,15 +1047,16 @@ document.addEventListener('DOMContentLoaded', () => {
 // ================================================================
 // 3D MINI-SHOP CAROUSEL — Ordering & Delivery "Ready to Order?" panel
 // Cards are rendered server-side by Django (one per featured_product);
-// this just arranges however many actually exist into a rotating 3D
-// ring, with drag/swipe, autoplay, arrows, and dots.
+// this arranges however many actually exist into a rotating 3D ring,
+// with drag/swipe, autoplay, arrows, and dots. Reusable so both rows
+// (which rotate in opposite directions) share identical logic.
 // ================================================================
-document.addEventListener('DOMContentLoaded', () => {
-    const scene = document.getElementById('miniShopScene');
-    const ring = document.getElementById('miniShopRing');
-    const dotsWrap = document.getElementById('miniShopDots');
-    const prevBtn = document.getElementById('miniShopPrev');
-    const nextBtn = document.getElementById('miniShopNext');
+function initMiniShopCarousel(sceneId, ringId, dotsId, prevId, nextId, autoplayDirection) {
+    const scene = document.getElementById(sceneId);
+    const ring = document.getElementById(ringId);
+    const dotsWrap = document.getElementById(dotsId);
+    const prevBtn = document.getElementById(prevId);
+    const nextBtn = document.getElementById(nextId);
     if (!scene || !ring || !dotsWrap) return;
 
     const cards = Array.from(ring.querySelectorAll('.ring-card'));
@@ -1063,7 +1064,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (N === 0) return;
 
     const angleStep = 360 / N;
-    const radius = 130; // px — matches the .carousel-3d-scene sizing in CSS
+    // Radius comes from a CSS custom property so desktop can use a much
+    // wider ring (more horizontal coverage) without touching JS —
+    // see the @media (min-width: 1025px) override in style.css.
+    const radius = parseFloat(getComputedStyle(scene).getPropertyValue('--carousel-radius')) || 130;
 
     cards.forEach((card, i) => {
         card.dataset.baseAngle = i * angleStep;
@@ -1179,12 +1183,13 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // ── Gentle autoplay when idle ──
+    // ── Gentle autoplay when idle — direction is configurable so the
+    // second row can spin the opposite way from the first. ──
     let autoplayTimer = null;
     function startAutoplay() {
         stopAutoplay();
         autoplayTimer = setInterval(() => {
-            if (!isDragging) goToStep(1);
+            if (!isDragging) goToStep(autoplayDirection);
         }, 3200);
     }
     function stopAutoplay() {
@@ -1193,4 +1198,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     render();
     startAutoplay();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    // Row 1 spins one way, row 2 spins the opposite way (-1 vs 1)
+    initMiniShopCarousel('miniShopScene', 'miniShopRing', 'miniShopDots', 'miniShopPrev', 'miniShopNext', 1);
+    initMiniShopCarousel('miniShopScene2', 'miniShopRing2', 'miniShopDots2', 'miniShopPrev2', 'miniShopNext2', -1);
 });
