@@ -60,7 +60,8 @@
             background: linear-gradient(90deg, #c0392b, #e67e22, #c0392b);
             background-size: 200% 100%;
             animation: offer-gradient 3s linear infinite;
-            border-radius: 12px;
+            border-radius: 16px;
+            border: 1px solid rgba(255,255,255,0.25);
             padding: 13px 16px;
             max-width: 380px;
             box-shadow: 0 0 0 0 rgba(192,57,43,0.5);
@@ -76,6 +77,32 @@
         .side-highlight p { margin: 0; font-size: 0.9rem; color: #fff; line-height: 1.6; font-weight: 500; }
         .side-stat b { display: block; font-family: var(--font-display, 'Cormorant Garamond'), serif; font-size: 1.7rem; color: var(--cream); }
         .side-stat span { font-size: 0.74rem; color: #a9c2ab; }
+
+        /* Glass swipe strip — same component on desktop and mobile */
+        .glass-strip {
+            position: relative; z-index: 1;
+            display: flex; gap: 12px;
+            margin-top: 40px;
+            overflow-x: auto;
+            scroll-snap-type: x proximity;
+            padding: 2px 2px 6px;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+        }
+        .glass-strip::-webkit-scrollbar { display: none; }
+        .glass-card {
+            scroll-snap-align: start;
+            flex: 0 0 auto;
+            min-width: 128px;
+            background: rgba(247,242,234,0.09);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            border: 1.5px solid rgba(247,242,234,0.24);
+            border-radius: 16px;
+            padding: 16px 18px 14px;
+            transition: border-color 0.2s, background 0.2s;
+        }
+        .glass-card:hover { border-color: rgba(201,168,76,0.5); background: rgba(247,242,234,0.13); }
 
         .side-foot { position: relative; z-index: 1; font-size: 0.76rem; color: #a9c2ab; }
 
@@ -147,7 +174,8 @@
             .side-headline { font-size: 1.65rem; margin-bottom: 14px; }
             .side-highlight { max-width: 100%; padding: 11px 14px; }
             .side-highlight p { font-size: 0.84rem; }
-            .side-stats { margin-top: 22px; gap: 22px; flex-wrap: wrap; }
+            .glass-strip { margin-top: 22px; gap: 10px; }
+            .glass-card { min-width: 108px; padding: 13px 15px 11px; }
             .side-stat b { font-size: 1.4rem; }
             .side-foot { margin-top: 18px; }
             .auth-form-wrap { padding: 32px 20px 48px; }
@@ -160,7 +188,8 @@
             .side-headline { font-size: 1.45rem; }
             .side-highlight { flex-direction: row; padding: 10px 12px; }
             .side-highlight p { font-size: 0.8rem; }
-            .side-stats { gap: 16px; }
+            .glass-strip { gap: 8px; }
+            .glass-card { min-width: 96px; padding: 11px 12px 10px; border-radius: 13px; }
             .auth-form-wrap { padding: 26px 16px 40px; }
             .auth-card { max-width: 100%; }
             .field-row { flex-wrap: wrap; gap: 10px; align-items: flex-start; }
@@ -183,10 +212,10 @@
             <h1 class="side-headline">Welcome back to<br>the <em>farm</em>.</h1>
             <div class="side-highlight"><i class="fas fa-fire"></i><p>Sign in for member pricing, festival offers, and to pick up right where your cart left off.</p></div>
         </div>
-        <div class="side-stats">
-            <div class="side-stat"><b>5</b><span>Beehive colonies</span></div>
-            <div class="side-stat"><b>6+</b><span>Fruit varieties</span></div>
-            <div class="side-stat"><b>100%</b><span>Organic, home-grown</span></div>
+        <div class="glass-strip">
+            <div class="glass-card side-stat"><b>5</b><span>Beehive colonies</span></div>
+            <div class="glass-card side-stat"><b>6+</b><span>Fruit varieties</span></div>
+            <div class="glass-card side-stat"><b>100%</b><span>Organic, home-grown</span></div>
         </div>
         <div class="side-foot">Bhulka Danda, Tilottama, Rupandehi, Nepal 🇳🇵</div>
     </aside>
