@@ -6,89 +6,298 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sign Up — Angan Baari</title>
     <link rel="shortcut icon" href="{% static 'favicon.ico' %}">
-    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,400&family=DM+Sans:wght@300;400;500;600;700&family=Cinzel:wght@500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
     <link rel="stylesheet" href="{% static 'style.css' %}">
     <style>
-        .auth-page { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; background: var(--cream); position: relative; }
-        .back-to-shop { position: absolute; top: 24px; left: 24px; display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 50px; background: var(--white); color: var(--moss); font-size: 0.82rem; font-weight: 500; text-decoration: none; box-shadow: 0 2px 10px rgba(26,47,30,0.08); transition: background 0.2s, transform 0.2s; }
-        .back-to-shop:hover { background: var(--moss); color: white; transform: translateX(-2px); }
-        .auth-logo-link { display: block; text-decoration: none; }
-        @media (max-width: 480px) {
-            .back-to-shop { top: 14px; left: 14px; padding: 7px 13px; font-size: 0.78rem; }
-            .auth-card { padding-top: 60px; }
+        :root {
+            --moss: var(--moss, #4a7c59);
+            --gold: var(--gold, #c9a84c);
+            --forest: var(--forest, #1a2f1e);
+            --cream: var(--cream, #f7f2ea);
+            --mist: var(--mist, #e4e0d6);
+            --text-muted: var(--text-muted, #7a8a7d);
         }
-        .auth-card { background: var(--white); border-radius: 20px; padding: 48px 40px; width: 100%; max-width: 420px; box-shadow: 0 20px 60px rgba(26,47,30,0.12); }
-        .auth-logo { text-align: center; margin-bottom: 32px; }
-        .auth-logo i { font-size: 2rem; color: var(--moss); }
-        .auth-logo h1 { font-family: var(--font-display); font-size: 1.8rem; color: var(--forest); margin: 8px 0 4px; }
-        .auth-logo p { font-size: 0.85rem; color: var(--text-muted); }
-        .auth-title { font-family: var(--font-display); font-size: 1.4rem; color: var(--forest); margin-bottom: 24px; }
-        .form-group { margin-bottom: 16px; }
-        .form-group label { display: block; font-size: 0.8rem; font-family: var(--font-accent); letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 6px; }
-        .form-group input { width: 100%; padding: 12px 16px; border: 1.5px solid var(--mist); border-radius: 10px; font-size: 0.95rem; font-family: var(--font-body); color: var(--forest); outline: none; transition: border-color 0.2s; box-sizing: border-box; }
-        .form-group input:focus { border-color: var(--moss); }
-        .btn-auth { width: 100%; padding: 14px; background: var(--forest); color: white; border: none; border-radius: 10px; font-size: 0.95rem; font-weight: 600; font-family: var(--font-body); cursor: pointer; transition: background 0.3s; margin-top: 8px; }
-        .btn-auth:hover { background: var(--moss); }
-        .auth-links { text-align: center; margin-top: 20px; font-size: 0.85rem; color: var(--text-muted); }
-        .auth-links a { color: var(--moss); font-weight: 500; }
-        .messages { margin-bottom: 16px; }
-        .msg { padding: 10px 14px; border-radius: 8px; font-size: 0.85rem; margin-bottom: 8px; }
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: var(--font-body, 'DM Sans'), sans-serif; }
+
+        .auth-shell {
+            min-height: 100vh;
+            display: grid;
+            grid-template-columns: 42% 58%;
+        }
+
+        /* ── Left: living panel ── */
+        .auth-side {
+            position: relative;
+            background: linear-gradient(165deg, var(--forest) 0%, #24401f 55%, var(--moss) 130%);
+            color: var(--cream);
+            padding: 48px 44px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            overflow: hidden;
+        }
+        .auth-side::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background-image:
+                radial-gradient(circle at 15% 20%, rgba(201,168,76,0.14) 0, transparent 40%),
+                radial-gradient(circle at 85% 75%, rgba(201,168,76,0.10) 0, transparent 45%);
+            pointer-events: none;
+        }
+        .side-top { position: relative; z-index: 1; }
+        .side-logo { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; color: var(--cream); }
+        .side-logo i { font-size: 1.3rem; color: var(--gold); }
+        .side-logo span { font-family: var(--font-accent, 'Cinzel'), serif; font-size: 0.78rem; letter-spacing: 0.14em; text-transform: uppercase; }
+
+        .side-headline {
+            position: relative; z-index: 1;
+            font-family: var(--font-display, 'Cormorant Garamond'), serif;
+            font-weight: 400;
+            font-size: clamp(2.2rem, 3.6vw, 3.1rem);
+            line-height: 1.15;
+            margin: 40px 0 18px;
+        }
+        .side-headline em { font-style: italic; color: var(--gold); }
+        .side-sub { position: relative; z-index: 1; font-size: 0.95rem; color: #cfe0d1; max-width: 380px; line-height: 1.7; }
+
+        /* Growing vine — purely decorative rhythm of the farm, marks time passing down the panel */
+        .vine-rail { position: relative; z-index: 1; margin-top: 44px; padding-left: 26px; border-left: 1.5px solid rgba(247,242,234,0.22); }
+        .vine-item { position: relative; padding: 0 0 26px 0; font-size: 0.86rem; color: #cfe0d1; }
+        .vine-item:last-child { padding-bottom: 0; }
+        .vine-item::before {
+            content: ''; position: absolute; left: -31px; top: 4px; width: 9px; height: 9px; border-radius: 50%;
+            background: var(--gold); box-shadow: 0 0 0 4px rgba(201,168,76,0.16);
+        }
+        .vine-item b { display: block; color: var(--cream); font-weight: 600; margin-bottom: 2px; }
+
+        .side-foot { position: relative; z-index: 1; font-size: 0.76rem; color: #a9c2ab; }
+
+        /* ── Right: form ── */
+        .auth-form-wrap { display: flex; align-items: center; justify-content: center; padding: 48px 32px; background: var(--cream); }
+        .auth-card { width: 100%; max-width: 400px; animation: cardIn 0.5s ease both; }
+        @keyframes cardIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        .back-to-shop { display: inline-flex; align-items: center; gap: 6px; font-size: 0.8rem; font-weight: 500; color: var(--text-muted); text-decoration: none; margin-bottom: 28px; transition: color 0.2s; }
+        .back-to-shop:hover { color: var(--moss); }
+
+        .auth-eyebrow { font-family: var(--font-accent, 'Cinzel'), serif; font-size: 0.72rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--moss); margin-bottom: 8px; }
+        .auth-title { font-family: var(--font-display, 'Cormorant Garamond'), serif; font-size: 2rem; color: var(--forest); margin: 0 0 32px; font-weight: 400; }
+
+        .messages { margin-bottom: 18px; }
+        .msg { padding: 11px 14px; border-radius: 10px; font-size: 0.84rem; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
         .msg-error { background: #fef2f2; color: #c0392b; border: 1px solid #fecaca; }
         .msg-success { background: #f0fdf4; color: var(--moss); border: 1px solid #bbf7d0; }
-        .password-hint { font-size: 0.75rem; color: var(--text-muted); margin-top: 4px; }
+
+        .field { margin-bottom: 18px; }
+        .field label { display: block; font-size: 0.74rem; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 7px; }
+        .input-wrap { position: relative; display: flex; align-items: center; }
+        .input-wrap i.field-icon { position: absolute; left: 15px; font-size: 0.88rem; color: var(--text-muted); pointer-events: none; }
+        .input-wrap input {
+            width: 100%; padding: 13px 16px 13px 42px; border: 1.5px solid var(--mist); border-radius: 11px;
+            font-size: 0.95rem; font-family: inherit; color: var(--forest); outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s; background: #fff;
+        }
+        .input-wrap input:focus { border-color: var(--moss); box-shadow: 0 0 0 3px rgba(74,124,89,0.12); }
+        .input-wrap input.pw-input { padding-right: 44px; }
+
+        .pw-toggle {
+            position: absolute; right: 6px; background: none; border: none; cursor: pointer;
+            color: var(--text-muted); font-size: 0.92rem; padding: 8px; border-radius: 8px;
+            display: flex; align-items: center; justify-content: center; transition: color 0.2s, background 0.2s;
+        }
+        .pw-toggle:hover { color: var(--moss); background: var(--mist); }
+        .pw-toggle:focus-visible { outline: 2px solid var(--moss); outline-offset: 2px; }
+
+        /* Strength meter — leaves fill in as the password grows stronger */
+        .strength-row { display: flex; align-items: center; gap: 10px; margin-top: 9px; }
+        .strength-leaves { display: flex; gap: 4px; }
+        .strength-leaves i { font-size: 0.72rem; color: var(--mist); transition: color 0.25s ease, transform 0.25s ease; }
+        .strength-leaves i.on { color: var(--moss); transform: scale(1.12); }
+        .strength-leaves i.on.strong { color: var(--gold); }
+        .strength-label { font-size: 0.72rem; color: var(--text-muted); font-weight: 600; min-height: 1em; }
+
+        .match-hint { font-size: 0.74rem; margin-top: 7px; display: none; align-items: center; gap: 5px; }
+        .match-hint.show { display: flex; }
+        .match-hint.ok { color: var(--moss); }
+        .match-hint.no { color: #c0392b; }
+
+        .btn-auth {
+            width: 100%; padding: 14px; background: var(--forest); color: var(--cream); border: none;
+            border-radius: 11px; font-size: 0.95rem; font-weight: 600; font-family: inherit; cursor: pointer;
+            transition: background 0.25s, transform 0.15s; margin-top: 6px;
+            display: flex; align-items: center; justify-content: center; gap: 9px;
+        }
+        .btn-auth:hover { background: var(--moss); }
+        .btn-auth:active { transform: scale(0.98); }
+        .btn-auth:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+        .auth-links { text-align: center; margin-top: 22px; font-size: 0.85rem; color: var(--text-muted); }
+        .auth-links a { color: var(--moss); font-weight: 600; text-decoration: none; }
+        .auth-links a:hover { text-decoration: underline; }
+
+        @media (max-width: 860px) {
+            .auth-shell { grid-template-columns: 1fr; }
+            .auth-side { padding: 32px 26px; }
+            .side-headline { font-size: 1.7rem; margin: 22px 0 12px; }
+            .side-sub { font-size: 0.86rem; }
+            .vine-rail { margin-top: 24px; }
+            .vine-item { padding-bottom: 16px; font-size: 0.8rem; }
+            .auth-form-wrap { padding: 36px 22px 56px; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .auth-card { animation: none; }
+            .strength-leaves i, .btn-auth { transition: none; }
+        }
     </style>
 </head>
 <body>
-<div class="auth-page">
-    <a href="{% url 'shop' %}" class="back-to-shop"><i class="fas fa-arrow-left"></i> Back to Shop</a>
-    <div class="auth-card">
-        <a href="/" class="auth-logo-link">
-        <div class="auth-logo">
-            <i class="fas fa-seedling"></i>
-            <h1>आँगन बारी</h1>
-            <p>Angan Baari · Organic Farm</p>
+<div class="auth-shell">
+    <aside class="auth-side">
+        <div class="side-top">
+            <a href="/" class="side-logo"><i class="fas fa-seedling"></i><span>आँगन बारी · Angan Baari</span></a>
+            <h1 class="side-headline">Grow your <em>own</em><br>place at the table.</h1>
+            <p class="side-sub">Create an account to unlock member pricing on seasonal fruit, honey, and festival offers — straight from Bhulka Danda to your door.</p>
         </div>
-        </a>
-
-        <h2 class="auth-title">Create your account 🌱</h2>
-
-        {% if messages %}
-        <div class="messages">
-            {% for message in messages %}
-            <div class="msg msg-{{ message.tags }}">{{ message }}</div>
-            {% endfor %}
+        <div class="vine-rail">
+            <div class="vine-item"><b>Fresh, seasonal picks</b>Mango, lychee, papaya & more, harvested to order.</div>
+            <div class="vine-item"><b>Raw farm honey</b>From our own hives, five colonies strong.</div>
+            <div class="vine-item"><b>Member-only offers</b>Festival discounts unlocked once you're signed in.</div>
         </div>
-        {% endif %}
+        <div class="side-foot">Bhulka Danda, Tilottama, Rupandehi, Nepal 🇳🇵</div>
+    </aside>
 
-        <form method="POST">
-            {% csrf_token %}
-            <div class="form-group">
-                <label>Full Name</label>
-                <input type="text" name="name" placeholder="Ramesh Thapa" required autofocus>
-            </div>
-            <div class="form-group">
-                <label>Email Address</label>
-                <input type="email" name="email" placeholder="your@email.com" required>
-            </div>
-            <div class="form-group">
-                <label>Password</label>
-                <input type="password" name="password" placeholder="Min. 8 characters" required>
-                <p class="password-hint">At least 8 characters</p>
-            </div>
-            <div class="form-group">
-                <label>Confirm Password</label>
-                <input type="password" name="confirm_password" placeholder="Repeat your password" required>
-            </div>
-            <button type="submit" class="btn-auth">
-                <i class="fas fa-user-plus"></i> Create Account
-            </button>
-        </form>
+    <div class="auth-form-wrap">
+        <div class="auth-card">
+            <a href="{% url 'shop' %}" class="back-to-shop"><i class="fas fa-arrow-left"></i> Back to Shop</a>
 
-        <div class="auth-links">
-            Already have an account? <a href="{% url 'login' %}">Login</a>
+            <div class="auth-eyebrow">New here</div>
+            <h2 class="auth-title">Create your account</h2>
+
+            {% if messages %}
+            <div class="messages">
+                {% for message in messages %}
+                <div class="msg msg-{{ message.tags }}"><i class="fas fa-circle-exclamation"></i> {{ message }}</div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <form method="POST" id="signupForm" novalidate>
+                {% csrf_token %}
+
+                <div class="field">
+                    <label for="id_name">Full Name</label>
+                    <div class="input-wrap">
+                        <i class="fas fa-user field-icon"></i>
+                        <input type="text" id="id_name" name="name" placeholder="Ramesh Thapa" required autofocus autocomplete="name">
+                    </div>
+                </div>
+
+                <div class="field">
+                    <label for="id_email">Email Address</label>
+                    <div class="input-wrap">
+                        <i class="fas fa-envelope field-icon"></i>
+                        <input type="email" id="id_email" name="email" placeholder="your@email.com" required autocomplete="email">
+                    </div>
+                </div>
+
+                <div class="field">
+                    <label for="id_password">Password</label>
+                    <div class="input-wrap">
+                        <i class="fas fa-lock field-icon"></i>
+                        <input type="password" id="id_password" name="password" class="pw-input" placeholder="Min. 8 characters" required minlength="8" autocomplete="new-password">
+                        <button type="button" class="pw-toggle" data-target="id_password" aria-label="Show password">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
+                    <div class="strength-row">
+                        <div class="strength-leaves" id="strengthLeaves">
+                            <i class="fas fa-leaf"></i><i class="fas fa-leaf"></i><i class="fas fa-leaf"></i><i class="fas fa-leaf"></i>
+                        </div>
+                        <span class="strength-label" id="strengthLabel"></span>
+                    </div>
+                </div>
+
+                <div class="field">
+                    <label for="id_confirm_password">Confirm Password</label>
+                    <div class="input-wrap">
+                        <i class="fas fa-lock field-icon"></i>
+                        <input type="password" id="id_confirm_password" name="confirm_password" class="pw-input" placeholder="Repeat your password" required autocomplete="new-password">
+                        <button type="button" class="pw-toggle" data-target="id_confirm_password" aria-label="Show password">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
+                    <div class="match-hint" id="matchHint"><i class="fas fa-check"></i> <span></span></div>
+                </div>
+
+                <button type="submit" class="btn-auth">
+                    <i class="fas fa-user-plus"></i> Create Account
+                </button>
+            </form>
+
+            <div class="auth-links">
+                Already have an account? <a href="{% url 'login' %}">Login</a>
+            </div>
         </div>
     </div>
 </div>
+
+<script>
+    // Show / hide password toggle — shared by both password fields
+    document.querySelectorAll('.pw-toggle').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            const input = document.getElementById(btn.dataset.target);
+            const icon = btn.querySelector('i');
+            const showing = input.type === 'text';
+            input.type = showing ? 'password' : 'text';
+            icon.classList.toggle('fa-eye', showing);
+            icon.classList.toggle('fa-eye-slash', !showing);
+            btn.setAttribute('aria-label', showing ? 'Show password' : 'Hide password');
+        });
+    });
+
+    // Live password strength — four leaves fill in as length/variety grows
+    const pwInput = document.getElementById('id_password');
+    const leaves = document.querySelectorAll('#strengthLeaves i');
+    const strengthLabel = document.getElementById('strengthLabel');
+    const LABELS = ['', 'Weak', 'Fair', 'Good', 'Strong'];
+
+    function scorePassword(pw) {
+        if (!pw) return 0;
+        let score = 0;
+        if (pw.length >= 8) score++;
+        if (pw.length >= 12) score++;
+        if (/[A-Z]/.test(pw) && /[a-z]/.test(pw)) score++;
+        if (/[0-9]/.test(pw) || /[^A-Za-z0-9]/.test(pw)) score++;
+        return Math.min(score, 4);
+    }
+
+    pwInput.addEventListener('input', function () {
+        const score = scorePassword(pwInput.value);
+        leaves.forEach(function (leaf, i) {
+            leaf.classList.toggle('on', i < score);
+            leaf.classList.toggle('strong', score === 4);
+        });
+        strengthLabel.textContent = pwInput.value ? LABELS[score] : '';
+    });
+
+    // Live "do the passwords match" hint
+    const confirmInput = document.getElementById('id_confirm_password');
+    const matchHint = document.getElementById('matchHint');
+    function checkMatch() {
+        if (!confirmInput.value) { matchHint.classList.remove('show'); return; }
+        const ok = confirmInput.value === pwInput.value;
+        matchHint.classList.add('show');
+        matchHint.classList.toggle('ok', ok);
+        matchHint.classList.toggle('no', !ok);
+        matchHint.querySelector('i').className = ok ? 'fas fa-check' : 'fas fa-xmark';
+        matchHint.querySelector('span').textContent = ok ? 'Passwords match' : "Passwords don't match";
+    }
+    confirmInput.addEventListener('input', checkMatch);
+    pwInput.addEventListener('input', checkMatch);
+</script>
 </body>
 </html>
