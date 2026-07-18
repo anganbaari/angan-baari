@@ -106,7 +106,7 @@
         .auth-form-wrap {
             position: relative;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
-            padding: 24px 32px;
+            padding: 14px 32px;
             background: linear-gradient(135deg, var(--cream) 0%, #eee7d8 100%);
             overflow: hidden;
         }
@@ -118,13 +118,10 @@
                 radial-gradient(circle at 85% 80%, rgba(201,168,76,0.16) 0, transparent 45%);
             pointer-events: none;
         }
-        .auth-top { position: relative; z-index: 1; width: 100%; max-width: 400px; margin-bottom: 12px; }
-
-        /* Floating nav buttons for the empty side margins on wide screens —
-           the inline Back to Shop link (in .auth-top) handles narrower screens instead. */
+        /* Floating nav button for the empty right margin on wide screens only */
         .side-nav-float {
             display: none;
-            position: fixed; top: 28px; z-index: 20;
+            position: fixed; top: 28px; right: 28px; z-index: 20;
             align-items: center; gap: 8px;
             padding: 10px 18px; border-radius: 50px;
             background: rgba(74,124,89,0.14);
@@ -137,11 +134,8 @@
             transition: background 0.2s, border-color 0.2s;
         }
         .side-nav-float:hover { background: rgba(74,124,89,0.24); border-color: var(--moss); }
-        .side-nav-float.nav-left { left: 28px; }
-        .side-nav-float.nav-right { right: 28px; }
         @media (min-width: 1300px) {
             .side-nav-float { display: inline-flex; }
-            .auth-top { display: none; }
         }
         .auth-card {
             position: relative; z-index: 1;
@@ -152,18 +146,18 @@
             -webkit-backdrop-filter: blur(22px);
             border: 1.5px solid rgba(255,255,255,0.6);
             border-radius: 28px;
-            padding: 26px 30px;
+            padding: 20px 28px;
             box-shadow: 0 20px 60px rgba(26,47,30,0.10);
         }
         @keyframes cardIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-        .back-to-shop { display: inline-flex; align-items: center; gap: 6px; font-size: 0.8rem; font-weight: 500; color: var(--text-muted); text-decoration: none; transition: color 0.2s; }
+        .back-to-shop { display: inline-flex; align-items: center; gap: 6px; font-size: 0.8rem; font-weight: 500; color: var(--text-muted); text-decoration: none; margin-bottom: 14px; transition: color 0.2s; }
         .back-to-shop:hover { color: var(--moss); }
 
         .auth-eyebrow { font-family: var(--font-accent, 'Cinzel'), serif; font-size: 0.72rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--moss); margin-bottom: 8px; }
-        .auth-title { font-family: var(--font-display, 'Cormorant Garamond'), serif; font-size: 2rem; color: var(--forest); margin: 0 0 18px; font-weight: 400; }
+        .auth-title { font-family: var(--font-display, 'Cormorant Garamond'), serif; font-size: 2rem; color: var(--forest); margin: 0 0 12px; font-weight: 400; }
 
-        .messages { margin-bottom: 18px; }
+        .messages { margin-bottom: 12px; }
 
         /* Quick sign-up buttons — live in the green panel now */
         .side-social-label { position: relative; z-index: 1; font-family: var(--font-accent, 'Cinzel'), serif; font-size: 0.7rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--gold); margin: 18px 0 10px; }
@@ -187,12 +181,12 @@
         .msg-error { background: #fef2f2; color: #c0392b; border: 1px solid #fecaca; }
         .msg-success { background: #f0fdf4; color: var(--moss); border: 1px solid #bbf7d0; }
 
-        .field { margin-bottom: 12px; }
+        .field { margin-bottom: 9px; }
         .field label { display: block; font-size: 0.74rem; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 7px; }
         .input-wrap { position: relative; display: flex; align-items: center; }
         .input-wrap i.field-icon { position: absolute; left: 15px; font-size: 0.88rem; color: var(--text-muted); pointer-events: none; }
         .input-wrap input {
-            width: 100%; padding: 10px 16px 10px 42px; border: 1.5px solid var(--mist); border-radius: 15px;
+            width: 100%; padding: 8px 16px 8px 42px; border: 1.5px solid var(--mist); border-radius: 14px;
             font-size: 0.95rem; font-family: inherit; color: var(--forest); outline: none;
             transition: border-color 0.2s, box-shadow 0.2s; background: #fff;
         }
@@ -208,7 +202,7 @@
         .pw-toggle:focus-visible { outline: 2px solid var(--moss); outline-offset: 2px; }
 
         /* Strength meter — leaves fill in as the password grows stronger */
-        .strength-row { display: flex; align-items: center; gap: 10px; margin-top: 9px; }
+        .strength-row { display: flex; align-items: center; gap: 10px; margin-top: 5px; }
         .strength-leaves { display: flex; gap: 4px; }
         .strength-leaves i { font-size: 0.72rem; color: var(--mist); transition: color 0.25s ease, transform 0.25s ease; }
         .strength-leaves i.on { color: var(--moss); transform: scale(1.12); }
@@ -221,7 +215,7 @@
         .match-hint.no { color: #c0392b; }
 
         .btn-auth {
-            width: 100%; padding: 11px; background: var(--forest); color: var(--cream); border: none;
+            width: 100%; padding: 9px; background: var(--forest); color: var(--cream); border: none;
             border-radius: 15px; font-size: 0.95rem; font-weight: 600; font-family: inherit; cursor: pointer;
             transition: background 0.25s, transform 0.15s; margin-top: 6px;
             display: flex; align-items: center; justify-content: center; gap: 9px;
@@ -230,7 +224,7 @@
         .btn-auth:active { transform: scale(0.98); }
         .btn-auth:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 
-        .auth-links { text-align: center; margin-top: 22px; font-size: 0.85rem; color: var(--text-muted); }
+        .auth-links { text-align: center; margin-top: 14px; font-size: 0.85rem; color: var(--text-muted); }
         .auth-links a { color: var(--moss); font-weight: 600; text-decoration: none; }
         .auth-links a:hover { text-decoration: underline; }
 
@@ -268,7 +262,6 @@
             .glass-card i { font-size: 0.8rem; margin-bottom: 5px; }
             .auth-form-wrap { padding: 20px 12px 36px; }
             .auth-card { max-width: 100%; padding: 22px 18px; border-radius: 20px; }
-            .auth-top { max-width: 100%; margin-bottom: 16px; }
             .strength-row { flex-wrap: wrap; }
             .input-wrap input { padding: 12px 14px 12px 40px; font-size: 0.9rem; }
             .social-btn { font-size: 0.82rem; padding: 11px 14px; }
@@ -314,11 +307,8 @@
     </aside>
 
     <div class="auth-form-wrap">
-        <div class="auth-top">
-            <a href="{% url 'shop' %}" class="back-to-shop"><i class="fas fa-arrow-left"></i> Back to Shop</a>
-        </div>
-
         <div class="auth-card">
+            <a href="{% url 'shop' %}" class="back-to-shop"><i class="fas fa-arrow-left"></i> Back to Shop</a>
             <div class="auth-eyebrow">New here</div>
             <h2 class="auth-title">Create your account</h2>
 
