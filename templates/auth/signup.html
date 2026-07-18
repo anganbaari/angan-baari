@@ -59,13 +59,13 @@
 
         .side-highlight {
             position: relative; z-index: 1;
-            display: flex; align-items: flex-start; gap: 10px;
+            display: flex; align-items: flex-start; gap: 12px;
             background: linear-gradient(90deg, #c0392b, #e67e22, #c0392b);
             background-size: 200% 100%;
-            border-radius: 16px;
+            border-radius: 18px;
             border: 1px solid rgba(255,255,255,0.25);
-            padding: 13px 16px;
-            max-width: 380px;
+            padding: 18px 22px;
+            max-width: 420px;
             animation: offer-gradient 3s linear infinite, offer-pulse 2s infinite;
         }
         @keyframes offer-gradient { 0% { background-position: 0% 50%; } 100% { background-position: 200% 50%; } }
@@ -73,16 +73,16 @@
             0%, 100% { box-shadow: 0 0 0 0 rgba(192,57,43,0.5); }
             50% { box-shadow: 0 0 0 8px rgba(192,57,43,0); }
         }
-        .side-highlight i { color: #fff; font-size: 0.95rem; margin-top: 2px; animation: flicker 1s infinite alternate; flex-shrink: 0; }
+        .side-highlight i { color: #fff; font-size: 1.15rem; margin-top: 3px; animation: flicker 1s infinite alternate; flex-shrink: 0; }
         @keyframes flicker { 0% { transform: scale(1) rotate(-3deg); opacity: 0.85; } 100% { transform: scale(1.15) rotate(3deg); opacity: 1; } }
-        .side-highlight p { margin: 0; font-size: 0.9rem; color: #fff; line-height: 1.6; font-weight: 500; }
+        .side-highlight p { margin: 0; font-size: 1rem; color: #fff; line-height: 1.6; font-weight: 500; }
 
         /* Glass swipe strip — same component on desktop and mobile */
         .glass-strip {
             position: relative; z-index: 1;
             min-width: 0;
             display: flex; gap: 8px;
-            margin-top: 40px;
+            margin-top: 20px;
         }
         .glass-card {
             flex: 1 1 0;
@@ -105,7 +105,7 @@
         /* ── Right: form ── */
         .auth-form-wrap {
             position: relative;
-            display: flex; align-items: center; justify-content: center;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
             padding: 48px 32px;
             background: linear-gradient(135deg, var(--cream) 0%, #eee7d8 100%);
             overflow: hidden;
@@ -118,6 +118,7 @@
                 radial-gradient(circle at 85% 80%, rgba(201,168,76,0.16) 0, transparent 45%);
             pointer-events: none;
         }
+        .auth-top { position: relative; z-index: 1; width: 100%; max-width: 400px; margin-bottom: 22px; }
         .auth-card {
             position: relative; z-index: 1;
             width: 100%; max-width: 400px;
@@ -132,7 +133,7 @@
         }
         @keyframes cardIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-        .back-to-shop { display: inline-flex; align-items: center; gap: 6px; font-size: 0.8rem; font-weight: 500; color: var(--text-muted); text-decoration: none; margin-bottom: 28px; transition: color 0.2s; }
+        .back-to-shop { display: inline-flex; align-items: center; gap: 6px; font-size: 0.8rem; font-weight: 500; color: var(--text-muted); text-decoration: none; margin-bottom: 20px; transition: color 0.2s; }
         .back-to-shop:hover { color: var(--moss); }
 
         .auth-eyebrow { font-family: var(--font-accent, 'Cinzel'), serif; font-size: 0.72rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--moss); margin-bottom: 8px; }
@@ -156,7 +157,7 @@
         .social-phone:hover { border-color: var(--moss); box-shadow: 0 2px 10px rgba(74,124,89,0.15); }
         .social-phone i { color: var(--moss); }
 
-        .divider-or { display: flex; align-items: center; gap: 12px; margin: 4px 0 22px; }
+        .divider-or { display: flex; align-items: center; gap: 12px; margin: 4px 0 0; }
         .divider-or::before, .divider-or::after { content: ''; flex: 1; height: 1px; background: var(--mist); }
         .divider-or span { font-size: 0.74rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap; }
         .msg { padding: 11px 14px; border-radius: 12px; font-size: 0.84rem; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
@@ -221,7 +222,7 @@
             .side-headline { font-size: 1.65rem; margin: 20px 0 14px; }
             .side-highlight { max-width: 100%; padding: 11px 14px; }
             .side-highlight p { font-size: 0.84rem; }
-            .glass-strip { margin-top: 22px; gap: 8px; }
+            .glass-strip { margin-top: 16px; gap: 8px; }
             .glass-card { padding: 12px 10px 11px; }
             .glass-card p { display: none; }
             .side-foot { margin-top: 18px; }
@@ -236,16 +237,17 @@
             .side-headline { font-size: 1.45rem; }
             .side-highlight { padding: 10px 12px; }
             .side-highlight p { font-size: 0.8rem; }
-            .glass-strip { margin-top: 20px; gap: 8px; }
+            .glass-strip { margin-top: 14px; gap: 8px; }
             .glass-card { padding: 10px 8px 9px; border-radius: 13px; }
             .glass-card b { font-size: 0.68rem; }
             .glass-card i { font-size: 0.8rem; margin-bottom: 5px; }
             .auth-form-wrap { padding: 20px 12px 36px; }
             .auth-card { max-width: 100%; padding: 22px 18px; border-radius: 20px; }
+            .auth-top { max-width: 100%; margin-bottom: 16px; }
             .strength-row { flex-wrap: wrap; }
             .input-wrap input { padding: 12px 14px 12px 40px; font-size: 0.9rem; }
             .social-btn { font-size: 0.82rem; padding: 11px 14px; }
-            .divider-or { margin: 2px 0 18px; }
+            .divider-or { margin: 2px 0 0; }
         }
 
         @media (prefers-reduced-motion: reduce) {
@@ -272,19 +274,8 @@
     </aside>
 
     <div class="auth-form-wrap">
-        <div class="auth-card">
+        <div class="auth-top">
             <a href="{% url 'shop' %}" class="back-to-shop"><i class="fas fa-arrow-left"></i> Back to Shop</a>
-
-            <div class="auth-eyebrow">New here</div>
-            <h2 class="auth-title">Create your account</h2>
-
-            {% if messages %}
-            <div class="messages">
-                {% for message in messages %}
-                <div class="msg msg-{{ message.tags }}"><i class="fas fa-circle-exclamation"></i> {{ message }}</div>
-                {% endfor %}
-            </div>
-            {% endif %}
 
             <div class="social-buttons">
                 <a href="#" class="social-btn social-google" data-provider="google">
@@ -299,6 +290,19 @@
             </div>
 
             <div class="divider-or"><span>or sign up with email</span></div>
+        </div>
+
+        <div class="auth-card">
+            <div class="auth-eyebrow">New here</div>
+            <h2 class="auth-title">Create your account</h2>
+
+            {% if messages %}
+            <div class="messages">
+                {% for message in messages %}
+                <div class="msg msg-{{ message.tags }}"><i class="fas fa-circle-exclamation"></i> {{ message }}</div>
+                {% endfor %}
+            </div>
+            {% endif %}
 
             <form method="POST" id="signupForm" novalidate>
                 {% csrf_token %}
