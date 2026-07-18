@@ -106,7 +106,7 @@
         .auth-form-wrap {
             position: relative;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
-            padding: 48px 32px;
+            padding: 24px 32px;
             background: linear-gradient(135deg, var(--cream) 0%, #eee7d8 100%);
             overflow: hidden;
         }
@@ -118,7 +118,31 @@
                 radial-gradient(circle at 85% 80%, rgba(201,168,76,0.16) 0, transparent 45%);
             pointer-events: none;
         }
-        .auth-top { position: relative; z-index: 1; width: 100%; max-width: 400px; margin-bottom: 22px; }
+        .auth-top { position: relative; z-index: 1; width: 100%; max-width: 400px; margin-bottom: 12px; }
+
+        /* Floating nav buttons for the empty side margins on wide screens —
+           the inline Back to Shop link (in .auth-top) handles narrower screens instead. */
+        .side-nav-float {
+            display: none;
+            position: fixed; top: 28px; z-index: 20;
+            align-items: center; gap: 8px;
+            padding: 10px 18px; border-radius: 50px;
+            background: rgba(74,124,89,0.14);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            border: 1.5px solid rgba(74,124,89,0.4);
+            color: var(--forest);
+            font-size: 0.82rem; font-weight: 600;
+            text-decoration: none;
+            transition: background 0.2s, border-color 0.2s;
+        }
+        .side-nav-float:hover { background: rgba(74,124,89,0.24); border-color: var(--moss); }
+        .side-nav-float.nav-left { left: 28px; }
+        .side-nav-float.nav-right { right: 28px; }
+        @media (min-width: 1300px) {
+            .side-nav-float { display: inline-flex; }
+            .auth-top { display: none; }
+        }
         .auth-card {
             position: relative; z-index: 1;
             width: 100%; max-width: 400px;
@@ -128,7 +152,7 @@
             -webkit-backdrop-filter: blur(22px);
             border: 1.5px solid rgba(255,255,255,0.6);
             border-radius: 28px;
-            padding: 36px 32px;
+            padding: 26px 30px;
             box-shadow: 0 20px 60px rgba(26,47,30,0.10);
         }
         @keyframes cardIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
@@ -137,7 +161,7 @@
         .back-to-shop:hover { color: var(--moss); }
 
         .auth-eyebrow { font-family: var(--font-accent, 'Cinzel'), serif; font-size: 0.72rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--moss); margin-bottom: 8px; }
-        .auth-title { font-family: var(--font-display, 'Cormorant Garamond'), serif; font-size: 2rem; color: var(--forest); margin: 0 0 32px; font-weight: 400; }
+        .auth-title { font-family: var(--font-display, 'Cormorant Garamond'), serif; font-size: 2rem; color: var(--forest); margin: 0 0 18px; font-weight: 400; }
 
         .messages { margin-bottom: 18px; }
 
@@ -163,12 +187,12 @@
         .msg-error { background: #fef2f2; color: #c0392b; border: 1px solid #fecaca; }
         .msg-success { background: #f0fdf4; color: var(--moss); border: 1px solid #bbf7d0; }
 
-        .field { margin-bottom: 18px; }
+        .field { margin-bottom: 12px; }
         .field label { display: block; font-size: 0.74rem; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 7px; }
         .input-wrap { position: relative; display: flex; align-items: center; }
         .input-wrap i.field-icon { position: absolute; left: 15px; font-size: 0.88rem; color: var(--text-muted); pointer-events: none; }
         .input-wrap input {
-            width: 100%; padding: 13px 16px 13px 42px; border: 1.5px solid var(--mist); border-radius: 15px;
+            width: 100%; padding: 10px 16px 10px 42px; border: 1.5px solid var(--mist); border-radius: 15px;
             font-size: 0.95rem; font-family: inherit; color: var(--forest); outline: none;
             transition: border-color 0.2s, box-shadow 0.2s; background: #fff;
         }
@@ -197,7 +221,7 @@
         .match-hint.no { color: #c0392b; }
 
         .btn-auth {
-            width: 100%; padding: 14px; background: var(--forest); color: var(--cream); border: none;
+            width: 100%; padding: 11px; background: var(--forest); color: var(--cream); border: none;
             border-radius: 15px; font-size: 0.95rem; font-weight: 600; font-family: inherit; cursor: pointer;
             transition: background 0.25s, transform 0.15s; margin-top: 6px;
             display: flex; align-items: center; justify-content: center; gap: 9px;
@@ -258,6 +282,8 @@
     </style>
 </head>
 <body>
+<a href="{% url 'shop' %}" class="side-nav-float nav-left"><i class="fas fa-arrow-left"></i> Back to Shop</a>
+<a href="/" class="side-nav-float nav-right">Back to Website <i class="fas fa-arrow-right"></i></a>
 <div class="auth-shell">
     <aside class="auth-side">
         <div class="side-top">
