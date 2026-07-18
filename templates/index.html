@@ -938,8 +938,7 @@
                         <p class="fs-shop-brand-line">आँगन बारी पसल</p>
 
                         {% if featured_products %}
-                        <div class="mini-shop-glass-panel">
-                            <!-- Row 1 — rotates one direction -->
+                        <!-- Row 1 — rotates one direction -->
                             <div class="carousel-3d-scene" id="miniShopScene">
                                 <div class="carousel-3d" id="miniShopRing">
                                     {% for product in featured_products %}
@@ -1006,7 +1005,6 @@
                                 <div class="carousel-3d-dots" id="miniShopDots2"></div>
                                 <button type="button" class="carousel-3d-arrow" id="miniShopNext2" aria-label="Next product"><i class="fas fa-chevron-right"></i></button>
                             </div>
-                        </div>
                         {% endif %}
 
                         <a href="{% url 'shop' %}" class="fs-shop-btn">

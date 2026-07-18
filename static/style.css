@@ -5488,7 +5488,11 @@ ul { list-style: none; }
     display: flex;
     flex-direction: column;
     align-items: center;
-    background: transparent;
+    background: rgba(255,255,255,0.08);
+    -webkit-backdrop-filter: blur(14px);
+    backdrop-filter: blur(14px);
+    border: 1px solid rgba(255,255,255,0.18);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.25);
 }
 
 .fs-shop-cta .fs-form-title { margin-top: 4px; margin-bottom: 2px; color: var(--cream); }
@@ -5641,22 +5645,26 @@ ul { list-style: none; }
 .carousel-3d-scene {
     width: 100%;
     max-width: 320px;
-    height: 210px;
-    margin: 20px auto 8px;
+    height: 190px;
+    margin: 8px auto 2px;
     perspective: 900px;
     position: relative;
     cursor: grab;
     touch-action: pan-y;
+    overflow: hidden;
+    border-radius: 16px;
     --carousel-radius: 130;
+    --carousel-spacing: 148;
 }
 .carousel-3d-scene.dragging { cursor: grabbing; }
 
 @media (min-width: 1025px) {
     .carousel-3d-scene {
         max-width: 92%;
-        height: 280px;
+        height: 210px;
         perspective: 1500px;
         --carousel-radius: 270;
+        --carousel-spacing: 148;
     }
     .ring-card {
         width: 130px;
@@ -5665,22 +5673,8 @@ ul { list-style: none; }
     }
 }
 
-/* Glass panel wrapping both carousel rows — lets the delivery section's
-   background photo show through with a frosted, translucent look
-   instead of either a solid card or fully invisible container. */
-.mini-shop-glass-panel {
-    width: 100%;
-    background: rgba(255,255,255,0.08);
-    -webkit-backdrop-filter: blur(14px);
-    backdrop-filter: blur(14px);
-    border: 1px solid rgba(255,255,255,0.18);
-    border-radius: 20px;
-    padding: 18px 10px 12px;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.25);
-}
-
 .carousel-3d-scene-row2 {
-    margin-top: 6px;
+    margin-top: -8px;
 }
 
 .carousel-3d {
@@ -5786,7 +5780,7 @@ ul { list-style: none; }
     align-items: center;
     justify-content: center;
     gap: 16px;
-    margin-bottom: 18px;
+    margin-bottom: 4px;
 }
 .carousel-3d-arrow {
     width: 32px;

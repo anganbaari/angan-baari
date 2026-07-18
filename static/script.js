@@ -1,5 +1,5 @@
 /* ================================================================
-   Angan Baari— Premium JavaScript
+   Angan Baari — Premium JavaScript
    Features: Loader, Navbar scroll, Carousel, Lightbox,
              ScrollSpy, AOS init, Animated Counters, Mobile Menu
 ================================================================ */
@@ -1069,15 +1069,18 @@ function initMiniShopCarousel(sceneId, ringId, dotsId, prevId, nextId, autoplayD
     // see the @media (min-width: 1025px) override in style.css.
     const radius = parseFloat(getComputedStyle(scene).getPropertyValue('--carousel-radius')) || 130;
 
-    // On desktop, show TWO cards prominently side by side instead of
-    // just one dead-center. This works by rotating the whole ring half
-    // a step so the "front" position sits exactly between two cards
-    // (instead of on top of one), then treating both of those as
-    // equally "front" — rather than trying to force a single card to
-    // represent two products.
+    // Desktop uses a different layout entirely: a "coverflow" style
+    // arrangement (cards positioned mainly via translateX, with a
+    // gentle 3D tilt) instead of true circular ring rotation. The
+    // previous approach tried to make two cards symmetric around the
+    // front by angle alone — but a wide ring radius (needed so cards
+    // don't overlap while rotating) also pushes symmetric cards far
+    // apart in actual screen position, which is why it looked like one
+    // big center card plus two disconnected slivers. Coverflow avoids
+    // that because card spacing is a direct, independent pixel value,
+    // not a side effect of the rotation radius.
     const showTwoFront = window.matchMedia('(min-width: 1025px)').matches;
-    const frontOffset = showTwoFront ? angleStep / 2 : 0;
-    const frontThreshold = showTwoFront ? angleStep * 0.75 : angleStep / 2;
+    const spacing = parseFloat(getComputedStyle(scene).getPropertyValue('--carousel-spacing')) || 148;
 
     cards.forEach((card, i) => {
         card.dataset.baseAngle = i * angleStep;
@@ -1099,10 +1102,11 @@ function initMiniShopCarousel(sceneId, ringId, dotsId, prevId, nextId, autoplayD
         return ((logicalIndex % N) + N) % N;
     }
 
-    function updateCardStates() {
+    function renderRing() {
+        ring.style.transform = `rotateY(${currentRotation}deg)`;
         cards.forEach((card, i) => {
             const baseAngle = i * angleStep;
-            const cardAngle = (baseAngle + currentRotation + frontOffset) % 360;
+            const cardAngle = (baseAngle + currentRotation) % 360;
             const normalized = ((cardAngle % 360) + 360) % 360;
             const distFromFront = Math.min(normalized, 360 - normalized);
 
@@ -1111,14 +1115,46 @@ function initMiniShopCarousel(sceneId, ringId, dotsId, prevId, nextId, autoplayD
             card.style.transform = `rotateY(${baseAngle}deg) translateZ(${radius}px) scale(${scale.toFixed(3)})`;
 
             card.classList.remove('is-front', 'is-side', 'is-back');
-            if (distFromFront < frontThreshold) card.classList.add('is-front');
+            if (distFromFront < angleStep / 2) card.classList.add('is-front');
             else if (distFromFront < 90) card.classList.add('is-side');
             else card.classList.add('is-back');
         });
     }
 
+    function renderCoverflow() {
+        ring.style.transform = 'none'; // positioning happens per-card, not on the ring itself
+        const continuousIndex = -currentRotation / angleStep; // fractional during drag
+        cards.forEach((card, i) => {
+            let rawOffset = i - continuousIndex;
+            // wrap to the shortest path so cards don't take the "long way around"
+            while (rawOffset > N / 2) rawOffset -= N;
+            while (rawOffset <= -N / 2) rawOffset += N;
+            // shift by 0.5 so a PAIR of cards straddles dead-center,
+            // instead of one single card sitting on it
+            const offset = rawOffset - 0.5;
+            const absOffset = Math.abs(offset);
+
+            const xPos = offset * spacing;
+            const rotateYval = Math.max(-65, Math.min(65, offset * 24));
+            const z = -absOffset * 70;
+            const scale = Math.max(0.55, 1.08 - absOffset * 0.16);
+
+            card.style.transform =
+                `translateX(${xPos.toFixed(1)}px) translateZ(${z.toFixed(1)}px) rotateY(${rotateYval.toFixed(1)}deg) scale(${scale.toFixed(3)})`;
+
+            card.classList.remove('is-front', 'is-side', 'is-back');
+            if (absOffset < 0.75) card.classList.add('is-front');
+            else if (absOffset < 2) card.classList.add('is-side');
+            else card.classList.add('is-back');
+        });
+    }
+
+    function updateCardStates() {
+        if (showTwoFront) renderCoverflow();
+        else renderRing();
+    }
+
     function render() {
-        ring.style.transform = `rotateY(${currentRotation}deg)`;
         updateCardStates();
         const active = activeDotIndex();
         dots.forEach((d, i) => d.classList.toggle('active', i === active));
@@ -1163,7 +1199,6 @@ function initMiniShopCarousel(sceneId, ringId, dotsId, prevId, nextId, autoplayD
         const delta = clientX - startX;
         dragDistance = Math.abs(delta);
         currentRotation = startRotation + delta * 0.4;
-        ring.style.transform = `rotateY(${currentRotation}deg)`;
         updateCardStates();
     }
     function dragEnd() {
