@@ -133,7 +133,7 @@
         }
         @keyframes cardIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-        .back-to-shop { display: inline-flex; align-items: center; gap: 6px; font-size: 0.8rem; font-weight: 500; color: var(--text-muted); text-decoration: none; margin-bottom: 20px; transition: color 0.2s; }
+        .back-to-shop { display: inline-flex; align-items: center; gap: 6px; font-size: 0.8rem; font-weight: 500; color: var(--text-muted); text-decoration: none; transition: color 0.2s; }
         .back-to-shop:hover { color: var(--moss); }
 
         .auth-eyebrow { font-family: var(--font-accent, 'Cinzel'), serif; font-size: 0.72rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--moss); margin-bottom: 8px; }
@@ -141,25 +141,24 @@
 
         .messages { margin-bottom: 18px; }
 
-        .social-buttons { display: flex; flex-direction: column; gap: 10px; margin-bottom: 22px; }
+        /* Quick sign-up buttons — live in the green panel now */
+        .side-social-label { position: relative; z-index: 1; font-family: var(--font-accent, 'Cinzel'), serif; font-size: 0.7rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--gold); margin: 18px 0 10px; }
+        .social-buttons { position: relative; z-index: 1; display: flex; flex-direction: column; gap: 9px; margin-bottom: 18px; }
         .social-btn {
             display: flex; align-items: center; justify-content: center; gap: 10px;
-            padding: 12px 16px; border-radius: 14px; font-size: 0.88rem; font-weight: 600;
-            text-decoration: none; border: 1.5px solid var(--mist); transition: transform 0.15s, box-shadow 0.2s, border-color 0.2s;
+            padding: 11px 16px; border-radius: 13px; font-size: 0.84rem; font-weight: 600;
+            text-decoration: none; border: 1.5px solid transparent; transition: transform 0.15s, box-shadow 0.2s, border-color 0.2s;
         }
         .social-btn:active { transform: scale(0.98); }
         .social-google { background: #fff; color: #3c4043; }
-        .social-google:hover { border-color: #4285F4; box-shadow: 0 2px 10px rgba(66,133,244,0.15); }
+        .social-google:hover { box-shadow: 0 2px 12px rgba(0,0,0,0.25); }
         .social-google i { color: #4285F4; }
-        .social-facebook { background: #1877F2; color: #fff; border-color: #1877F2; }
+        .social-facebook { background: #1877F2; color: #fff; }
         .social-facebook:hover { background: #1564d1; }
-        .social-phone { background: #fff; color: var(--forest); }
-        .social-phone:hover { border-color: var(--moss); box-shadow: 0 2px 10px rgba(74,124,89,0.15); }
-        .social-phone i { color: var(--moss); }
+        .social-phone { background: rgba(247,242,234,0.12); color: var(--cream); border-color: rgba(247,242,234,0.35); backdrop-filter: blur(10px); }
+        .social-phone:hover { background: rgba(247,242,234,0.2); }
+        .social-phone i { color: var(--gold); }
 
-        .divider-or { display: flex; align-items: center; gap: 12px; margin: 4px 0 0; }
-        .divider-or::before, .divider-or::after { content: ''; flex: 1; height: 1px; background: var(--mist); }
-        .divider-or span { font-size: 0.74rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap; }
         .msg { padding: 11px 14px; border-radius: 12px; font-size: 0.84rem; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
         .msg-error { background: #fef2f2; color: #c0392b; border: 1px solid #fecaca; }
         .msg-success { background: #f0fdf4; color: var(--moss); border: 1px solid #bbf7d0; }
@@ -225,6 +224,8 @@
             .glass-strip { margin-top: 12px; gap: 8px; }
             .glass-card { padding: 12px 10px 11px; }
             .glass-card p { display: none; }
+            .side-social-label { margin: 14px 0 8px; }
+            .social-buttons { gap: 8px; margin-bottom: 14px; }
             .side-foot { margin-top: 18px; }
             .auth-form-wrap { padding: 24px 16px 40px; }
             .auth-card { padding: 28px 24px; border-radius: 22px; }
@@ -247,7 +248,6 @@
             .strength-row { flex-wrap: wrap; }
             .input-wrap input { padding: 12px 14px 12px 40px; font-size: 0.9rem; }
             .social-btn { font-size: 0.82rem; padding: 11px 14px; }
-            .divider-or { margin: 2px 0 0; }
         }
 
         @media (prefers-reduced-motion: reduce) {
@@ -265,6 +265,20 @@
             <h1 class="side-headline">Grow your <em>own</em><br>place at the table.</h1>
             <div class="side-highlight"><i class="fas fa-fire"></i><p>Create an account to unlock member pricing on seasonal fruit, honey, and festival offers — straight from Bhulka Danda to your door.</p></div>
         </div>
+
+        <div class="side-social-label">Quick sign up</div>
+        <div class="social-buttons">
+            <a href="#" class="social-btn social-google" data-provider="google">
+                <i class="fab fa-google"></i> Continue with Google
+            </a>
+            <a href="#" class="social-btn social-facebook" data-provider="facebook">
+                <i class="fab fa-facebook-f"></i> Continue with Facebook
+            </a>
+            <a href="#" class="social-btn social-phone" data-provider="phone">
+                <i class="fas fa-phone"></i> Continue with Phone Number
+            </a>
+        </div>
+
         <div class="glass-strip">
             <div class="glass-card"><i class="fas fa-apple-whole"></i><b>Fresh, seasonal picks</b><p>Mango, lychee, papaya & more, harvested to order.</p></div>
             <div class="glass-card"><i class="fas fa-jar"></i><b>Raw farm honey</b><p>From our own hives, five colonies strong.</p></div>
@@ -276,20 +290,6 @@
     <div class="auth-form-wrap">
         <div class="auth-top">
             <a href="{% url 'shop' %}" class="back-to-shop"><i class="fas fa-arrow-left"></i> Back to Shop</a>
-
-            <div class="social-buttons">
-                <a href="#" class="social-btn social-google" data-provider="google">
-                    <i class="fab fa-google"></i> Continue with Google
-                </a>
-                <a href="#" class="social-btn social-facebook" data-provider="facebook">
-                    <i class="fab fa-facebook-f"></i> Continue with Facebook
-                </a>
-                <a href="#" class="social-btn social-phone" data-provider="phone">
-                    <i class="fas fa-phone"></i> Continue with Phone Number
-                </a>
-            </div>
-
-            <div class="divider-or"><span>or sign up with email</span></div>
         </div>
 
         <div class="auth-card">
