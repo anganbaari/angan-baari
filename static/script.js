@@ -1,5 +1,5 @@
 /* ================================================================
-   Angan Baari — Premium JavaScript
+   Angan Baari— Premium JavaScript
    Features: Loader, Navbar scroll, Carousel, Lightbox,
              ScrollSpy, AOS init, Animated Counters, Mobile Menu
 ================================================================ */
@@ -1051,13 +1051,10 @@ document.addEventListener('DOMContentLoaded', () => {
 // with drag/swipe, autoplay, arrows, and dots. Reusable so both rows
 // (which rotate in opposite directions) share identical logic.
 // ================================================================
-function initMiniShopCarousel(sceneId, ringId, dotsId, prevId, nextId, autoplayDirection, startOffsetFraction) {
+function initMiniShopCarousel(sceneId, ringId, autoplayDirection, startOffsetFraction) {
     const scene = document.getElementById(sceneId);
     const ring = document.getElementById(ringId);
-    const dotsWrap = document.getElementById(dotsId);
-    const prevBtn = document.getElementById(prevId);
-    const nextBtn = document.getElementById(nextId);
-    if (!scene || !ring || !dotsWrap) return;
+    if (!scene || !ring) return;
 
     const cards = Array.from(ring.querySelectorAll('.ring-card'));
     const N = cards.length;
@@ -1086,21 +1083,8 @@ function initMiniShopCarousel(sceneId, ringId, dotsId, prevId, nextId, autoplayD
         card.dataset.baseAngle = i * angleStep;
     });
 
-    // Build one dot per card
-    cards.forEach((_, i) => {
-        const dot = document.createElement('div');
-        dot.className = 'carousel-3d-dot' + (i === 0 ? ' active' : '');
-        dot.addEventListener('click', () => goToDot(i));
-        dotsWrap.appendChild(dot);
-    });
-    const dots = Array.from(dotsWrap.querySelectorAll('.carousel-3d-dot'));
-
     let logicalIndex = Math.round((startOffsetFraction || 0) * N); // unwrapped — keeps counting up/down, never resets/snaps backward
     let currentRotation = -logicalIndex * angleStep;
-
-    function activeDotIndex() {
-        return ((logicalIndex % N) + N) % N;
-    }
 
     function renderRing() {
         ring.style.transform = `rotateY(${currentRotation}deg)`;
@@ -1156,8 +1140,6 @@ function initMiniShopCarousel(sceneId, ringId, dotsId, prevId, nextId, autoplayD
 
     function render() {
         updateCardStates();
-        const active = activeDotIndex();
-        dots.forEach((d, i) => d.classList.toggle('active', i === active));
     }
 
     function goToStep(delta) {
@@ -1165,19 +1147,6 @@ function initMiniShopCarousel(sceneId, ringId, dotsId, prevId, nextId, autoplayD
         currentRotation = -logicalIndex * angleStep;
         render();
     }
-
-    function goToDot(targetIndex) {
-        const current = activeDotIndex();
-        let diff = targetIndex - current;
-        if (diff > N / 2) diff -= N;
-        if (diff < -N / 2) diff += N;
-        logicalIndex += diff;
-        currentRotation = -logicalIndex * angleStep;
-        render();
-    }
-
-    if (nextBtn) nextBtn.addEventListener('click', () => goToStep(1));
-    if (prevBtn) prevBtn.addEventListener('click', () => goToStep(-1));
 
     // ── Drag / swipe (mouse + touch) ──
     let isDragging = false;
@@ -1249,6 +1218,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // Row 1 spins one way, row 2 spins the opposite way (-1 vs 1), and
     // starts halfway around the ring so the two rows never show the
     // same product at the front simultaneously.
-    initMiniShopCarousel('miniShopScene', 'miniShopRing', 'miniShopDots', 'miniShopPrev', 'miniShopNext', 1, 0);
-    initMiniShopCarousel('miniShopScene2', 'miniShopRing2', 'miniShopDots2', 'miniShopPrev2', 'miniShopNext2', -1, 0.5);
+    initMiniShopCarousel('miniShopScene', 'miniShopRing', 1, 0);
+    initMiniShopCarousel('miniShopScene2', 'miniShopRing2', -1, 0.5);
 });
