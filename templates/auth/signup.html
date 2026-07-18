@@ -81,31 +81,24 @@
         .glass-strip {
             position: relative; z-index: 1;
             min-width: 0;
-            display: flex; gap: 12px;
+            display: flex; gap: 8px;
             margin-top: 40px;
-            overflow-x: auto;
-            scroll-snap-type: x proximity;
-            padding: 2px 2px 6px;
-            -webkit-overflow-scrolling: touch;
-            scrollbar-width: none;
         }
-        .glass-strip::-webkit-scrollbar { display: none; }
         .glass-card {
-            scroll-snap-align: start;
-            flex: 0 0 auto;
-            width: 190px;
+            flex: 1 1 0;
+            min-width: 0;
             background: rgba(247,242,234,0.09);
             backdrop-filter: blur(14px);
             -webkit-backdrop-filter: blur(14px);
             border: 1.5px solid rgba(247,242,234,0.24);
             border-radius: 16px;
-            padding: 16px 18px 15px;
+            padding: 13px 12px 12px;
             transition: border-color 0.2s, background 0.2s;
         }
         .glass-card:hover { border-color: rgba(201,168,76,0.5); background: rgba(247,242,234,0.13); }
-        .glass-card i { color: var(--gold); font-size: 1rem; margin-bottom: 9px; display: block; }
-        .glass-card b { display: block; color: var(--cream); font-weight: 600; font-size: 0.86rem; margin-bottom: 4px; }
-        .glass-card p { margin: 0; font-size: 0.78rem; color: #cfe0d1; line-height: 1.5; }
+        .glass-card i { color: var(--gold); font-size: 0.92rem; margin-bottom: 7px; display: block; }
+        .glass-card b { display: block; color: var(--cream); font-weight: 600; font-size: 0.76rem; line-height: 1.3; margin-bottom: 4px; }
+        .glass-card p { margin: 0; font-size: 0.68rem; color: #cfe0d1; line-height: 1.42; }
 
         .side-foot { position: relative; z-index: 1; font-size: 0.76rem; color: #a9c2ab; }
 
@@ -228,8 +221,9 @@
             .side-headline { font-size: 1.65rem; margin: 20px 0 14px; }
             .side-highlight { max-width: 100%; padding: 11px 14px; }
             .side-highlight p { font-size: 0.84rem; }
-            .glass-strip { margin-top: 22px; gap: 10px; }
-            .glass-card { width: 168px; padding: 13px 15px 12px; }
+            .glass-strip { margin-top: 22px; gap: 8px; }
+            .glass-card { padding: 12px 10px 11px; }
+            .glass-card p { display: none; }
             .side-foot { margin-top: 18px; }
             .auth-form-wrap { padding: 24px 16px 40px; }
             .auth-card { padding: 28px 24px; border-radius: 22px; }
@@ -243,8 +237,9 @@
             .side-highlight { padding: 10px 12px; }
             .side-highlight p { font-size: 0.8rem; }
             .glass-strip { margin-top: 20px; gap: 8px; }
-            .glass-card { width: 148px; padding: 12px 13px 11px; border-radius: 13px; }
-            .glass-card p { font-size: 0.74rem; }
+            .glass-card { padding: 10px 8px 9px; border-radius: 13px; }
+            .glass-card b { font-size: 0.68rem; }
+            .glass-card i { font-size: 0.8rem; margin-bottom: 5px; }
             .auth-form-wrap { padding: 20px 12px 36px; }
             .auth-card { max-width: 100%; padding: 22px 18px; border-radius: 20px; }
             .strength-row { flex-wrap: wrap; }

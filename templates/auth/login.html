@@ -85,25 +85,19 @@
         .glass-strip {
             position: relative; z-index: 1;
             min-width: 0;
-            display: flex; gap: 12px;
+            display: flex; gap: 8px;
             margin-top: 40px;
-            overflow-x: auto;
-            scroll-snap-type: x proximity;
-            padding: 2px 2px 6px;
-            -webkit-overflow-scrolling: touch;
-            scrollbar-width: none;
         }
-        .glass-strip::-webkit-scrollbar { display: none; }
         .glass-card {
-            scroll-snap-align: start;
-            flex: 0 0 auto;
-            min-width: 128px;
+            flex: 1 1 0;
+            min-width: 0;
             background: rgba(247,242,234,0.09);
             backdrop-filter: blur(14px);
             -webkit-backdrop-filter: blur(14px);
             border: 1.5px solid rgba(247,242,234,0.24);
             border-radius: 16px;
-            padding: 16px 18px 14px;
+            padding: 14px 12px 12px;
+            text-align: center;
             transition: border-color 0.2s, background 0.2s;
         }
         .glass-card:hover { border-color: rgba(201,168,76,0.5); background: rgba(247,242,234,0.13); }
@@ -203,8 +197,8 @@
             .side-headline { font-size: 1.65rem; margin-bottom: 14px; }
             .side-highlight { max-width: 100%; padding: 11px 14px; }
             .side-highlight p { font-size: 0.84rem; }
-            .glass-strip { margin-top: 22px; gap: 10px; }
-            .glass-card { min-width: 108px; padding: 13px 15px 11px; }
+            .glass-strip { margin-top: 22px; gap: 8px; }
+            .glass-card { padding: 11px 8px 10px; }
             .side-stat b { font-size: 1.4rem; }
             .side-foot { margin-top: 18px; }
             .auth-form-wrap { padding: 24px 16px 40px; }
@@ -218,8 +212,10 @@
             .side-headline { font-size: 1.45rem; }
             .side-highlight { flex-direction: row; padding: 10px 12px; }
             .side-highlight p { font-size: 0.8rem; }
-            .glass-strip { gap: 8px; }
-            .glass-card { min-width: 96px; padding: 11px 12px 10px; border-radius: 13px; }
+            .glass-strip { gap: 6px; }
+            .glass-card { padding: 9px 6px 8px; border-radius: 13px; }
+            .side-stat b { font-size: 1.15rem; }
+            .side-stat span { font-size: 0.62rem; }
             .auth-form-wrap { padding: 20px 12px 36px; }
             .auth-card { max-width: 100%; padding: 22px 18px; border-radius: 20px; }
             .field-row { flex-wrap: wrap; gap: 10px; align-items: flex-start; }

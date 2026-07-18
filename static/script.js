@@ -1,5 +1,5 @@
 /* ================================================================
-   Angan Baari — Premium JavaScript
+   Angan Baari— Premium JavaScript
    Features: Loader, Navbar scroll, Carousel, Lightbox,
              ScrollSpy, AOS init, Animated Counters, Mobile Menu
 ================================================================ */
@@ -1051,7 +1051,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // with drag/swipe, autoplay, arrows, and dots. Reusable so both rows
 // (which rotate in opposite directions) share identical logic.
 // ================================================================
-function initMiniShopCarousel(sceneId, ringId, dotsId, prevId, nextId, autoplayDirection) {
+function initMiniShopCarousel(sceneId, ringId, dotsId, prevId, nextId, autoplayDirection, startOffsetFraction) {
     const scene = document.getElementById(sceneId);
     const ring = document.getElementById(ringId);
     const dotsWrap = document.getElementById(dotsId);
@@ -1069,6 +1069,16 @@ function initMiniShopCarousel(sceneId, ringId, dotsId, prevId, nextId, autoplayD
     // see the @media (min-width: 1025px) override in style.css.
     const radius = parseFloat(getComputedStyle(scene).getPropertyValue('--carousel-radius')) || 130;
 
+    // On desktop, show TWO cards prominently side by side instead of
+    // just one dead-center. This works by rotating the whole ring half
+    // a step so the "front" position sits exactly between two cards
+    // (instead of on top of one), then treating both of those as
+    // equally "front" — rather than trying to force a single card to
+    // represent two products.
+    const showTwoFront = window.matchMedia('(min-width: 1025px)').matches;
+    const frontOffset = showTwoFront ? angleStep / 2 : 0;
+    const frontThreshold = showTwoFront ? angleStep * 0.75 : angleStep / 2;
+
     cards.forEach((card, i) => {
         card.dataset.baseAngle = i * angleStep;
     });
@@ -1082,8 +1092,8 @@ function initMiniShopCarousel(sceneId, ringId, dotsId, prevId, nextId, autoplayD
     });
     const dots = Array.from(dotsWrap.querySelectorAll('.carousel-3d-dot'));
 
-    let currentRotation = 0;
-    let logicalIndex = 0; // unwrapped — keeps counting up/down, never resets/snaps backward
+    let logicalIndex = Math.round((startOffsetFraction || 0) * N); // unwrapped — keeps counting up/down, never resets/snaps backward
+    let currentRotation = -logicalIndex * angleStep;
 
     function activeDotIndex() {
         return ((logicalIndex % N) + N) % N;
@@ -1092,7 +1102,7 @@ function initMiniShopCarousel(sceneId, ringId, dotsId, prevId, nextId, autoplayD
     function updateCardStates() {
         cards.forEach((card, i) => {
             const baseAngle = i * angleStep;
-            const cardAngle = (baseAngle + currentRotation) % 360;
+            const cardAngle = (baseAngle + currentRotation + frontOffset) % 360;
             const normalized = ((cardAngle % 360) + 360) % 360;
             const distFromFront = Math.min(normalized, 360 - normalized);
 
@@ -1101,7 +1111,7 @@ function initMiniShopCarousel(sceneId, ringId, dotsId, prevId, nextId, autoplayD
             card.style.transform = `rotateY(${baseAngle}deg) translateZ(${radius}px) scale(${scale.toFixed(3)})`;
 
             card.classList.remove('is-front', 'is-side', 'is-back');
-            if (distFromFront < angleStep / 2) card.classList.add('is-front');
+            if (distFromFront < frontThreshold) card.classList.add('is-front');
             else if (distFromFront < 90) card.classList.add('is-side');
             else card.classList.add('is-back');
         });
@@ -1201,7 +1211,9 @@ function initMiniShopCarousel(sceneId, ringId, dotsId, prevId, nextId, autoplayD
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Row 1 spins one way, row 2 spins the opposite way (-1 vs 1)
-    initMiniShopCarousel('miniShopScene', 'miniShopRing', 'miniShopDots', 'miniShopPrev', 'miniShopNext', 1);
-    initMiniShopCarousel('miniShopScene2', 'miniShopRing2', 'miniShopDots2', 'miniShopPrev2', 'miniShopNext2', -1);
+    // Row 1 spins one way, row 2 spins the opposite way (-1 vs 1), and
+    // starts halfway around the ring so the two rows never show the
+    // same product at the front simultaneously.
+    initMiniShopCarousel('miniShopScene', 'miniShopRing', 'miniShopDots', 'miniShopPrev', 'miniShopNext', 1, 0);
+    initMiniShopCarousel('miniShopScene2', 'miniShopRing2', 'miniShopDots2', 'miniShopPrev2', 'miniShopNext2', -1, 0.5);
 });
