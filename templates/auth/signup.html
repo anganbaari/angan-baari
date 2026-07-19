@@ -118,10 +118,11 @@
                 radial-gradient(circle at 85% 80%, rgba(201,168,76,0.16) 0, transparent 45%);
             pointer-events: none;
         }
-        /* Floating nav button for the empty right margin on wide screens only */
+        /* Two nav buttons sitting in the empty margins that flank the card,
+           scrolling with the page (not pinned to the viewport corners). */
         .side-nav-float {
             display: none;
-            position: fixed; top: 28px; right: 28px; z-index: 20;
+            position: absolute; top: 40px; z-index: 5;
             align-items: center; gap: 8px;
             padding: 10px 18px; border-radius: 50px;
             background: rgba(74,124,89,0.14);
@@ -134,9 +135,13 @@
             transition: background 0.2s, border-color 0.2s;
         }
         .side-nav-float:hover { background: rgba(74,124,89,0.24); border-color: var(--moss); }
+        .side-nav-float.nav-left { left: 24px; }
+        .side-nav-float.nav-right { right: 24px; }
         @media (min-width: 1300px) {
             .side-nav-float { display: inline-flex; }
+            .auth-top { display: none; }
         }
+        .auth-top { position: relative; z-index: 1; width: 100%; max-width: 400px; margin-bottom: 12px; }
         .auth-card {
             position: relative; z-index: 1;
             width: 100%; max-width: 400px;
@@ -151,7 +156,7 @@
         }
         @keyframes cardIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-        .back-to-shop { display: inline-flex; align-items: center; gap: 6px; font-size: 0.8rem; font-weight: 500; color: var(--text-muted); text-decoration: none; margin-bottom: 14px; transition: color 0.2s; }
+        .back-to-shop { display: inline-flex; align-items: center; gap: 6px; font-size: 0.8rem; font-weight: 500; color: var(--text-muted); text-decoration: none; transition: color 0.2s; }
         .back-to-shop:hover { color: var(--moss); }
 
         .auth-eyebrow { font-family: var(--font-accent, 'Cinzel'), serif; font-size: 0.72rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--moss); margin-bottom: 8px; }
@@ -262,6 +267,7 @@
             .glass-card i { font-size: 0.8rem; margin-bottom: 5px; }
             .auth-form-wrap { padding: 20px 12px 36px; }
             .auth-card { max-width: 100%; padding: 22px 18px; border-radius: 20px; }
+            .auth-top { max-width: 100%; margin-bottom: 16px; }
             .strength-row { flex-wrap: wrap; }
             .input-wrap input { padding: 12px 14px 12px 40px; font-size: 0.9rem; }
             .social-btn { font-size: 0.82rem; padding: 11px 14px; }
@@ -275,8 +281,6 @@
     </style>
 </head>
 <body>
-<a href="{% url 'shop' %}" class="side-nav-float nav-left"><i class="fas fa-arrow-left"></i> Back to Shop</a>
-<a href="/" class="side-nav-float nav-right">Back to Website <i class="fas fa-arrow-right"></i></a>
 <div class="auth-shell">
     <aside class="auth-side">
         <div class="side-top">
@@ -307,8 +311,14 @@
     </aside>
 
     <div class="auth-form-wrap">
-        <div class="auth-card">
+        <a href="{% url 'shop' %}" class="side-nav-float nav-left"><i class="fas fa-arrow-left"></i> Back to Shop</a>
+        <a href="/" class="side-nav-float nav-right">Back to Website <i class="fas fa-arrow-right"></i></a>
+
+        <div class="auth-top">
             <a href="{% url 'shop' %}" class="back-to-shop"><i class="fas fa-arrow-left"></i> Back to Shop</a>
+        </div>
+
+        <div class="auth-card">
             <div class="auth-eyebrow">New here</div>
             <h2 class="auth-title">Create your account</h2>
 
