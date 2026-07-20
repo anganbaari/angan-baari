@@ -5661,15 +5661,15 @@ ul { list-style: none; }
 @media (min-width: 1025px) {
     .carousel-3d-scene {
         max-width: 92%;
-        height: 210px;
+        height: 260px;
         perspective: 1500px;
         --carousel-radius: 270;
-        --carousel-spacing: 148;
+        --carousel-spacing: 205;
     }
     .ring-card {
-        width: 130px;
-        height: 180px;
-        margin: -90px 0 0 -65px;
+        width: 165px;
+        height: 225px;
+        margin: -113px 0 0 -83px;
     }
 }
 
