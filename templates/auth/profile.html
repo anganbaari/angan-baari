@@ -43,6 +43,70 @@
         .no-orders i { font-size: 2.5rem; color: var(--sage-light); margin-bottom: 12px; display: block; }
         .btn-shop { display: inline-flex; align-items: center; gap: 8px; background: var(--forest); color: white; padding: 12px 24px; border-radius: 50px; font-size: 0.9rem; font-weight: 500; text-decoration: none; margin-top: 16px; }
 
+        /* Order tracking timeline — Placed -> Confirmed -> Delivered.
+           Cancelled orders get a distinct red state instead of the normal steps. */
+        .order-timeline { display: flex; align-items: flex-start; margin: 16px 0 4px; }
+        .timeline-step { flex: 1; text-align: center; position: relative; }
+        .timeline-step:not(:last-child)::after {
+            content: ''; position: absolute; top: 11px; left: 50%; width: 100%; height: 2px;
+            background: var(--mist); z-index: 0;
+        }
+        .timeline-step.done:not(:last-child)::after { background: #6a9e7a; }
+        .timeline-dot {
+            position: relative; z-index: 1; width: 24px; height: 24px; border-radius: 50%;
+            background: var(--mist); color: transparent; display: flex; align-items: center; justify-content: center;
+            margin: 0 auto 6px; font-size: 0.7rem; transition: background 0.3s, color 0.3s;
+        }
+        .timeline-step.done .timeline-dot { background: #6a9e7a; color: #fff; }
+        .timeline-step.current .timeline-dot { background: var(--forest); color: #fff; box-shadow: 0 0 0 4px rgba(74,124,89,0.2); }
+        .timeline-label { font-size: 0.68rem; color: var(--text-muted); font-weight: 600; }
+        .timeline-step.done .timeline-label, .timeline-step.current .timeline-label { color: var(--forest); }
+        .order-timeline.cancelled-timeline { justify-content: flex-start; gap: 8px; }
+        .cancelled-note { display: flex; align-items: center; gap: 8px; color: #991b1b; font-size: 0.82rem; font-weight: 600; }
+        .cancelled-note i { font-size: 1rem; }
+
+        /* ── My Wishlist ── */
+        .wishlist-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; margin-bottom: 40px; }
+        .wishlist-card { background: var(--white); border: 1px solid var(--mist); border-radius: 12px; overflow: hidden; transition: transform 0.2s, box-shadow 0.2s; }
+        .wishlist-card:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(26,47,30,0.1); }
+        .wishlist-card-img { height: 120px; background: var(--mist); display: flex; align-items: center; justify-content: center; overflow: hidden; }
+        .wishlist-card-img img { width: 100%; height: 100%; object-fit: cover; }
+        .wishlist-card-body { padding: 12px 14px; }
+        .wishlist-card-name { font-size: 0.9rem; font-weight: 600; color: var(--forest); margin-bottom: 4px; overflow-wrap: break-word; }
+        .wishlist-card-price { font-size: 0.82rem; color: var(--text-muted); margin-bottom: 10px; }
+        .wishlist-card-actions { display: flex; gap: 6px; }
+        .wishlist-btn { flex: 1; text-align: center; padding: 7px 8px; border-radius: 8px; font-size: 0.76rem; font-weight: 600; text-decoration: none; cursor: pointer; border: none; transition: opacity 0.2s; }
+        .wishlist-btn:hover { opacity: 0.85; }
+        .wishlist-btn-cart { background: var(--forest); color: #fff; }
+        .wishlist-btn-remove { background: #fee2e2; color: #991b1b; }
+        .no-wishlist, .no-coupons { text-align: center; padding: 32px 20px; color: var(--text-muted); font-size: 0.88rem; margin-bottom: 40px; background: var(--white); border: 1px dashed var(--mist); border-radius: 12px; }
+
+        /* ── My Coupons ── */
+        .coupons-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; margin-bottom: 40px; }
+        .coupon-card { background: linear-gradient(135deg, var(--forest), #2d4a32); color: #fff; border-radius: 12px; padding: 16px 18px; position: relative; overflow: hidden; }
+        .coupon-card::after { content: ''; position: absolute; top: -20px; right: -20px; width: 80px; height: 80px; border-radius: 50%; background: rgba(201,168,76,0.15); }
+        .coupon-code { font-family: var(--font-display); font-size: 1.3rem; font-weight: 700; letter-spacing: 0.04em; color: #fff; position: relative; }
+        .coupon-festival { font-size: 0.72rem; color: #c9a84c; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+        .coupon-desc { font-size: 0.8rem; color: rgba(255,255,255,0.85); margin: 6px 0 10px; position: relative; }
+        .coupon-copy-btn { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); color: #fff; padding: 6px 12px; border-radius: 8px; font-size: 0.74rem; cursor: pointer; position: relative; transition: background 0.2s; }
+        .coupon-copy-btn:hover { background: rgba(255,255,255,0.28); }
+
+        /* ── Account Settings (Edit Profile / Change Password) ── */
+        .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 40px; }
+        .settings-card { background: var(--white); border: 1px solid var(--mist); border-radius: 12px; padding: 20px; }
+        .settings-card summary { cursor: pointer; font-weight: 600; color: var(--forest); font-size: 0.95rem; list-style: none; display: flex; align-items: center; gap: 8px; }
+        .settings-card summary::-webkit-details-marker { display: none; }
+        .settings-card summary i.chevron { margin-left: auto; transition: transform 0.2s; font-size: 0.8rem; color: var(--text-muted); }
+        .settings-card[open] summary i.chevron { transform: rotate(180deg); }
+        .settings-form { margin-top: 16px; display: flex; flex-direction: column; gap: 12px; }
+        .settings-form label { font-size: 0.74rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); }
+        .settings-form input { padding: 10px 14px; border: 1.5px solid var(--mist); border-radius: 10px; font-size: 0.9rem; font-family: inherit; color: var(--forest); }
+        .settings-form input:focus { outline: none; border-color: var(--moss); }
+        .settings-submit { padding: 10px; background: var(--forest); color: #fff; border: none; border-radius: 10px; font-size: 0.88rem; font-weight: 600; cursor: pointer; transition: background 0.2s; }
+        .settings-submit:hover { background: var(--moss); }
+        @media (max-width: 700px) { .settings-grid { grid-template-columns: 1fr; } }
+
+
         /* ══════════════════════════════════════════
            MOBILE / TABLET BOTTOM NAV — modern glass bar
         ══════════════════════════════════════════ */
@@ -257,6 +321,98 @@
             </div>
         </div>
 
+        <!-- Account Settings -->
+        <div class="settings-grid">
+            <details class="settings-card">
+                <summary><i class="fas fa-user-edit"></i> Edit Profile <i class="fas fa-chevron-down chevron"></i></summary>
+                <form method="POST" action="{% url 'edit_profile' %}" class="settings-form">
+                    {% csrf_token %}
+                    <div>
+                        <label>Full Name</label>
+                        <input type="text" name="name" value="{{ user.get_full_name }}" required>
+                    </div>
+                    <div>
+                        <label>Email Address</label>
+                        <input type="email" name="email" value="{{ user.email }}" required>
+                    </div>
+                    <button type="submit" class="settings-submit"><i class="fas fa-check"></i> Save Changes</button>
+                </form>
+            </details>
+            <details class="settings-card">
+                <summary><i class="fas fa-lock"></i> Change Password <i class="fas fa-chevron-down chevron"></i></summary>
+                <form method="POST" action="{% url 'change_password' %}" class="settings-form">
+                    {% csrf_token %}
+                    <div>
+                        <label>Current Password</label>
+                        <input type="password" name="old_password" required>
+                    </div>
+                    <div>
+                        <label>New Password</label>
+                        <input type="password" name="new_password1" required>
+                    </div>
+                    <div>
+                        <label>Confirm New Password</label>
+                        <input type="password" name="new_password2" required>
+                    </div>
+                    <button type="submit" class="settings-submit"><i class="fas fa-key"></i> Update Password</button>
+                </form>
+            </details>
+        </div>
+
+        <!-- My Wishlist -->
+        <div class="section-head">
+            <h2 class="section-title">My Wishlist</h2>
+            <span class="orders-count-badge">{{ wishlist_items.count }}</span>
+        </div>
+        {% if wishlist_items %}
+        <div class="wishlist-grid">
+            {% for item in wishlist_items %}
+            <div class="wishlist-card">
+                <div class="wishlist-card-img">
+                    {% if item.product.main_image %}
+                    <img src="{% static item.product.main_image %}" alt="{{ item.product.name }}">
+                    {% else %}
+                    <i class="fas fa-seedling" style="font-size:1.6rem;color:var(--moss);"></i>
+                    {% endif %}
+                </div>
+                <div class="wishlist-card-body">
+                    <div class="wishlist-card-name">{{ item.product.name }}</div>
+                    <div class="wishlist-card-price">Rs. {{ item.product.price }} <span style="color:var(--text-muted);">{{ item.product.price_unit }}</span></div>
+                    <div class="wishlist-card-actions">
+                        <a href="{{ item.product.get_absolute_url }}" class="wishlist-btn wishlist-btn-cart"><i class="fas fa-eye"></i> View</a>
+                        <button type="button" class="wishlist-btn wishlist-btn-remove" data-wishlist-remove data-product-id="{{ item.product.id }}"><i class="fas fa-heart-broken"></i> Remove</button>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="no-wishlist"><i class="far fa-heart" style="font-size:1.6rem;display:block;margin-bottom:8px;color:var(--sage-light);"></i>Nothing saved yet — tap the heart icon on any product to save it here.</div>
+        {% endif %}
+
+        <!-- My Coupons -->
+        <div class="section-head">
+            <h2 class="section-title">My Coupons</h2>
+            <span class="orders-count-badge">{{ live_coupons|length }}</span>
+        </div>
+        {% if live_coupons %}
+        <div class="coupons-grid">
+            {% for coupon in live_coupons %}
+            <div class="coupon-card">
+                {% if coupon.festival_name %}<div class="coupon-festival">{{ coupon.festival_name }}</div>{% endif %}
+                <div class="coupon-code">{{ coupon.code }}</div>
+                <div class="coupon-desc">
+                    {% if coupon.discount_type == 'percent' %}{{ coupon.discount_value|floatformat:0 }}% off{% else %}Rs. {{ coupon.discount_value|floatformat:0 }} off{% endif %}
+                    {% if coupon.description %} — {{ coupon.description }}{% endif %}
+                </div>
+                <button type="button" class="coupon-copy-btn" data-copy-code="{{ coupon.code }}"><i class="fas fa-copy"></i> Copy Code</button>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="no-coupons"><i class="fas fa-tag" style="font-size:1.6rem;display:block;margin-bottom:8px;color:var(--sage-light);"></i>No active coupons right now — check back during festival season!</div>
+        {% endif %}
+
         <!-- Order History -->
         <div class="section-head">
             <h2 class="section-title">My Orders</h2>
@@ -273,6 +429,28 @@
                 </div>
                 <div class="order-product"><i class="fas fa-box" style="color:var(--moss);margin-right:6px;"></i>{{ order.product_interest }}</div>
                 <div class="order-address"><i class="fas fa-map-marker-alt" style="margin-right:6px;"></i>{{ order.address }}</div>
+
+                {% if order.status == 'cancelled' %}
+                <div class="order-timeline cancelled-timeline">
+                    <span class="cancelled-note"><i class="fas fa-circle-xmark"></i> This order was cancelled</span>
+                </div>
+                {% else %}
+                <div class="order-timeline">
+                    <div class="timeline-step done">
+                        <div class="timeline-dot"><i class="fas fa-check"></i></div>
+                        <div class="timeline-label">Placed</div>
+                    </div>
+                    <div class="timeline-step {% if order.status == 'confirmed' or order.status == 'delivered' %}done{% else %}current{% endif %}">
+                        <div class="timeline-dot"><i class="fas fa-check"></i></div>
+                        <div class="timeline-label">Confirmed</div>
+                    </div>
+                    <div class="timeline-step {% if order.status == 'delivered' %}done{% elif order.status == 'confirmed' %}current{% endif %}">
+                        <div class="timeline-dot"><i class="fas fa-check"></i></div>
+                        <div class="timeline-label">Delivered</div>
+                    </div>
+                </div>
+                {% endif %}
+
                 {% if order.can_cancel %}
                 <div style="margin-top:10px;">
                     <a href="/cancel/{{ order.cancel_token }}/" style="font-size:0.78rem;color:#c0392b;">Cancel Order</a>
@@ -378,6 +556,45 @@
             if (!badge) return;
             const statusClass = Array.from(badge.classList).find(c => c.startsWith('status-'));
             if (statusClass) card.classList.add(statusClass);
+        });
+
+        // ── Wishlist: remove item ──
+        function getCookie(name) {
+            const match = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+            return match ? decodeURIComponent(match[2]) : null;
+        }
+        document.querySelectorAll('[data-wishlist-remove]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                const productId = btn.dataset.productId;
+                fetch(`/wishlist/toggle/${productId}/`, {
+                    method: 'POST',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRFToken': getCookie('csrftoken'),
+                    },
+                })
+                .then(res => res.json())
+                .then(function (data) {
+                    if (data.status === 'ok') {
+                        btn.closest('.wishlist-card').remove();
+                    }
+                })
+                .catch(function () {
+                    alert('Could not remove this item right now — please try again.');
+                });
+            });
+        });
+
+        // ── Coupons: copy code to clipboard ──
+        document.querySelectorAll('[data-copy-code]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                const code = btn.dataset.copyCode;
+                navigator.clipboard.writeText(code).then(function () {
+                    const original = btn.innerHTML;
+                    btn.innerHTML = '<i class="fas fa-check"></i> Copied!';
+                    setTimeout(function () { btn.innerHTML = original; }, 1600);
+                });
+            });
         });
 
         // Active bottom-nav state is now rendered server-side (see template),

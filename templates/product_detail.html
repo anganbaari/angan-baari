@@ -833,11 +833,8 @@
                         </span>
                         {% endif %}
                     </div>
-                    <!-- Wishlist toggle: client-side (localStorage) for now.
-                         Wire to your backend by POSTing to your own toggle
-                         endpoint inside toggleWishlist() below, once you add one. -->
-                    <button type="button" class="wishlist-btn" id="wishlistBtn" data-product-id="{{ product.id }}" onclick="toggleWishlist(this)" aria-label="Add to wishlist">
-                        <i class="far fa-heart"></i>
+                    <button type="button" class="wishlist-btn {% if is_wishlisted %}active{% endif %}" id="wishlistBtn" data-product-id="{{ product.id }}" data-logged-in="{% if user.is_authenticated %}1{% else %}0{% endif %}" onclick="toggleWishlist(this)" aria-label="Add to wishlist">
+                        <i class="{% if is_wishlisted %}fas{% else %}far{% endif %} fa-heart"></i>
                     </button>
                 </div>
 
@@ -1428,30 +1425,37 @@
             if (stickyWeight) stickyWeight.textContent = btn.dataset.weight + ' kg, fixed';
         }
 
-        /* ---------------- Wishlist (client-side placeholder) ----------------
-           TODO: replace localStorage logic with a real fetch() call to your
-           own wishlist toggle endpoint once you build one, e.g.:
-           fetch(`/wishlist/toggle/${productId}/`, { method: 'POST', headers: {...} })
-        */
-        function toggleWishlist(btn) {
-            const id = btn.dataset.productId;
-            const key = 'ab_wishlist';
-            let saved = JSON.parse(localStorage.getItem(key) || '[]');
-            const isActive = saved.includes(id);
-            saved = isActive ? saved.filter(x => x !== id) : [...saved, id];
-            localStorage.setItem(key, JSON.stringify(saved));
-            btn.classList.toggle('active', !isActive);
-            btn.querySelector('i').className = !isActive ? 'fas fa-heart' : 'far fa-heart';
+        /* ---------------- Wishlist ---------------- */
+        function getCookie(name) {
+            const match = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+            return match ? decodeURIComponent(match[2]) : null;
         }
-        (function initWishlist() {
-            const btn = document.getElementById('wishlistBtn');
-            if (!btn) return;
-            const saved = JSON.parse(localStorage.getItem('ab_wishlist') || '[]');
-            if (saved.includes(btn.dataset.productId)) {
-                btn.classList.add('active');
-                btn.querySelector('i').className = 'fas fa-heart';
+        function toggleWishlist(btn) {
+            if (btn.dataset.loggedIn !== '1') {
+                window.location.href = '/account/login/?next=' + encodeURIComponent(window.location.pathname);
+                return;
             }
-        })();
+            const id = btn.dataset.productId;
+            btn.disabled = true;
+            fetch(`/wishlist/toggle/${id}/`, {
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRFToken': getCookie('csrftoken'),
+                },
+            })
+            .then(res => res.json())
+            .then(function (data) {
+                if (data.status === 'ok') {
+                    btn.classList.toggle('active', data.is_saved);
+                    btn.querySelector('i').className = data.is_saved ? 'fas fa-heart' : 'far fa-heart';
+                }
+            })
+            .catch(function () {
+                alert('Could not update your wishlist right now — please try again.');
+            })
+            .finally(function () { btn.disabled = false; });
+        }
 
         /* ---------------- Sticky mobile bar ---------------- */
         (function initStickyBar() {

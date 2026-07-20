@@ -4,7 +4,7 @@ from django.core.mail import send_mail
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.urls import reverse
-from .models import NewsletterSubscriber, ContactMessage, ProductOrder, Review
+from .models import NewsletterSubscriber, ContactMessage, ProductOrder, Review, Wishlist
 from .emails import (
     send_order_received_email,
     send_order_cancelled_email,
@@ -172,6 +172,10 @@ def product_detail(request, slug):
     if product.pricing_mode == 'fixed_weight':
         variants = product.variants.filter(is_available=True).order_by('weight')
 
+    is_wishlisted = False
+    if request.user.is_authenticated:
+        is_wishlisted = Wishlist.objects.filter(user=request.user, product=product).exists()
+
     return render(request, 'product_detail.html', {
         'product': product,
         'related_products': related_products,
@@ -180,6 +184,7 @@ def product_detail(request, slug):
         'avg_rating': avg_rating,
         'ratings': Review.RATING_CHOICES,
         'variants': variants,
+        'is_wishlisted': is_wishlisted,
     })
 
 def submit_review(request, slug):
@@ -199,6 +204,26 @@ def submit_review(request, slug):
             )
             return redirect(product.get_absolute_url() + '?reviewed=1')
     return redirect(product.get_absolute_url())
+
+
+@login_required
+def wishlist_toggle(request, product_id):
+    """Add/remove a product from the logged-in user's wishlist. Login is
+    required since Wishlist rows are tied to a real user account — there's
+    no session-based wishlist for anonymous visitors (unlike the cart)."""
+    from .models import Product
+    product = get_object_or_404(Product, id=product_id)
+    existing = Wishlist.objects.filter(user=request.user, product=product).first()
+    if existing:
+        existing.delete()
+        is_saved = False
+    else:
+        Wishlist.objects.create(user=request.user, product=product)
+        is_saved = True
+
+    if is_ajax(request):
+        return JsonResponse({'status': 'ok', 'is_saved': is_saved})
+    return redirect(request.META.get('HTTP_REFERER', '/shop/'))
 
 
 # ─── CART SYSTEM ───────────────────────────────────────────────
