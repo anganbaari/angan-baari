@@ -121,8 +121,8 @@
         /* Two nav buttons sitting in the empty margins that flank the card,
            scrolling with the page (not pinned to the viewport corners). */
         .side-nav-float {
-            display: none;
-            position: absolute; top: 40px; z-index: 5;
+            display: inline-flex;
+            position: absolute; top: 24px; z-index: 5;
             align-items: center; gap: 8px;
             padding: 10px 18px; border-radius: 50px;
             background: rgba(74,124,89,0.14);
@@ -135,13 +135,8 @@
             transition: background 0.2s, border-color 0.2s;
         }
         .side-nav-float:hover { background: rgba(74,124,89,0.24); border-color: var(--moss); }
-        .side-nav-float.nav-left { left: 24px; }
-        .side-nav-float.nav-right { right: 24px; }
-        .auth-top { position: relative; z-index: 1; width: 100%; max-width: 400px; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-        @media (min-width: 1300px) {
-            .side-nav-float { display: inline-flex; }
-            .auth-top { display: none; }
-        }
+        .side-nav-float.nav-left { left: 16px; }
+        .side-nav-float.nav-right { right: 16px; }
         .auth-card {
             position: relative; z-index: 1;
             width: 100%; max-width: 400px;
@@ -256,6 +251,9 @@
         }
 
         @media (max-width: 420px) {
+            .side-nav-float { font-size: 0.72rem; padding: 8px 12px; gap: 5px; top: 14px; }
+            .side-nav-float.nav-left { left: 10px; }
+            .side-nav-float.nav-right { right: 10px; }
             .auth-side { padding: 24px 18px 22px; }
             .side-logo span { font-size: 0.7rem; }
             .side-headline { font-size: 1.45rem; }
@@ -267,7 +265,6 @@
             .glass-card i { font-size: 0.8rem; margin-bottom: 5px; }
             .auth-form-wrap { padding: 20px 12px 36px; }
             .auth-card { max-width: 100%; padding: 22px 18px; border-radius: 20px; }
-            .auth-top { max-width: 100%; margin-bottom: 16px; flex-wrap: wrap; gap: 8px; }
             .strength-row { flex-wrap: wrap; }
             .input-wrap input { padding: 12px 14px 12px 40px; font-size: 0.9rem; }
             .social-btn { font-size: 0.82rem; padding: 11px 14px; }
@@ -313,11 +310,6 @@
     <div class="auth-form-wrap">
         <a href="{% url 'shop' %}" class="side-nav-float nav-left"><i class="fas fa-arrow-left"></i> Back to Shop</a>
         <a href="/" class="side-nav-float nav-right">Back to Website <i class="fas fa-arrow-right"></i></a>
-
-        <div class="auth-top">
-            <a href="{% url 'shop' %}" class="back-to-shop"><i class="fas fa-arrow-left"></i> Back to Shop</a>
-            <a href="/" class="back-to-shop">Back to Website <i class="fas fa-arrow-right"></i></a>
-        </div>
 
         <div class="auth-card">
             <div class="auth-eyebrow">New here</div>
