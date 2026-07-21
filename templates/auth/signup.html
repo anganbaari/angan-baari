@@ -141,7 +141,7 @@
             .side-nav-float { display: inline-flex; }
             .auth-top { display: none; }
         }
-        .auth-top { position: relative; z-index: 1; width: 100%; max-width: 400px; margin-bottom: 12px; }
+        .auth-top { position: relative; z-index: 1; width: 100%; max-width: 400px; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
         .auth-card {
             position: relative; z-index: 1;
             width: 100%; max-width: 400px;
@@ -267,7 +267,7 @@
             .glass-card i { font-size: 0.8rem; margin-bottom: 5px; }
             .auth-form-wrap { padding: 20px 12px 36px; }
             .auth-card { max-width: 100%; padding: 22px 18px; border-radius: 20px; }
-            .auth-top { max-width: 100%; margin-bottom: 16px; }
+            .auth-top { max-width: 100%; margin-bottom: 16px; flex-wrap: wrap; gap: 8px; }
             .strength-row { flex-wrap: wrap; }
             .input-wrap input { padding: 12px 14px 12px 40px; font-size: 0.9rem; }
             .social-btn { font-size: 0.82rem; padding: 11px 14px; }
@@ -316,6 +316,7 @@
 
         <div class="auth-top">
             <a href="{% url 'shop' %}" class="back-to-shop"><i class="fas fa-arrow-left"></i> Back to Shop</a>
+            <a href="/" class="back-to-shop">Back to Website <i class="fas fa-arrow-right"></i></a>
         </div>
 
         <div class="auth-card">
@@ -337,7 +338,7 @@
                     <label for="id_name">Full Name</label>
                     <div class="input-wrap">
                         <i class="fas fa-user field-icon"></i>
-                        <input type="text" id="id_name" name="name" placeholder="Your Name" required autofocus autocomplete="name">
+                        <input type="text" id="id_name" name="name" placeholder="Ramesh Thapa" required autofocus autocomplete="name">
                     </div>
                 </div>
 

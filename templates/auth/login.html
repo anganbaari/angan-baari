@@ -107,7 +107,7 @@
         /* ── Right: form ── */
         .auth-form-wrap {
             position: relative;
-            display: flex; align-items: center; justify-content: center;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
             padding: 48px 32px;
             background: linear-gradient(135deg, var(--cream) 0%, #eee7d8 100%);
             overflow: hidden;
@@ -143,7 +143,7 @@
             .side-nav-float { display: inline-flex; }
             .auth-top { display: none; }
         }
-        .auth-top { position: relative; z-index: 1; width: 100%; max-width: 400px; margin-bottom: 12px; }
+        .auth-top { position: relative; z-index: 1; width: 100%; max-width: 400px; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
         .auth-card {
             position: relative; z-index: 1;
             width: 100%; max-width: 400px;
@@ -242,7 +242,7 @@
             .side-stat span { font-size: 0.62rem; }
             .auth-form-wrap { padding: 20px 12px 36px; }
             .auth-card { max-width: 100%; padding: 22px 18px; border-radius: 20px; }
-            .auth-top { max-width: 100%; margin-bottom: 16px; }
+            .auth-top { max-width: 100%; margin-bottom: 16px; flex-wrap: wrap; gap: 8px; }
             .field-row { flex-wrap: wrap; gap: 10px; align-items: flex-start; }
             .input-wrap input { padding: 12px 14px 12px 40px; font-size: 0.9rem; }
         }
@@ -277,6 +277,7 @@
 
         <div class="auth-top">
             <a href="{% url 'shop' %}" class="back-to-shop"><i class="fas fa-arrow-left"></i> Back to Shop</a>
+            <a href="/" class="back-to-shop">Back to Website <i class="fas fa-arrow-right"></i></a>
         </div>
 
         <div class="auth-card">
