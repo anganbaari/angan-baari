@@ -99,9 +99,13 @@
         .settings-card summary i.chevron { margin-left: auto; transition: transform 0.2s; font-size: 0.8rem; color: var(--text-muted); }
         .settings-card[open] summary i.chevron { transform: rotate(180deg); }
         .settings-form { margin-top: 16px; display: flex; flex-direction: column; gap: 12px; }
-        .settings-form label { font-size: 0.74rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); }
-        .settings-form input { padding: 10px 14px; border: 1.5px solid var(--mist); border-radius: 10px; font-size: 0.9rem; font-family: inherit; color: var(--forest); }
+        .settings-form label { display: block; font-size: 0.74rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); margin-bottom: 6px; }
+        .settings-form .pw-input-wrap { position: relative; display: flex; align-items: center; }
+        .settings-form input { width: 100%; padding: 10px 14px; border: 1.5px solid var(--mist); border-radius: 10px; font-size: 0.9rem; font-family: inherit; color: var(--forest); box-sizing: border-box; }
+        .settings-form input.pw-input { padding-right: 42px; }
         .settings-form input:focus { outline: none; border-color: var(--moss); }
+        .settings-pw-toggle { position: absolute; right: 4px; background: none; border: none; cursor: pointer; color: var(--text-muted); font-size: 0.85rem; padding: 8px; border-radius: 8px; display: flex; align-items: center; justify-content: center; transition: color 0.2s, background 0.2s; }
+        .settings-pw-toggle:hover { color: var(--moss); background: var(--mist); }
         .settings-submit { padding: 10px; background: var(--forest); color: #fff; border: none; border-radius: 10px; font-size: 0.88rem; font-weight: 600; cursor: pointer; transition: background 0.2s; }
         .settings-submit:hover { background: var(--moss); }
         @media (max-width: 700px) { .settings-grid { grid-template-columns: 1fr; } }
@@ -344,15 +348,24 @@
                     {% csrf_token %}
                     <div>
                         <label>Current Password</label>
-                        <input type="password" name="old_password" required>
+                        <div class="pw-input-wrap">
+                            <input type="password" name="old_password" id="pw_old" class="pw-input" required>
+                            <button type="button" class="settings-pw-toggle" data-target="pw_old" aria-label="Show password"><i class="fas fa-eye"></i></button>
+                        </div>
                     </div>
                     <div>
                         <label>New Password</label>
-                        <input type="password" name="new_password1" required>
+                        <div class="pw-input-wrap">
+                            <input type="password" name="new_password1" id="pw_new1" class="pw-input" required>
+                            <button type="button" class="settings-pw-toggle" data-target="pw_new1" aria-label="Show password"><i class="fas fa-eye"></i></button>
+                        </div>
                     </div>
                     <div>
                         <label>Confirm New Password</label>
-                        <input type="password" name="new_password2" required>
+                        <div class="pw-input-wrap">
+                            <input type="password" name="new_password2" id="pw_new2" class="pw-input" required>
+                            <button type="button" class="settings-pw-toggle" data-target="pw_new2" aria-label="Show password"><i class="fas fa-eye"></i></button>
+                        </div>
                     </div>
                     <button type="submit" class="settings-submit"><i class="fas fa-key"></i> Update Password</button>
                 </form>
@@ -556,6 +569,19 @@
             if (!badge) return;
             const statusClass = Array.from(badge.classList).find(c => c.startsWith('status-'));
             if (statusClass) card.classList.add(statusClass);
+        });
+
+        // ── Change Password: show/hide toggle ──
+        document.querySelectorAll('.settings-pw-toggle').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                const input = document.getElementById(btn.dataset.target);
+                const icon = btn.querySelector('i');
+                const showing = input.type === 'text';
+                input.type = showing ? 'password' : 'text';
+                icon.classList.toggle('fa-eye', showing);
+                icon.classList.toggle('fa-eye-slash', !showing);
+                btn.setAttribute('aria-label', showing ? 'Show password' : 'Hide password');
+            });
         });
 
         // ── Wishlist: remove item ──

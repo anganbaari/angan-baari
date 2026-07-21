@@ -1,5 +1,5 @@
 /* ================================================================
-   Angan Baari— Premium JavaScript
+   THE HIMALAYAN SUSTAINABLE FARM — Premium JavaScript
    Features: Loader, Navbar scroll, Carousel, Lightbox,
              ScrollSpy, AOS init, Animated Counters, Mobile Menu
 ================================================================ */
@@ -1121,7 +1121,7 @@ function initMiniShopCarousel(sceneId, ringId, autoplayDirection, startOffsetFra
             const xPos = offset * spacing;
             const rotateYval = Math.max(-65, Math.min(65, offset * 24));
             const z = -absOffset * 70;
-            const scale = Math.max(0.55, 1.08 - absOffset * 0.16);
+            const scale = Math.max(0.55, 1.22 - absOffset * 0.16);
 
             card.style.transform =
                 `translateX(${xPos.toFixed(1)}px) translateZ(${z.toFixed(1)}px) rotateY(${rotateYval.toFixed(1)}deg) scale(${scale.toFixed(3)})`;
@@ -1153,6 +1153,8 @@ function initMiniShopCarousel(sceneId, ringId, autoplayDirection, startOffsetFra
     let startX = 0;
     let startRotation = 0;
     let dragDistance = 0; // used to tell an intentional drag apart from a tap
+    let onDragStartCb = null;
+    let onDragEndCb = null;
 
     function dragStart(clientX) {
         isDragging = true;
@@ -1161,7 +1163,7 @@ function initMiniShopCarousel(sceneId, ringId, autoplayDirection, startOffsetFra
         startRotation = currentRotation;
         scene.classList.add('dragging');
         ring.classList.add('no-transition');
-        stopAutoplay();
+        if (onDragStartCb) onDragStartCb();
     }
     function dragMove(clientX) {
         if (!isDragging) return;
@@ -1178,7 +1180,7 @@ function initMiniShopCarousel(sceneId, ringId, autoplayDirection, startOffsetFra
         logicalIndex = Math.round(-currentRotation / angleStep);
         currentRotation = -logicalIndex * angleStep;
         render();
-        startAutoplay();
+        if (onDragEndCb) onDragEndCb();
     }
 
     scene.addEventListener('mousedown', e => { e.preventDefault(); dragStart(e.clientX); });
@@ -1197,27 +1199,50 @@ function initMiniShopCarousel(sceneId, ringId, autoplayDirection, startOffsetFra
         });
     });
 
-    // ── Gentle autoplay when idle — direction is configurable so the
-    // second row can spin the opposite way from the first. ──
-    let autoplayTimer = null;
-    function startAutoplay() {
-        stopAutoplay();
-        autoplayTimer = setInterval(() => {
-            if (!isDragging) goToStep(autoplayDirection);
-        }, 3200);
-    }
-    function stopAutoplay() {
-        if (autoplayTimer) clearInterval(autoplayTimer);
-    }
-
     render();
-    startAutoplay();
+
+    // Autoplay is driven externally by a single shared clock (see the
+    // DOMContentLoaded block below) so both rows always change cards
+    // at exactly the same moment, instead of two independent timers
+    // that can drift out of sync over time.
+    return {
+        step: () => { if (!isDragging) goToStep(autoplayDirection); },
+        onDragStart: cb => { onDragStartCb = cb; },
+        onDragEnd: cb => { onDragEndCb = cb; },
+    };
 }
 
 document.addEventListener('DOMContentLoaded', () => {
     // Row 1 spins one way, row 2 spins the opposite way (-1 vs 1), and
     // starts halfway around the ring so the two rows never show the
     // same product at the front simultaneously.
-    initMiniShopCarousel('miniShopScene', 'miniShopRing', 1, 0);
-    initMiniShopCarousel('miniShopScene2', 'miniShopRing2', -1, 0.5);
+    const row1 = initMiniShopCarousel('miniShopScene', 'miniShopRing', 1, 0);
+    const row2 = initMiniShopCarousel('miniShopScene2', 'miniShopRing2', -1, 0.5);
+    if (!row1 || !row2) return;
+
+    // One shared timer steps BOTH rows at the same instant, every tick —
+    // this is what keeps them properly synchronized instead of each
+    // row quietly drifting apart on its own schedule.
+    let sharedTimer = null;
+    function startShared() {
+        stopShared();
+        sharedTimer = setInterval(() => {
+            row1.step();
+            row2.step();
+        }, 3200);
+    }
+    function stopShared() {
+        if (sharedTimer) clearInterval(sharedTimer);
+    }
+
+    // Dragging either row pauses the shared clock for both, and
+    // resuming (from either row) restarts it fresh for both — so a
+    // drag on one row doesn't leave it stepping out of time with the
+    // other afterward.
+    row1.onDragStart(stopShared);
+    row2.onDragStart(stopShared);
+    row1.onDragEnd(startShared);
+    row2.onDragEnd(startShared);
+
+    startShared();
 });
