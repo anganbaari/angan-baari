@@ -928,10 +928,11 @@
                         {% if not product.is_available %}
                         <span class="p-unavailable-badge">Out of Season</span>
                         {% endif %}
-                        <button class="p-wish {% if product.id|stringformat:'s' in saved_ids %}wished{% endif %}"
-                                onclick="event.stopPropagation(); toggleSaveLater({{ product.id }}, this)"
-                                title="Save for later" data-id="{{ product.id }}">
-                            <i class="{% if product.id|stringformat:'s' in saved_ids %}fas{% else %}far{% endif %} fa-heart"></i>
+                        <button class="p-wish {% if product.id in wishlist_ids %}wished{% endif %}"
+                                onclick="event.stopPropagation(); toggleWishlist({{ product.id }}, this)"
+                                title="Add to wishlist" data-id="{{ product.id }}"
+                                data-logged-in="{% if user.is_authenticated %}1{% else %}0{% endif %}">
+                            <i class="{% if product.id in wishlist_ids %}fas{% else %}far{% endif %} fa-heart"></i>
                         </button>
                     </div>
                     <div class="p-card-body">
@@ -1137,6 +1138,25 @@
         });
 
         // Save for Later toggle
+        function toggleWishlist(productId, btn) {
+            if (btn.dataset.loggedIn !== '1') {
+                window.location.href = '/account/login/?next=' + encodeURIComponent(window.location.pathname + window.location.search);
+                return;
+            }
+            btn.disabled = true;
+            postJSON(`/wishlist/toggle/${productId}/`)
+            .then(data => {
+                if (data.status === 'ok') {
+                    const icon = btn.querySelector('i');
+                    btn.classList.toggle('wished', data.is_saved);
+                    icon.classList.toggle('fas', data.is_saved);
+                    icon.classList.toggle('far', !data.is_saved);
+                }
+            })
+            .catch(err => console.error('Wishlist error:', err))
+            .finally(() => { btn.disabled = false; });
+        }
+
         function toggleSaveLater(productId, btn) {
             postJSON(`/cart/save-for-later/${productId}/`)
             .then(data => {

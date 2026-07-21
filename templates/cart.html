@@ -457,6 +457,38 @@
             </div>
         </div>
 
+        <!-- My Wishlist -->
+        {% if user.is_authenticated %}
+        <div class="saved-section" id="wishlistSection" style="display:{% if wishlist_items %}block{% else %}none{% endif %};">
+            <h2 class="saved-title"><i class="fas fa-heart"></i> My Wishlist (<span id="wishlistCount">{{ wishlist_items|length }}</span>)</h2>
+            <div class="saved-grid" id="wishlistGrid">
+                {% for item in wishlist_items %}
+                <div class="saved-card" id="wishlist-card-{{ item.product.id }}" data-id="{{ item.product.id }}">
+                    <div class="saved-card-img">
+                        {% if item.product.main_image %}<img src="{% static item.product.main_image %}" alt="{{ item.product.name }}">{% endif %}
+                    </div>
+                    <div class="saved-card-body">
+                        <div class="saved-card-name">{{ item.product.name }}</div>
+                        <div class="saved-card-price">Rs. {{ item.product.price }}</div>
+                        <div class="saved-card-actions">
+                            <button type="button" class="btn-move-cart"
+                                data-action="add-wishlist"
+                                data-id="{{ item.product.id }}"
+                                data-name="{{ item.product.name }}"
+                                data-price="{{ item.product.price }}"
+                                data-unit="{{ item.product.price_unit }}"
+                                data-image="{{ item.product.main_image }}">
+                                <i class="fas fa-cart-plus"></i> Add to Cart
+                            </button>
+                            <button type="button" class="btn-remove-saved" data-action="remove-wishlist"><i class="fas fa-times"></i></button>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
         <!-- Recommended products -->
         {% if recommended_products %}
         <div class="reco-section">
@@ -542,7 +574,8 @@
             "toggle_save_for_later": "{% url 'toggle_save_for_later' 0 %}",
             "move_to_cart": "{% url 'move_to_cart' 0 %}",
             "remove_saved": "{% url 'remove_saved' 0 %}",
-            "add_to_cart": "{% url 'add_to_cart' 0 %}"
+            "add_to_cart": "{% url 'add_to_cart' 0 %}",
+            "wishlist_toggle": "{% url 'wishlist_toggle' 0 %}"
         }
     </script>
 
@@ -987,6 +1020,70 @@
                     setTimeout(() => { btn.classList.remove('is-added'); btn.textContent = 'Add to Cart'; btn.disabled = false; }, 1400);
                 } catch (err) {
                     btn.disabled = false;
+                }
+                return;
+            }
+
+            // Add a wishlist item to cart (wishlist card stays put — it's a
+            // saved product, not a cart line, so adding to cart doesn't remove it)
+            if (action === 'add-wishlist') {
+                btn.disabled = true;
+                const productId = btn.dataset.id;
+                try {
+                    const data = await post(urlFor('add_to_cart', productId), {});
+                    updateBadges(data.count);
+                    const lineKey = data.line_key || productId;
+                    const existingRow = document.getElementById('cart-item-' + lineKey);
+                    const item = {
+                        id: lineKey, name: btn.dataset.name, price: btn.dataset.price,
+                        price_unit: btn.dataset.unit, image: btn.dataset.image,
+                        weight: data.weight || null,
+                        qty: data.qty,
+                        pricing_mode: data.pricing_mode,
+                        weight_step: data.weight_step,
+                        weight_unit_label: data.weight_unit_label,
+                    };
+                    if (existingRow) {
+                        existingRow.replaceWith(buildCartItemNode(item));
+                        document.getElementById('summaryrow-' + lineKey)?.remove();
+                    } else {
+                        document.getElementById('cartItemsList').appendChild(buildCartItemNode(item));
+                    }
+                    document.getElementById('summaryRows').appendChild(buildSummaryRow(item));
+                    let total = 0;
+                    document.querySelectorAll('#cartItemsList .cart-item').forEach(row => {
+                        const price = parseFloat(row.dataset.price);
+                        const qty = parseInt(document.getElementById('qtynum-' + row.dataset.id).textContent);
+                        const weight = row.dataset.weight ? parseFloat(row.dataset.weight) : 1;
+                        total += price * qty * weight;
+                    });
+                    updateTotal(total);
+                    updateCountPill();
+                    toggleEmptyState();
+                    showToast(item.name + ' added to cart');
+                } finally {
+                    btn.disabled = false;
+                }
+                return;
+            }
+
+            // Remove an item from the wishlist entirely
+            if (action === 'remove-wishlist') {
+                const card = btn.closest('.saved-card');
+                const id = card.dataset.id;
+                card.classList.add('is-removing');
+                try {
+                    await post(urlFor('wishlist_toggle', id), {});
+                    setTimeout(() => {
+                        card.remove();
+                        const grid = document.getElementById('wishlistGrid');
+                        const section = document.getElementById('wishlistSection');
+                        const countEl = document.getElementById('wishlistCount');
+                        if (grid && !grid.children.length && section) section.style.display = 'none';
+                        if (countEl) countEl.textContent = Math.max(0, parseInt(countEl.textContent) - 1);
+                    }, 180);
+                } catch (err) {
+                    card.classList.remove('is-removing');
                 }
                 return;
             }

@@ -648,12 +648,17 @@ def cart_view(request):
     all_products = list(Product.objects.filter(is_available=True).exclude(id__in=excluded_ids))
     recommended_products = random.sample(all_products, min(6, len(all_products)))
 
+    wishlist_items = []
+    if request.user.is_authenticated:
+        wishlist_items = Wishlist.objects.filter(user=request.user).select_related('product')
+
     return render(request, 'cart.html', {
         'items': items,
         'total': total,
         'count': cart_count(request),
         'saved_items': saved_items,
         'recommended_products': recommended_products,
+        'wishlist_items': wishlist_items,
     })
 
 
@@ -839,12 +844,17 @@ def shop(request):
                 p.price_range_low = min(prices)
                 p.price_range_high = max(prices)
 
+    wishlist_ids = []
+    if request.user.is_authenticated:
+        wishlist_ids = list(Wishlist.objects.filter(user=request.user).values_list('product_id', flat=True))
+
     return render(request, 'shop.html', {
         'products': products,
         'cat_tree': cat_tree,
         'selected_category': selected_category,
         'total_count': Product.objects.count(),
         'saved_ids': saved_ids,
+        'wishlist_ids': wishlist_ids,
         'has_active_offers': has_active_offers,
     })
 
