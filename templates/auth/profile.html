@@ -68,7 +68,7 @@
         .cancelled-note i { font-size: 1rem; }
 
         /* ── My Wishlist ── */
-        .wishlist-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; margin-bottom: 40px; }
+        .wishlist-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 14px; margin-bottom: 40px; }
         .wishlist-card { background: var(--white); border: 1px solid var(--mist); border-radius: 12px; overflow: hidden; transition: transform 0.2s, box-shadow 0.2s; }
         .wishlist-card:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(26,47,30,0.1); }
         .wishlist-card-img { height: 120px; background: var(--mist); display: flex; align-items: center; justify-content: center; overflow: hidden; }
@@ -94,7 +94,7 @@
         .coupon-copy-btn:hover { background: rgba(255,255,255,0.28); }
 
         /* ── Account Settings (Edit Profile / Change Password) ── */
-        .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 40px; }
+        .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 40px; align-items: start; }
         .settings-card { background: var(--white); border: 1px solid var(--mist); border-radius: 12px; padding: 20px; }
         .settings-card summary { cursor: pointer; font-weight: 600; color: var(--forest); font-size: 0.95rem; list-style: none; display: flex; align-items: center; gap: 8px; }
         .settings-card summary::-webkit-details-marker { display: none; }
@@ -383,19 +383,27 @@
         <div class="wishlist-grid">
             {% for item in wishlist_items %}
             <div class="wishlist-card">
-                <div class="wishlist-card-img">
+                <a href="{{ item.product.get_absolute_url }}" class="wishlist-card-img">
                     {% if item.product.main_image %}
                     <img src="{% static item.product.main_image %}" alt="{{ item.product.name }}">
                     {% else %}
                     <i class="fas fa-seedling" style="font-size:1.6rem;color:var(--moss);"></i>
                     {% endif %}
-                </div>
+                </a>
                 <div class="wishlist-card-body">
-                    <div class="wishlist-card-name">{{ item.product.name }}</div>
+                    <a href="{{ item.product.get_absolute_url }}" class="wishlist-card-name" style="display:block;text-decoration:none;">{{ item.product.name }}</a>
                     <div class="wishlist-card-price">Rs. {{ item.product.price }} <span style="color:var(--text-muted);">{{ item.product.price_unit }}</span></div>
                     <div class="wishlist-card-actions">
-                        <a href="{{ item.product.get_absolute_url }}" class="wishlist-btn wishlist-btn-cart"><i class="fas fa-eye"></i> View</a>
-                        <button type="button" class="wishlist-btn wishlist-btn-remove" data-wishlist-remove data-product-id="{{ item.product.id }}"><i class="fas fa-heart-broken"></i> Remove</button>
+                        <button type="button" class="wishlist-btn wishlist-btn-cart"
+                            data-wishlist-add-cart
+                            data-product-id="{{ item.product.id }}"
+                            data-product-name="{{ item.product.name }}"
+                            data-product-price="{{ item.product.price }}"
+                            data-product-unit="{{ item.product.price_unit }}"
+                            data-product-image="{{ item.product.main_image }}">
+                            <i class="fas fa-cart-plus"></i> Add to Cart
+                        </button>
+                        <button type="button" class="wishlist-btn wishlist-btn-remove" data-wishlist-remove data-product-id="{{ item.product.id }}"><i class="fas fa-heart-broken"></i></button>
                     </div>
                 </div>
             </div>
@@ -615,6 +623,36 @@
                 })
                 .catch(function () {
                     alert('Could not remove this item right now — please try again.');
+                });
+            });
+        });
+
+        // ── Wishlist: add to cart (item stays in the wishlist — it's a
+        // saved product, not a cart line, so this doesn't remove the card) ──
+        document.querySelectorAll('[data-wishlist-add-cart]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                const productId = btn.dataset.productId;
+                btn.disabled = true;
+                fetch(`/cart/add/${productId}/`, {
+                    method: 'POST',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRFToken': getCookie('csrftoken'),
+                    },
+                })
+                .then(res => res.json())
+                .then(function (data) {
+                    if (data.status === 'ok') {
+                        const original = btn.innerHTML;
+                        btn.innerHTML = '<i class="fas fa-check"></i> Added';
+                        setTimeout(function () { btn.innerHTML = original; btn.disabled = false; }, 1400);
+                    } else {
+                        btn.disabled = false;
+                    }
+                })
+                .catch(function () {
+                    alert('Could not add this item to your cart right now — please try again.');
+                    btn.disabled = false;
                 });
             });
         });
