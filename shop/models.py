@@ -195,6 +195,12 @@ class ProductOrder(models.Model):
     status = models.CharField(max_length=20, choices=STATUS, default='pending')
     ordered_at = models.DateTimeField(auto_now_add=True)
     cancel_token = models.CharField(max_length=64, blank=True)
+    cart_snapshot = models.JSONField(
+        null=True, blank=True,
+        help_text='Structured line items (product id, weight, qty) captured at checkout time, '
+                   'used by the "Reorder" button. Orders placed before this field existed have '
+                   'no snapshot, so they won\'t show a working Reorder button.'
+    )
 
     def save(self, *args, **kwargs):
         if not self.order_number:

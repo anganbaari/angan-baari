@@ -4,6 +4,7 @@ from django.core.mail import send_mail
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.urls import reverse
+from django.contrib import messages
 from .models import NewsletterSubscriber, ContactMessage, ProductOrder, Review, Wishlist
 from .emails import (
     send_order_received_email,
@@ -117,6 +118,87 @@ def cancel_order(request, token):
         })
 
     return render(request, 'cancel.html', {'order': order})
+
+
+@login_required
+def reorder(request, order_id):
+    """Re-add a past order's items to the current cart, using a structured
+    snapshot saved at checkout time. Orders placed before this field existed
+    have no snapshot and can't be reordered. Fixed-weight items (goat/chicken)
+    are always skipped since each listing is one unique animal — the exact
+    one from a past order is very unlikely to still be available."""
+    from .models import Product
+    order = get_object_or_404(ProductOrder, id=order_id, email=request.user.email)
+
+    if not order.cart_snapshot:
+        messages.error(request, "This order can't be reordered — it was placed before this feature existed.")
+        return redirect('profile')
+
+    cart = get_cart(request)
+    added_count = 0
+    skipped_count = 0
+
+    for line in order.cart_snapshot:
+        product_id = line.get('product_id')
+        try:
+            product = Product.objects.get(id=product_id, is_available=True)
+        except Product.DoesNotExist:
+            skipped_count += 1
+            continue
+
+        if product.pricing_mode == 'fixed_weight':
+            skipped_count += 1
+            continue
+
+        try:
+            qty = max(1, int(line.get('qty') or 1))
+        except (TypeError, ValueError):
+            qty = 1
+
+        if product.pricing_mode == 'variable_weight':
+            step = product.weight_step or '0.50'
+            weight_str = format_weight(line.get('weight') or step, step)
+            line_key = make_line_key(product.id, weight_str)
+            qty_to_add = 1  # each variable-weight line represents one weight-slice, same as add_to_cart
+            weight_for_cart = weight_str
+            weight_step_for_cart = str(product.weight_step)
+            weight_unit_for_cart = product.weight_unit_label
+        else:  # fixed_quantity
+            line_key = make_line_key(product.id, None)
+            qty_to_add = qty
+            weight_for_cart = None
+            weight_step_for_cart = None
+            weight_unit_for_cart = None
+
+        if line_key in cart and isinstance(cart[line_key], dict):
+            cart[line_key]['qty'] = int(cart[line_key].get('qty', 0) or 0) + qty_to_add
+        else:
+            cart[line_key] = {
+                'product_id': product.id,
+                'name': product.name,
+                'price': str(product.price),
+                'price_unit': product.price_unit,
+                'image': product.main_image,
+                'slug': product.slug,
+                'qty': qty_to_add,
+                'weight': weight_for_cart,
+                'pricing_mode': product.pricing_mode,
+                'weight_step': weight_step_for_cart,
+                'weight_unit_label': weight_unit_for_cart,
+            }
+        added_count += 1
+
+    save_cart(request, cart)
+
+    if added_count and skipped_count:
+        messages.success(request, f"Added {added_count} item(s) to your cart. {skipped_count} item(s) from this order are no longer available.")
+    elif added_count:
+        messages.success(request, f"Added {added_count} item(s) to your cart.")
+    else:
+        messages.error(request, "None of the items from this order are available to reorder right now.")
+
+    return redirect('cart')
+
 
 def newsletter_signup(request):
     if request.method == 'POST':
@@ -724,6 +806,18 @@ def checkout(request):
         if coupon_applied:
             product_list += f" | Coupon: {coupon_code} (-Rs.{discount_amount:.0f})"
 
+        # Structured snapshot for the "Reorder" button — just enough to
+        # re-add the same lines later (product + weight + qty), not the
+        # historical price, since a reorder should use CURRENT pricing.
+        cart_snapshot = [
+            {
+                'product_id': i.get('product_id'),
+                'weight': i.get('weight'),
+                'qty': i.get('qty'),
+            }
+            for i in items if i.get('product_id')
+        ]
+
         order = ProductOrder.objects.create(
             name=name,
             email=email,
@@ -731,6 +825,7 @@ def checkout(request):
             address=address,
             product_interest=product_list,
             message=message,
+            cart_snapshot=cart_snapshot,
         )
 
         if coupon_applied and coupon_obj:
