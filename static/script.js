@@ -1,5 +1,5 @@
 /* ================================================================
-   THE HIMALAYAN SUSTAINABLE FARM — Premium JavaScript
+   Angan Baari — Premium JavaScript
    Features: Loader, Navbar scroll, Carousel, Lightbox,
              ScrollSpy, AOS init, Animated Counters, Mobile Menu
 ================================================================ */
@@ -1121,7 +1121,7 @@ function initMiniShopCarousel(sceneId, ringId, autoplayDirection, startOffsetFra
             const xPos = offset * spacing;
             const rotateYval = Math.max(-70, Math.min(70, offset * 32));
             const z = -absOffset * 70;
-            const scale = Math.max(0.55, 1.22 - absOffset * 0.16);
+            const scale = Math.max(0.5, 1.35 - absOffset * 0.35);
 
             card.style.transform =
                 `translateX(${xPos.toFixed(1)}px) translateZ(${z.toFixed(1)}px) rotateY(${rotateYval.toFixed(1)}deg) scale(${scale.toFixed(3)})`;
