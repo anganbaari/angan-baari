@@ -5502,7 +5502,7 @@ ul { list-style: none; }
     font-weight: 700;
     font-size: 2rem;
     color: var(--gold);
-    margin-bottom: 2px;
+    margin-bottom: 1px;
     letter-spacing: 0.02em;
 }
 
@@ -5646,7 +5646,7 @@ ul { list-style: none; }
     width: 100%;
     max-width: 320px;
     height: 190px;
-    margin: 2px auto 2px;
+    margin: 1px auto 1px;
     perspective: 900px;
     position: relative;
     cursor: grab;
