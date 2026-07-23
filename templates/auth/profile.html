@@ -40,10 +40,10 @@
         .order-product { font-size: 0.88rem; color: var(--text-body); margin-bottom: 4px; }
         .order-address { font-size: 0.82rem; color: var(--text-muted); }
         .no-orders { text-align: center; padding: 48px 20px; color: var(--text-muted); }
-        .reorder-btn { display: inline-flex; align-items: center; gap: 6px; font-size: 0.78rem; font-weight: 600; color: var(--moss); text-decoration: none; padding: 5px 12px; border: 1px solid var(--moss); border-radius: 50px; transition: background 0.2s, color 0.2s; }
-        .reorder-btn:hover { background: var(--moss); color: #fff; }
         .no-orders i { font-size: 2.5rem; color: var(--sage-light); margin-bottom: 12px; display: block; }
         .btn-shop { display: inline-flex; align-items: center; gap: 8px; background: var(--forest); color: white; padding: 12px 24px; border-radius: 50px; font-size: 0.9rem; font-weight: 500; text-decoration: none; margin-top: 16px; }
+        .reorder-btn { display: inline-flex; align-items: center; gap: 6px; font-size: 0.78rem; font-weight: 600; color: var(--moss); text-decoration: none; padding: 5px 12px; border: 1px solid var(--moss); border-radius: 50px; transition: background 0.2s, color 0.2s; }
+        .reorder-btn:hover { background: var(--moss); color: #fff; }
 
         /* Order tracking timeline — Placed -> Confirmed -> Delivered.
            Cancelled orders get a distinct red state instead of the normal steps. */
@@ -171,8 +171,6 @@
             font-size: 1.18rem;
             transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), color 0.3s ease;
         }
-        /* Tap feedback — icon pops up on press so the customer sees their
-           tap registered, even before the page navigates. */
         .mobile-bottom-nav .nav-item:active .nav-icon-wrap,
         .mobile-bottom-nav .nav-item.tap-pop .nav-icon-wrap {
             animation: navItemPop 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -182,8 +180,6 @@
             45%  { transform: scale(1.28); }
             100% { transform: scale(1); }
         }
-        /* Active tab — background lives directly on the element that has
-           .active, so it is always painted on the correct icon. */
         .mobile-bottom-nav .nav-item.active {
             background: linear-gradient(135deg, #2d5a3d, #4a7c59);
             color: #fff;
@@ -191,7 +187,6 @@
         .mobile-bottom-nav .nav-item.active i { transform: translateY(-1px) scale(1.1); }
         .mobile-bottom-nav .nav-label { transition: color 0.3s ease, font-weight 0.3s ease; }
         .mobile-bottom-nav .nav-item.active .nav-label { color: #fff; font-weight: 600; }
-        /* Cart badge */
         .mobile-bottom-nav .cart-badge {
             position: absolute;
             top: -5px;
@@ -209,7 +204,6 @@
             font-weight: 700;
             border: 2px solid #fff;
         }
-        /* Offers — a periodic wiggle draws the eye without being annoying; pauses when active */
         .mobile-bottom-nav .nav-item-offers .nav-icon-wrap i {
             animation: navOfferWiggle 2.8s ease-in-out infinite;
         }
@@ -276,22 +270,18 @@
             </a>
             <nav class="desktop-nav">
                 <div class="nav-links">
-                    <!-- Shop -->
                     <a href="{% url 'shop' %}">
                         <i class="fas fa-store"></i> Shop
                     </a>
-                    <!-- Cart -->
                     <a href="{% url 'cart' %}" style="position:relative;">
                         <i class="fas fa-shopping-cart"></i> Cart
                         {% with total_qty=request.session.cart.values|length %}
                         {% if total_qty > 0 %}<span style="position:absolute;top:-6px;right:-6px;background:#c0392b;color:white;font-size:0.65rem;width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;">{{ total_qty }}</span>{% endif %}
                         {% endwith %}
                     </a>
-                    <!-- Offers -->
                     <a href="{% url 'offers' %}" class="offer-nav-link">
                         <i class="fas fa-fire offer-flame"></i> Offers
                     </a>
-                    <!-- Login / Profile -->
                     {% if user.is_authenticated %}
                     <a href="{% url 'profile' %}" class="active">
                         <i class="fas fa-user-circle"></i> {{ user.first_name }}
@@ -301,7 +291,6 @@
                         <i class="fas fa-user-circle"></i> Login
                     </a>
                     {% endif %}
-                    <!-- Website -->
                     <a href="/">
                         <i class="fas fa-globe"></i> Website
                     </a>
@@ -312,7 +301,6 @@
 
     <div class="profile-page">
 
-        <!-- Profile Header -->
         <div class="profile-header">
             <div class="profile-id">
                 <div class="profile-avatar">{{ user.first_name|first|upper }}</div>
@@ -327,7 +315,6 @@
             </div>
         </div>
 
-        <!-- Account Settings -->
         <div class="settings-grid">
             <details class="settings-card">
                 <summary><i class="fas fa-user-edit"></i> Edit Profile <i class="fas fa-chevron-down chevron"></i></summary>
@@ -374,7 +361,6 @@
             </details>
         </div>
 
-        <!-- My Wishlist -->
         <div class="section-head">
             <h2 class="section-title">My Wishlist</h2>
             <span class="orders-count-badge">{{ wishlist_items.count }}</span>
@@ -413,7 +399,6 @@
         <div class="no-wishlist"><i class="far fa-heart" style="font-size:1.6rem;display:block;margin-bottom:8px;color:var(--sage-light);"></i>Nothing saved yet — tap the heart icon on any product to save it here.</div>
         {% endif %}
 
-        <!-- My Coupons -->
         <div class="section-head">
             <h2 class="section-title">My Coupons</h2>
             <span class="orders-count-badge">{{ live_coupons|length }}</span>
@@ -436,7 +421,6 @@
         <div class="no-coupons"><i class="fas fa-tag" style="font-size:1.6rem;display:block;margin-bottom:8px;color:var(--sage-light);"></i>No active coupons right now — check back during festival season!</div>
         {% endif %}
 
-        <!-- Order History -->
         <div class="section-head">
             <h2 class="section-title">My Orders</h2>
             <span class="orders-count-badge">{{ orders.count }}</span>
@@ -510,15 +494,12 @@
         </div>
     </footer>
 
-    <!-- MOBILE / TABLET BOTTOM NAV (hidden on desktop) -->
     <nav class="mobile-bottom-nav" id="bottomNav" aria-label="Mobile navigation">
         <div class="nav-items">
-            <!-- Shop -->
             <a href="{% url 'shop' %}" class="nav-item">
                 <span class="nav-icon-wrap"><i class="fas fa-store"></i></span>
                 <span class="nav-label">Shop</span>
             </a>
-            <!-- Cart -->
             <a href="{% url 'cart' %}" class="nav-item">
                 <span class="nav-icon-wrap">
                     <i class="fas fa-shopping-cart"></i>
@@ -528,7 +509,6 @@
                 </span>
                 <span class="nav-label">Cart</span>
             </a>
-            <!-- Offers -->
             <a href="{% url 'offers' %}" class="nav-item nav-item-offers">
                 <span class="nav-icon-wrap">
                     <i class="fas fa-tag"></i>
@@ -536,10 +516,6 @@
                 </span>
                 <span class="nav-label">Offers</span>
             </a>
-            <!-- Profile / Login — this template only ever renders for a
-                 logged-in user viewing their own profile, so Profile is
-                 hardcoded active rather than relying on
-                 request.resolver_match.url_name. -->
             {% if user.is_authenticated %}
             <a href="{% url 'profile' %}" class="nav-item active">
                 <span class="nav-icon-wrap"><i class="far fa-user-circle"></i></span>
@@ -551,7 +527,6 @@
                 <span class="nav-label">Login</span>
             </a>
             {% endif %}
-            <!-- Website (back to main site) -->
             <a href="/" class="nav-item">
                 <span class="nav-icon-wrap"><i class="fas fa-globe"></i></span>
                 <span class="nav-label">Website</span>
@@ -560,12 +535,9 @@
     </nav>
 
     <script>
-        // Navbar always solid (no transparent state) — same as the shop page
         const navbar = document.getElementById('navbar');
         if (navbar) navbar.classList.add('scrolled');
 
-        // Keep the page content clear of the real navbar height, instead of
-        // guessing a fixed margin-top (handles font-load reflow + any screen size)
         const profilePage = document.querySelector('.profile-page');
         function syncProfileTopSpacing() {
             if (!navbar || !profilePage) return;
@@ -579,7 +551,6 @@
             document.fonts.ready.then(syncProfileTopSpacing);
         }
 
-        // Color-code each order card's left border to match its status badge
         document.querySelectorAll('.order-card').forEach(card => {
             const badge = card.querySelector('.order-status');
             if (!badge) return;
@@ -587,7 +558,6 @@
             if (statusClass) card.classList.add(statusClass);
         });
 
-        // ── Change Password: show/hide toggle ──
         document.querySelectorAll('.settings-pw-toggle').forEach(function (btn) {
             btn.addEventListener('click', function () {
                 const input = document.getElementById(btn.dataset.target);
@@ -600,7 +570,6 @@
             });
         });
 
-        // ── Wishlist: remove item ──
         function getCookie(name) {
             const match = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
             return match ? decodeURIComponent(match[2]) : null;
@@ -627,8 +596,6 @@
             });
         });
 
-        // ── Wishlist: add to cart (item stays in the wishlist — it's a
-        // saved product, not a cart line, so this doesn't remove the card) ──
         document.querySelectorAll('[data-wishlist-add-cart]').forEach(function (btn) {
             btn.addEventListener('click', function () {
                 const productId = btn.dataset.productId;
@@ -657,7 +624,6 @@
             });
         });
 
-        // ── Coupons: copy code to clipboard ──
         document.querySelectorAll('[data-copy-code]').forEach(function (btn) {
             btn.addEventListener('click', function () {
                 const code = btn.dataset.copyCode;
@@ -669,10 +635,6 @@
             });
         });
 
-        // Active bottom-nav state is now rendered server-side (see template),
-        // so no JS path-matching is needed here.
-
-        // Swap the Profile/Login icon outline -> filled when it's the active page
         document.querySelectorAll('.mobile-bottom-nav .nav-item i.fa-user-circle').forEach(icon => {
             const item = icon.closest('.nav-item');
             if (item && item.classList.contains('active')) {
@@ -681,10 +643,6 @@
             }
         });
 
-        // Tap-pop feedback for the bottom nav — :active in CSS already
-        // handles this on most browsers, but iOS Safari frequently ignores
-        // :active on <a> elements unless a touch listener is present, so
-        // this guarantees the pop is visible everywhere on tap.
         (function () {
             const navItems = document.querySelectorAll('.mobile-bottom-nav .nav-item');
             navItems.forEach(function (item) {
@@ -697,7 +655,6 @@
             });
         })();
 
-        // Sliding active-page pill in the top nav
         (function () {
             const navLinksWrap = document.querySelector('#navbar .nav-links');
             if (!navLinksWrap) return;
