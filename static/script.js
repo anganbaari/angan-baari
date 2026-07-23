@@ -1119,7 +1119,7 @@ function initMiniShopCarousel(sceneId, ringId, autoplayDirection, startOffsetFra
             const absOffset = Math.abs(offset);
 
             const xPos = offset * spacing;
-            const rotateYval = Math.max(-65, Math.min(65, offset * 24));
+            const rotateYval = Math.max(-70, Math.min(70, offset * 32));
             const z = -absOffset * 70;
             const scale = Math.max(0.55, 1.22 - absOffset * 0.16);
 

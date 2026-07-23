@@ -5660,11 +5660,11 @@ ul { list-style: none; }
 
 @media (min-width: 1025px) {
     .carousel-3d-scene {
-        max-width: 92%;
+        max-width: 95%;
         height: 260px;
-        perspective: 1500px;
+        perspective: 1000px;
         --carousel-radius: 270;
-        --carousel-spacing: 205;
+        --carousel-spacing: 175;
     }
     .ring-card {
         width: 165px;
