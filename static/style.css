@@ -5674,7 +5674,13 @@ ul { list-style: none; }
 }
 
 .carousel-3d-scene-row2 {
-    margin-top: -60px;
+    margin-top: -14px;
+}
+
+@media (min-width: 1025px) {
+    .carousel-3d-scene-row2 {
+        margin-top: -60px;
+    }
 }
 
 .carousel-3d {
