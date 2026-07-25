@@ -1437,12 +1437,16 @@
             }
             const id = btn.dataset.productId;
             btn.disabled = true;
+            const variantField = document.getElementById('cartVariantField');
+            const body = variantField ? new URLSearchParams({ variant_id: variantField.value }) : null;
             fetch(`/wishlist/toggle/${id}/`, {
                 method: 'POST',
                 headers: {
                     'X-Requested-With': 'XMLHttpRequest',
                     'X-CSRFToken': getCookie('csrftoken'),
+                    'Content-Type': 'application/x-www-form-urlencoded',
                 },
+                body: body,
             })
             .then(res => res.json())
             .then(function (data) {

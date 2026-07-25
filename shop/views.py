@@ -300,12 +300,82 @@ def wishlist_toggle(request, product_id):
         existing.delete()
         is_saved = False
     else:
-        Wishlist.objects.create(user=request.user, product=product)
+        variant = None
+        if product.pricing_mode == 'fixed_weight':
+            variant_id = request.POST.get('variant_id')
+            if variant_id:
+                variant = product.variants.filter(id=variant_id, is_available=True).first()
+            if not variant:
+                available = sorted(product.available_variants(), key=lambda v: v.total_price())
+                variant = available[0] if available else None
+        Wishlist.objects.create(user=request.user, product=product, variant=variant)
         is_saved = True
 
     if is_ajax(request):
         return JsonResponse({'status': 'ok', 'is_saved': is_saved})
     return redirect(request.META.get('HTTP_REFERER', '/shop/'))
+
+
+@login_required
+def wishlist_set_variant(request, product_id):
+    """Change which size/animal a fixed-weight wishlist item points to —
+    e.g. switching a wishlisted goat from the 15kg listing to the 20kg one."""
+    from .models import Product
+    product = get_object_or_404(Product, id=product_id)
+    wishlist_item = get_object_or_404(Wishlist, user=request.user, product=product)
+
+    variant_id = request.POST.get('variant_id')
+    variant = product.variants.filter(id=variant_id, is_available=True).first()
+    if not variant:
+        return JsonResponse({'status': 'error', 'message': 'That size is no longer available'}, status=400)
+
+    wishlist_item.variant = variant
+    wishlist_item.save(update_fields=['variant'])
+    return JsonResponse({
+        'status': 'ok',
+        'weight': f"{variant.weight:.2f}",
+        'price': str(variant.total_price()),
+    })
+
+
+@login_required
+def wishlist_move_to_cart(request, product_id):
+    """Add a wishlist item to the cart, then remove it from the wishlist —
+    a saved item is 'claimed' once it's actually in the cart, matching how
+    most shopping wishlists behave. For fixed_weight products, uses whichever
+    variant was picked (or currently selected in the dropdown)."""
+    from .models import Product
+    product = get_object_or_404(Product, id=product_id)
+
+    line_key, weight_str, qty_to_add, fixed_total = resolve_cart_line(request, product)
+    mode = product.pricing_mode
+    price_to_store = str(fixed_total) if fixed_total is not None else str(product.price)
+
+    cart = get_cart(request)
+    if line_key in cart:
+        if mode != 'fixed_weight':
+            cart[line_key]['qty'] = int(cart[line_key].get('qty', 0) or 0) + qty_to_add
+    else:
+        cart[line_key] = {
+            'product_id': product.id,
+            'name': product.name,
+            'price': price_to_store,
+            'price_unit': '(fixed price)' if mode == 'fixed_weight' else product.price_unit,
+            'image': product.main_image,
+            'slug': product.slug,
+            'qty': 1 if mode == 'fixed_weight' else qty_to_add,
+            'weight': weight_str,
+            'pricing_mode': mode,
+            'weight_step': str(product.weight_step) if mode == 'variable_weight' else None,
+            'weight_unit_label': product.weight_unit_label if mode == 'variable_weight' else None,
+        }
+    save_cart(request, cart)
+
+    Wishlist.objects.filter(user=request.user, product=product).delete()
+
+    if is_ajax(request):
+        return JsonResponse({'status': 'ok', 'count': cart_count(request)})
+    return redirect('cart')
 
 
 # ─── CART SYSTEM ───────────────────────────────────────────────

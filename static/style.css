@@ -1813,15 +1813,15 @@ ul { list-style: none; }
  
 /* Masonry Grid */
 .gallery-masonry {
-    columns: 4;
-    column-gap: 14px;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
     max-width: 1300px;
     margin: 0 auto;
 }
  
 .gm-item {
-    break-inside: avoid;
-    margin-bottom: 14px;
+    aspect-ratio: 1 / 1;
     border-radius: var(--radius-sm);
     overflow: hidden;
     position: relative;
@@ -1847,8 +1847,9 @@ ul { list-style: none; }
  
 .gm-item img {
     width: 100%;
+    height: 100%;
+    object-fit: cover;
     display: block;
-    border-radius: var(--radius-sm);
     transition: transform 0.65s var(--ease-smooth);
     filter: brightness(0.88) saturate(1.1);
 }
@@ -1888,6 +1889,30 @@ ul { list-style: none; }
     width: fit-content;
     font-weight: 600;
 }
+
+/* Category color-coding — a persistent corner dot (visible even
+   before hover) plus a matching tag color once the overlay appears,
+   so categories are scannable at a glance across the whole grid. */
+.gm-item::before {
+    content: '';
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    z-index: 2;
+    box-shadow: 0 0 0 2px rgba(255,255,255,0.85);
+}
+.gm-item[data-cat="fruits"]::before  { background: #e67e22; }
+.gm-item[data-cat="honey"]::before   { background: var(--gold); }
+.gm-item[data-cat="animals"]::before { background: #8a5a3a; }
+.gm-item[data-cat="farm"]::before    { background: var(--moss); }
+
+.gm-item[data-cat="fruits"] .gm-tag  { background: #e67e22; color: #fff; }
+.gm-item[data-cat="honey"] .gm-tag   { background: var(--gold); color: var(--forest); }
+.gm-item[data-cat="animals"] .gm-tag { background: #8a5a3a; color: #fff; }
+.gm-item[data-cat="farm"] .gm-tag    { background: var(--moss); color: #fff; }
  
 .gm-overlay p {
     color: var(--white);

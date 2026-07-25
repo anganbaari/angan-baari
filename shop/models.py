@@ -95,6 +95,9 @@ class Product(models.Model):
     def available_variants(self):
         return [v for v in self.variants.all() if v.is_available]
 
+    def available_variant_count(self):
+        return len(self.available_variants())
+
     def locked_total_price(self):
         """For fixed-weight products with NO variant rows added (fallback only):
         the locked total price (rate x product.fixed_weight)."""
@@ -245,6 +248,11 @@ class Review(models.Model):
 class Wishlist(models.Model):
     user = models.ForeignKey('auth.User', on_delete=models.CASCADE, related_name='wishlist')
     product = models.ForeignKey(Product, on_delete=models.CASCADE)
+    variant = models.ForeignKey(
+        'ProductVariant', null=True, blank=True, on_delete=models.SET_NULL, related_name='wishlisted_by',
+        help_text='Only used for "Fixed weight" products (goat/chicken) — which specific size/animal '
+                   'was picked. Left blank for every other pricing mode.'
+    )
     added_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

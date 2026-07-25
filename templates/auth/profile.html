@@ -60,7 +60,11 @@
             margin: 0 auto 6px; font-size: 0.7rem; transition: background 0.3s, color 0.3s;
         }
         .timeline-step.done .timeline-dot { background: #6a9e7a; color: #fff; }
-        .timeline-step.current .timeline-dot { background: var(--forest); color: #fff; box-shadow: 0 0 0 4px rgba(74,124,89,0.2); }
+        .timeline-step.current .timeline-dot { background: #fff; color: var(--forest); border: 2px solid var(--forest); animation: timelinePulse 1.8s ease-in-out infinite; }
+        @keyframes timelinePulse {
+            0%, 100% { box-shadow: 0 0 0 3px rgba(74,124,89,0.15); }
+            50% { box-shadow: 0 0 0 7px rgba(74,124,89,0.06); }
+        }
         .timeline-label { font-size: 0.68rem; color: var(--text-muted); font-weight: 600; }
         .timeline-step.done .timeline-label, .timeline-step.current .timeline-label { color: var(--forest); }
         .order-timeline.cancelled-timeline { justify-content: flex-start; gap: 8px; }
@@ -69,13 +73,15 @@
 
         /* ── My Wishlist ── */
         .wishlist-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 14px; margin-bottom: 40px; }
-        .wishlist-card { background: var(--white); border: 1px solid var(--mist); border-radius: 12px; overflow: hidden; transition: transform 0.2s, box-shadow 0.2s; }
+        .wishlist-card { background: var(--white); border: 1px solid var(--mist); border-radius: 12px; overflow: hidden; transition: transform 0.2s, box-shadow 0.2s, opacity 0.2s; }
         .wishlist-card:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(26,47,30,0.1); }
         .wishlist-card-img { height: 120px; background: var(--mist); display: flex; align-items: center; justify-content: center; overflow: hidden; }
         .wishlist-card-img img { width: 100%; height: 100%; object-fit: cover; }
         .wishlist-card-body { padding: 12px 14px; }
         .wishlist-card-name { font-size: 0.9rem; font-weight: 600; color: var(--forest); margin-bottom: 4px; overflow-wrap: break-word; }
         .wishlist-card-price { font-size: 0.82rem; color: var(--text-muted); margin-bottom: 10px; }
+        .wishlist-variant-select { width: 100%; font-size: 0.78rem; font-weight: 600; color: var(--forest); background: var(--mist); border: 1px solid transparent; border-radius: 8px; padding: 6px 8px; margin-bottom: 6px; cursor: pointer; }
+        .wishlist-variant-select:focus { outline: none; border-color: var(--moss); }
         .wishlist-card-actions { display: flex; gap: 6px; }
         .wishlist-btn { flex: 1; text-align: center; padding: 7px 8px; border-radius: 8px; font-size: 0.76rem; font-weight: 600; text-decoration: none; cursor: pointer; border: none; transition: opacity 0.2s; }
         .wishlist-btn:hover { opacity: 0.85; }
@@ -368,7 +374,7 @@
         {% if wishlist_items %}
         <div class="wishlist-grid">
             {% for item in wishlist_items %}
-            <div class="wishlist-card">
+            <div class="wishlist-card" data-wishlist-item data-pricing-mode="{{ item.product.pricing_mode }}">
                 <a href="{{ item.product.get_absolute_url }}" class="wishlist-card-img">
                     {% if item.product.main_image %}
                     <img src="{% static item.product.main_image %}" alt="{{ item.product.name }}">
@@ -378,15 +384,22 @@
                 </a>
                 <div class="wishlist-card-body">
                     <a href="{{ item.product.get_absolute_url }}" class="wishlist-card-name" style="display:block;text-decoration:none;">{{ item.product.name }}</a>
+
+                    {% if item.product.pricing_mode == "fixed_weight" and item.product.available_variant_count > 1 %}
+                    <select class="wishlist-variant-select" data-wishlist-variant-select data-product-id="{{ item.product.id }}">
+                        {% for v in item.product.available_variants %}
+                        <option value="{{ v.id }}" {% if item.variant.id == v.id %}selected{% endif %}>{{ v.weight|floatformat:2 }} kg — Rs. {{ v.total_price|floatformat:0 }}</option>
+                        {% endfor %}
+                    </select>
+                    <div class="wishlist-card-price" data-wishlist-price>Rs. {{ item.variant.total_price|default:item.product.locked_total_price|floatformat:0 }} <span style="color:var(--text-muted);">fixed price</span></div>
+                    {% elif item.product.pricing_mode == "fixed_weight" %}
+                    <div class="wishlist-card-price">Rs. {{ item.variant.total_price|default:item.product.locked_total_price|floatformat:0 }} <span style="color:var(--text-muted);">fixed price</span></div>
+                    {% else %}
                     <div class="wishlist-card-price">Rs. {{ item.product.price }} <span style="color:var(--text-muted);">{{ item.product.price_unit }}</span></div>
+                    {% endif %}
+
                     <div class="wishlist-card-actions">
-                        <button type="button" class="wishlist-btn wishlist-btn-cart"
-                            data-wishlist-add-cart
-                            data-product-id="{{ item.product.id }}"
-                            data-product-name="{{ item.product.name }}"
-                            data-product-price="{{ item.product.price }}"
-                            data-product-unit="{{ item.product.price_unit }}"
-                            data-product-image="{{ item.product.main_image }}">
+                        <button type="button" class="wishlist-btn wishlist-btn-cart" data-wishlist-add-cart data-product-id="{{ item.product.id }}">
                             <i class="fas fa-cart-plus"></i> Add to Cart
                         </button>
                         <button type="button" class="wishlist-btn wishlist-btn-remove" data-wishlist-remove data-product-id="{{ item.product.id }}"><i class="fas fa-heart-broken"></i></button>
@@ -447,12 +460,16 @@
                         <div class="timeline-dot"><i class="fas fa-check"></i></div>
                         <div class="timeline-label">Placed</div>
                     </div>
-                    <div class="timeline-step {% if order.status == 'confirmed' or order.status == 'delivered' %}done{% else %}current{% endif %}">
-                        <div class="timeline-dot"><i class="fas fa-check"></i></div>
-                        <div class="timeline-label">Confirmed</div>
+                    <div class="timeline-step {% if order.status == 'confirmed' or order.status == 'delivered' %}done{% elif order.status == 'pending' %}current{% endif %}">
+                        <div class="timeline-dot">{% if order.status == 'confirmed' or order.status == 'delivered' %}<i class="fas fa-check"></i>{% else %}<i class="fas fa-clock"></i>{% endif %}</div>
+                        <div class="timeline-label">Pending</div>
                     </div>
                     <div class="timeline-step {% if order.status == 'delivered' %}done{% elif order.status == 'confirmed' %}current{% endif %}">
-                        <div class="timeline-dot"><i class="fas fa-check"></i></div>
+                        <div class="timeline-dot">{% if order.status == 'delivered' %}<i class="fas fa-check"></i>{% else %}<i class="fas fa-clock"></i>{% endif %}</div>
+                        <div class="timeline-label">Confirmed</div>
+                    </div>
+                    <div class="timeline-step {% if order.status == 'delivered' %}done{% endif %}">
+                        <div class="timeline-dot">{% if order.status == 'delivered' %}<i class="fas fa-check"></i>{% endif %}</div>
                         <div class="timeline-label">Delivered</div>
                     </div>
                 </div>
@@ -574,7 +591,34 @@
             const match = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
             return match ? decodeURIComponent(match[2]) : null;
         }
-        document.querySelectorAll('[data-wishlist-remove]').forEach(function (btn) {
+        // ── Wishlist: change which size/animal is selected (fixed-weight only) ──
+        document.querySelectorAll('[data-wishlist-variant-select]').forEach(function (select) {
+            select.addEventListener('change', function () {
+                const productId = select.dataset.productId;
+                const card = select.closest('.wishlist-card');
+                const priceEl = card ? card.querySelector('[data-wishlist-price]') : null;
+                fetch(`/wishlist/set-variant/${productId}/`, {
+                    method: 'POST',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRFToken': getCookie('csrftoken'),
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: new URLSearchParams({ variant_id: select.value }),
+                })
+                .then(res => res.json())
+                .then(function (data) {
+                    if (data.status === 'ok' && priceEl) {
+                        priceEl.innerHTML = `Rs. ${parseFloat(data.price).toFixed(0)} <span style="color:var(--text-muted);">fixed price</span>`;
+                    }
+                })
+                .catch(function () {
+                    alert('Could not update the selected size right now — please try again.');
+                });
+            });
+        });
+
+        // ── Wishlist: remove item ──
             btn.addEventListener('click', function () {
                 const productId = btn.dataset.productId;
                 fetch(`/wishlist/toggle/${productId}/`, {
@@ -599,20 +643,25 @@
         document.querySelectorAll('[data-wishlist-add-cart]').forEach(function (btn) {
             btn.addEventListener('click', function () {
                 const productId = btn.dataset.productId;
+                const card = btn.closest('.wishlist-card');
+                const variantSelect = card ? card.querySelector('[data-wishlist-variant-select]') : null;
+                const body = variantSelect ? new URLSearchParams({ variant_id: variantSelect.value }) : null;
                 btn.disabled = true;
-                fetch(`/cart/add/${productId}/`, {
+                fetch(`/wishlist/move-to-cart/${productId}/`, {
                     method: 'POST',
                     headers: {
                         'X-Requested-With': 'XMLHttpRequest',
                         'X-CSRFToken': getCookie('csrftoken'),
+                        'Content-Type': 'application/x-www-form-urlencoded',
                     },
+                    body: body,
                 })
                 .then(res => res.json())
                 .then(function (data) {
                     if (data.status === 'ok') {
-                        const original = btn.innerHTML;
-                        btn.innerHTML = '<i class="fas fa-check"></i> Added';
-                        setTimeout(function () { btn.innerHTML = original; btn.disabled = false; }, 1400);
+                        // Item moved to the cart, so it's no longer a wishlist entry.
+                        card.style.opacity = '0';
+                        setTimeout(function () { card.remove(); }, 200);
                     } else {
                         btn.disabled = false;
                     }
