@@ -1307,10 +1307,7 @@
  
         <!-- Filter Buttons -->
         <div class="gallery-filter-bar" data-aos="fade-up" data-aos-delay="80">
-            <button class="gf-btn active" data-filter="all">
-                <i class="fas fa-border-all"></i> All Photos
-            </button>
-            <button class="gf-btn" data-filter="fruits">
+            <button class="gf-btn active" data-filter="fruits">
                 <i class="fas fa-apple-alt"></i> Fruits
             </button>
             <button class="gf-btn" data-filter="honey">
@@ -1321,6 +1318,9 @@
             </button>
             <button class="gf-btn" data-filter="farm">
                 <i class="fas fa-sun"></i> Farm Life
+            </button>
+            <button class="gf-btn" data-filter="all">
+                <i class="fas fa-border-all"></i> All Photos
             </button>
         </div>
  
@@ -1343,7 +1343,7 @@
                 </div>
             </div>
  
-            <div class="gm-item" data-cat="honey">
+            <div class="gm-item hidden" data-cat="honey">
                 <img src="{% static 'images/honey3.jpg' %}" alt="Fresh golden honey from our beehives" loading="lazy">
                 <div class="gm-overlay">
                     <span class="gm-tag">Honey</span>
@@ -1351,7 +1351,7 @@
                 </div>
             </div>
  
-            <div class="gm-item" data-cat="farm">
+            <div class="gm-item hidden" data-cat="farm">
                 <img src="{% static 'images/img2.jpg' %}" alt="Happy farm animals grazing in the field" loading="lazy">
                 <div class="gm-overlay">
                     <span class="gm-tag">Farm Life</span>
@@ -1359,7 +1359,7 @@
                 </div>
             </div>
  
-            <div class="gm-item" data-cat="farm">
+            <div class="gm-item hidden" data-cat="farm">
                 <img src="{% static 'images/sunflower.jpg' %}" alt="Scenic view of the farm with sunflowers" loading="lazy">
                 <div class="gm-overlay">
                     <span class="gm-tag">Farm Life</span>
@@ -1399,7 +1399,7 @@
                 </div>
             </div>
  
-            <div class="gm-item" data-cat="animals">
+            <div class="gm-item hidden" data-cat="animals">
                 <img src="{% static 'images/goat6.jpg' %}" alt="Newborn kid goat on our farm" loading="lazy">
                 <div class="gm-overlay">
                     <span class="gm-tag">Animals</span>
@@ -1407,7 +1407,7 @@
                 </div>
             </div>
  
-            <div class="gm-item" data-cat="animals">
+            <div class="gm-item hidden" data-cat="animals">
                 <img src="{% static 'images/goat4.jpg' %}" alt="Goats grazing freely on the farm" loading="lazy">
                 <div class="gm-overlay">
                     <span class="gm-tag">Animals</span>
@@ -1415,20 +1415,20 @@
                 </div>
             </div>
  
-            <div class="gm-item" data-cat="honey">
+            <div class="gm-item hidden" data-cat="honey">
                 <img src="{% static 'images/honey7.jpg' %}" alt="Bees working hard on a hive" loading="lazy">
                 <div class="gm-overlay">
                     <span class="gm-tag">Honey</span>
                     <p>Busy Beehive</p>
                 </div>
             </div>
-            <div class="gm-item" data-cat="honey">
+            <div class="gm-item hidden" data-cat="honey">
                 <img src="{% static 'images/honey4.jpg' %}" alt="Bees working hard on a hive" loading="lazy">
                 <div class="gm-overlay">
                     <span class="gm-tag">Honey</span>
                     <p>Working Bees</p>
                 </div>
-                <div class="gm-item" data-cat="honey">
+                <div class="gm-item hidden" data-cat="honey">
                 <img src="{% static 'images/honey8.jpg' %}" alt="Bees working hard on a hive" loading="lazy">
                 <div class="gm-overlay">
                     <span class="gm-tag">Honey</span>
@@ -1471,10 +1471,10 @@
                 <div class="ns-body">
                     <div class="ns-meta">
                         <span class="ns-tag ns-tag-harvest">Harvest Alert</span>
-                        <span class="ns-date">Kartik 2, 2083</span>
+                        <span class="ns-date">Ashadh 12, 2083</span>
                     </div>
                     <h3 class="ns-headline">New batch of Angan Baari Gold Honey — order before it runs out</h3>
-                    <p class="ns-text">हामी यही कार्तिक २ गतेदेखि विशेष अर्गानिक महको नयाँ ब्याच संकलन (Harvest) गर्दैछौँ। चाकाबाट सिधै निकालिएको यो मह पूर्ण रूपमा प्राकृतिक, कच्चा (Raw) र अप्रशोधित(Unfiltered) छ। यस सिजनका लागि सीमित मात्रा मात्र उपलब्ध!</p>
+                    <p class="ns-text">हामी यही जेठ १२ गतेदेखि विशेष अर्गानिक महको नयाँ ब्याच संकलन (Harvest) गर्दैछौँ। चाकाबाट सिधै निकालिएको यो मह पूर्ण रूपमा प्राकृतिक, कच्चा (Raw) र अप्रशोधित(Unfiltered) छ। यस सिजनका लागि सीमित मात्रा मात्र उपलब्ध!</p>
                     <a class="ns-cta"
                        href="https://wa.me/9779821025084?text=Hello%20Angan%20Baari!%20I%20would%20like%20to%20order%20*Pure%20Tilottama%20Gold%20Honey*.%20Please%20let%20me%20know%20the%20availability%20and%20price."
                        target="_blank" rel="noopener noreferrer">
@@ -1494,7 +1494,7 @@
                     <div class="ns-body">
                         <div class="ns-meta">
                             <span class="ns-tag ns-tag-season">Season</span>
-                            <span class="ns-date"> भादौ 5, 2026</span>
+                            <span class="ns-date">July 24, 2026</span>
                         </div>
                         <h3 class="ns-headline">Organic tomatoes exceptionally sweet this season</h3>
                         <p class="ns-text">ताजा सलाद र ससहरू बनाउनका लागि एकदमै उपयुक्त। अवसर नगुमाउनुहोस्, आजै किन्नुहोस्!</p>

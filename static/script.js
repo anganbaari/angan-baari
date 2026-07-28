@@ -364,10 +364,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const visibleCount  = document.getElementById('visibleCount');
     const totalCount    = document.getElementById('totalCount');
     const totalPhotos   = galleryItems.length;
- 
+    const initiallyVisible = Array.from(galleryItems).filter(item => !item.classList.contains('hidden')).length;
+
     if (totalCount) totalCount.textContent = totalPhotos;
-    if (visibleCount) visibleCount.textContent = totalPhotos;
- 
+    if (visibleCount) visibleCount.textContent = initiallyVisible;
+
     filterBtns.forEach(btn => {
         btn.addEventListener('click', () => {
             // Update active button
