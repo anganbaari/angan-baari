@@ -232,48 +232,75 @@ document.addEventListener('DOMContentLoaded', () => {
     // ============================================================
     // 5. GALLERY LIGHTBOX + FILTER
     // ============================================================
-    const lightbox       = document.getElementById('lightbox');
-    const lightboxImg    = document.querySelector('.lightbox-content');
+    const lightbox        = document.getElementById('lightbox');
+    const lightboxImg     = document.querySelector('.lightbox-content');
     const lightboxCaption = document.querySelector('.lightbox-caption');
-    const closeButton    = document.querySelector('.close-button');
- 
-    function openLightbox(img) {
-        if (!lightbox || !lightboxImg) return;
-        lightbox.classList.add('active');
+    const closeButton     = document.querySelector('.close-button');
+    const lightboxPrevBtn = document.getElementById('lightboxPrev');
+    const lightboxNextBtn = document.getElementById('lightboxNext');
+    const lightboxCounter = document.getElementById('lightboxCounter');
+
+    let currentGalleryImages = [];
+    let currentLightboxIndex = 0;
+
+    // Only images currently visible under whatever filter is active —
+    // so Next/Prev cycles through what you're actually looking at,
+    // not photos hidden by a different category filter.
+    function getVisibleGalleryImages() {
+        return Array.from(document.querySelectorAll('.gm-item:not(.hidden) img'));
+    }
+
+    function showLightboxImage(index) {
+        if (!currentGalleryImages.length) return;
+        currentLightboxIndex = ((index % currentGalleryImages.length) + currentGalleryImages.length) % currentGalleryImages.length;
+        const img = currentGalleryImages[currentLightboxIndex];
         lightboxImg.src = img.src;
         lightboxImg.alt = img.alt;
         if (lightboxCaption) lightboxCaption.textContent = img.alt;
+        if (lightboxCounter) lightboxCounter.textContent = `${currentLightboxIndex + 1} / ${currentGalleryImages.length}`;
+    }
+
+    function openLightbox(img) {
+        if (!lightbox || !lightboxImg) return;
+        currentGalleryImages = getVisibleGalleryImages();
+        const clickedIndex = currentGalleryImages.indexOf(img);
+        lightbox.classList.add('active');
+        showLightboxImage(clickedIndex >= 0 ? clickedIndex : 0);
         document.body.style.overflow = 'hidden';
     }
- 
+
     function closeLightbox() {
         if (!lightbox) return;
         lightbox.classList.remove('active');
         document.body.style.overflow = '';
     }
- 
+
     // Wire lightbox to all masonry gallery images
     document.querySelectorAll('.gm-item img').forEach(img => {
         img.addEventListener('click', () => openLightbox(img));
     });
- 
+
     if (closeButton) {
         closeButton.addEventListener('click', closeLightbox);
         closeButton.addEventListener('keydown', e => {
             if (e.key === 'Enter' || e.key === ' ') closeLightbox();
         });
     }
- 
+
+    if (lightboxPrevBtn) lightboxPrevBtn.addEventListener('click', () => showLightboxImage(currentLightboxIndex - 1));
+    if (lightboxNextBtn) lightboxNextBtn.addEventListener('click', () => showLightboxImage(currentLightboxIndex + 1));
+
     if (lightbox) {
         lightbox.addEventListener('click', e => {
             if (e.target === lightbox) closeLightbox();
         });
     }
- 
+
     document.addEventListener('keydown', e => {
-        if (e.key === 'Escape' && lightbox && lightbox.classList.contains('active')) {
-            closeLightbox();
-        }
+        if (!lightbox || !lightbox.classList.contains('active')) return;
+        if (e.key === 'Escape') closeLightbox();
+        else if (e.key === 'ArrowLeft') showLightboxImage(currentLightboxIndex - 1);
+        else if (e.key === 'ArrowRight') showLightboxImage(currentLightboxIndex + 1);
     });
  
     // ============================================================

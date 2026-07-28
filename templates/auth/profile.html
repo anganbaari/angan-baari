@@ -619,6 +619,7 @@
         });
 
         // ── Wishlist: remove item ──
+        document.querySelectorAll('[data-wishlist-remove]').forEach(function (btn) {
             btn.addEventListener('click', function () {
                 const productId = btn.dataset.productId;
                 fetch(`/wishlist/toggle/${productId}/`, {

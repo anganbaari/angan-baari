@@ -2951,8 +2951,8 @@ ul { list-style: none; }
 }
 
 .close-button {
-    color: rgba(255,255,255,0.75);
-    font-size: 1.6rem;
+    color: rgba(255,255,255,0.95);
+    font-size: 1.9rem;
     cursor: pointer;
     z-index: 9001;
     width: 44px;
@@ -2961,8 +2961,8 @@ ul { list-style: none; }
     align-items: center;
     justify-content: center;
     border-radius: 50%;
-    background: rgba(255,255,255,0.1);
-    border: 1px solid rgba(255,255,255,0.15);
+    background: rgba(0,0,0,0.35);
+    border: 1.5px solid rgba(255,255,255,0.4);
     transition: all var(--trans-base);
     flex-shrink: 0;
 }
