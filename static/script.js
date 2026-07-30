@@ -392,9 +392,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const shopCards   = document.querySelectorAll('.shop-card');
     const shopVisible = document.getElementById('shopVisible');
     const shopTotal   = document.getElementById('shopTotal');
+    const shopInitiallyVisible = Array.from(shopCards).filter(card => !card.classList.contains('hidden')).length;
  
     if (shopTotal) shopTotal.textContent = shopCards.length;
-    if (shopVisible) shopVisible.textContent = shopCards.length;
+    if (shopVisible) shopVisible.textContent = shopInitiallyVisible;
  
     shopTabs.forEach(tab => {
         tab.addEventListener('click', () => {

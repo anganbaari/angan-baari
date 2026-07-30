@@ -124,6 +124,27 @@
     <link rel="stylesheet" href="{% static 'style.css' %}">
 
 <style>
+.btn-shop-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 42px;
+    height: 42px;
+    background: transparent;
+    color: var(--gold);
+    border-radius: 50%;
+    font-size: 0.95rem;
+    text-decoration: none;
+    transition: all 0.3s ease;
+    border: 1.5px solid var(--gold);
+}
+.btn-shop-icon:hover {
+    background: var(--gold);
+    color: var(--forest);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(201,168,76,0.3);
+}
 .btn-details {
     display: inline-flex;
     align-items: center;
@@ -576,10 +597,7 @@
  
         <!-- Category Filter Tabs -->
         <div class="shop-tabs" data-aos="fade-up" data-aos-delay="80">
-            <button class="shop-tab active" data-cat="all">
-                <i class="fas fa-border-all"></i><span>All</span>
-            </button>
-            <button class="shop-tab" data-cat="fruits">
+            <button class="shop-tab active" data-cat="fruits">
                 <i class="fas fa-apple-alt"></i><span>Fruits</span>
             </button>
             <button class="shop-tab" data-cat="vegetables">
@@ -593,6 +611,9 @@
             </button>
             <button class="shop-tab" data-cat="pickles">
                 <i class="fas fa-pepper-hot"></i><span>Pickles</span>
+            </button>
+            <button class="shop-tab" data-cat="all">
+                <i class="fas fa-border-all"></i><span>All</span>
             </button>
         </div>
  
@@ -611,7 +632,7 @@
         <div class="shop-grid" id="shopGrid">
             
             <!-- ── HONEY ── -->
-            <div class="shop-card shop-card-featured" data-cat="honey" data-aos="fade-right" data-aos-delay="0">
+            <div class="shop-card shop-card-featured hidden" data-cat="honey" data-aos="fade-right" data-aos-delay="0">
                 <div class="shop-img-wrap">
                     <img src="{% static 'images/honey9.jpg' %}" alt="Jar of pure golden organic honey" loading="lazy">
                 </div>
@@ -626,6 +647,9 @@
                            href="https://wa.me/9779821025084?text=Hello%20Angan%20Baari!%20I%20would%20like%20to%20order%20*Pure%20Tilottama%20Gold%20Honey*.%20Please%20let%20me%20know%20the%20availability%20and%20price."
                            target="_blank" rel="noopener noreferrer">
                             <i class="fab fa-whatsapp"></i> WhatsApp
+                        </a>
+                        <a href="{% url 'shop' %}" class="btn-shop-icon" aria-label="Visit our shop">
+                            <i class="fas fa-store"></i>
                         </a>
                         <a href="/products/honey/" class="btn-details" aria-label="View Honey details">
                             <i class="fas fa-info-circle"></i>
@@ -652,6 +676,9 @@
                            target="_blank" rel="noopener noreferrer">
                             <i class="fab fa-whatsapp"></i> WhatsApp
                         </a>
+                        <a href="{% url 'shop' %}" class="btn-shop-icon" aria-label="Visit our shop">
+                            <i class="fas fa-store"></i>
+                        </a>
                         <a href="/products/mangoes/" class="btn-details" aria-label="View Mangoes details">
                             <i class="fas fa-info-circle"></i>
                         </a>
@@ -674,6 +701,9 @@
                         <button class="btn-unavailable" disabled>
                             <i class="fas fa-times-circle"></i> Out of Stock
                         </button>
+                        <a href="{% url 'shop' %}" class="btn-shop-icon" aria-label="Visit our shop">
+                            <i class="fas fa-store"></i>
+                        </a>
                         <a href="/products/litchi/" class="btn-details" aria-label="View Litchi details">
                             <i class="fas fa-info-circle"></i>
                         </a>
@@ -697,6 +727,9 @@
                            href="https://wa.me/9779821025084?text=Hello%20Angan%20Baari!%20I%20would%20like%20to%20order%20*Jackfruit*.%20Please%20let%20me%20know%20the%20availability%20and%20price."
                            target="_blank" rel="noopener noreferrer">
                             <i class="fab fa-whatsapp"></i> WhatsApp
+                        </a>
+                        <a href="{% url 'shop' %}" class="btn-shop-icon" aria-label="Visit our shop">
+                            <i class="fas fa-store"></i>
                         </a>
                         <a href="/products/jackfruit/" class="btn-details" aria-label="View Jackfruit details">
                             <i class="fas fa-info-circle"></i>
@@ -722,6 +755,9 @@
                            target="_blank" rel="noopener noreferrer">
                             <i class="fab fa-whatsapp"></i> WhatsApp
                         </a>
+                        <a href="{% url 'shop' %}" class="btn-shop-icon" aria-label="Visit our shop">
+                            <i class="fas fa-store"></i>
+                        </a>
                         <a href="/products/papaya/" class="btn-details" aria-label="View Papaya details">
                             <i class="fas fa-info-circle"></i>
                         </a>
@@ -745,6 +781,9 @@
                            href="https://wa.me/9779821025084?text=Hello%20Angan%20Baari!%20I%20would%20like%20to%20order%20*Bananas*.%20Please%20let%20me%20know%20the%20availability%20and%20price."
                            target="_blank" rel="noopener noreferrer">
                             <i class="fab fa-whatsapp"></i> WhatsApp
+                        </a>
+                        <a href="{% url 'shop' %}" class="btn-shop-icon" aria-label="Visit our shop">
+                            <i class="fas fa-store"></i>
                         </a>
                         <a href="/products/banana/" class="btn-details" aria-label="View Banana details">
                             <i class="fas fa-info-circle"></i>
@@ -770,6 +809,9 @@
                            target="_blank" rel="noopener noreferrer">
                             <i class="fab fa-whatsapp"></i> WhatsApp
                         </a>
+                        <a href="{% url 'shop' %}" class="btn-shop-icon" aria-label="Visit our shop">
+                            <i class="fas fa-store"></i>
+                        </a>
                         <a href="/products/lemons/" class="btn-details" aria-label="View Lemons details">
                             <i class="fas fa-info-circle"></i>
                         </a>
@@ -779,7 +821,7 @@
             </div>
  
             <!-- ── VEGETABLES ── -->
-            <div class="shop-card" data-cat="vegetables" data-aos="fade-left" data-aos-delay="0">
+            <div class="shop-card hidden" data-cat="vegetables" data-aos="fade-left" data-aos-delay="0">
                 <div class="shop-img-wrap">
                     <img src="{% static 'images/vegetable2.jpg' %}" alt="Fresh organic vegetables from our farm" loading="lazy">
                 </div>
@@ -795,6 +837,9 @@
                            target="_blank" rel="noopener noreferrer">
                             <i class="fab fa-whatsapp"></i> WhatsApp
                         </a>
+                        <a href="{% url 'shop' %}" class="btn-shop-icon" aria-label="Visit our shop">
+                            <i class="fas fa-store"></i>
+                        </a>
                         <a href="/products/vegetables/" class="btn-details" aria-label="View Vegetables details">
                             <i class="fas fa-info-circle"></i>
                         </a>
@@ -803,7 +848,7 @@
                 <a href="/products/vegetables/" class="shop-card-link" aria-label="View Seasonal Vegetables details"></a>
             </div>
  
-            <div class="shop-card" data-cat="vegetables" data-aos="fade-left" data-aos-delay="60">
+            <div class="shop-card hidden" data-cat="vegetables" data-aos="fade-left" data-aos-delay="60">
                 <div class="shop-img-wrap">
                     <img src="{% static 'images/mushroom.jpg' %}" alt="Fresh organic mushrooms" loading="lazy">
                 </div>
@@ -817,6 +862,9 @@
                         <button class="btn-unavailable" disabled>
                             <i class="fas fa-times-circle"></i> Out of Stock
                         </button>
+                        <a href="{% url 'shop' %}" class="btn-shop-icon" aria-label="Visit our shop">
+                            <i class="fas fa-store"></i>
+                        </a>
                         <a href="/products/mushroom/" class="btn-details" aria-label="View Mushroom details">
                             <i class="fas fa-info-circle"></i>
                         </a>
@@ -827,7 +875,7 @@
 
  
             <!-- ── ANIMALS ── -->
-            <div class="shop-card" data-cat="animals" data-aos="fade-right" data-aos-delay="0">
+            <div class="shop-card hidden" data-cat="animals" data-aos="fade-right" data-aos-delay="0">
                 <div class="shop-img-wrap">
                     <img src="{% static 'images/goat1.jpg' %}" alt="Healthy locally raised organic goat" loading="lazy">
                 </div>
@@ -843,6 +891,9 @@
                            target="_blank" rel="noopener noreferrer">
                             <i class="fab fa-whatsapp"></i> WhatsApp
                         </a>
+                        <a href="{% url 'shop' %}" class="btn-shop-icon" aria-label="Visit our shop">
+                            <i class="fas fa-store"></i>
+                        </a>
                         <a href="/products/goats/" class="btn-details" aria-label="View Goats details">
                             <i class="fas fa-info-circle"></i>
                         </a>
@@ -851,7 +902,7 @@
                 <a href="/products/goats/" class="shop-card-link" aria-label="View Goats details"></a>
             </div>
  
-            <div class="shop-card" data-cat="animals" data-aos="fade-left" data-aos-delay="60">
+            <div class="shop-card hidden" data-cat="animals" data-aos="fade-left" data-aos-delay="60">
                 <div class="shop-img-wrap">
                     <img src="{% static 'images/localbhale1.jpg' %}" alt="Free-range hens from our farm" loading="lazy">
                 </div>
@@ -867,6 +918,9 @@
                            target="_blank" rel="noopener noreferrer">
                             <i class="fab fa-whatsapp"></i> WhatsApp
                         </a>
+                        <a href="{% url 'shop' %}" class="btn-shop-icon" aria-label="Visit our shop">
+                            <i class="fas fa-store"></i>
+                        </a>
                         <a href="/products/local-chickens/" class="btn-details" aria-label="View Local Chickens details">
                             <i class="fas fa-info-circle"></i>
                         </a>
@@ -876,7 +930,7 @@
             </div>
  
             <!-- ── PICKLES ── -->
-            <div class="shop-card" data-cat="pickles" data-aos="fade-left" data-aos-delay="0">
+            <div class="shop-card hidden" data-cat="pickles" data-aos="fade-left" data-aos-delay="0">
                 <div class="shop-img-wrap">
                     <img src="{% static 'images/mangopickle1.jpg' %}" alt="Homemade tangy mango pickles" loading="lazy">
                 </div>
@@ -891,6 +945,9 @@
                            href="https://wa.me/9779821025084?text=Hello%20Angan%20Baari!%20I%20would%20like%20to%20order%20*Homemade%20Mango%20Pickle*.%20Please%20let%20me%20know%20the%20availability%20and%20price."
                            target="_blank" rel="noopener noreferrer">
                             <i class="fab fa-whatsapp"></i> WhatsApp
+                        </a>
+                        <a href="{% url 'shop' %}" class="btn-shop-icon" aria-label="Visit our shop">
+                            <i class="fas fa-store"></i>
                         </a>
                         <a href="/products/mango-pickles/" class="btn-details" aria-label="View Mango Pickles details">
                             <i class="fas fa-info-circle"></i>

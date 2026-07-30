@@ -1732,6 +1732,7 @@ ul { list-style: none; }
     .shop-cta-row { gap: 6px; }
     .btn-whatsapp, .btn-unavailable { font-size: 0.66rem; padding: 8px 4px; }
     .btn-whatsapp i, .btn-unavailable i { font-size: 0.82rem; }
+    .btn-details, .btn-shop-icon { width: 34px; height: 34px; font-size: 0.8rem; }
 }
  
 /* ================================================================
