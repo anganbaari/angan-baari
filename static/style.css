@@ -1729,9 +1729,16 @@ ul { list-style: none; }
         -webkit-box-orient: vertical;
         overflow: hidden;
     }
-    .shop-cta-row { gap: 6px; }
-    .btn-whatsapp, .btn-unavailable { font-size: 0.66rem; padding: 8px 4px; }
-    .btn-whatsapp i, .btn-unavailable i { font-size: 0.82rem; }
+    .shop-cta-row { gap: 8px; justify-content: center; }
+    .btn-whatsapp, .btn-unavailable {
+        flex: 0 0 auto;
+        width: 34px;
+        height: 34px;
+        padding: 0;
+        border-radius: 50%;
+    }
+    .btn-whatsapp .btn-label, .btn-unavailable .btn-label { display: none; }
+    .btn-whatsapp i, .btn-unavailable i { font-size: 0.95rem; margin: 0; }
     .btn-details, .btn-shop-icon { width: 34px; height: 34px; font-size: 0.8rem; }
 }
  
