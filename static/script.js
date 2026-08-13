@@ -458,8 +458,79 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
 
-    window.addEventListener('scroll', scrollSpy, { passive: true });
-    scrollSpy(); // run once on load
+    // ── HONEYBEE EXTRAS ──────────────────────────────────────────
+
+    // 1. Scroll progress bar
+    const progressBar = document.getElementById('scrollProgress');
+
+    // 2. Honey drip on scroll stop
+    let dripTimer = null;
+    const _navbar = document.getElementById('navbar');
+
+    // 3. Pill tooltip
+    let _tooltip = null;
+    if (_pill) {
+        _tooltip = document.createElement('div');
+        _tooltip.className = 'nav-pill-tooltip';
+        _pill.appendChild(_tooltip);
+    }
+    let tooltipTimer = null;
+
+    function showTooltip(text) {
+        if (!_tooltip) return;
+        _tooltip.textContent = text;
+        _tooltip.classList.add('visible');
+        clearTimeout(tooltipTimer);
+        tooltipTimer = setTimeout(() => _tooltip.classList.remove('visible'), 1500);
+    }
+
+    // 4. Move pill with bounce + tooltip
+    function movePillBee(el) {
+        if (!_pill || !el) { if (_pill) _pill.style.opacity = '0'; return; }
+        _pill.style.opacity = '1';
+        _pill.style.width = el.offsetWidth + 'px';
+        _pill.style.transform = `translateX(${el.offsetLeft}px)`;
+        _pill.classList.remove('bounce');
+        void _pill.offsetWidth;
+        _pill.classList.add('bounce');
+        setTimeout(() => _pill.classList.remove('bounce'), 450);
+        showTooltip(el.textContent.trim());
+    }
+
+    const scrollSpyBee = () => {
+        const scrollTop = window.scrollY;
+
+        // Progress bar
+        if (progressBar) {
+            const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+            progressBar.style.width = Math.min((scrollTop / docHeight) * 100, 100) + '%';
+        }
+
+        // Honey drip — show after scroll stops
+        if (_navbar) {
+            _navbar.classList.remove('drip-active');
+            clearTimeout(dripTimer);
+            dripTimer = setTimeout(() => _navbar.classList.add('drip-active'), 800);
+        }
+
+        // ScrollSpy
+        const pos = scrollTop + 120;
+        sections.forEach(sec => {
+            if (pos >= sec.offsetTop && pos < sec.offsetTop + sec.offsetHeight) {
+                navAnchors.forEach(link => {
+                    link.classList.remove('active');
+                    if (link.getAttribute('href') === '#' + sec.id) link.classList.add('active');
+                });
+                if (_navLinksWrap) {
+                    const activeLink = _navLinksWrap.querySelector('a[href="#' + sec.id + '"]');
+                    if (activeLink) movePillBee(activeLink);
+                }
+            }
+        });
+    };
+
+    window.addEventListener('scroll', scrollSpyBee, { passive: true });
+    scrollSpyBee(); // run once on load
  
     // scroll handled below in ScrollSpy section
  

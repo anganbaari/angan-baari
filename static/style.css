@@ -294,95 +294,54 @@ ul { list-style: none; }
 }
 
 /* Nav Links — sliding active-page pill */
-/* ── HONEYBEE NAV THEME ─────────────────────────────── */
 .nav-links {
     position: relative;
     display: flex;
     align-items: center;
-    gap: clamp(0.2rem, 0.8vw, 0.6rem);
-    background: rgba(0,0,0,0.30);
-    border: 1px solid rgba(245,200,0,0.18);
-    border-radius: 10px;
-    padding: 4px 6px;
-    /* subtle diagonal bee-stripe pattern */
-    background-image: repeating-linear-gradient(
-        -45deg,
-        rgba(245,200,0,0.035) 0px,
-        rgba(245,200,0,0.035) 2px,
-        transparent 2px,
-        transparent 10px
-    );
+    gap: clamp(0.4rem, 1vw, 0.9rem);
 }
 
-/* Floating bee to the left of the nav */
-.nav-links::before {
-    content: "🐝";
-    position: absolute;
-    left: -30px;
-    top: 50%;
-    transform: translateY(-50%);
-    font-size: 1.05rem;
-    opacity: 0.75;
-    animation: bee-hover 2.8s ease-in-out infinite;
-    pointer-events: none;
-}
-
-@keyframes bee-hover {
-    0%, 100% { transform: translateY(-50%) rotate(-6deg); }
-    50%       { transform: translateY(calc(-50% - 5px)) rotate(6deg); }
-}
-
-/* Hexagon sliding pill */
 .nav-pill {
     position: absolute;
-    top: 4px;
+    top: 0;
     left: 0;
-    height: calc(100% - 8px);
-    clip-path: polygon(8% 0%, 92% 0%, 100% 50%, 92% 100%, 8% 100%, 0% 50%);
-    background: linear-gradient(135deg, #f5c800 0%, #e6a000 50%, #f5c800 100%);
-    box-shadow: 0 0 14px rgba(245,200,0,0.55), 0 0 4px rgba(245,200,0,0.35);
+    height: 100%;
+    border-radius: 50px;
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.08);
     opacity: 0;
     pointer-events: none;
-    transition: transform 0.4s cubic-bezier(0.34,1.56,0.64,1),
-                width   0.4s cubic-bezier(0.34,1.56,0.64,1),
-                opacity 0.25s ease;
+    transition: transform 0.35s var(--ease-spring), width 0.35s var(--ease-spring), opacity 0.25s ease;
     z-index: 0;
 }
 
 .nav-links a {
     position: relative;
     z-index: 1;
-    color: rgba(255,255,255,0.80);
-    font-size: 0.85rem;
+    color: rgba(255,255,255,0.78);
+    font-size: 0.86rem;
     font-weight: 500;
-    letter-spacing: 0.04em;
-    padding: 8px 15px;
-    border-radius: 7px;
-    transition: color 0.2s ease;
+    letter-spacing: 0.03em;
+    padding: 9px 16px;
+    border-radius: 50px;
+    transition: color var(--trans-base);
     white-space: nowrap;
 }
 
-.nav-links a:hover {
-    color: #f5c800;
-}
-
-/* Active link — dark text so it's readable on golden hexagon */
+.nav-links a:hover,
 .nav-links a.active {
-    color: #1a1200;
-    font-weight: 700;
+    color: var(--white);
 }
 
 .nav-cta {
     background: var(--moss) !important;
     color: var(--white) !important;
     letter-spacing: 0.05em !important;
-    border: 1.5px solid rgba(245,200,0,0.35) !important;
     transition: background var(--trans-base), transform 0.2s !important;
 }
 
 .nav-cta:hover {
     background: var(--forest-mid) !important;
-    border-color: rgba(245,200,0,0.65) !important;
     transform: translateY(-1px);
 }
 
