@@ -458,16 +458,12 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
 
-    // ── HONEYBEE EXTRAS ──────────────────────────────────────────
-
-    // 1. Scroll progress bar
+    // ── HONEYBEE SCROLL EXTRAS ────────────────────────────────
     const progressBar = document.getElementById('scrollProgress');
-
-    // 2. Honey drip on scroll stop
     let dripTimer = null;
     const _navbar = document.getElementById('navbar');
 
-    // 3. Pill tooltip
+    // Tooltip element
     let _tooltip = null;
     if (_pill) {
         _tooltip = document.createElement('div');
@@ -484,12 +480,11 @@ document.addEventListener('DOMContentLoaded', () => {
         tooltipTimer = setTimeout(() => _tooltip.classList.remove('visible'), 1500);
     }
 
-    // 4. Move pill with bounce + tooltip
     function movePillBee(el) {
         if (!_pill || !el) { if (_pill) _pill.style.opacity = '0'; return; }
         _pill.style.opacity = '1';
         _pill.style.width = el.offsetWidth + 'px';
-        _pill.style.transform = `translateX(${el.offsetLeft}px)`;
+        _pill.style.transform = 'translateX(' + el.offsetLeft + 'px)';
         _pill.classList.remove('bounce');
         void _pill.offsetWidth;
         _pill.classList.add('bounce');
@@ -506,14 +501,14 @@ document.addEventListener('DOMContentLoaded', () => {
             progressBar.style.width = Math.min((scrollTop / docHeight) * 100, 100) + '%';
         }
 
-        // Honey drip — show after scroll stops
+        // Honey drip
         if (_navbar) {
             _navbar.classList.remove('drip-active');
             clearTimeout(dripTimer);
             dripTimer = setTimeout(() => _navbar.classList.add('drip-active'), 800);
         }
 
-        // ScrollSpy
+        // ScrollSpy + pill
         const pos = scrollTop + 120;
         sections.forEach(sec => {
             if (pos >= sec.offsetTop && pos < sec.offsetTop + sec.offsetHeight) {
@@ -530,7 +525,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     window.addEventListener('scroll', scrollSpyBee, { passive: true });
-    scrollSpyBee(); // run once on load
+    scrollSpyBee();
  
     // scroll handled below in ScrollSpy section
  

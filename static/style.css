@@ -294,55 +294,198 @@ ul { list-style: none; }
 }
 
 /* Nav Links — sliding active-page pill */
+/* ══════════════════════════════════════════════════════
+   HONEYBEE NAVBAR THEME
+══════════════════════════════════════════════════════ */
+
+/* Nav container — dark with bee-stripe pattern */
 .nav-links {
     position: relative;
     display: flex;
     align-items: center;
-    gap: clamp(0.4rem, 1vw, 0.9rem);
+    gap: clamp(0.2rem, 0.8vw, 0.6rem);
+    background: rgba(0,0,0,0.30);
+    border: 1px solid rgba(245,200,0,0.18);
+    border-radius: 10px;
+    padding: 4px 6px;
+    background-image: repeating-linear-gradient(
+        -45deg,
+        rgba(245,200,0,0.04) 0px,
+        rgba(245,200,0,0.04) 2px,
+        transparent 2px,
+        transparent 10px
+    );
 }
 
+/* Bee floating left of nav links */
+.nav-links::before {
+    content: "🐝";
+    position: absolute;
+    left: -30px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 1.05rem;
+    opacity: 0.8;
+    animation: bee-hover 2.8s ease-in-out infinite;
+    pointer-events: none;
+}
+
+@keyframes bee-hover {
+    0%, 100% { transform: translateY(-50%) rotate(-6deg); }
+    50%       { transform: translateY(calc(-50% - 5px)) rotate(6deg); }
+}
+
+/* Hexagon sliding pill */
 .nav-pill {
     position: absolute;
-    top: 0;
+    top: 4px;
     left: 0;
-    height: 100%;
-    border-radius: 50px;
-    background: rgba(255,255,255,0.1);
-    border: 1px solid rgba(255,255,255,0.08);
+    height: calc(100% - 8px);
+    clip-path: polygon(8% 0%, 92% 0%, 100% 50%, 92% 100%, 8% 100%, 0% 50%);
+    background: linear-gradient(135deg, #f5c800 0%, #e6a000 50%, #f5c800 100%);
+    box-shadow: 0 0 14px rgba(245,200,0,0.55), 0 0 4px rgba(245,200,0,0.35);
     opacity: 0;
     pointer-events: none;
-    transition: transform 0.35s var(--ease-spring), width 0.35s var(--ease-spring), opacity 0.25s ease;
+    transition: transform 0.4s cubic-bezier(0.34,1.56,0.64,1),
+                width   0.4s cubic-bezier(0.34,1.56,0.64,1),
+                opacity 0.25s ease;
     z-index: 0;
 }
 
+/* Pill bounce animation */
+.nav-pill.bounce {
+    animation: honey-bounce 0.45s cubic-bezier(0.34,1.56,0.64,1) forwards;
+}
+@keyframes honey-bounce {
+    0%   { transform: scaleY(0.7); }
+    60%  { transform: scaleY(1.12); }
+    100% { transform: scaleY(1); }
+}
+
+/* Pill tooltip */
+.nav-pill-tooltip {
+    position: absolute;
+    top: -32px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: linear-gradient(135deg, #e6a000, #f5c800);
+    color: #1a1200;
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 3px 10px;
+    border-radius: 50px;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+    box-shadow: 0 2px 8px rgba(245,200,0,0.4);
+}
+.nav-pill-tooltip::after {
+    content: '';
+    position: absolute;
+    bottom: -5px;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 5px solid transparent;
+    border-top-color: #f5c800;
+}
+.nav-pill-tooltip.visible { opacity: 1; }
+
+/* Nav links */
 .nav-links a {
     position: relative;
     z-index: 1;
-    color: rgba(255,255,255,0.78);
-    font-size: 0.86rem;
+    color: rgba(255,255,255,0.80);
+    font-size: 0.85rem;
     font-weight: 500;
-    letter-spacing: 0.03em;
-    padding: 9px 16px;
-    border-radius: 50px;
-    transition: color var(--trans-base);
+    letter-spacing: 0.04em;
+    padding: 8px 15px;
+    border-radius: 7px;
+    transition: color 0.2s ease;
     white-space: nowrap;
 }
 
-.nav-links a:hover,
-.nav-links a.active {
-    color: var(--white);
-}
+.nav-links a:hover { color: #f5c800; }
+.nav-links a.active { color: #1a1200; font-weight: 700; }
 
+/* CTA button */
 .nav-cta {
     background: var(--moss) !important;
     color: var(--white) !important;
     letter-spacing: 0.05em !important;
+    border: 1.5px solid rgba(245,200,0,0.35) !important;
     transition: background var(--trans-base), transform 0.2s !important;
 }
-
 .nav-cta:hover {
     background: var(--forest-mid) !important;
+    border-color: rgba(245,200,0,0.65) !important;
     transform: translateY(-1px);
+}
+
+/* Logo bee icon */
+.brand-icon {
+    width: 38px;
+    height: 38px;
+    background: linear-gradient(135deg, #f5c800, #e6a000);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.3rem;
+    box-shadow: 0 2px 10px rgba(245,200,0,0.4);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    flex-shrink: 0;
+}
+.brand:hover .brand-icon {
+    transform: rotate(-10deg) scale(1.1);
+    box-shadow: 0 4px 16px rgba(245,200,0,0.6);
+}
+
+/* Honey drip bottom edge */
+.navbar::after {
+    content: '';
+    position: absolute;
+    bottom: -6px;
+    left: 0; right: 0;
+    height: 6px;
+    pointer-events: none;
+    z-index: 99;
+    background:
+        radial-gradient(ellipse 12px 8px at 10% 0%, #e6a000 60%, transparent 100%),
+        radial-gradient(ellipse 10px 10px at 25% 0%, #f5c800 60%, transparent 100%),
+        radial-gradient(ellipse 8px 7px  at 42% 0%, #e6a000 60%, transparent 100%),
+        radial-gradient(ellipse 12px 9px at 58% 0%, #f5c800 60%, transparent 100%),
+        radial-gradient(ellipse 9px 8px  at 73% 0%, #e6a000 60%, transparent 100%),
+        radial-gradient(ellipse 11px 7px at 88% 0%, #f5c800 60%, transparent 100%);
+    opacity: 0;
+    transition: opacity 0.6s ease;
+}
+.navbar.drip-active::after { opacity: 1; }
+
+/* Scroll progress bar */
+.scroll-progress {
+    position: fixed;
+    top: 0; left: 0;
+    height: 3px;
+    width: 0%;
+    background: linear-gradient(90deg, #e6a000, #f5c800, #fff7cc, #f5c800, #e6a000);
+    background-size: 200% 100%;
+    animation: shimmer-bar 2s linear infinite;
+    z-index: 9999;
+    transition: width 0.1s linear;
+    box-shadow: 0 0 8px rgba(245,200,0,0.7);
+}
+@keyframes shimmer-bar {
+    0%   { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+/* Honeycomb texture on navbar */
+.navbar {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='100'%3E%3Cpath d='M28 66L0 50V16L28 0l28 16v34z' fill='none' stroke='%23f5c800' stroke-width='0.5' opacity='0.08'/%3E%3Cpath d='M28 100L0 84V50l28-16 28 16v34z' fill='none' stroke='%23f5c800' stroke-width='0.5' opacity='0.08'/%3E%3C/svg%3E");
+    background-size: 28px 50px;
 }
 
 /* ─── Offers nav link — animated CTA, consistent on every page ───
