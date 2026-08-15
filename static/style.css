@@ -605,12 +605,41 @@ ul { list-style: none; }
 .desktop-nav {
     display: flex;
     align-items: center;
-    gap: 22px;
+    gap: 12px;
+}
+
+/* Order Now — merged into the honeycomb theme as its own small
+   gold hexagon button, sized to sit naturally beside the strip. */
+.hc-cta {
+    position: relative;
+    display: flex; align-items: center; justify-content: center;
+    width: 108px; height: 46px;
+    padding: 0 6px;
+    clip-path: polygon(11% 0%, 89% 0%, 100% 50%, 89% 100%, 11% 100%, 0% 50%);
+    background:
+        radial-gradient(120% 90% at 28% 15%, rgba(255,250,220,.7) 0%, rgba(255,250,220,0) 45%),
+        linear-gradient(150deg, #ffe680 0%, #ffc93c 40%, #f0a412 75%, #d6860a 100%);
+    box-shadow:
+        inset 0 3px 5px rgba(255,250,220,.6),
+        inset 0 -8px 12px rgba(120,70,10,.35),
+        0 6px 14px -4px rgba(180,120,10,.45);
+    color: #4a2e05 !important;
+    font-family: var(--font-accent);
+    font-size: 12px; font-weight: 700; letter-spacing: .03em;
+    text-transform: uppercase;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: transform .35s cubic-bezier(0.34,1.56,0.64,1), filter .3s ease;
+    flex-shrink: 0;
+}
+.hc-cta:hover {
+    transform: translateY(-3px);
+    filter: brightness(1.06);
 }
 
 .hc-scale-box {
-    width: 808px;
-    height: 107px;
+    width: 518px;
+    height: 69px;
     position: relative;
 }
 
@@ -620,7 +649,7 @@ ul { list-style: none; }
     top: 0; left: 0;
     width: calc(var(--cell) * var(--cells) + var(--gap) * (var(--cells) - 1));
     height: var(--H);
-    transform: scale(.78);
+    transform: scale(.5);
     transform-origin: top left;
 
     --hc-clip: path("M 26.07 2.30 Q 28.00 0.00 31.00 0.00 L 81.00 0.00 Q 84.00 0.00 85.93 2.30 L 110.07 31.13 Q 112.00 33.43 110.15 35.79 L 91.11 60.11 Q 89.26 62.47 90.83 65.03 L 110.43 96.91 Q 112.00 99.46 110.21 101.87 L 85.79 134.60 Q 84.00 137.00 81.00 137.00 L 31.00 137.00 Q 28.00 137.00 26.21 134.60 L 1.79 101.87 Q 0.00 99.46 1.57 96.91 L 21.17 65.03 Q 22.74 62.47 20.89 60.11 L 1.85 35.79 Q 0.00 33.43 1.93 31.13 L 26.07 2.30 Z");
