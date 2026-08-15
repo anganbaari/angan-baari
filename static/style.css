@@ -755,13 +755,6 @@ ul { list-style: none; }
     .hc-ping { display: none; }
 }
 
-/* Honeycomb needs more breathing room than the old compact pill nav,
-   so the desktop↔mobile-nav cutoff moves up from 1024px to 1200px. */
-@media (max-width: 1200px) {
-    .hamburger { display: flex; }
-    .desktop-nav { display: none; }
-}
-
 /* ================================================================
    HAMBURGER BUTTON
 ================================================================ */
@@ -814,6 +807,13 @@ ul { list-style: none; }
 .hamburger.open .ham-bot {
     width: 20px;
     transform: translateY(-7px) rotate(-45deg);
+}
+
+/* Honeycomb needs more breathing room than the old compact pill nav,
+   so the desktop↔mobile-nav cutoff moves up from 1024px to 1200px. */
+@media (max-width: 1200px) {
+    .hamburger { display: flex; }
+    .desktop-nav { display: none; }
 }
  
 /* ================================================================
