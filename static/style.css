@@ -594,6 +594,185 @@ ul { list-style: none; }
 }
 
 /* ================================================================
+   6. HONEYCOMB DESKTOP NAV
+   Replaces the old pill-style .nav-links for the homepage desktop
+   nav only (.navbar-app pages keep their own separate markup).
+   Sized at 78% of native geometry via .hc-scale-box so the flex
+   layout reserves the correct (scaled) footprint next to the brand
+   — plain transform:scale() alone would leave the unscaled box
+   reserved, breaking the navbar-inner flex row.
+================================================================ */
+.desktop-nav {
+    display: flex;
+    align-items: center;
+    gap: 22px;
+}
+
+.hc-scale-box {
+    width: 808px;
+    height: 107px;
+    position: relative;
+}
+
+.hc-strip {
+    --cell: 112px; --cells: 8; --gap: 20px; --H: 137px;
+    position: absolute;
+    top: 0; left: 0;
+    width: calc(var(--cell) * var(--cells) + var(--gap) * (var(--cells) - 1));
+    height: var(--H);
+    transform: scale(.78);
+    transform-origin: top left;
+
+    --hc-clip: path("M 26.07 2.30 Q 28.00 0.00 31.00 0.00 L 81.00 0.00 Q 84.00 0.00 85.93 2.30 L 110.07 31.13 Q 112.00 33.43 110.15 35.79 L 91.11 60.11 Q 89.26 62.47 90.83 65.03 L 110.43 96.91 Q 112.00 99.46 110.21 101.87 L 85.79 134.60 Q 84.00 137.00 81.00 137.00 L 31.00 137.00 Q 28.00 137.00 26.21 134.60 L 1.79 101.87 Q 0.00 99.46 1.57 96.91 L 21.17 65.03 Q 22.74 62.47 20.89 60.11 L 1.85 35.79 Q 0.00 33.43 1.93 31.13 L 26.07 2.30 Z");
+    --hc-clip-ping: path("M 28.40 3.04 Q 31.00 0.00 35.00 0.00 L 89.00 0.00 Q 93.00 0.00 95.60 3.04 L 121.40 33.31 Q 124.00 36.36 121.51 39.48 L 101.32 64.82 Q 98.83 67.94 100.95 71.33 L 121.88 104.78 Q 124.00 108.17 121.58 111.36 L 95.42 145.81 Q 93.00 149.00 89.00 149.00 L 35.00 149.00 Q 31.00 149.00 28.58 145.81 L 2.42 111.36 Q 0.00 108.17 2.12 104.78 L 23.05 71.33 Q 25.17 67.94 22.68 64.82 L 2.49 39.48 Q 0.00 36.36 2.60 33.31 L 28.40 3.04 Z");
+    --hc-clip-connector: path("M 6.38 2.93 Q 7.00 0.00 10.00 0.00 L 18.00 0.00 Q 21.00 0.00 21.62 2.93 L 27.38 30.07 Q 28.00 33.00 27.38 35.93 L 21.62 63.07 Q 21.00 66.00 18.00 66.00 L 10.00 66.00 Q 7.00 66.00 6.38 63.07 L 0.62 35.93 Q 0.00 33.00 0.62 30.07 L 6.38 2.93 Z");
+}
+
+/* the stretched hexagon sitting behind every icon */
+.hc-strip-bg {
+    position: absolute; top: 12.5%; width: 1113.15px; height: 75%;
+    transform-origin: left center;
+    clip-path: path("M 45.545 5.83 Q 62.575 0.00 80.575 0.00 L 1032.575 0.00 Q 1050.575 0.00 1067.605 5.83 L 1113.15 51.375 L 1067.605 96.92 Q 1050.575 102.75 1032.575 102.75 L 80.575 102.75 Q 62.575 102.75 45.545 96.92 L 0.00 51.375 Z");
+    background: linear-gradient(155deg, #6b3a12 0%, #4a260b 60%, #371c08 100%);
+    box-shadow: inset 0 10px 18px rgba(0,0,0,.4), 0 16px 26px -8px rgba(50,26,6,.5);
+}
+
+/* small gold hexagon connectors bridging the notch between each pair of cells */
+.hc-connector {
+    position: absolute; top: 33.43px;
+    width: 28px; height: 66px;
+    clip-path: var(--hc-clip-connector);
+    background: linear-gradient(155deg, #ffe680 0%, #ffc93c 45%, #f0a412 100%);
+    box-shadow: inset 0 2px 4px rgba(255,250,220,.6), 0 4px 10px rgba(180,120,10,.4);
+    transform: scale(1.9, .78);
+    transform-origin: center;
+    z-index: 3;
+}
+
+.hc-honey-drip {
+    position: absolute; left: -64px; bottom: -6px; z-index: 3; pointer-events: none;
+    animation: hcBeeFloat 3.6s ease-in-out infinite;
+}
+@keyframes hcBeeFloat {
+    0%, 100% { transform: translateY(0) rotate(0deg); }
+    50% { transform: translateY(-5px) rotate(-2deg); }
+}
+
+.hc-nav {
+    position: relative; z-index: 2;
+    display: flex; gap: var(--gap); list-style: none; height: 100%;
+}
+.hc-cell { position: relative; width: var(--cell); height: 100%; }
+
+/* each icon sits in its own fully poppable hexagon */
+.hc-link {
+    position: relative;
+    display: flex; flex-direction: column; align-items: center; justify-content: space-between;
+    width: 100%; height: 100%;
+    padding: 24px 6px 20px;
+    clip-path: var(--hc-clip);
+    background:
+        radial-gradient(120% 90% at 28% 12%, rgba(255,235,180,.5) 0%, rgba(255,235,180,0) 42%),
+        linear-gradient(150deg, #d9922e 0%, #b8681c 42%, #7a3d0f 78%, #5a2c0a 100%);
+    box-shadow:
+        inset 0 4px 7px rgba(255,224,150,.4),
+        inset 0 -12px 18px rgba(35,15,3,.5),
+        inset 0 0 0 1px rgba(255,255,255,.22);
+    backdrop-filter: blur(1.5px) saturate(150%);
+    color: #fbead0;
+    text-decoration: none;
+    cursor: pointer;
+    transition: transform .55s cubic-bezier(0.34,1.56,0.64,1), box-shadow .5s cubic-bezier(0.25,0.46,0.45,0.94), background .5s cubic-bezier(0.25,0.46,0.45,0.94), filter .45s cubic-bezier(0.25,0.46,0.45,0.94);
+}
+.hc-link::before {
+    content: "";
+    position: absolute; inset: -15%;
+    background: linear-gradient(115deg,
+        rgba(255,255,255,0) 42%,
+        rgba(255,255,255,.5) 48%,
+        rgba(255,255,255,.15) 52%,
+        rgba(255,255,255,0) 58%);
+    background-size: 260% 260%;
+    background-position: -30% -30%;
+    mix-blend-mode: screen;
+    pointer-events: none;
+    animation: hcSheenDrift 10s ease-in-out infinite;
+}
+.hc-cell:nth-child(2n) .hc-link::before { animation-delay: -3.3s; }
+.hc-cell:nth-child(3n) .hc-link::before { animation-delay: -6.6s; }
+@keyframes hcSheenDrift {
+    0%, 100% { background-position: -30% -30%; }
+    50% { background-position: 90% 90%; }
+}
+.hc-cell:hover .hc-link::before {
+    animation: hcSheenSweep .9s cubic-bezier(0.25,0.46,0.45,0.94);
+}
+@keyframes hcSheenSweep {
+    0% { background-position: -60% -60%; }
+    100% { background-position: 140% 140%; }
+}
+.hc-link svg {
+    width: 38px; height: 38px;
+    stroke: currentColor; fill: none; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round;
+    transition: transform .5s cubic-bezier(0.34,1.56,0.64,1);
+}
+.hc-label {
+    font-family: var(--font-accent);
+    font-size: 17px; letter-spacing: .03em;
+    font-weight: 900; text-transform: uppercase; text-align: center;
+    white-space: nowrap;
+}
+
+/* hover preview lift */
+.hc-cell:hover .hc-link:not(.active) {
+    transform: translateY(-8px);
+    filter: brightness(1.1);
+    z-index: 4;
+}
+
+/* the "we are here" cell — pops up bright gold */
+.hc-link.active {
+    background:
+        radial-gradient(120% 90% at 28% 10%, rgba(255,250,220,.8) 0%, rgba(255,250,220,0) 45%),
+        linear-gradient(150deg, #ffe680 0%, #ffc93c 40%, #f0a412 75%, #d6860a 100%);
+    box-shadow:
+        inset 0 4px 8px rgba(255,250,220,.6),
+        inset 0 -10px 16px rgba(120,70,10,.35),
+        0 18px 28px -10px rgba(240,164,18,.6);
+    color: #4a2e05;
+    transform: translateY(-16px) scale(1.09);
+    z-index: 5;
+}
+.hc-link.active svg { transform: scale(1.08); }
+
+/* pulse ring fired once on click, confirming the popup */
+.hc-ping {
+    position: absolute; inset: -6px; pointer-events: none;
+    clip-path: var(--hc-clip-ping);
+    border: 2px solid #ffd968;
+    opacity: 0;
+}
+.hc-ping.run { animation: hcPing .9s cubic-bezier(0.25,0.46,0.45,0.94); }
+@keyframes hcPing {
+    0% { opacity: .85; transform: scale(1); }
+    100% { opacity: 0; transform: scale(1.35); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .hc-link { transition: none; }
+    .hc-link.active { transform: translateY(-14px); }
+    .hc-link::before { animation: none; }
+    .hc-ping { display: none; }
+}
+
+/* Honeycomb needs more breathing room than the old compact pill nav,
+   so the desktop↔mobile-nav cutoff moves up from 1024px to 1200px. */
+@media (max-width: 1200px) {
+    .hamburger { display: flex; }
+    .desktop-nav { display: none; }
+}
+
+/* ================================================================
    HAMBURGER BUTTON
 ================================================================ */
 .hamburger {
@@ -3297,10 +3476,6 @@ ul { list-style: none; }
 @media (max-width: 1024px) {
     :root { --section-pad: 90px 5vw; }
 
-    /* Show hamburger on tablet & mobile — 9 nav links is too cramped */
-    .hamburger { display: flex; }
-    .desktop-nav { display: none; }
- 
     .about-inner { grid-template-columns: 1fr; gap: 50px; }
     .about-images { height: 420px; }
     .vision-pillars { grid-template-columns: 1fr; }

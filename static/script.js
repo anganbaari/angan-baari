@@ -91,6 +91,72 @@ document.addEventListener('DOMContentLoaded', () => {
  
  
     // ============================================================
+    // 2b. HONEYCOMB DESKTOP NAV — click, scroll-spy, bg alignment
+    // ============================================================
+    const hcCells = Array.from(document.querySelectorAll('.hc-link'));
+    if (hcCells.length) {
+        const hcSections = hcCells.map(c => document.getElementById(c.dataset.target));
+
+        // The background shape's flat (straight) middle spans 952px of its
+        // native 1113.15px-wide coordinate space (chamfered tips on each
+        // side). Align that flat segment to the box row exactly, so the
+        // tapered tips extend past the first/last box instead of hiding
+        // under them.
+        function fitStripBg() {
+            const strip = document.querySelector('.hc-strip');
+            const bg = document.querySelector('.hc-strip-bg');
+            if (!strip || !bg) return;
+            const boxRowWidth = strip.offsetWidth; // unaffected by the strip's own scale() transform
+            const nativeWidth = 1113.15;
+            const flatRatio = 952 / nativeWidth;
+            const totalBgWidth = boxRowWidth / flatRatio;
+            const taperPx = (totalBgWidth - boxRowWidth) / 2;
+            const scale = totalBgWidth / nativeWidth;
+            bg.style.left = `${-taperPx}px`;
+            bg.style.transform = `scaleX(${scale})`;
+        }
+        fitStripBg();
+        window.addEventListener('resize', fitStripBg);
+
+        function hcSetActive(link, firePing) {
+            hcCells.forEach(c => c.classList.remove('active'));
+            link.classList.add('active');
+            if (firePing) {
+                const ping = link.querySelector('.hc-ping');
+                ping.classList.remove('run');
+                void ping.offsetWidth; // restart animation
+                ping.classList.add('run');
+            }
+        }
+
+        // Click: smooth scroll + immediate popup + ping
+        hcCells.forEach(link => {
+            link.addEventListener('click', e => {
+                e.preventDefault();
+                hcSetActive(link, true);
+                const target = document.getElementById(link.dataset.target);
+                if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            });
+        });
+
+        // Scroll-spy: pop up whichever cell's section is in view
+        const hcObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const link = hcCells.find(c => c.dataset.target === entry.target.id);
+                    if (link && !link.classList.contains('active')) hcSetActive(link, false);
+                }
+            });
+        }, { rootMargin: '-45% 0px -45% 0px', threshold: 0 });
+
+        hcSections.forEach(s => s && hcObserver.observe(s));
+
+        // Activate first cell on load
+        hcSetActive(hcCells[0], false);
+    }
+
+
+    // ============================================================
     // 3. SIDE DRAWER MENU
     // ============================================================
     const hamburger      = document.getElementById('mobile-menu');
