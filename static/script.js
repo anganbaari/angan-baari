@@ -525,9 +525,6 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // ── HONEYBEE SCROLL EXTRAS ────────────────────────────────
-    const progressBar = document.getElementById('scrollProgress');
-    let dripTimer = null;
-    const _navbar = document.getElementById('navbar');
 
     // Tooltip element
     let _tooltip = null;
@@ -560,19 +557,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const scrollSpyBee = () => {
         const scrollTop = window.scrollY;
-
-        // Progress bar
-        if (progressBar) {
-            const docHeight = document.documentElement.scrollHeight - window.innerHeight;
-            progressBar.style.width = Math.min((scrollTop / docHeight) * 100, 100) + '%';
-        }
-
-        // Honey drip
-        if (_navbar) {
-            _navbar.classList.remove('drip-active');
-            clearTimeout(dripTimer);
-            dripTimer = setTimeout(() => _navbar.classList.add('drip-active'), 800);
-        }
 
         // ScrollSpy + pill
         const pos = scrollTop + 120;

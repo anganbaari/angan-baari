@@ -443,45 +443,6 @@ ul { list-style: none; }
     box-shadow: 0 4px 16px rgba(245,200,0,0.6);
 }
 
-/* Honey drip bottom edge */
-.navbar::after {
-    content: '';
-    position: absolute;
-    bottom: -6px;
-    left: 0; right: 0;
-    height: 6px;
-    pointer-events: none;
-    z-index: 99;
-    background:
-        radial-gradient(ellipse 12px 8px at 10% 0%, #e6a000 60%, transparent 100%),
-        radial-gradient(ellipse 10px 10px at 25% 0%, #f5c800 60%, transparent 100%),
-        radial-gradient(ellipse 8px 7px  at 42% 0%, #e6a000 60%, transparent 100%),
-        radial-gradient(ellipse 12px 9px at 58% 0%, #f5c800 60%, transparent 100%),
-        radial-gradient(ellipse 9px 8px  at 73% 0%, #e6a000 60%, transparent 100%),
-        radial-gradient(ellipse 11px 7px at 88% 0%, #f5c800 60%, transparent 100%);
-    opacity: 0;
-    transition: opacity 0.6s ease;
-}
-.navbar.drip-active::after { opacity: 1; }
-
-/* Scroll progress bar */
-.scroll-progress {
-    position: fixed;
-    top: 0; left: 0;
-    height: 3px;
-    width: 0%;
-    background: linear-gradient(90deg, #e6a000, #f5c800, #fff7cc, #f5c800, #e6a000);
-    background-size: 200% 100%;
-    animation: shimmer-bar 2s linear infinite;
-    z-index: 9999;
-    transition: width 0.1s linear;
-    box-shadow: 0 0 8px rgba(245,200,0,0.7);
-}
-@keyframes shimmer-bar {
-    0%   { background-position: 200% 0; }
-    100% { background-position: -200% 0; }
-}
-
 /* Honeycomb texture on navbar */
 .navbar {
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='100'%3E%3Cpath d='M28 66L0 50V16L28 0l28 16v34z' fill='none' stroke='%23f5c800' stroke-width='0.5' opacity='0.08'/%3E%3Cpath d='M28 100L0 84V50l28-16 28 16v34z' fill='none' stroke='%23f5c800' stroke-width='0.5' opacity='0.08'/%3E%3C/svg%3E");
@@ -615,7 +576,7 @@ ul { list-style: none; }
     display: flex; align-items: center; justify-content: center;
     width: 108px; height: 46px;
     padding: 0 6px;
-    clip-path: polygon(11% 0%, 89% 0%, 100% 50%, 89% 100%, 11% 100%, 0% 50%);
+    clip-path: path("M 10.04 3.55 Q 11.88 0.00 15.88 0.00 L 92.12 0.00 Q 96.12 0.00 97.96 3.55 L 106.16 19.45 Q 108.00 23.00 106.16 26.55 L 97.96 42.45 Q 96.12 46.00 92.12 46.00 L 15.88 46.00 Q 11.88 46.00 10.04 42.45 L 1.84 26.55 Q 0.00 23.00 1.84 19.45 L 10.04 3.55 Z");
     background:
         radial-gradient(120% 90% at 28% 15%, rgba(255,250,220,.7) 0%, rgba(255,250,220,0) 45%),
         linear-gradient(150deg, #ffe680 0%, #ffc93c 40%, #f0a412 75%, #d6860a 100%);
@@ -652,9 +613,9 @@ ul { list-style: none; }
     transform: scale(.5);
     transform-origin: top left;
 
-    --hc-clip: path("M 26.07 2.30 Q 28.00 0.00 31.00 0.00 L 81.00 0.00 Q 84.00 0.00 85.93 2.30 L 110.07 31.13 Q 112.00 33.43 110.15 35.79 L 91.11 60.11 Q 89.26 62.47 90.83 65.03 L 110.43 96.91 Q 112.00 99.46 110.21 101.87 L 85.79 134.60 Q 84.00 137.00 81.00 137.00 L 31.00 137.00 Q 28.00 137.00 26.21 134.60 L 1.79 101.87 Q 0.00 99.46 1.57 96.91 L 21.17 65.03 Q 22.74 62.47 20.89 60.11 L 1.85 35.79 Q 0.00 33.43 1.93 31.13 L 26.07 2.30 Z");
-    --hc-clip-ping: path("M 28.40 3.04 Q 31.00 0.00 35.00 0.00 L 89.00 0.00 Q 93.00 0.00 95.60 3.04 L 121.40 33.31 Q 124.00 36.36 121.51 39.48 L 101.32 64.82 Q 98.83 67.94 100.95 71.33 L 121.88 104.78 Q 124.00 108.17 121.58 111.36 L 95.42 145.81 Q 93.00 149.00 89.00 149.00 L 35.00 149.00 Q 31.00 149.00 28.58 145.81 L 2.42 111.36 Q 0.00 108.17 2.12 104.78 L 23.05 71.33 Q 25.17 67.94 22.68 64.82 L 2.49 39.48 Q 0.00 36.36 2.60 33.31 L 28.40 3.04 Z");
-    --hc-clip-connector: path("M 6.38 2.93 Q 7.00 0.00 10.00 0.00 L 18.00 0.00 Q 21.00 0.00 21.62 2.93 L 27.38 30.07 Q 28.00 33.00 27.38 35.93 L 21.62 63.07 Q 21.00 66.00 18.00 66.00 L 10.00 66.00 Q 7.00 66.00 6.38 63.07 L 0.62 35.93 Q 0.00 33.00 0.62 30.07 L 6.38 2.93 Z");
+    --hc-clip: path("M 23.51 5.37 Q 28.00 0.00 35.00 0.00 L 77.00 0.00 Q 84.00 0.00 88.49 5.37 L 107.51 28.06 Q 112.00 33.43 107.69 38.94 L 93.58 56.96 Q 89.26 62.47 92.93 68.44 L 108.33 93.50 Q 112.00 99.46 107.81 105.07 L 88.19 131.39 Q 84.00 137.00 77.00 137.00 L 35.00 137.00 Q 28.00 137.00 23.81 131.39 L 4.19 105.07 Q 0.00 99.46 3.67 93.50 L 19.07 68.44 Q 22.74 62.47 18.42 56.96 L 4.31 38.94 Q 0.00 33.43 4.49 28.06 L 23.51 5.37 Z");
+    --hc-clip-ping: path("M 25.81 6.09 Q 31.00 0.00 39.00 0.00 L 85.00 0.00 Q 93.00 0.00 98.19 6.09 L 118.81 30.27 Q 124.00 36.36 119.01 42.61 L 103.81 61.69 Q 98.83 67.94 103.07 74.73 L 119.76 101.39 Q 124.00 108.17 119.16 114.55 L 97.84 142.63 Q 93.00 149.00 85.00 149.00 L 39.00 149.00 Q 31.00 149.00 26.16 142.63 L 4.84 114.55 Q 0.00 108.17 4.24 101.39 L 20.93 74.73 Q 25.17 67.94 20.19 61.69 L 4.99 42.61 Q 0.00 36.36 5.19 30.27 L 25.81 6.09 Z");
+    --hc-clip-connector: path("M 5.96 4.89 Q 7.00 0.00 12.00 0.00 L 16.00 0.00 Q 21.00 0.00 22.04 4.89 L 26.96 28.11 Q 28.00 33.00 26.96 37.89 L 22.04 61.11 Q 21.00 66.00 16.00 66.00 L 12.00 66.00 Q 7.00 66.00 5.96 61.11 L 1.04 37.89 Q 0.00 33.00 1.04 28.11 L 5.96 4.89 Z");
 }
 
 /* the stretched hexagon sitting behind every icon */
