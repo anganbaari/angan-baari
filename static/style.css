@@ -424,23 +424,24 @@ ul { list-style: none; }
     transform: translateY(-1px);
 }
 
-/* Logo bee icon */
+/* Logo sapling icon */
 .brand-icon {
-    width: 38px;
-    height: 38px;
-    background: linear-gradient(135deg, #f5c800, #e6a000);
-    border-radius: 10px;
+    width: 42px;
+    height: 42px;
+    background: var(--moss);
+    border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.3rem;
-    box-shadow: 0 2px 10px rgba(245,200,0,0.4);
+    font-size: 1.1rem;
+    color: var(--cream);
+    box-shadow: 0 2px 10px rgba(74,124,89,0.4);
     transition: transform 0.3s ease, box-shadow 0.3s ease;
     flex-shrink: 0;
 }
 .brand:hover .brand-icon {
-    transform: rotate(-10deg) scale(1.1);
-    box-shadow: 0 4px 16px rgba(245,200,0,0.6);
+    transform: scale(1.08);
+    box-shadow: 0 4px 16px rgba(74,124,89,0.55);
 }
 
 /* Honeycomb texture on navbar */
@@ -1022,17 +1023,17 @@ ul { list-style: none; }
   padding: 0 28px;
 }
 .vhc-strip{
-  --cell:105px; --cellH:65px; --cells:8; --gap:9px;
+  --cell:88px; --cellH:52px; --cells:8; --gap:7px;
   position:relative;
   width:var(--cell);
   height:calc(var(--cellH) * var(--cells) + var(--gap) * (var(--cells) - 1));
 }
 .vhc-strip-bg{
-  position:absolute; left:50%; top:0; width:63px; height:100%;
+  position:absolute; left:50%; top:0; width:52.8px; height:100%;
   transform:translateX(-50%);
-  clip-path: path("M 7.27 17.69 Q 0.00 23.00 0.00 32.00 L 0.00 551.00 Q 0.00 560.00 7.27 565.31 L 24.23 577.69 Q 31.50 583.00 38.77 577.69 L 55.73 565.31 Q 63.00 560.00 63.00 551.00 L 63.00 32.00 Q 63.00 23.00 55.73 17.69 L 38.77 5.31 Q 31.50 0.00 24.23 5.31 L 7.27 17.69 Z");
+  clip-path: path("M 6.38 15.17 Q 0.00 20.00 0.00 28.00 L 0.00 437.00 Q 0.00 445.00 6.38 449.83 L 20.02 460.17 Q 26.40 465.00 32.78 460.17 L 46.42 449.83 Q 52.80 445.00 52.80 437.00 L 52.80 28.00 Q 52.80 20.00 46.42 15.17 L 32.78 4.83 Q 26.40 0.00 20.02 4.83 L 6.38 15.17 Z");
   background: linear-gradient(180deg, #6b3a12 0%, #4a260b 55%, #371c08 100%);
-  box-shadow: inset 5px 0 10px rgba(0,0,0,.4), inset -5px 0 10px rgba(0,0,0,.3);
+  box-shadow: inset 4px 0 8px rgba(0,0,0,.4), inset -4px 0 8px rgba(0,0,0,.3);
 }
 
 .vhc-nav{ position:relative; z-index:2; list-style:none; display:flex; flex-direction:column; gap:var(--gap); margin:0; padding:0; }
@@ -1047,9 +1048,9 @@ ul { list-style: none; }
   position:relative;
   display:flex; align-items:center; justify-content:center;
   width:100%; height:100%;
-  padding:0 20px;
+  padding:0 16px;
   overflow:hidden;
-  clip-path: path("M 23.74 3.11 Q 26.25 0.00 30.25 0.00 L 74.75 0.00 Q 78.75 0.00 81.26 3.11 L 102.49 29.39 Q 105.00 32.50 102.49 35.61 L 81.26 61.89 Q 78.75 65.00 74.75 65.00 L 30.25 65.00 Q 26.25 65.00 23.74 61.89 L 2.51 35.61 Q 0.00 32.50 2.51 29.39 L 23.74 3.11 Z");
+  clip-path: path("M 19.42 3.05 Q 22.00 0.00 26.00 0.00 L 62.00 0.00 Q 66.00 0.00 68.58 3.05 L 85.42 22.95 Q 88.00 26.00 85.42 29.05 L 68.58 48.95 Q 66.00 52.00 62.00 52.00 L 26.00 52.00 Q 22.00 52.00 19.42 48.95 L 2.58 29.05 Q 0.00 26.00 2.58 22.95 L 19.42 3.05 Z");
   background:
     radial-gradient(120% 90% at 28% 12%, rgba(255,235,180,.5) 0%, rgba(255,235,180,0) 42%),
     linear-gradient(150deg, #d9922e 0%, #b8681c 42%, #7a3d0f 78%, #5a2c0a 100%);
@@ -1086,7 +1087,7 @@ ul { list-style: none; }
 .vhc-label{
   position:relative; z-index:1;
   font-family: var(--font-accent);
-  font-size:11px; letter-spacing:.03em;
+  font-size:9.5px; letter-spacing:.02em;
   font-weight:700; text-transform:uppercase; text-align:center;
 }
 
@@ -1118,7 +1119,7 @@ ul { list-style: none; }
 
 .vhc-ping{
   position:absolute; inset:-6px; pointer-events:none;
-  clip-path: path("M 26.23 3.98 Q 29.25 0.00 34.25 0.00 L 82.75 0.00 Q 87.75 0.00 90.77 3.98 L 113.98 34.52 Q 117.00 38.50 113.98 42.48 L 90.77 73.02 Q 87.75 77.00 82.75 77.00 L 34.25 77.00 Q 29.25 77.00 26.23 73.02 L 3.02 42.48 Q 0.00 38.50 3.02 34.52 L 26.23 3.98 Z");
+  clip-path: path("M 21.92 3.94 Q 25.00 0.00 30.00 0.00 L 70.00 0.00 Q 75.00 0.00 78.08 3.94 L 96.92 28.06 Q 100.00 32.00 96.92 35.94 L 78.08 60.06 Q 75.00 64.00 70.00 64.00 L 30.00 64.00 Q 25.00 64.00 21.92 60.06 L 3.08 35.94 Q 0.00 32.00 3.08 28.06 L 21.92 3.94 Z");
   border:2px solid #ffd968;
   opacity:0;
 }
@@ -1137,34 +1138,44 @@ ul { list-style: none; }
  
 /* Drawer CTA Button */
 .drawer-cta {
-    padding: 8px 28px 24px;
+    padding: 4px 28px 20px;
     flex-shrink: 0;
 }
- 
+
 .drawer-order-btn {
+    position: relative;
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 10px;
     width: 100%;
-    padding: 15px 24px;
-    background: var(--gold);
+    height: 52px;
+    padding: 0 34px;
+    clip-path: polygon(9% 0%, 91% 0%, 100% 50%, 91% 100%, 9% 100%, 0% 50%);
+    background:
+        radial-gradient(120% 90% at 28% 12%, rgba(255,250,220,.7) 0%, rgba(255,250,220,0) 42%),
+        linear-gradient(150deg, #ffe680 0%, #ffc93c 40%, #f0a412 75%, #d6860a 100%);
+    box-shadow:
+        inset 0 3px 6px rgba(255,250,220,.6),
+        inset 0 -8px 13px rgba(120,70,10,.3);
     color: var(--forest);
     font-family: var(--font-body);
     font-size: 0.9rem;
-    font-weight: 600;
+    font-weight: 700;
     letter-spacing: 0.05em;
-    border-radius: 50px;
     text-decoration: none;
     transition: all 0.3s var(--ease-smooth);
 }
- 
+
 .drawer-order-btn:hover {
-    background: var(--gold-light);
+    filter: brightness(1.06);
     transform: translateY(-2px);
-    box-shadow: 0 10px 28px rgba(201,168,76,0.35);
+    box-shadow:
+        inset 0 3px 6px rgba(255,250,220,.6),
+        inset 0 -8px 13px rgba(120,70,10,.3),
+        0 10px 28px rgba(201,168,76,0.35);
 }
- 
+
 .drawer-order-btn i { font-size: 0.88rem; }
  
 /* Drawer Footer */
@@ -1209,6 +1220,41 @@ ul { list-style: none; }
     background: var(--moss);
     border-color: var(--moss);
     color: var(--white);
+    transform: translateY(-2px);
+}
+
+/* Brand colors, filled in */
+.drawer-socials a[aria-label="Facebook"] {
+    background: #1877F2;
+    border-color: #1877F2;
+    color: #fff;
+}
+.drawer-socials a[aria-label="Instagram"] {
+    background: radial-gradient(circle at 30% 110%, #ffdb73 0%, #fdb44b 16%, #f56040 40%, #e1306c 62%, #c13584 78%, #833ab4 92%);
+    border-color: transparent;
+    color: #fff;
+}
+.drawer-socials a[aria-label="YouTube"] {
+    background: #FF0000;
+    border-color: #FF0000;
+    color: #fff;
+}
+.drawer-socials a[aria-label="X"] {
+    background: #000000;
+    border-color: rgba(255,255,255,0.15);
+    color: #fff;
+}
+.drawer-socials a[aria-label="Threads"] {
+    background: #000000;
+    border-color: rgba(255,255,255,0.15);
+    color: #fff;
+}
+.drawer-socials a[aria-label="Facebook"]:hover,
+.drawer-socials a[aria-label="Instagram"]:hover,
+.drawer-socials a[aria-label="YouTube"]:hover,
+.drawer-socials a[aria-label="X"]:hover,
+.drawer-socials a[aria-label="Threads"]:hover {
+    filter: brightness(1.12);
     transform: translateY(-2px);
 }
  
