@@ -163,9 +163,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const sideDrawer     = document.getElementById('sideDrawer');
     const drawerBackdrop = document.getElementById('drawerBackdrop');
     const drawerClose    = document.getElementById('drawerClose');
-    const drawerLinks    = document.querySelectorAll('.drawer-link');
+    const drawerCells    = document.querySelectorAll('.vhc-cell');
+    const drawerLinks    = document.querySelectorAll('.vhc-link');
     const drawerOrderBtn = document.querySelector('.drawer-order-btn');
- 
+
     function openDrawer() {
         sideDrawer.classList.add('open');
         drawerBackdrop.classList.add('active');
@@ -173,14 +174,14 @@ document.addEventListener('DOMContentLoaded', () => {
         hamburger.setAttribute('aria-expanded', 'true');
         sideDrawer.setAttribute('aria-hidden', 'false');
         document.body.style.overflow = 'hidden';
- 
-        // Stagger-reveal each nav link
-        drawerLinks.forEach((link, i) => {
-            link.style.transitionDelay = `${0.12 + i * 0.06}s`;
-            setTimeout(() => link.classList.add('revealed'), 10);
+
+        // Stagger-reveal each nav cell
+        drawerCells.forEach((cell, i) => {
+            cell.style.transitionDelay = `${0.12 + i * 0.06}s`;
+            setTimeout(() => cell.classList.add('revealed'), 10);
         });
     }
- 
+
     function closeDrawer() {
         sideDrawer.classList.remove('open');
         drawerBackdrop.classList.remove('active');
@@ -188,22 +189,34 @@ document.addEventListener('DOMContentLoaded', () => {
         hamburger.setAttribute('aria-expanded', 'false');
         sideDrawer.setAttribute('aria-hidden', 'true');
         document.body.style.overflow = '';
- 
+
         // Reset stagger for next open
-        drawerLinks.forEach(link => {
-            link.classList.remove('revealed');
-            link.style.transitionDelay = '0s';
+        drawerCells.forEach(cell => {
+            cell.classList.remove('revealed');
+            cell.style.transitionDelay = '0s';
         });
     }
- 
+
     if (hamburger) hamburger.addEventListener('click', openDrawer);
     if (drawerClose) drawerClose.addEventListener('click', closeDrawer);
     if (drawerBackdrop) drawerBackdrop.addEventListener('click', closeDrawer);
- 
-    // Close on any drawer link click
-    drawerLinks.forEach(link => link.addEventListener('click', closeDrawer));
+
+    // Tap a hexagon: instant pop + ping, then close the drawer
+    drawerLinks.forEach(link => {
+        link.addEventListener('click', () => {
+            drawerLinks.forEach(c => c.classList.remove('active'));
+            link.classList.add('active');
+            const ping = link.querySelector('.vhc-ping');
+            if (ping) {
+                ping.classList.remove('run');
+                void ping.offsetWidth;
+                ping.classList.add('run');
+            }
+            closeDrawer();
+        });
+    });
     if (drawerOrderBtn) drawerOrderBtn.addEventListener('click', closeDrawer);
- 
+
     // Close on Escape key
     document.addEventListener('keydown', e => {
         if (e.key === 'Escape' && sideDrawer && sideDrawer.classList.contains('open')) {
@@ -491,7 +504,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // 7. SCROLLSPY — Active nav link highlighting + pill sync
     // ============================================================
     const sections   = document.querySelectorAll('section[id], div[id]');
-    const navAnchors = document.querySelectorAll('.nav-links a[href^="#"], .drawer-link[href^="#"]');
+    const navAnchors = document.querySelectorAll('.vhc-link[href^="#"]');
     // Re-query pill and navLinksWrap here so ScrollSpy can access them
     const _navLinksWrap = navbar ? navbar.querySelector('.nav-links') : null;
     const _pill = _navLinksWrap ? _navLinksWrap.querySelector('.nav-pill') : null;
