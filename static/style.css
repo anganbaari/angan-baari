@@ -1008,6 +1008,132 @@ ul { list-style: none; }
     opacity: 1;
     transform: translateX(0);
 }
+
+/* ================================================================
+   VERTICAL HONEYCOMB MOBILE NAV
+   Same chain theme as the desktop honeycomb, rotated 90°, for the
+   side drawer. Text-only, no connectors, left-aligned under the
+   drawer header brand.
+================================================================ */
+.drawer-nav { padding: 8px 0 20px; }
+
+.vhc-wrap{
+  display:flex; justify-content:flex-start;
+  padding: 0 28px;
+}
+.vhc-strip{
+  --cell:105px; --cellH:65px; --cells:8; --gap:9px;
+  position:relative;
+  width:var(--cell);
+  height:calc(var(--cellH) * var(--cells) + var(--gap) * (var(--cells) - 1));
+}
+.vhc-strip-bg{
+  position:absolute; left:50%; top:0; width:63px; height:100%;
+  transform:translateX(-50%);
+  clip-path: path("M 7.27 17.69 Q 0.00 23.00 0.00 32.00 L 0.00 551.00 Q 0.00 560.00 7.27 565.31 L 24.23 577.69 Q 31.50 583.00 38.77 577.69 L 55.73 565.31 Q 63.00 560.00 63.00 551.00 L 63.00 32.00 Q 63.00 23.00 55.73 17.69 L 38.77 5.31 Q 31.50 0.00 24.23 5.31 L 7.27 17.69 Z");
+  background: linear-gradient(180deg, #6b3a12 0%, #4a260b 55%, #371c08 100%);
+  box-shadow: inset 5px 0 10px rgba(0,0,0,.4), inset -5px 0 10px rgba(0,0,0,.3);
+}
+
+.vhc-nav{ position:relative; z-index:2; list-style:none; display:flex; flex-direction:column; gap:var(--gap); margin:0; padding:0; }
+.vhc-cell{
+  position:relative; width:var(--cell); height:var(--cellH);
+  opacity:0; transform:translateX(30px);
+  transition: opacity .4s ease, transform .4s ease;
+}
+.vhc-cell.revealed{ opacity:1; transform:translateX(0); }
+
+.vhc-link{
+  position:relative;
+  display:flex; align-items:center; justify-content:center;
+  width:100%; height:100%;
+  padding:0 20px;
+  overflow:hidden;
+  clip-path: path("M 23.74 3.11 Q 26.25 0.00 30.25 0.00 L 74.75 0.00 Q 78.75 0.00 81.26 3.11 L 102.49 29.39 Q 105.00 32.50 102.49 35.61 L 81.26 61.89 Q 78.75 65.00 74.75 65.00 L 30.25 65.00 Q 26.25 65.00 23.74 61.89 L 2.51 35.61 Q 0.00 32.50 2.51 29.39 L 23.74 3.11 Z");
+  background:
+    radial-gradient(120% 90% at 28% 12%, rgba(255,235,180,.5) 0%, rgba(255,235,180,0) 42%),
+    linear-gradient(150deg, #d9922e 0%, #b8681c 42%, #7a3d0f 78%, #5a2c0a 100%);
+  box-shadow:
+    inset 0 3px 6px rgba(255,224,150,.4),
+    inset 0 -10px 15px rgba(35,15,3,.5),
+    inset 0 0 0 1px rgba(255,255,255,.2);
+  backdrop-filter: blur(1.5px) saturate(150%);
+  color:#fbead0;
+  text-decoration:none;
+  cursor:pointer;
+  transition: transform .55s cubic-bezier(0.34,1.56,0.64,1), box-shadow .5s cubic-bezier(0.25,0.46,0.45,0.94), background .5s cubic-bezier(0.25,0.46,0.45,0.94), filter .45s cubic-bezier(0.25,0.46,0.45,0.94);
+}
+.vhc-link::before{
+  content:"";
+  position:absolute; inset:-15%;
+  background: linear-gradient(115deg,
+      rgba(255,255,255,0) 42%,
+      rgba(255,255,255,.5) 48%,
+      rgba(255,255,255,.15) 52%,
+      rgba(255,255,255,0) 58%);
+  background-size: 260% 260%;
+  background-position: -30% -30%;
+  mix-blend-mode: screen;
+  pointer-events: none;
+  animation: vhcSheenDrift 10s ease-in-out infinite;
+}
+.vhc-cell:nth-child(2n) .vhc-link::before{ animation-delay:-3.3s; }
+.vhc-cell:nth-child(3n) .vhc-link::before{ animation-delay:-6.6s; }
+@keyframes vhcSheenDrift{
+  0%,100%{ background-position:-30% -30%; }
+  50%{ background-position:90% 90%; }
+}
+.vhc-label{
+  position:relative; z-index:1;
+  font-family: var(--font-accent);
+  font-size:11px; letter-spacing:.03em;
+  font-weight:700; text-transform:uppercase; text-align:center;
+}
+
+.vhc-cell:active .vhc-link:not(.active){
+  transform: translateX(8px);
+  filter:brightness(1.1);
+}
+.vhc-cell:active .vhc-link::before{
+  animation: vhcSheenSweep .8s cubic-bezier(0.25,0.46,0.45,0.94);
+}
+@keyframes vhcSheenSweep{
+  0%{ background-position:-60% -60%; }
+  100%{ background-position:140% 140%; }
+}
+
+.vhc-link.active{
+  background:
+    radial-gradient(120% 90% at 28% 10%, rgba(255,250,220,.8) 0%, rgba(255,250,220,0) 45%),
+    linear-gradient(150deg, #ffe680 0%, #ffc93c 40%, #f0a412 75%, #d6860a 100%);
+  box-shadow:
+    inset 0 3px 6px rgba(255,250,220,.6),
+    inset 0 -8px 13px rgba(120,70,10,.35),
+    8px 6px 20px -8px rgba(240,164,18,.55),
+    inset 0 0 0 1px rgba(255,255,255,.3);
+  color:#4a2e05;
+  transform: translateX(14px) scale(1.06);
+  z-index:5;
+}
+
+.vhc-ping{
+  position:absolute; inset:-6px; pointer-events:none;
+  clip-path: path("M 26.23 3.98 Q 29.25 0.00 34.25 0.00 L 82.75 0.00 Q 87.75 0.00 90.77 3.98 L 113.98 34.52 Q 117.00 38.50 113.98 42.48 L 90.77 73.02 Q 87.75 77.00 82.75 77.00 L 34.25 77.00 Q 29.25 77.00 26.23 73.02 L 3.02 42.48 Q 0.00 38.50 3.02 34.52 L 26.23 3.98 Z");
+  border:2px solid #ffd968;
+  opacity:0;
+}
+.vhc-ping.run{ animation: vhcPing .9s cubic-bezier(0.25,0.46,0.45,0.94); }
+@keyframes vhcPing{
+  0%{ opacity:.85; transform:scale(1); }
+  100%{ opacity:0; transform:scale(1.3); }
+}
+
+@media (prefers-reduced-motion: reduce){
+  .vhc-link{ transition:none; }
+  .vhc-link::before{ animation:none; }
+  .vhc-ping{ display:none; }
+}
+
  
 /* Drawer CTA Button */
 .drawer-cta {
