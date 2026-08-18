@@ -260,8 +260,8 @@ ul { list-style: none; }
 .brand:hover { opacity: 0.85; }
 
 .brand-icon {
-    width: 48px;
-    height: 48px;
+    width: 84px;
+    height: 84px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -429,8 +429,8 @@ ul { list-style: none; }
 
 /* Logo icon (pipal leaf mark) */
 .brand-icon {
-    width: 48px;
-    height: 48px;
+    width: 84px;
+    height: 84px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -940,8 +940,8 @@ ul { list-style: none; }
 }
  
 .drawer-brand-icon {
-    width: 70px;
-    height: 70px;
+    width: 72px;
+    height: 72px;
     display: flex;
     align-items: center;
     justify-content: center;
