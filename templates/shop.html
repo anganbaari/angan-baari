@@ -407,7 +407,9 @@
         .no-results p { color: #8a9e8e; font-size: 0.9rem; }
 
         /* ══════════════════════════════════════════
-           MOBILE / TABLET BOTTOM NAV — modern glass bar
+           MOBILE / TABLET BOTTOM NAV — honeycomb hexagon bar,
+           matching the desktop honeycomb theme. Points face top/bottom,
+           sides are flat so cells butt cleanly against each other.
         ══════════════════════════════════════════ */
         .mobile-bottom-nav {
             display: none;
@@ -416,19 +418,20 @@
             left: 0;
             right: 0;
             z-index: 500;
-            background: rgba(255, 255, 255, 0.94);
+            background: linear-gradient(180deg, rgba(22,38,25,.95) 0%, rgba(13,23,15,.97) 100%);
             backdrop-filter: blur(18px) saturate(160%);
             -webkit-backdrop-filter: blur(18px) saturate(160%);
-            border-top: 1px solid rgba(232, 226, 216, 0.9);
-            padding: 8px 6px calc(6px + env(safe-area-inset-bottom, 6px));
-            box-shadow: 0 -10px 30px rgba(26, 47, 30, 0.10);
+            border-top: 1px solid rgba(255,255,255,0.08);
+            padding: 10px 6px calc(6px + env(safe-area-inset-bottom, 6px));
+            box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.25);
         }
         .mobile-bottom-nav .nav-items {
             position: relative;
             display: flex;
-            justify-content: space-around;
+            justify-content: center;
             align-items: center;
-            max-width: 600px;
+            gap: 0;
+            max-width: 420px;
             margin: 0 auto;
         }
         .mobile-bottom-nav .nav-item {
@@ -438,30 +441,39 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            gap: 3px;
-            flex: 1;
+            gap: 2px;
+            width: 68px;
+            height: 92px;
+            flex-shrink: 0;
             text-decoration: none;
-            color: #8a9e8e;
-            font-size: 0.63rem;
+            color: #fbead0;
+            font-size: 0.56rem;
             font-family: 'DM Sans', sans-serif;
-            font-weight: 500;
-            padding: 8px 4px;
-            border-radius: 16px;
+            font-weight: 600;
+            letter-spacing: .02em;
+            text-transform: uppercase;
+            padding: 20px 6px 16px;
             cursor: pointer;
-            background: none;
+            background:
+                radial-gradient(120% 90% at 28% 12%, rgba(255,235,180,.5) 0%, rgba(255,235,180,0) 42%),
+                linear-gradient(150deg, #d9922e 0%, #b8681c 42%, #7a3d0f 78%, #5a2c0a 100%);
+            box-shadow:
+                inset 0 3px 6px rgba(255,224,150,.4),
+                inset 0 -10px 15px rgba(35,15,3,.5);
+            clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
             border: none;
-            transition: color 0.3s ease, background 0.3s ease;
+            transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.35s ease, box-shadow 0.35s ease;
         }
         .mobile-bottom-nav .nav-icon-wrap {
             position: relative;
             display: flex;
             align-items: center;
             justify-content: center;
-            width: 24px;
-            height: 24px;
+            width: 22px;
+            height: 22px;
         }
         .mobile-bottom-nav .nav-item i {
-            font-size: 1.18rem;
+            font-size: 1.05rem;
             transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), color 0.3s ease;
         }
         /* Tap feedback — icon pops up on press so the customer sees their
@@ -479,22 +491,28 @@
             45%  { transform: scale(1.28); }
             100% { transform: scale(1); }
         }
-        /* Active tab — background lives directly on the element that has
-           .active, so it is always painted on the correct icon. (Previously
-           a separate absolutely-positioned pill was moved via JS pixel
-           math, which could land on the wrong tab on mobile/tablet.) */
+        /* Active tab — pops up bright gold, same language as the desktop
+           honeycomb's active cell. */
         .mobile-bottom-nav .nav-item.active {
-            background: linear-gradient(135deg, #2d5a3d, #4a7c59);
-            color: #fff;
+            background:
+                radial-gradient(120% 90% at 28% 10%, rgba(255,250,220,.8) 0%, rgba(255,250,220,0) 45%),
+                linear-gradient(150deg, #ffe680 0%, #ffc93c 40%, #f0a412 75%, #d6860a 100%);
+            box-shadow:
+                inset 0 3px 6px rgba(255,250,220,.6),
+                inset 0 -8px 13px rgba(120,70,10,.35),
+                0 10px 20px -6px rgba(240,164,18,.55);
+            color: #4a2e05;
+            transform: translateY(-10px) scale(1.06);
+            z-index: 2;
         }
         .mobile-bottom-nav .nav-item.active i { transform: translateY(-1px) scale(1.1); }
         .mobile-bottom-nav .nav-label { transition: color 0.3s ease, font-weight 0.3s ease; }
-        .mobile-bottom-nav .nav-item.active .nav-label { color: #fff; font-weight: 600; }
+        .mobile-bottom-nav .nav-item.active .nav-label { color: #4a2e05; font-weight: 700; }
         /* Cart badge */
         .mobile-bottom-nav .cart-badge {
             position: absolute;
-            top: -5px;
-            right: -9px;
+            top: -3px;
+            right: -7px;
             background: #c0392b;
             color: #fff;
             font-size: 0.56rem;
@@ -506,9 +524,22 @@
             align-items: center;
             justify-content: center;
             font-weight: 700;
-            border: 2px solid #fff;
+            border: 2px solid #1c2e1e;
         }
-        /* Offers — a periodic wiggle draws the eye without being annoying; pauses when active */
+        /* Offers — red-gold honey box like the desktop version, plus the
+           periodic wiggle draws the eye without being annoying */
+        .mobile-bottom-nav .nav-item-offers {
+            background:
+                radial-gradient(120% 90% at 28% 12%, rgba(255,200,150,.45) 0%, rgba(255,200,150,0) 42%),
+                linear-gradient(150deg, #e8763a 0%, #c23b1f 42%, #8a2510 78%, #5c1608 100%);
+        }
+        .mobile-bottom-nav .nav-item-offers.active {
+            background:
+                radial-gradient(120% 90% at 28% 10%, rgba(255,220,190,.8) 0%, rgba(255,220,190,0) 45%),
+                linear-gradient(150deg, #ffb37a 0%, #ff7a3c 40%, #e8481f 75%, #b82c10 100%);
+            color: #4a1608;
+        }
+        .mobile-bottom-nav .nav-item-offers.active .nav-label { color: #4a1608; }
         .mobile-bottom-nav .nav-item-offers .nav-icon-wrap i {
             animation: navOfferWiggle 2.8s ease-in-out infinite;
         }
@@ -523,20 +554,20 @@
         }
         .mobile-bottom-nav .offer-dot {
             position: absolute;
-            top: -2px;
-            right: -5px;
+            top: -1px;
+            right: -4px;
             width: 7px;
             height: 7px;
             border-radius: 50%;
-            background: #e67e22;
-            border: 1.5px solid #fff;
+            background: #ffd968;
+            border: 1.5px solid #2a1204;
         }
         .mobile-bottom-nav .offer-dot::after {
             content: '';
             position: absolute;
             inset: -2px;
             border-radius: 50%;
-            border: 1.5px solid #e67e22;
+            border: 1.5px solid #ffd968;
             animation: navOfferPing 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
         }
         @keyframes navOfferPing {
