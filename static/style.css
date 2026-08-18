@@ -639,10 +639,16 @@ ul { list-style: none; }
     transform: scaleX(0.6723);
 }
 
-/* Offers hexagon: a touch of red/orange in the flame to draw the eye */
-.offer-flame {
-    color: #ff6a3d;
-    filter: drop-shadow(0 0 3px rgba(255,90,40,.55));
+/* Offers hexagon: red-gold "honey" box to draw the eye — icon stays white */
+.hc-cell--offer .hc-link:not(.active) {
+    background:
+        radial-gradient(120% 90% at 28% 12%, rgba(255,200,150,.45) 0%, rgba(255,200,150,0) 42%),
+        linear-gradient(150deg, #e8763a 0%, #c23b1f 42%, #8a2510 78%, #5c1608 100%);
+}
+.hc-cell--offer .hc-link.active {
+    background:
+        radial-gradient(120% 90% at 28% 10%, rgba(255,220,190,.8) 0%, rgba(255,220,190,0) 45%),
+        linear-gradient(150deg, #ffb37a 0%, #ff7a3c 40%, #e8481f 75%, #b82c10 100%);
 }
 
 .hc-strip {
