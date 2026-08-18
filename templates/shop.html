@@ -410,6 +410,8 @@
            MOBILE / TABLET BOTTOM NAV — honeycomb hexagon bar,
            matching the desktop honeycomb theme. Points face top/bottom,
            sides are flat so cells butt cleanly against each other.
+           No solid bar background — a stretched hexagon (like desktop)
+           sits behind the row instead, so the page shows through.
         ══════════════════════════════════════════ */
         .mobile-bottom-nav {
             display: none;
@@ -418,12 +420,9 @@
             left: 0;
             right: 0;
             z-index: 500;
-            background: linear-gradient(180deg, rgba(22,38,25,.95) 0%, rgba(13,23,15,.97) 100%);
-            backdrop-filter: blur(18px) saturate(160%);
-            -webkit-backdrop-filter: blur(18px) saturate(160%);
-            border-top: 1px solid rgba(255,255,255,0.08);
-            padding: 10px 6px calc(6px + env(safe-area-inset-bottom, 6px));
-            box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.25);
+            background: transparent;
+            padding: 0 6px calc(6px + env(safe-area-inset-bottom, 6px));
+            pointer-events: none;
         }
         .mobile-bottom-nav .nav-items {
             position: relative;
@@ -431,8 +430,22 @@
             justify-content: center;
             align-items: center;
             gap: 0;
-            max-width: 420px;
+            max-width: 320px;
             margin: 0 auto;
+            pointer-events: auto;
+        }
+        .mobile-bottom-nav .nav-items::before {
+            content: '';
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            width: 270px;
+            height: 49.4px;
+            transform: translate(-50%, -50%);
+            clip-path: path("M 14.34 6.99 Q 20.00 0.00 29.00 0.00 L 241.00 0.00 Q 250.00 0.00 255.66 6.99 L 264.34 17.71 Q 270.00 24.70 264.34 31.69 L 255.66 42.41 Q 250.00 49.40 241.00 49.40 L 29.00 49.40 Q 20.00 49.40 14.34 42.41 L 5.66 31.69 Q 0.00 24.70 5.66 17.71 L 14.34 6.99 Z");
+            background: linear-gradient(180deg, #6b3a12 0%, #4a260b 55%, #371c08 100%);
+            box-shadow: inset 0 6px 10px rgba(0,0,0,.35), inset 0 -6px 10px rgba(0,0,0,.3), 0 8px 20px rgba(0,0,0,.3);
+            z-index: 0;
         }
         .mobile-bottom-nav .nav-item {
             position: relative;
@@ -441,26 +454,26 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            gap: 2px;
-            width: 68px;
-            height: 92px;
+            gap: 1px;
+            width: 54px;
+            height: 76px;
             flex-shrink: 0;
             text-decoration: none;
             color: #fbead0;
-            font-size: 0.56rem;
+            font-size: 0.46rem;
             font-family: 'DM Sans', sans-serif;
             font-weight: 600;
-            letter-spacing: .02em;
+            letter-spacing: .01em;
             text-transform: uppercase;
-            padding: 20px 6px 16px;
+            padding: 15px 4px 12px;
             cursor: pointer;
             background:
                 radial-gradient(120% 90% at 28% 12%, rgba(255,235,180,.5) 0%, rgba(255,235,180,0) 42%),
                 linear-gradient(150deg, #d9922e 0%, #b8681c 42%, #7a3d0f 78%, #5a2c0a 100%);
             box-shadow:
-                inset 0 3px 6px rgba(255,224,150,.4),
-                inset 0 -10px 15px rgba(35,15,3,.5);
-            clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+                inset 0 3px 5px rgba(255,224,150,.4),
+                inset 0 -8px 12px rgba(35,15,3,.5);
+            clip-path: path("M 22.91 2.88 Q 27.00 0.00 31.09 2.88 L 49.91 16.12 Q 54.00 19.00 54.00 24.00 L 54.00 52.00 Q 54.00 57.00 49.91 59.88 L 31.09 73.12 Q 27.00 76.00 22.91 73.12 L 4.09 59.88 Q 0.00 57.00 0.00 52.00 L 0.00 24.00 Q 0.00 19.00 4.09 16.12 L 22.91 2.88 Z");
             border: none;
             transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.35s ease, box-shadow 0.35s ease;
         }
@@ -469,11 +482,11 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            width: 22px;
-            height: 22px;
+            width: 18px;
+            height: 18px;
         }
         .mobile-bottom-nav .nav-item i {
-            font-size: 1.05rem;
+            font-size: 0.86rem;
             transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), color 0.3s ease;
         }
         /* Tap feedback — icon pops up on press so the customer sees their
@@ -498,11 +511,11 @@
                 radial-gradient(120% 90% at 28% 10%, rgba(255,250,220,.8) 0%, rgba(255,250,220,0) 45%),
                 linear-gradient(150deg, #ffe680 0%, #ffc93c 40%, #f0a412 75%, #d6860a 100%);
             box-shadow:
-                inset 0 3px 6px rgba(255,250,220,.6),
-                inset 0 -8px 13px rgba(120,70,10,.35),
-                0 10px 20px -6px rgba(240,164,18,.55);
+                inset 0 3px 5px rgba(255,250,220,.6),
+                inset 0 -7px 11px rgba(120,70,10,.35),
+                0 8px 16px -5px rgba(240,164,18,.55);
             color: #4a2e05;
-            transform: translateY(-10px) scale(1.06);
+            transform: translateY(-8px) scale(1.06);
             z-index: 2;
         }
         .mobile-bottom-nav .nav-item.active i { transform: translateY(-1px) scale(1.1); }
@@ -512,19 +525,19 @@
         .mobile-bottom-nav .cart-badge {
             position: absolute;
             top: -3px;
-            right: -7px;
+            right: -5px;
             background: #c0392b;
             color: #fff;
-            font-size: 0.56rem;
-            min-width: 16px;
-            height: 16px;
+            font-size: 0.5rem;
+            min-width: 14px;
+            height: 14px;
             padding: 0 3px;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
             font-weight: 700;
-            border: 2px solid #1c2e1e;
+            border: 1.5px solid #2a1204;
         }
         /* Offers — red-gold honey box like the desktop version, plus the
            periodic wiggle draws the eye without being annoying */
@@ -555,9 +568,9 @@
         .mobile-bottom-nav .offer-dot {
             position: absolute;
             top: -1px;
-            right: -4px;
-            width: 7px;
-            height: 7px;
+            right: -2px;
+            width: 6px;
+            height: 6px;
             border-radius: 50%;
             background: #ffd968;
             border: 1.5px solid #2a1204;
