@@ -260,16 +260,19 @@ ul { list-style: none; }
 .brand:hover { opacity: 0.85; }
 
 .brand-icon {
-    width: 42px;
-    height: 42px;
-    background: var(--moss);
-    border-radius: 50%;
+    width: 48px;
+    height: 48px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.1rem;
-    color: var(--cream);
     flex-shrink: 0;
+}
+
+.brand-icon img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
 }
 
 .brand-text {
@@ -424,24 +427,25 @@ ul { list-style: none; }
     transform: translateY(-1px);
 }
 
-/* Logo sapling icon */
+/* Logo icon (pipal leaf mark) */
 .brand-icon {
-    width: 42px;
-    height: 42px;
-    background: var(--moss);
-    border-radius: 50%;
+    width: 48px;
+    height: 48px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.1rem;
-    color: var(--cream);
-    box-shadow: 0 2px 10px rgba(74,124,89,0.4);
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
     flex-shrink: 0;
+    transition: transform 0.3s ease;
+}
+.brand-icon img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+    filter: drop-shadow(0 2px 8px rgba(0,0,0,0.35));
 }
 .brand:hover .brand-icon {
     transform: scale(1.08);
-    box-shadow: 0 4px 16px rgba(74,124,89,0.55);
 }
 
 /* Honeycomb texture on navbar */
@@ -936,16 +940,19 @@ ul { list-style: none; }
 }
  
 .drawer-brand-icon {
-    width: 40px;
-    height: 40px;
-    background: var(--moss);
-    border-radius: 50%;
+    width: 44px;
+    height: 44px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1rem;
-    color: var(--cream);
     flex-shrink: 0;
+}
+.drawer-brand-icon img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+    filter: drop-shadow(0 2px 8px rgba(0,0,0,0.35));
 }
  
 .drawer-brand-name {
