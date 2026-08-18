@@ -599,11 +599,37 @@ ul { list-style: none; }
     filter: brightness(1.06);
 }
 
+/* Cart badge sitting on the Cart hexagon (app pages) */
+.hc-cart-badge {
+    position: absolute; top: 15px; right: 19px;
+    background: #c0392b; color: #fff; font-size: 0.6rem;
+    width: 17px; height: 17px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; z-index: 3;
+}
+
+/* Offers hexagon keeps its pulsing ring — applied to the cell wrapper,
+   not the clipped link, so the box-shadow ring isn't cut by clip-path */
+.hc-cell--offer { animation: hcOfferPulse 2s infinite; border-radius: 50%; }
+@keyframes hcOfferPulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(192,57,43,0.5); }
+    50% { box-shadow: 0 0 0 6px rgba(192,57,43,0); }
+}
+
 .hc-scale-box {
     width: 518px;
     height: 69px;
     position: relative;
 }
+
+/* App pages (shop/cart/offers) use a 5-item honeycomb — same per-cell
+   geometry as the homepage's 8-item version, just fewer cells and a
+   smaller reserved box. The stretched background hexagon needs no
+   separate path here: fitStripBg() in script.js reads the strip's
+   native width at runtime and scales the shared chamfered shape to fit
+   whatever cell count is present. */
+.hc-scale-box--app5 { width: 320px; height: 68.5px; }
+.hc-strip--cells5 { --cells: 5; }
 
 .hc-strip {
     --cell: 112px; --cells: 8; --gap: 20px; --H: 137px;
