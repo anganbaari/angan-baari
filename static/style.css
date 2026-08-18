@@ -631,6 +631,20 @@ ul { list-style: none; }
 .hc-scale-box--app5 { width: 320px; height: 68.5px; }
 .hc-strip--cells5 { --cells: 5; }
 
+/* App pages don't load script.js, so fitStripBg() never runs there —
+   these are the same left-offset/scale values it would have computed
+   for a 5-cell row, applied statically instead. */
+.hc-strip--cells5 .hc-strip-bg {
+    left: -54.17px;
+    transform: scaleX(0.6723);
+}
+
+/* Offers hexagon: a touch of red/orange in the flame to draw the eye */
+.offer-flame {
+    color: #ff6a3d;
+    filter: drop-shadow(0 0 3px rgba(255,90,40,.55));
+}
+
 .hc-strip {
     --cell: 112px; --cells: 8; --gap: 20px; --H: 137px;
     position: absolute;
