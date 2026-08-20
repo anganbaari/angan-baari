@@ -260,8 +260,8 @@ ul { list-style: none; }
 .brand:hover { opacity: 0.85; }
 
 .brand-icon {
-    width: 84px;
-    height: 84px;
+    width: 70px;
+    height: 70px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -481,8 +481,8 @@ ul { list-style: none; }
 
 /* Logo icon (pipal leaf mark) */
 .brand-icon {
-    width: 70px;
-    height: 70px;
+    width: 60px;
+    height: 60x;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -915,9 +915,13 @@ ul { list-style: none; }
 /* Honeycomb needs more breathing room than the old compact pill nav,
    so the desktop↔mobile-nav cutoff moves up from 1024px to 1200px. */
 @media (max-width: 1200px) {
-    .hamburger { display: flex; }
-    .desktop-nav { display: none; }
+    .hamburger {display: flex;}
+
+    .desktop-nav {display: none;}
+
+    .brand-icon {width: 40px;height: 40px;}
 }
+
  
 /* ================================================================
    SIDE DRAWER BACKDROP
