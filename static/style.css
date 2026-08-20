@@ -313,9 +313,9 @@ ul { list-style: none; }
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 38px;
-    height: 51px;
-    margin-left: 14px;
+    width: 60px;
+    height: 82px;
+    margin-left: -5px;
     flex-shrink: 0;
     overflow: visible;
     pointer-events: none;
@@ -323,8 +323,8 @@ ul { list-style: none; }
 
 .nav-nepal-flag {
     display: block;
-    width: 38px;
-    height: 51px;
+    width: 60px;
+    height: 82px;
     overflow: visible;
     filter: drop-shadow(0 2px 5px rgba(0,0,0,0.42));
     image-rendering: crisp-edges;
