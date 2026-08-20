@@ -235,7 +235,7 @@ ul { list-style: none; }
     background: rgb(16, 28, 18) !important;
     backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;
-    padding: 13px 5vw;
+    padding: 13px 2vw;
     box-shadow: 0 8px 32px rgba(0,0,0,0.18);
     border-bottom: 1px solid rgba(255,255,255,0.06);
 }
@@ -481,8 +481,8 @@ ul { list-style: none; }
 
 /* Logo icon (pipal leaf mark) */
 .brand-icon {
-    width: 84px;
-    height: 84px;
+    width: 70px;
+    height: 70px;
     display: flex;
     align-items: center;
     justify-content: center;
