@@ -310,6 +310,7 @@ ul { list-style: none; }
 
 .brand-flag {
     position: relative;
+    transform: translateY(-12px);
     display: flex;
     align-items: center;
     justify-content: center;
