@@ -1404,3 +1404,133 @@ document.addEventListener('DOMContentLoaded', () => {
 
     startShared();
 });
+
+// ================================================================
+// NATURAL WIND-WAVING NEPAL FLAG — NAVBAR
+// Speed 3.0 · Main wave 45 · Secondary wave 10 · Horizontal 18
+// The flag is rendered on a padded source canvas so the moon and
+// sun remain complete while the cloth bends in the wind.
+// ================================================================
+(function () {
+    const canvas = document.getElementById('navNepalFlag');
+    if (!canvas) return;
+
+    const WIDTH = 450;
+    const HEIGHT = 600;
+    const FLAG_W = 330;
+    const FLAG_H = 441;
+    const PAD_X = 60;
+    const PAD_Y = 78;
+
+    canvas.width = WIDTH;
+    canvas.height = HEIGHT;
+
+    const ctx = canvas.getContext('2d', { alpha: true });
+    if (!ctx) return;
+
+    const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="110" height="147" viewBox="0 0 110 147">
+        <path d="M 0.00,0.00 L 110.00,68.88 L 32.22,68.88 L 110.00,146.67 L 0.00,146.67 Z" fill="#DC143C" stroke="#003893" stroke-width="3.5" stroke-linejoin="round"/>
+        <g transform="translate(27.50,43.05)">
+            <path d="M 22.27,-4.58 L 21.52,-4.79 L 20.33,-2.42 L 15.70,3.07 L 12.48,5.11 L 11.18,4.57 L 10.86,2.96 L 12.80,1.99 L 13.23,0.48 L 10.00,-0.05 L 10.21,-1.45 L 11.93,-4.36 L 7.74,-3.72 L 7.95,-7.81 L 6.34,-7.48 L 4.18,-5.87 L 2.89,-10.06 L 0.52,-7.05 L -0.23,-7.16 L -2.17,-9.74 L -3.78,-5.98 L -6.69,-7.81 L -7.98,-7.92 L -7.33,-7.59 L -7.33,-3.72 L -9.38,-3.61 L -11.10,-4.25 L -9.81,-0.05 L -13.04,0.59 L -12.93,1.56 L -10.89,3.18 L -11.64,5.33 L -13.04,5.00 L -15.62,3.07 L -18.43,0.16 L -20.90,-3.61 L -21.55,-3.61 L -20.68,1.77 L -17.99,6.51 L -14.87,9.95 L -10.24,13.30 L -3.46,15.34 L 1.93,15.56 L 9.89,13.73 L 14.74,10.39 L 20.23,3.50 L 22.16,-2.42 Z" fill="#FFFFFF"/>
+        </g>
+        <path d="M 27.50,131.32 L 23.64,122.20 L 15.73,128.16 L 16.94,118.33 L 7.11,119.55 L 13.08,111.64 L 3.96,107.78 L 13.08,103.91 L 7.11,96.01 L 16.94,97.22 L 15.73,87.39 L 23.64,93.35 L 27.50,84.24 L 31.36,93.35 L 39.27,87.39 L 38.06,97.22 L 47.89,96.01 L 41.92,103.91 L 51.04,107.78 L 41.92,111.64 L 47.89,119.55 L 38.06,118.33 L 39.27,128.16 L 31.36,122.20 Z" fill="#FFFFFF"/>
+    </svg>`;
+
+    const sourceCanvas = document.createElement('canvas');
+    sourceCanvas.width = WIDTH;
+    sourceCanvas.height = HEIGHT;
+    const sourceCtx = sourceCanvas.getContext('2d', { alpha: true });
+    if (!sourceCtx) return;
+
+    const img = new Image();
+    img.decoding = 'async';
+
+    img.onload = function () {
+        sourceCtx.clearRect(0, 0, WIDTH, HEIGHT);
+        sourceCtx.drawImage(img, PAD_X, PAD_Y, FLAG_W, FLAG_H);
+        const sourcePixels = sourceCtx.getImageData(0, 0, WIDTH, HEIGHT).data;
+        startAnimation(sourcePixels);
+    };
+
+    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+
+    function samplePixel(data, x, y) {
+        if (x < 0 || x >= WIDTH - 1 || y < 0 || y >= HEIGHT - 1) {
+            return [0, 0, 0, 0];
+        }
+
+        const x0 = Math.floor(x);
+        const y0 = Math.floor(y);
+        const x1 = x0 + 1;
+        const y1 = y0 + 1;
+        const fx = x - x0;
+        const fy = y - y0;
+
+        const p00 = (y0 * WIDTH + x0) * 4;
+        const p10 = (y0 * WIDTH + x1) * 4;
+        const p01 = (y1 * WIDTH + x0) * 4;
+        const p11 = (y1 * WIDTH + x1) * 4;
+
+        const result = [0, 0, 0, 0];
+        for (let c = 0; c < 4; c++) {
+            const top = data[p00 + c] * (1 - fx) + data[p10 + c] * fx;
+            const bottom = data[p01 + c] * (1 - fx) + data[p11 + c] * fx;
+            result[c] = top * (1 - fy) + bottom * fy;
+        }
+        return result;
+    }
+
+    function drawFlag(time, sourcePixels) {
+        const output = ctx.createImageData(WIDTH, HEIGHT);
+        const out = output.data;
+        const t = time * 0.001;
+
+        for (let y = 0; y < HEIGHT; y++) {
+            for (let x = 0; x < WIDTH; x++) {
+                const fx = x - PAD_X;
+                const fy = y - PAD_Y;
+
+                if (fx < -70 || fx > FLAG_W + 70 || fy < -80 || fy > FLAG_H + 80) continue;
+
+                const u = Math.max(0, Math.min(1, fx / FLAG_W));
+                const strength = Math.pow(u, 1.35);
+
+                const wave1 = Math.sin(u * Math.PI * 1.65 - t * 3.0);
+                const wave2 = Math.sin(u * Math.PI * 3.0 - t * 3.0 + 1.4);
+
+                const verticalWave = strength * (wave1 * 45 + wave2 * 10);
+
+                const horizontalWave = strength * Math.sin(
+                    u * Math.PI * 1.5 - t * 3.0 + 0.7
+                ) * 18;
+
+                const sourceX = PAD_X + fx - horizontalWave;
+                const sourceY = PAD_Y + fy - verticalWave;
+
+                const pixel = samplePixel(sourcePixels, sourceX, sourceY);
+                const index = (y * WIDTH + x) * 4;
+
+                const shade = 1 + Math.sin(
+                    u * Math.PI * 1.65 - t * 3.0 + 0.5
+                ) * 0.08;
+
+                out[index]     = Math.min(255, pixel[0] * shade);
+                out[index + 1] = Math.min(255, pixel[1] * shade);
+                out[index + 2] = Math.min(255, pixel[2] * shade);
+                out[index + 3] = pixel[3];
+            }
+        }
+
+        ctx.clearRect(0, 0, WIDTH, HEIGHT);
+        ctx.putImageData(output, 0, 0);
+    }
+
+    function startAnimation(sourcePixels) {
+        function animate(time) {
+            drawFlag(time, sourcePixels);
+            requestAnimationFrame(animate);
+        }
+        requestAnimationFrame(animate);
+    }
+})();

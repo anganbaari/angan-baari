@@ -309,12 +309,26 @@ ul { list-style: none; }
 }
 
 .brand-flag {
+    position: relative;
     display: flex;
     align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 51px;
     margin-left: 14px;
     flex-shrink: 0;
+    overflow: visible;
+    pointer-events: none;
 }
-.brand-flag svg { display: block; filter: drop-shadow(0 2px 6px rgba(0,0,0,0.35)); }
+
+.nav-nepal-flag {
+    display: block;
+    width: 38px;
+    height: 51px;
+    overflow: visible;
+    filter: drop-shadow(0 2px 6px rgba(0,0,0,0.35));
+    image-rendering: auto;
+}
 
 /* Tagline + flag are the "nice to have" pieces — only show once the
    desktop nav itself has room (matches the 1200px cutoff below), so
@@ -323,6 +337,14 @@ ul { list-style: none; }
 @media (min-width: 1201px) {
     .brand-subtag, .brand-flag { display: flex; }
     .brand-subtag { display: block; }
+}
+
+@media (max-width: 1200px) {
+    .brand-flag { display: none !important; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .nav-nepal-flag { animation: none; }
 }
 
 /* Nav Links — sliding active-page pill */
