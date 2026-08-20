@@ -283,17 +283,46 @@ ul { list-style: none; }
 
 .brand-name {
     font-family: var(--font-display);
-    font-size: 1.15rem;
-    font-weight: 600;
-    color: var(--white);
+    font-size: 1.65rem;
+    font-weight: 700;
+    color: var(--gold);
+    line-height: 1.15;
 }
 
 .brand-tagline {
-    font-size: 0.7rem;
-    letter-spacing: 0.12em;
+    font-size: 0.78rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--white);
+    font-family: var(--font-accent);
+    display: block;
+}
+
+.brand-subtag {
+    font-size: 0.6rem;
+    letter-spacing: 0.16em;
     text-transform: uppercase;
     color: var(--sage-light);
     font-family: var(--font-accent);
+    display: block;
+    margin-top: 2px;
+}
+
+.brand-flag {
+    display: flex;
+    align-items: center;
+    margin-left: 14px;
+    flex-shrink: 0;
+}
+.brand-flag svg { display: block; filter: drop-shadow(0 2px 6px rgba(0,0,0,0.35)); }
+
+/* Tagline + flag are the "nice to have" pieces — only show once the
+   desktop nav itself has room (matches the 1200px cutoff below), so
+   they never crowd the menu on tablet/narrow-desktop widths. */
+.brand-subtag, .brand-flag { display: none; }
+@media (min-width: 1201px) {
+    .brand-subtag, .brand-flag { display: flex; }
+    .brand-subtag { display: block; }
 }
 
 /* Nav Links — sliding active-page pill */

@@ -518,31 +518,30 @@
             right: 0;
             z-index: 500;
             background: transparent;
-            padding: 0 6px calc(6px + env(safe-area-inset-bottom, 6px));
+            height: 92px;
+            padding-bottom: env(safe-area-inset-bottom, 0);
             pointer-events: none;
+        }
+        .mobile-bottom-nav .mbav-bg {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 95vw;
+            height: 46px;
+            background: linear-gradient(180deg, #6b3a12 0%, #4a260b 55%, #371c08 100%);
+            box-shadow: inset 0 6px 10px rgba(0,0,0,.35), inset 0 -6px 10px rgba(0,0,0,.3), 0 8px 20px rgba(0,0,0,.3);
+            z-index: 0;
         }
         .mobile-bottom-nav .nav-items {
             position: relative;
             display: flex;
             justify-content: center;
             align-items: center;
-            gap: 0;
-            max-width: 320px;
-            margin: 0 auto;
+            gap: 9px;
+            width: 100%;
+            height: 100%;
             pointer-events: auto;
-        }
-        .mobile-bottom-nav .nav-items::before {
-            content: '';
-            position: absolute;
-            left: 50%;
-            top: 50%;
-            width: 270px;
-            height: 49.4px;
-            transform: translate(-50%, -50%);
-            clip-path: path("M 14.34 6.99 Q 20.00 0.00 29.00 0.00 L 241.00 0.00 Q 250.00 0.00 255.66 6.99 L 264.34 17.71 Q 270.00 24.70 264.34 31.69 L 255.66 42.41 Q 250.00 49.40 241.00 49.40 L 29.00 49.40 Q 20.00 49.40 14.34 42.41 L 5.66 31.69 Q 0.00 24.70 5.66 17.71 L 14.34 6.99 Z");
-            background: linear-gradient(180deg, #6b3a12 0%, #4a260b 55%, #371c08 100%);
-            box-shadow: inset 0 6px 10px rgba(0,0,0,.35), inset 0 -6px 10px rgba(0,0,0,.3), 0 8px 20px rgba(0,0,0,.3);
-            z-index: 0;
         }
         .mobile-bottom-nav .nav-item {
             position: relative;
@@ -1011,6 +1010,7 @@
 
     <!-- MOBILE / TABLET BOTTOM NAV (hidden on desktop) -->
     <nav class="mobile-bottom-nav" id="bottomNav" aria-label="Mobile navigation">
+        <div class="mbav-bg" id="mbavBg" aria-hidden="true"></div>
         <div class="nav-items">
             <!-- Shop -->
             <a href="{% url 'shop' %}" class="nav-item">
@@ -1149,6 +1149,43 @@
             navLinksWrap.addEventListener('mouseleave', () => movePill(currentActive()));
             window.addEventListener('resize', () => movePill(currentActive()));
             if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => movePill(currentActive()));
+        })();
+
+        // ── MOBILE BOTTOM NAV — dynamic stretched-hexagon background ──
+        (function () {
+            const bg = document.getElementById('mbavBg');
+            if (!bg) return;
+
+            function roundedHexPath(w, h, r, tail) {
+                const pts = [[tail, 0], [w - tail, 0], [w, h / 2], [w - tail, h], [tail, h], [0, h / 2]];
+                const sub = (a, b) => [b[0] - a[0], b[1] - a[1]];
+                const norm = v => { const l = Math.hypot(v[0], v[1]); return l ? [v[0] / l, v[1] / l] : [0, 0]; };
+                const add = (p, v, d) => [p[0] + v[0] * d, p[1] + v[1] * d];
+                const n = pts.length, entry = [], exitp = [];
+                for (let i = 0; i < n; i++) {
+                    const prev = pts[(i - 1 + n) % n], cur = pts[i], next = pts[(i + 1) % n];
+                    entry.push(add(cur, norm(sub(cur, prev)), r));
+                    exitp.push(add(cur, norm(sub(cur, next)), r));
+                }
+                let d = `M ${entry[0][0].toFixed(2)} ${entry[0][1].toFixed(2)} `;
+                for (let i = 0; i < n; i++) {
+                    d += `Q ${pts[i][0].toFixed(2)} ${pts[i][1].toFixed(2)} ${exitp[i][0].toFixed(2)} ${exitp[i][1].toFixed(2)} `;
+                    const ne = entry[(i + 1) % n];
+                    d += `L ${ne[0].toFixed(2)} ${ne[1].toFixed(2)} `;
+                }
+                return d + 'Z';
+            }
+
+            function fitMobileBg() {
+                const w = bg.offsetWidth;
+                const h = bg.offsetHeight;
+                if (!w || !h) return;
+                const tail = Math.min(46, w * 0.1);
+                bg.style.clipPath = `path("${roundedHexPath(w, h, 10, tail)}")`;
+            }
+            fitMobileBg();
+            window.addEventListener('resize', fitMobileBg);
+            if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitMobileBg);
         })();
     </script>
 </body>

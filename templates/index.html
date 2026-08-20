@@ -223,7 +223,33 @@
                 <div class="brand-text">
                     <span class="brand-name">आँगन बारी</span>
                     <span class="brand-tagline">Angan Baari</span>
+                    <span class="brand-subtag">Organic Farm</span>
                 </div>
+                <span class="brand-flag" aria-hidden="true">
+                    <svg viewBox="0 0 110 147" width="38" height="51">
+                        <defs>
+                            <filter id="navFlagWave" x="-30%" y="-30%" width="160%" height="160%">
+                                <feTurbulence type="fractalNoise" numOctaves="1" baseFrequency="0.012 0.05" result="noise" seed="3">
+                                    <animate attributeName="baseFrequency" dur="3.2s" values="0.012 0.05;0.016 0.05;0.012 0.05" repeatCount="indefinite"/>
+                                </feTurbulence>
+                                <feDisplacementMap in="SourceGraphic" in2="noise" scale="9" xChannelSelector="R" yChannelSelector="G"/>
+                            </filter>
+                        </defs>
+                        <g filter="url(#navFlagWave)">
+                            <path d="M 0.00,0.00 L 110.00,68.88 L 32.22,68.88 L 110.00,146.67 L 0.00,146.67 Z" fill="#DC143C" stroke="#003893" stroke-width="3.5" stroke-linejoin="round"/>
+                            <path d="M 5.59,43.05 L -1.51,37.28 L 7.26,34.67 Z" fill="#FFFFFF"/>
+                            <path d="M 7.26,34.67 L 2.91,26.62 L 12.01,27.56 Z" fill="#FFFFFF"/>
+                            <path d="M 12.01,27.56 L 11.07,18.46 L 19.12,22.81 Z" fill="#FFFFFF"/>
+                            <path d="M 19.12,22.81 L 21.73,14.04 L 27.50,21.14 Z" fill="#FFFFFF"/>
+                            <path d="M 27.50,21.14 L 33.27,14.04 L 35.88,22.81 Z" fill="#FFFFFF"/>
+                            <path d="M 35.88,22.81 L 43.93,18.46 L 42.99,27.56 Z" fill="#FFFFFF"/>
+                            <path d="M 42.99,27.56 L 52.09,26.62 L 47.74,34.67 Z" fill="#FFFFFF"/>
+                            <path d="M 47.74,34.67 L 56.51,37.28 L 49.41,43.05 Z" fill="#FFFFFF"/>
+                            <path d="M 5.59,43.05 A 21.91,21.91 0 0,1 49.41,43.05 A 23.54,23.54 0 0,0 5.59,43.05 Z" fill="#FFFFFF"/>
+                            <path d="M 27.50,131.32 L 23.64,122.20 L 15.73,128.16 L 16.94,118.33 L 7.11,119.55 L 13.08,111.64 L 3.96,107.78 L 13.08,103.91 L 7.11,96.01 L 16.94,97.22 L 15.73,87.39 L 23.64,93.35 L 27.50,84.24 L 31.36,93.35 L 39.27,87.39 L 38.06,97.22 L 47.89,96.01 L 41.92,103.91 L 51.04,107.78 L 41.92,111.64 L 47.89,119.55 L 38.06,118.33 L 39.27,128.16 L 31.36,122.20 Z" fill="#FFFFFF"/>
+                        </g>
+                    </svg>
+                </span>
             </a>
  
             <!-- Desktop Nav — Honeycomb -->
