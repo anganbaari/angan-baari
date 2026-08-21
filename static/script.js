@@ -1,2034 +1,1563 @@
-// ================================================================
-// ANGAN BAARI — MAIN JAVASCRIPT
-// ================================================================
+/* ================================================================
+   Angan Baari — Premium JavaScript
+   Features: Loader, Navbar scroll, Carousel, Lightbox,
+             ScrollSpy, AOS init, Animated Counters, Mobile Menu
+================================================================ */
+ 
+document.addEventListener('DOMContentLoaded', () => {
+ 
+    // ============================================================
+    // 1. PAGE LOADER
+    // ============================================================
+    const loader = document.getElementById('loader');
+    if (loader) {
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                loader.classList.add('hidden');
+            }, 1600);
+        });
+        // Fallback: hide loader after 3s even if load hasn't fired
+        setTimeout(() => loader.classList.add('hidden'), 3000);
+    }
+ 
+ 
+    // ============================================================
+    // 2. NAVBAR — Scroll effect + sliding active-link pill
+    // ============================================================
+    const navbar = document.getElementById('navbar');
+    if (navbar) {
+        if (navbar.dataset.navMode === 'solid') {
+            // Interior pages (shop, cart, checkout) want a permanently
+            // solid navbar — no hero behind it, so skip the scroll logic.
+            navbar.classList.add('scrolled');
+        } else {
+            const sentinel = document.getElementById('navbar-sentinel');
+            if (sentinel && 'IntersectionObserver' in window) {
+                // Toggles exactly when the hero scrolls out of view —
+                // works the same regardless of hero height, so it behaves
+                // consistently on phone, tablet, and desktop alike.
+                const io = new IntersectionObserver(
+                    ([entry]) => navbar.classList.toggle('scrolled', !entry.isIntersecting),
+                    { threshold: 0 }
+                );
+                io.observe(sentinel);
+            } else {
+                // Fallback for older browsers without IntersectionObserver
+                const onScroll = () => navbar.classList.toggle('scrolled', window.scrollY > 60);
+                window.addEventListener('scroll', onScroll, { passive: true });
+                onScroll();
+            }
+        }
 
-(function () {
+        // Sliding pill that highlights the active section link
+        const navLinksWrap = navbar.querySelector('.nav-links');
+        if (navLinksWrap) {
+            let pill = navLinksWrap.querySelector('.nav-pill');
+            if (!pill) {
+                pill = document.createElement('span');
+                pill.className = 'nav-pill';
+                navLinksWrap.prepend(pill);
+            }
+            const linkEls = Array.from(navLinksWrap.querySelectorAll('a:not(.nav-cta)'));
 
-    'use strict';
+            function movePill(el) {
+                if (!el) { pill.style.opacity = '0'; return; }
+                pill.style.opacity = '1';
+                pill.style.width = el.offsetWidth + 'px';
+                pill.style.transform = `translateX(${el.offsetLeft}px)`;
+            }
 
-    /* ============================================================
-       GLOBAL SETTINGS
-    ============================================================ */
+            function currentActive() {
+                return linkEls.find(a => a.classList.contains('active'));
+            }
 
-    const site = document.documentElement;
+            function setActiveByHash() {
+                const hash = window.location.hash || linkEls[0]?.getAttribute('href');
+                const match = linkEls.find(a => a.getAttribute('href') === hash) || linkEls[0];
+                linkEls.forEach(a => a.classList.toggle('active', a === match));
+                movePill(match);
+            }
 
-    const body = document.body;
+            linkEls.forEach(a => {
+                a.addEventListener('mouseenter', () => movePill(a));
+                a.addEventListener('click', () => setTimeout(setActiveByHash, 60));
+            });
+            navLinksWrap.addEventListener('mouseleave', () => movePill(currentActive()));
+            window.addEventListener('resize', () => movePill(currentActive()));
+
+            setActiveByHash();
+        }
+    }
+ 
+ 
+    // ============================================================
+    // 2b. HONEYCOMB DESKTOP NAV — click, scroll-spy, bg alignment
+    // ============================================================
+    const hcCells = Array.from(document.querySelectorAll('.hc-link'));
+    if (hcCells.length) {
+        const hcSections = hcCells.map(c => document.getElementById(c.dataset.target));
+
+        // The background shape's flat (straight) middle spans 952px of its
+        // native 1113.15px-wide coordinate space (chamfered tips on each
+        // side). Align that flat segment to the box row exactly, so the
+        // tapered tips extend past the first/last box instead of hiding
+        // under them.
+        function fitStripBg() {
+            const strip = document.querySelector('.hc-strip');
+            const bg = document.querySelector('.hc-strip-bg');
+            if (!strip || !bg) return;
+            const boxRowWidth = strip.offsetWidth; // unaffected by the strip's own scale() transform
+            const nativeWidth = 1113.15;
+            const flatRatio = 952 / nativeWidth;
+            const totalBgWidth = boxRowWidth / flatRatio;
+            const taperPx = (totalBgWidth - boxRowWidth) / 2;
+            const scale = totalBgWidth / nativeWidth;
+            bg.style.left = `${-taperPx}px`;
+            bg.style.transform = `scaleX(${scale})`;
+        }
+        fitStripBg();
+        window.addEventListener('resize', fitStripBg);
+
+        function hcSetActive(link, firePing) {
+            hcCells.forEach(c => c.classList.remove('active'));
+            link.classList.add('active');
+            if (firePing) {
+                const ping = link.querySelector('.hc-ping');
+                ping.classList.remove('run');
+                void ping.offsetWidth; // restart animation
+                ping.classList.add('run');
+            }
+        }
+
+        // Click: smooth scroll + immediate popup + ping
+        hcCells.forEach(link => {
+            link.addEventListener('click', e => {
+                e.preventDefault();
+                hcSetActive(link, true);
+                const target = document.getElementById(link.dataset.target);
+                if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            });
+        });
+
+        // Scroll-spy: pop up whichever cell's section is in view
+        const hcObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const link = hcCells.find(c => c.dataset.target === entry.target.id);
+                    if (link && !link.classList.contains('active')) hcSetActive(link, false);
+                }
+            });
+        }, { rootMargin: '-45% 0px -45% 0px', threshold: 0 });
+
+        hcSections.forEach(s => s && hcObserver.observe(s));
+
+        // Activate first cell on load
+        hcSetActive(hcCells[0], false);
+    }
 
 
-    /* ============================================================
-       MOBILE / DESKTOP NAVIGATION
-    ============================================================ */
-
-    const navbar =
-        document.getElementById('navbar');
-
-    const hamburger =
-        document.getElementById('hamburger');
-
-    const mobileDrawer =
-        document.getElementById('mobileDrawer');
-
-    const drawerOverlay =
-        document.getElementById('drawerOverlay');
-
-    const drawerClose =
-        document.getElementById('drawerClose');
-
+    // ============================================================
+    // 3. SIDE DRAWER MENU
+    // ============================================================
+    const hamburger      = document.getElementById('mobile-menu');
+    const sideDrawer     = document.getElementById('sideDrawer');
+    const drawerBackdrop = document.getElementById('drawerBackdrop');
+    const drawerClose    = document.getElementById('drawerClose');
+    const drawerCells    = document.querySelectorAll('.vhc-cell');
+    const drawerLinks    = document.querySelectorAll('.vhc-link');
+    const drawerOrderBtn = document.querySelector('.drawer-order-btn');
 
     function openDrawer() {
+        sideDrawer.classList.add('open');
+        drawerBackdrop.classList.add('active');
+        hamburger.classList.add('open');
+        hamburger.setAttribute('aria-expanded', 'true');
+        sideDrawer.setAttribute('aria-hidden', 'false');
+        document.body.style.overflow = 'hidden';
 
-        if (!mobileDrawer) return;
-
-        mobileDrawer.classList.add('open');
-
-        if (drawerOverlay) {
-            drawerOverlay.classList.add('open');
-        }
-
-        if (hamburger) {
-            hamburger.classList.add('active');
-        }
-
-        body.classList.add('drawer-open');
+        // Stagger-reveal each nav cell
+        drawerCells.forEach((cell, i) => {
+            cell.style.transitionDelay = `${0.12 + i * 0.06}s`;
+            setTimeout(() => cell.classList.add('revealed'), 10);
+        });
     }
-
 
     function closeDrawer() {
+        sideDrawer.classList.remove('open');
+        drawerBackdrop.classList.remove('active');
+        hamburger.classList.remove('open');
+        hamburger.setAttribute('aria-expanded', 'false');
+        sideDrawer.setAttribute('aria-hidden', 'true');
+        document.body.style.overflow = '';
 
-        if (!mobileDrawer) return;
-
-        mobileDrawer.classList.remove('open');
-
-        if (drawerOverlay) {
-            drawerOverlay.classList.remove('open');
-        }
-
-        if (hamburger) {
-            hamburger.classList.remove('active');
-        }
-
-        body.classList.remove('drawer-open');
+        // Reset stagger for next open
+        drawerCells.forEach(cell => {
+            cell.classList.remove('revealed');
+            cell.style.transitionDelay = '0s';
+        });
     }
 
+    if (hamburger) hamburger.addEventListener('click', openDrawer);
+    if (drawerClose) drawerClose.addEventListener('click', closeDrawer);
+    if (drawerBackdrop) drawerBackdrop.addEventListener('click', closeDrawer);
 
-    if (hamburger) {
-
-        hamburger.addEventListener(
-            'click',
-            function () {
-
-                if (
-                    mobileDrawer &&
-                    mobileDrawer.classList.contains('open')
-                ) {
-                    closeDrawer();
-                } else {
-                    openDrawer();
-                }
-
+    // Tap a hexagon: instant pop + ping, then close the drawer
+    drawerLinks.forEach(link => {
+        link.addEventListener('click', () => {
+            drawerLinks.forEach(c => c.classList.remove('active'));
+            link.classList.add('active');
+            const ping = link.querySelector('.vhc-ping');
+            if (ping) {
+                ping.classList.remove('run');
+                void ping.offsetWidth;
+                ping.classList.add('run');
             }
-        );
+            closeDrawer();
+        });
+    });
+    if (drawerOrderBtn) drawerOrderBtn.addEventListener('click', closeDrawer);
 
-    }
-
-
-    if (drawerClose) {
-
-        drawerClose.addEventListener(
-            'click',
-            closeDrawer
-        );
-
-    }
-
-
-    if (drawerOverlay) {
-
-        drawerOverlay.addEventListener(
-            'click',
-            closeDrawer
-        );
-
-    }
-
-
-    /* ============================================================
-       CLOSE DRAWER WHEN LINK IS CLICKED
-    ============================================================ */
-
-    if (mobileDrawer) {
-
-        const drawerLinks =
-            mobileDrawer.querySelectorAll(
-                'a'
-            );
-
-
-        drawerLinks.forEach(
-            function (link) {
-
-                link.addEventListener(
-                    'click',
-                    closeDrawer
-                );
-
-            }
-        );
-
-    }
-
-
-    /* ============================================================
-       NAVBAR SCROLL EFFECT
-    ============================================================ */
-
-    let lastScroll =
-        window.scrollY;
-
-
-    function updateNavbar() {
-
-        if (!navbar) return;
-
-        const currentScroll =
-            window.scrollY;
-
-
-        if (currentScroll > 40) {
-
-            navbar.classList.add(
-                'scrolled'
-            );
-
-        } else {
-
-            navbar.classList.remove(
-                'scrolled'
-            );
-
+    // Close on Escape key
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Escape' && sideDrawer && sideDrawer.classList.contains('open')) {
+            closeDrawer();
         }
+    });
+ 
+ 
+    // ============================================================
+    // 4. HERO CAROUSEL
+    // ============================================================
+    const slides       = document.querySelectorAll('.carousel-slide');
+    const prevButton   = document.querySelector('.prev-slide');
+    const nextButton   = document.querySelector('.next-slide');
+    const dotsContainer = document.querySelector('.carousel-dots');
+    let currentSlide   = 0;
+    let slideInterval;
+ 
+    function showSlide(index) {
+        slides[currentSlide].classList.remove('active');
+        if (dotsContainer && dotsContainer.children[currentSlide]) {
+            dotsContainer.children[currentSlide].classList.remove('active');
+        }
+ 
+        if (index >= slides.length) currentSlide = 0;
+        else if (index < 0)         currentSlide = slides.length - 1;
+        else                        currentSlide = index;
+ 
+        slides[currentSlide].classList.add('active');
+        if (dotsContainer && dotsContainer.children[currentSlide]) {
+            dotsContainer.children[currentSlide].classList.add('active');
+        }
+    }
+ 
+    function nextSlide() { showSlide(currentSlide + 1); }
+    function prevSlide() { showSlide(currentSlide - 1); }
+ 
+    function createDots() {
+        if (!dotsContainer) return;
+        slides.forEach((_, i) => {
+            const dot = document.createElement('div');
+            dot.classList.add('dot');
+            if (i === 0) dot.classList.add('active');
+            dot.setAttribute('aria-label', `Go to slide ${i + 1}`);
+            dot.addEventListener('click', () => {
+                showSlide(i);
+                resetAutoSlide();
+            });
+            dotsContainer.appendChild(dot);
+        });
+    }
+ 
+    function startAutoSlide() {
+        slideInterval = setInterval(nextSlide, 5500);
+    }
+ 
+    function resetAutoSlide() {
+        clearInterval(slideInterval);
+        startAutoSlide();
+    }
+ 
+    if (nextButton) {
+        nextButton.addEventListener('click', () => { nextSlide(); resetAutoSlide(); });
+    }
+    if (prevButton) {
+        prevButton.addEventListener('click', () => { prevSlide(); resetAutoSlide(); });
+    }
+ 
+    // Swipe support for mobile
+    let touchStartX = 0;
+    const heroCarousel = document.querySelector('.hero-carousel');
+    if (heroCarousel) {
+        heroCarousel.addEventListener('touchstart', e => {
+            touchStartX = e.changedTouches[0].screenX;
+        }, { passive: true });
+        heroCarousel.addEventListener('touchend', e => {
+            const diff = touchStartX - e.changedTouches[0].screenX;
+            if (Math.abs(diff) > 50) {
+                if (diff > 0) { nextSlide(); } else { prevSlide(); }
+                resetAutoSlide();
+            }
+        }, { passive: true });
+    }
+ 
+    if (slides.length > 0) {
+        createDots();
+        showSlide(0);
+        startAutoSlide();
+    }
+ 
+ 
+    // ============================================================
+    // 5. GALLERY LIGHTBOX + FILTER
+    // ============================================================
+    const lightbox        = document.getElementById('lightbox');
+    const lightboxImg     = document.querySelector('.lightbox-content');
+    const lightboxCaption = document.querySelector('.lightbox-caption');
+    const closeButton     = document.querySelector('.close-button');
+    const lightboxPrevBtn = document.getElementById('lightboxPrev');
+    const lightboxNextBtn = document.getElementById('lightboxNext');
+    const lightboxCounter = document.getElementById('lightboxCounter');
 
+    let currentGalleryImages = [];
+    let currentLightboxIndex = 0;
 
-        lastScroll =
-            currentScroll;
+    // Only images currently visible under whatever filter is active —
+    // so Next/Prev cycles through what you're actually looking at,
+    // not photos hidden by a different category filter.
+    function getVisibleGalleryImages() {
+        return Array.from(document.querySelectorAll('.gm-item:not(.hidden) img'));
     }
 
-
-    window.addEventListener(
-        'scroll',
-        updateNavbar,
-        {
-            passive: true
-        }
-    );
-
-
-    updateNavbar();
-
-
-    /* ============================================================
-       NAVIGATION ACTIVE SECTION
-    ============================================================ */
-
-    const sections =
-        document.querySelectorAll(
-            'section[id]'
-        );
-
-
-    const navLinks =
-        document.querySelectorAll(
-            '.desktop-nav a[href^="#"], ' +
-            '.mobile-drawer a[href^="#"]'
-        );
-
-
-    function updateActiveNavigation() {
-
-        const scrollPosition =
-            window.scrollY +
-            window.innerHeight *
-            0.35;
-
-
-        let currentSection =
-            '';
-
-
-        sections.forEach(
-            function (section) {
-
-                const top =
-                    section.offsetTop;
-
-                const bottom =
-                    top +
-                    section.offsetHeight;
-
-
-                if (
-                    scrollPosition >= top &&
-                    scrollPosition < bottom
-                ) {
-
-                    currentSection =
-                        section.id;
-                }
-
-            }
-        );
-
-
-        navLinks.forEach(
-            function (link) {
-
-                const href =
-                    link.getAttribute('href');
-
-
-                if (
-                    href ===
-                    '#' + currentSection
-                ) {
-
-                    link.classList.add(
-                        'active'
-                    );
-
-                } else {
-
-                    link.classList.remove(
-                        'active'
-                    );
-
-                }
-
-            }
-        );
-
+    function showLightboxImage(index) {
+        if (!currentGalleryImages.length) return;
+        currentLightboxIndex = ((index % currentGalleryImages.length) + currentGalleryImages.length) % currentGalleryImages.length;
+        const img = currentGalleryImages[currentLightboxIndex];
+        lightboxImg.src = img.src;
+        lightboxImg.alt = img.alt;
+        if (lightboxCaption) lightboxCaption.textContent = img.alt;
+        if (lightboxCounter) lightboxCounter.textContent = `${currentLightboxIndex + 1} / ${currentGalleryImages.length}`;
     }
 
-
-    window.addEventListener(
-        'scroll',
-        updateActiveNavigation,
-        {
-            passive: true
-        }
-    );
-
-
-    updateActiveNavigation();
-
-
-    /* ============================================================
-       SMOOTH SCROLL
-    ============================================================ */
-
-    document
-        .querySelectorAll(
-            'a[href^="#"]'
-        )
-        .forEach(
-            function (link) {
-
-                link.addEventListener(
-                    'click',
-                    function (event) {
-
-                        const targetId =
-                            this.getAttribute(
-                                'href'
-                            );
-
-
-                        if (
-                            !targetId ||
-                            targetId === '#'
-                        ) {
-                            return;
-                        }
-
-
-                        const target =
-                            document.querySelector(
-                                targetId
-                            );
-
-
-                        if (!target) {
-                            return;
-                        }
-
-
-                        event.preventDefault();
-
-
-                        const navbarHeight =
-                            navbar ?
-                            navbar.offsetHeight :
-                            0;
-
-
-                        const targetPosition =
-                            target.getBoundingClientRect()
-                                .top +
-                            window.scrollY -
-                            navbarHeight;
-
-
-                        window.scrollTo({
-                            top:
-                                targetPosition,
-                            behavior:
-                                'smooth'
-                        });
-
-                    }
-                );
-
-            }
-        );
-
-
-    /* ============================================================
-       HERO CAROUSEL
-    ============================================================ */
-
-    const heroSlides =
-        document.querySelectorAll(
-            '.hero-slide'
-        );
-
-
-    const heroDots =
-        document.querySelectorAll(
-            '.hero-dot'
-        );
-
-
-    let heroIndex =
-        0;
-
-
-    let heroTimer =
-        null;
-
-
-    function showHeroSlide(index) {
-
-        if (!heroSlides.length) {
-            return;
-        }
-
-
-        heroIndex =
-            (
-                index +
-                heroSlides.length
-            ) %
-            heroSlides.length;
-
-
-        heroSlides.forEach(
-            function (slide, i) {
-
-                slide.classList.toggle(
-                    'active',
-                    i === heroIndex
-                );
-
-            }
-        );
-
-
-        heroDots.forEach(
-            function (dot, i) {
-
-                dot.classList.toggle(
-                    'active',
-                    i === heroIndex
-                );
-
-            }
-        );
-
+    function openLightbox(img) {
+        if (!lightbox || !lightboxImg) return;
+        currentGalleryImages = getVisibleGalleryImages();
+        const clickedIndex = currentGalleryImages.indexOf(img);
+        lightbox.classList.add('active');
+        showLightboxImage(clickedIndex >= 0 ? clickedIndex : 0);
+        document.body.style.overflow = 'hidden';
     }
-
-
-    function nextHeroSlide() {
-
-        showHeroSlide(
-            heroIndex + 1
-        );
-
-    }
-
-
-    function startHeroTimer() {
-
-        if (
-            heroTimer ||
-            heroSlides.length < 2
-        ) {
-            return;
-        }
-
-
-        heroTimer =
-            setInterval(
-                nextHeroSlide,
-                6000
-            );
-
-    }
-
-
-    function resetHeroTimer() {
-
-        if (heroTimer) {
-
-            clearInterval(
-                heroTimer
-            );
-
-            heroTimer =
-                null;
-        }
-
-
-        startHeroTimer();
-
-    }
-
-
-    heroDots.forEach(
-        function (dot, index) {
-
-            dot.addEventListener(
-                'click',
-                function () {
-
-                    showHeroSlide(
-                        index
-                    );
-
-                    resetHeroTimer();
-
-                }
-            );
-
-        }
-    );
-
-
-    showHeroSlide(0);
-
-    startHeroTimer();
-
-
-    /* ============================================================
-       HERO SWIPE
-    ============================================================ */
-
-    const hero =
-        document.querySelector(
-            '.hero'
-        );
-
-
-    let touchStartX =
-        0;
-
-    let touchEndX =
-        0;
-
-
-    if (hero) {
-
-        hero.addEventListener(
-            'touchstart',
-            function (event) {
-
-                touchStartX =
-                    event.changedTouches[0]
-                        .screenX;
-
-            },
-            {
-                passive: true
-            }
-        );
-
-
-        hero.addEventListener(
-            'touchend',
-            function (event) {
-
-                touchEndX =
-                    event.changedTouches[0]
-                        .screenX;
-
-
-                const distance =
-                    touchEndX -
-                    touchStartX;
-
-
-                if (
-                    Math.abs(distance) <
-                    40
-                ) {
-                    return;
-                }
-
-
-                if (distance < 0) {
-
-                    showHeroSlide(
-                        heroIndex + 1
-                    );
-
-                } else {
-
-                    showHeroSlide(
-                        heroIndex - 1
-                    );
-
-                }
-
-
-                resetHeroTimer();
-
-            },
-            {
-                passive: true
-            }
-        );
-
-    }
-
-
-    /* ============================================================
-       INTERSECTION OBSERVER
-    ============================================================ */
-
-    const revealElements =
-        document.querySelectorAll(
-            '.reveal, ' +
-            '.fade-up, ' +
-            '.fade-in, ' +
-            '.slide-up'
-        );
-
-
-    if (
-        'IntersectionObserver' in window
-    ) {
-
-        const revealObserver =
-            new IntersectionObserver(
-                function (entries, observer) {
-
-                    entries.forEach(
-                        function (entry) {
-
-                            if (
-                                !entry.isIntersecting
-                            ) {
-                                return;
-                            }
-
-
-                            entry.target.classList.add(
-                                'visible'
-                            );
-
-
-                            observer.unobserve(
-                                entry.target
-                            );
-
-                        }
-                    );
-
-                },
-                {
-                    threshold: 0.12,
-                    rootMargin:
-                        '0px 0px -40px 0px'
-                }
-            );
-
-
-        revealElements.forEach(
-            function (element) {
-
-                revealObserver.observe(
-                    element
-                );
-
-            }
-        );
-
-    } else {
-
-        revealElements.forEach(
-            function (element) {
-
-                element.classList.add(
-                    'visible'
-                );
-
-            }
-        );
-
-    }
-
-
-    /* ============================================================
-       COUNTERS
-    ============================================================ */
-
-    const counters =
-        document.querySelectorAll(
-            '[data-count]'
-        );
-
-
-    function animateCounter(
-        element
-    ) {
-
-        const target =
-            parseFloat(
-                element.dataset.count
-            );
-
-
-        if (
-            Number.isNaN(target)
-        ) {
-            return;
-        }
-
-
-        const duration =
-            1800;
-
-
-        const start =
-            performance.now();
-
-
-        function update(
-            currentTime
-        ) {
-
-            const progress =
-                Math.min(
-                    (
-                        currentTime -
-                        start
-                    ) /
-                    duration,
-                    1
-                );
-
-
-            const eased =
-                1 -
-                Math.pow(
-                    1 - progress,
-                    3
-                );
-
-
-            const value =
-                target *
-                eased;
-
-
-            if (
-                Number.isInteger(
-                    target
-                )
-            ) {
-
-                element.textContent =
-                    Math.round(
-                        value
-                    );
-
-            } else {
-
-                element.textContent =
-                    value.toFixed(1);
-
-            }
-
-
-            if (
-                progress < 1
-            ) {
-
-                requestAnimationFrame(
-                    update
-                );
-
-            }
-
-        }
-
-
-        requestAnimationFrame(
-            update
-        );
-
-    }
-
-
-    if (
-        'IntersectionObserver' in window
-    ) {
-
-        const counterObserver =
-            new IntersectionObserver(
-                function (
-                    entries,
-                    observer
-                ) {
-
-                    entries.forEach(
-                        function (entry) {
-
-                            if (
-                                !entry.isIntersecting
-                            ) {
-                                return;
-                            }
-
-
-                            animateCounter(
-                                entry.target
-                            );
-
-
-                            observer.unobserve(
-                                entry.target
-                            );
-
-                        }
-                    );
-
-                },
-                {
-                    threshold: 0.5
-                }
-            );
-
-
-        counters.forEach(
-            function (counter) {
-
-                counterObserver.observe(
-                    counter
-                );
-
-            }
-        );
-
-    }
-
-
-    /* ============================================================
-       PRODUCTS FILTER
-    ============================================================ */
-
-    const filterButtons =
-        document.querySelectorAll(
-            '[data-filter]'
-        );
-
-
-    const productCards =
-        document.querySelectorAll(
-            '[data-category]'
-        );
-
-
-    filterButtons.forEach(
-        function (button) {
-
-            button.addEventListener(
-                'click',
-                function () {
-
-                    const filter =
-                        this.dataset.filter;
-
-
-                    filterButtons.forEach(
-                        function (btn) {
-
-                            btn.classList.remove(
-                                'active'
-                            );
-
-                        }
-                    );
-
-
-                    this.classList.add(
-                        'active'
-                    );
-
-
-                    productCards.forEach(
-                        function (card) {
-
-                            const category =
-                                card.dataset.category;
-
-
-                            const visible =
-                                filter ===
-                                'all' ||
-                                category ===
-                                filter;
-
-
-                            card.style.display =
-                                visible ?
-                                '' :
-                                'none';
-
-                        }
-                    );
-
-                }
-            );
-
-        }
-    );
-
-
-    /* ============================================================
-       GALLERY
-    ============================================================ */
-
-    const galleryItems =
-        document.querySelectorAll(
-            '.gallery-item'
-        );
-
-
-    const lightbox =
-        document.getElementById(
-            'lightbox'
-        );
-
-
-    const lightboxImage =
-        document.getElementById(
-            'lightboxImage'
-        );
-
-
-    const lightboxClose =
-        document.getElementById(
-            'lightboxClose'
-        );
-
-
-    function openLightbox(
-        item
-    ) {
-
-        if (
-            !lightbox ||
-            !lightboxImage
-        ) {
-            return;
-        }
-
-
-        const image =
-            item.querySelector(
-                'img'
-            );
-
-
-        if (!image) {
-            return;
-        }
-
-
-        lightboxImage.src =
-            image.currentSrc ||
-            image.src;
-
-
-        lightboxImage.alt =
-            image.alt ||
-            'Angan Baari';
-
-
-        lightbox.classList.add(
-            'open'
-        );
-
-
-        body.classList.add(
-            'lightbox-open'
-        );
-
-    }
-
 
     function closeLightbox() {
-
-        if (!lightbox) {
-            return;
-        }
-
-
-        lightbox.classList.remove(
-            'open'
-        );
-
-
-        body.classList.remove(
-            'lightbox-open'
-        );
-
+        if (!lightbox) return;
+        lightbox.classList.remove('active');
+        document.body.style.overflow = '';
     }
 
+    // Wire lightbox to all masonry gallery images
+    document.querySelectorAll('.gm-item img').forEach(img => {
+        img.addEventListener('click', () => openLightbox(img));
+    });
 
-    galleryItems.forEach(
-        function (item) {
-
-            item.addEventListener(
-                'click',
-                function () {
-
-                    openLightbox(
-                        this
-                    );
-
-                }
-            );
-
-        }
-    );
-
-
-    if (lightboxClose) {
-
-        lightboxClose.addEventListener(
-            'click',
-            closeLightbox
-        );
-
+    if (closeButton) {
+        closeButton.addEventListener('click', closeLightbox);
+        closeButton.addEventListener('keydown', e => {
+            if (e.key === 'Enter' || e.key === ' ') closeLightbox();
+        });
     }
 
+    if (lightboxPrevBtn) lightboxPrevBtn.addEventListener('click', () => showLightboxImage(currentLightboxIndex - 1));
+    if (lightboxNextBtn) lightboxNextBtn.addEventListener('click', () => showLightboxImage(currentLightboxIndex + 1));
 
     if (lightbox) {
-
-        lightbox.addEventListener(
-            'click',
-            function (event) {
-
-                if (
-                    event.target ===
-                    lightbox
-                ) {
-
-                    closeLightbox();
-
-                }
-
-            }
-        );
-
+        lightbox.addEventListener('click', e => {
+            if (e.target === lightbox) closeLightbox();
+        });
     }
 
+    document.addEventListener('keydown', e => {
+        if (!lightbox || !lightbox.classList.contains('active')) return;
+        if (e.key === 'Escape') closeLightbox();
+        else if (e.key === 'ArrowLeft') showLightboxImage(currentLightboxIndex - 1);
+        else if (e.key === 'ArrowRight') showLightboxImage(currentLightboxIndex + 1);
+    });
+ 
+    // ============================================================
+    // ANIMATED FILTER HELPER — shared by Gallery + Shop filters
+    // Fades out items leaving the set, waits, then reveals the new
+    // set with a staggered entrance instead of an instant snap.
+    // ============================================================
+    function animateFilterChange(items, matchFn, onCount) {
+        const OUT_MS = 220;
+        const toHide = [];
+        const toShow = [];
 
-    document.addEventListener(
-        'keydown',
-        function (event) {
+        items.forEach(item => {
+            const shouldShow = matchFn(item);
+            const isHidden = item.classList.contains('hidden');
+            if (!shouldShow && !isHidden) toHide.push(item);
+            else if (shouldShow && isHidden) toShow.push(item);
+        });
 
-            if (
-                event.key ===
-                'Escape'
-            ) {
-
-                closeLightbox();
-
-            }
-
+        if (onCount) {
+            let count = 0;
+            items.forEach(item => { if (matchFn(item)) count++; });
+            onCount(count);
         }
-    );
 
+        function revealItems(list) {
+            if (!list.length) return;
+            list.forEach(item => item.classList.remove('hidden'));
+            // Force a reflow so the entrance animation restarts cleanly
+            void list[0].offsetWidth;
+            list.forEach((item, i) => {
+                item.style.animationDelay = `${Math.min(i * 40, 280)}ms`;
+                item.classList.add('filter-in');
+                item.addEventListener('animationend', function handler() {
+                    item.classList.remove('filter-in');
+                    item.style.animationDelay = '';
+                    item.removeEventListener('animationend', handler);
+                });
+            });
+        }
 
-    /* ============================================================
-       DELIVERY CAROUSEL
-    ============================================================ */
-
-    const deliveryTrack =
-        document.querySelector(
-            '.delivery-track'
-        );
-
-
-    const deliveryCards =
-        document.querySelectorAll(
-            '.delivery-card'
-        );
-
-
-    const deliveryPrev =
-        document.querySelector(
-            '.delivery-prev'
-        );
-
-
-    const deliveryNext =
-        document.querySelector(
-            '.delivery-next'
-        );
-
-
-    let deliveryIndex =
-        0;
-
-
-    function updateDelivery() {
-
-        if (
-            !deliveryTrack ||
-            !deliveryCards.length
-        ) {
+        if (!toHide.length) {
+            revealItems(toShow);
             return;
         }
 
+        toHide.forEach(item => item.classList.add('filter-out'));
 
-        const card =
-            deliveryCards[0];
+        setTimeout(() => {
+            toHide.forEach(item => {
+                item.classList.remove('filter-out');
+                item.classList.add('hidden');
+            });
+            revealItems(toShow);
+        }, OUT_MS);
+    }
 
+    // Gallery Filter
+    const filterBtns    = document.querySelectorAll('.gf-btn');
+    const galleryItems  = document.querySelectorAll('.gm-item');
+    const visibleCount  = document.getElementById('visibleCount');
+    const totalCount    = document.getElementById('totalCount');
+    const totalPhotos   = galleryItems.length;
+    const initiallyVisible = Array.from(galleryItems).filter(item => !item.classList.contains('hidden')).length;
 
-        const gap =
-            parseFloat(
-                getComputedStyle(
-                    deliveryTrack
-                ).gap
-            ) || 0;
+    if (totalCount) totalCount.textContent = totalPhotos;
+    if (visibleCount) visibleCount.textContent = initiallyVisible;
 
-
-        const offset =
-            deliveryIndex *
-            (
-                card.offsetWidth +
-                gap
+    filterBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            // Update active button
+            filterBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+ 
+            const filter = btn.dataset.filter;
+            animateFilterChange(
+                galleryItems,
+                item => filter === 'all' || item.dataset.cat === filter,
+                count => { if (visibleCount) visibleCount.textContent = count; }
             );
+        });
+    });
+ 
+ 
+    // ============================================================
+    // 6. SHOP — CATEGORY FILTER
+    // ============================================================
+    const shopTabs    = document.querySelectorAll('.shop-tab');
+    const shopCards   = document.querySelectorAll('.shop-card');
+    const shopVisible = document.getElementById('shopVisible');
+    const shopTotal   = document.getElementById('shopTotal');
+    const shopInitiallyVisible = Array.from(shopCards).filter(card => !card.classList.contains('hidden')).length;
+ 
+    if (shopTotal) shopTotal.textContent = shopCards.length;
+    if (shopVisible) shopVisible.textContent = shopInitiallyVisible;
+ 
+    shopTabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            // Update active tab
+            shopTabs.forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+ 
+            const cat = tab.dataset.cat;
+            animateFilterChange(
+                shopCards,
+                card => cat === 'all' || card.dataset.cat === cat,
+                count => { if (shopVisible) shopVisible.textContent = count; }
+            );
+        });
+    });
+ 
+    // Mark out-of-stock cards for dimmed styling
+    shopCards.forEach(card => {
+        const stockText = card.querySelector('.shop-stock-text');
+        if (stockText && stockText.classList.contains('out-of-stock')) {
+            card.classList.add('out-of-stock-card');
+        }
+    });
+ 
+ 
+    // ============================================================
+    // 7. SCROLLSPY — Active nav link highlighting + pill sync
+    // ============================================================
+    const sections   = document.querySelectorAll('section[id], div[id]');
+    const navAnchors = document.querySelectorAll('.vhc-link[href^="#"]');
+    // Re-query pill and navLinksWrap here so ScrollSpy can access them
+    const _navLinksWrap = navbar ? navbar.querySelector('.nav-links') : null;
+    const _pill = _navLinksWrap ? _navLinksWrap.querySelector('.nav-pill') : null;
 
-
-        deliveryTrack.style.transform =
-            `translateX(-${offset}px)`;
-
+    function _movePill(el) {
+        if (!_pill || !el) { if (_pill) _pill.style.opacity = '0'; return; }
+        _pill.style.opacity = '1';
+        _pill.style.width = el.offsetWidth + 'px';
+        _pill.style.transform = `translateX(${el.offsetLeft}px)`;
     }
 
-
-    if (deliveryNext) {
-
-        deliveryNext.addEventListener(
-            'click',
-            function () {
-
-                if (
-                    deliveryIndex <
-                    deliveryCards.length - 1
-                ) {
-
-                    deliveryIndex++;
-
-                    updateDelivery();
-
-                }
-
-            }
-        );
-
-    }
-
-
-    if (deliveryPrev) {
-
-        deliveryPrev.addEventListener(
-            'click',
-            function () {
-
-                if (
-                    deliveryIndex >
-                    0
-                ) {
-
-                    deliveryIndex--;
-
-                    updateDelivery();
-
-                }
-
-            }
-        );
-
-    }
-
-
-    window.addEventListener(
-        'resize',
-        updateDelivery
-    );
-
-
-    /* ============================================================
-       NEWSLETTER FORM
-    ============================================================ */
-
-    const newsletterForm =
-        document.querySelector(
-            '.newsletter-form'
-        );
-
-
-    if (newsletterForm) {
-
-        newsletterForm.addEventListener(
-            'submit',
-            function (event) {
-
-                event.preventDefault();
-
-
-                const email =
-                    newsletterForm.querySelector(
-                        'input[type="email"]'
-                    );
-
-
-                if (
-                    !email ||
-                    !email.value.trim()
-                ) {
-                    return;
-                }
-
-
-                const button =
-                    newsletterForm.querySelector(
-                        'button'
-                    );
-
-
-                const originalText =
-                    button ?
-                    button.textContent :
-                    'Subscribe';
-
-
-                if (button) {
-
-                    button.textContent =
-                        'Subscribed ✓';
-
-                    button.disabled =
-                        true;
-
-                }
-
-
-                setTimeout(
-                    function () {
-
-                        newsletterForm.reset();
-
-
-                        if (button) {
-
-                            button.textContent =
-                                originalText;
-
-                            button.disabled =
-                                false;
-
-                        }
-
-                    },
-                    2500
-                );
-
-            }
-        );
-
-    }
-
-
-    /* ============================================================
-       CONTACT FORM
-    ============================================================ */
-
-    const contactForm =
-        document.querySelector(
-            '#contactForm'
-        );
-
-
-    if (contactForm) {
-
-        contactForm.addEventListener(
-            'submit',
-            function (event) {
-
-                const requiredFields =
-                    contactForm.querySelectorAll(
-                        '[required]'
-                    );
-
-
-                let valid =
-                    true;
-
-
-                requiredFields.forEach(
-                    function (field) {
-
-                        if (
-                            !field.value.trim()
-                        ) {
-
-                            valid =
-                                false;
-
-                            field.classList.add(
-                                'error'
-                            );
-
-                        } else {
-
-                            field.classList.remove(
-                                'error'
-                            );
-
-                        }
-
+    const scrollSpy = () => {
+        const scrollPos = window.scrollY + 120;
+        let matched = false;
+        sections.forEach(sec => {
+            if (scrollPos >= sec.offsetTop && scrollPos < sec.offsetTop + sec.offsetHeight) {
+                matched = true;
+                navAnchors.forEach(link => {
+                    link.classList.remove('active');
+                    if (link.getAttribute('href') === `#${sec.id}`) {
+                        link.classList.add('active');
                     }
-                );
-
-
-                if (!valid) {
-
-                    event.preventDefault();
-
-                }
-
-            }
-        );
-
-    }
-
-
-    /* ============================================================
-       SCROLL TO TOP
-    ============================================================ */
-
-    const scrollTopButton =
-        document.querySelector(
-            '.scroll-top'
-        );
-
-
-    if (scrollTopButton) {
-
-        window.addEventListener(
-            'scroll',
-            function () {
-
-                scrollTopButton.classList.toggle(
-                    'show',
-                    window.scrollY >
-                    500
-                );
-
-            },
-            {
-                passive: true
-            }
-        );
-
-
-        scrollTopButton.addEventListener(
-            'click',
-            function () {
-
-                window.scrollTo({
-                    top: 0,
-                    behavior: 'smooth'
                 });
-
+                // Move pill to matching desktop nav link
+                if (_navLinksWrap) {
+                    const activeLink = _navLinksWrap.querySelector(`a[href="#${sec.id}"]`);
+                    if (activeLink) _movePill(activeLink);
+                }
             }
-        );
+        });
+    };
 
+    // ── HONEYBEE SCROLL EXTRAS ────────────────────────────────
+
+    // Tooltip element
+    let _tooltip = null;
+    if (_pill) {
+        _tooltip = document.createElement('div');
+        _tooltip.className = 'nav-pill-tooltip';
+        _pill.appendChild(_tooltip);
+    }
+    let tooltipTimer = null;
+
+    function showTooltip(text) {
+        if (!_tooltip) return;
+        _tooltip.textContent = text;
+        _tooltip.classList.add('visible');
+        clearTimeout(tooltipTimer);
+        tooltipTimer = setTimeout(() => _tooltip.classList.remove('visible'), 1500);
     }
 
+    function movePillBee(el) {
+        if (!_pill || !el) { if (_pill) _pill.style.opacity = '0'; return; }
+        _pill.style.opacity = '1';
+        _pill.style.width = el.offsetWidth + 'px';
+        _pill.style.transform = 'translateX(' + el.offsetLeft + 'px)';
+        _pill.classList.remove('bounce');
+        void _pill.offsetWidth;
+        _pill.classList.add('bounce');
+        setTimeout(() => _pill.classList.remove('bounce'), 450);
+        showTooltip(el.textContent.trim());
+    }
 
-    /* ============================================================
-       AOS
-    ============================================================ */
+    const scrollSpyBee = () => {
+        const scrollTop = window.scrollY;
 
-    if (
-        typeof AOS !== 'undefined'
-    ) {
+        // ScrollSpy + pill
+        const pos = scrollTop + 120;
+        sections.forEach(sec => {
+            if (pos >= sec.offsetTop && pos < sec.offsetTop + sec.offsetHeight) {
+                navAnchors.forEach(link => {
+                    link.classList.remove('active');
+                    if (link.getAttribute('href') === '#' + sec.id) link.classList.add('active');
+                });
+                if (_navLinksWrap) {
+                    const activeLink = _navLinksWrap.querySelector('a[href="#' + sec.id + '"]');
+                    if (activeLink) movePillBee(activeLink);
+                }
+            }
+        });
+    };
 
+    window.addEventListener('scroll', scrollSpyBee, { passive: true });
+    scrollSpyBee();
+ 
+    // scroll handled below in ScrollSpy section
+ 
+    // ============================================================
+    // 8. ANIMATED COUNTERS
+    // ============================================================
+    const statNumbers = document.querySelectorAll('.stat-number');
+ 
+    function animateCounter(el) {
+        const target = parseInt(el.getAttribute('data-target'), 10);
+        if (isNaN(target) || target === 0) return; // skip zero
+        const duration = 1800;
+        const start = performance.now();
+ 
+        function update(now) {
+            const elapsed = now - start;
+            const progress = Math.min(elapsed / duration, 1);
+            // Ease out cubic
+            const eased = 1 - Math.pow(1 - progress, 3);
+            el.textContent = Math.floor(eased * target);
+            if (progress < 1) requestAnimationFrame(update);
+            else el.textContent = target;
+        }
+        requestAnimationFrame(update);
+    }
+ 
+    // Trigger counters when stats strip enters view
+    const statsStrip = document.querySelector('.stats-strip');
+    if (statsStrip && statNumbers.length) {
+        let counted = false;
+        const observer = new IntersectionObserver(entries => {
+            if (entries[0].isIntersecting && !counted) {
+                counted = true;
+                statNumbers.forEach(el => animateCounter(el));
+            }
+        }, { threshold: 0.4 });
+        observer.observe(statsStrip);
+    }
+ 
+ 
+    // ============================================================
+    // 9. ORDER FORM SUBMISSION
+    // ============================================================
+
+    const orderForm = document.getElementById('order-form');
+
+    if (orderForm) {
+        orderForm.addEventListener('submit', function() {
+            
+            const btn = this.querySelector('.fs-btn-submit');
+
+            if (!btn) return;
+
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
+            btn.disabled = true;
+
+            // No preventDefault()
+            // Django receives the form normally
+        });
+
+    }
+ 
+    // ============================================================
+    // 10. AOS (Animate On Scroll) Initialization
+    // ============================================================
+    if (typeof AOS !== 'undefined') {
         AOS.init({
             duration: 800,
             easing: 'ease-out-cubic',
             once: true,
-            offset: 60
+            offset: 60,
+            disableMutationObserver: false,
         });
 
+        // AOS calculates each element's trigger position once, at init.
+        // This page has many loading="lazy" images (produce cards,
+        // gallery, about section, etc.) that finish loading afterward
+        // and shift the page's layout/height — which silently makes
+        // AOS's cached positions wrong for everything below wherever
+        // the shift happened, so those elements never get their
+        // "aos-animate" class and stay stuck at their pre-animation
+        // offset forever. Re-running AOS.refresh() after images finish
+        // loading fixes this by re-measuring the real, final layout.
+        window.addEventListener('load', () => {
+            AOS.refresh();
+            // A couple of follow-up refreshes catch any lazy images
+            // that were still below the fold (and hadn't started
+            // loading yet) at the moment the 'load' event fired.
+            setTimeout(() => AOS.refresh(), 1000);
+            setTimeout(() => AOS.refresh(), 2500);
+        });
     }
 
+    // Force contact form visible after AOS init
+    setTimeout(function() {
+        const contactForm = document.querySelector('.contact-form-wrap');
+        if (contactForm) {
+            contactForm.style.opacity = '1';
+            contactForm.style.visibility = 'visible';
+            contactForm.style.transform = 'none';
+            contactForm.classList.add('aos-animate');
+        }
+        const contactTwo = document.querySelector('.contact-two-col');
+        if (contactTwo) {
+            contactTwo.style.opacity = '1';
+            contactTwo.style.visibility = 'visible';
+            contactTwo.style.transform = 'none';
+        }
+    }, 100);
+ 
+ 
+    // ============================================================
+    // 11. SMOOTH SCROLL for anchor links
+    // ============================================================
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener('click', function(e) {
+            const targetId = this.getAttribute('href');
+            if (targetId === '#') return;
+            const target = document.querySelector(targetId);
+            if (target) {
+                e.preventDefault();
+                const offset = navbar ? navbar.offsetHeight + 16 : 80;
+                const top = target.getBoundingClientRect().top + window.scrollY - offset;
+                window.scrollTo({ top, behavior: 'smooth' });
+            }
+        });
+    });
+ 
+}); // end DOMContentLoaded
 
-    /* ============================================================
-       FLAG — NATURAL WIND-BLOWN NEPAL FLAG
-       
-       SPEED  = 4.0
-       MAIN   = 34
-       SECOND = 6
-       EDGE   = 15
-    ============================================================ */
+// ============================================================
+// 12. INFINITE FARM BOARD CAROUSEL
+// ============================================================
+document.addEventListener('DOMContentLoaded', () => {
 
-    (function () {
+    const fbTrack    = document.getElementById('fbTrack');
+    const fbViewport = document.getElementById('fbViewport');
+    const fbDotsWrap = document.getElementById('fbDots');
+    const fbProgFill = document.getElementById('fbProgFill');
+    const fbPauseBtn = document.getElementById('fbPauseBtn');
+    const fbPauseIco = document.getElementById('fbPauseIco');
+    const fbPauseTxt = document.getElementById('fbPauseTxt');
 
-        const canvas =
-            document.getElementById(
-                'navNepalFlag'
-            );
+    if (!fbTrack || !fbViewport) return;
 
+    const FB_DATA = [
+        { icon:'fa-leaf',    cls:'fb-icon-now',  st:'fb-s-now',  lbl:'Growing now',    name:'Organic Mangoes',      desc:'Peak season · May–July' },
+        { icon:'fa-carrot',  cls:'fb-icon-now',  st:'fb-s-now',  lbl:'Growing now',    name:'Seasonal Vegetables',  desc:'Fresh harvest weekly' },
+        { icon:'fa-clock',   cls:'fb-icon-soon', st:'fb-s-soon', lbl:'Coming soon',    name:'Litchi',               desc:'Expected · June 2026' },
+        { icon:'fa-jar',     cls:'fb-icon-done', st:'fb-s-done', lbl:'Just harvested', name:'AnganBaari Gold Honey', desc:'Limited stock available' },
+        { icon:'fa-leaf',    cls:'fb-icon-now',  st:'fb-s-now',  lbl:'Growing now',    name:'Papaya & Bananas',     desc:'Year-round · order anytime' },
+        { icon:'fa-clock',   cls:'fb-icon-soon', st:'fb-s-soon', lbl:'Coming soon',    name:'Mushrooms',            desc:'Expected · Ashadh 2083' },
+        { icon:'fa-paw',     cls:'fb-icon-now',  st:'fb-s-now',  lbl:'Growing now',    name:'Free-range Hens',      desc:'Available year-round' },
+    ];
 
-        if (!canvas) {
-            return;
+    const FB_TOTAL    = FB_DATA.length;
+    const FB_CARD_W   = 210;
+    const FB_GAP      = 18;
+    const FB_STEP     = FB_CARD_W + FB_GAP;
+    const FB_DURATION = 3000;
+    const FB_VISIBLE  = 9;
+    const FB_CENTER   = Math.floor(FB_VISIBLE / 2);
+
+    let fbPaused    = false;
+    let fbRafId     = null;
+    let fbProgStart = null;
+    let fbDataPtr   = 0;
+    let fbTrackX    = 0;
+    let fbSlots     = [];
+
+    function fbMakeCard(dataIndex) {
+        const d = FB_DATA[((dataIndex % FB_TOTAL) + FB_TOTAL) % FB_TOTAL];
+        const el = document.createElement('div');
+        el.className = 'fb-card';
+        el.innerHTML = `
+            <div class="fb-icon ${d.cls}"><i class="fas ${d.icon}"></i></div>
+            <p class="fb-status ${d.st}">${d.lbl}</p>
+            <p class="fb-name">${d.name}</p>
+            <p class="fb-desc">${d.desc}</p>`;
+        return el;
+    }
+
+    // Initial render
+    for (let i = 0; i < FB_VISIBLE; i++) {
+        const di = fbDataPtr - FB_CENTER + i;
+        const el = fbMakeCard(di);
+        fbTrack.appendChild(el);
+        fbSlots.push({ el, dataIndex: di });
+    }
+
+    // Dots
+    for (let i = 0; i < FB_TOTAL; i++) {
+        const d = document.createElement('button');
+        d.className = 'fb-dot';
+        d.setAttribute('aria-label', FB_DATA[i].name);
+        d.addEventListener('click', () => { fbGoTo(i); fbResetProg(); });
+        fbDotsWrap.appendChild(d);
+    }
+
+    function fbGetDots() { return fbDotsWrap.querySelectorAll('.fb-dot'); }
+    function fbGetVpW()  { return fbViewport.offsetWidth || 900; }
+
+    function fbApplyTrackX(x, animate) {
+        if (animate) fbTrack.classList.add('fb-animating');
+        else fbTrack.classList.remove('fb-animating');
+        fbTrack.style.transform = `translateX(${x}px)`;
+    }
+
+    function fbApplyClasses() {
+        fbSlots.forEach((s, i) => {
+            s.el.classList.remove('fb-active','fb-near','fb-mid');
+            const dist = Math.abs(i - FB_CENTER);
+            if      (dist === 0) s.el.classList.add('fb-active');
+            else if (dist === 1) s.el.classList.add('fb-near');
+            else if (dist === 2) s.el.classList.add('fb-mid');
+        });
+        const realDot = ((fbDataPtr % FB_TOTAL) + FB_TOTAL) % FB_TOTAL;
+        fbGetDots().forEach((d, i) => d.classList.toggle('fb-dot-active', i === realDot));
+    }
+
+    function fbCalcX() {
+        const vpW = fbGetVpW();
+        return (vpW / 2) - (FB_CENTER * FB_STEP) - (FB_CARD_W / 2);
+    }
+
+    function fbGoTo(realI) {
+        fbDataPtr = realI;
+        fbTrack.innerHTML = '';
+        fbSlots = [];
+        for (let i = 0; i < FB_VISIBLE; i++) {
+            const di = fbDataPtr - FB_CENTER + i;
+            const el = fbMakeCard(di);
+            fbTrack.appendChild(el);
+            fbSlots.push({ el, dataIndex: di });
+        }
+        fbTrackX = fbCalcX();
+        fbApplyTrackX(fbTrackX, false);
+        fbApplyClasses();
+    }
+
+    function fbAdvance() {
+        fbDataPtr++;
+        fbTrackX -= FB_STEP;
+        fbApplyTrackX(fbTrackX, true);
+        fbApplyClasses();
+
+        setTimeout(() => {
+            fbTrack.classList.remove('fb-animating');
+            const removed = fbSlots.shift();
+            fbTrack.removeChild(removed.el);
+            const newDi = fbSlots[fbSlots.length - 1].dataIndex + 1;
+            const newEl = fbMakeCard(newDi);
+            fbTrack.appendChild(newEl);
+            fbSlots.push({ el: newEl, dataIndex: newDi });
+            fbTrackX += FB_STEP;
+            fbTrack.style.transform = `translateX(${fbTrackX}px)`;
+            fbApplyClasses();
+        }, 730);
+    }
+
+    function fbStartProg() {
+        fbProgStart = performance.now();
+        if (fbProgFill) fbProgFill.style.width = '0%';
+
+        function tick(now) {
+            if (fbPaused) return;
+            const pct = Math.min(((now - fbProgStart) / FB_DURATION) * 100, 100);
+            if (fbProgFill) fbProgFill.style.width = pct.toFixed(1) + '%';
+            if (pct < 100) {
+                fbRafId = requestAnimationFrame(tick);
+            } else {
+                fbAdvance();
+                fbRafId = requestAnimationFrame(() => fbStartProg());
+            }
+        }
+        fbRafId = requestAnimationFrame(tick);
+    }
+
+    function fbStopProg()  { cancelAnimationFrame(fbRafId); }
+    function fbResetProg() { fbStopProg(); if (!fbPaused) fbStartProg(); }
+
+    if (fbPauseBtn) {
+        fbPauseBtn.addEventListener('click', () => {
+            fbPaused = !fbPaused;
+            if (fbPaused) {
+                fbStopProg();
+                if (fbPauseIco) fbPauseIco.className = 'fas fa-play';
+                if (fbPauseTxt) fbPauseTxt.textContent = 'Resume';
+            } else {
+                if (fbPauseIco) fbPauseIco.className = 'fas fa-pause';
+                if (fbPauseTxt) fbPauseTxt.textContent = 'Pause';
+                fbStartProg();
+            }
+        });
+    }
+
+    // Init
+    fbTrackX = fbCalcX();
+    fbApplyTrackX(fbTrackX, false);
+    fbApplyClasses();
+    fbStartProg();
+
+    window.addEventListener('resize', () => {
+        fbTrackX = fbCalcX();
+        fbApplyTrackX(fbTrackX, false);
+    }, { passive: true });
+
+});
+// ============================================================
+// BACK TO TOP BUTTON
+// ============================================================
+document.addEventListener('DOMContentLoaded', () => {
+    const backToTop = document.getElementById('backToTop');
+    if (!backToTop) return;
+
+    // Show button after scrolling 400px
+    window.addEventListener('scroll', () => {
+        if (window.scrollY > 400) {
+            backToTop.classList.add('visible');
+        } else {
+            backToTop.classList.remove('visible');
+        }
+    }, { passive: true });
+
+    // Smooth scroll to top on click
+    backToTop.addEventListener('click', () => {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+});
+
+// ================================================================
+// NEWSLETTER POPUP — shows after 30 seconds
+// ================================================================
+document.addEventListener('DOMContentLoaded', function () {
+    const popup     = document.getElementById('nlPopup');
+    const backdrop  = document.getElementById('nlBackdrop');
+    const closeBtn  = document.getElementById('nlClose');
+    const noThanks  = document.getElementById('nlNoThanks');
+    const popupForm = document.getElementById('nlPopupForm');
+
+    if (!popup) return;
+
+    // Don't show again for 24 hours after dismissal
+    const dismissedUntil = localStorage.getItem('nl_dismissed_until');
+    if (dismissedUntil && Date.now() < Number(dismissedUntil)) return;
+
+    function openPopup() {
+        popup.classList.add('active');
+        if (backdrop) backdrop.classList.add('active');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closePopup() {
+        popup.classList.remove('active');
+        if (backdrop) backdrop.classList.remove('active');
+        document.body.style.overflow = '';
+        // Suppress for 24 hours
+        const expires = Date.now() + 24 * 60 * 60 * 1000;
+        localStorage.setItem('nl_dismissed_until', expires);
+    }
+
+    // Show after 30 seconds
+    setTimeout(openPopup, 30000);
+
+    if (closeBtn)  closeBtn.addEventListener('click', closePopup);
+    if (noThanks)  noThanks.addEventListener('click', closePopup);
+    if (backdrop)  backdrop.addEventListener('click', closePopup);
+
+    // Close on Escape key
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && popup.classList.contains('active')) {
+            closePopup();
+        }
+    });
+
+    // Handle popup form submit
+    if (popupForm) {
+        popupForm.addEventListener('submit', function () {
+            closePopup();
+        });
+    }
+});
+
+// ================================================================
+// NEWSLETTER SECTION — show success message after submit
+// ================================================================
+document.addEventListener('DOMContentLoaded', function () {
+    const form    = document.getElementById('newsletterForm');
+    const success = document.getElementById('newsletterSuccess');
+
+    if (!form) return;
+
+    // Check if we just came back from a newsletter signup
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('subscribed') === '1') {
+        if (form) form.style.display = 'none';
+        if (success) success.classList.add('show');
+        // Scroll to newsletter section smoothly after a short delay
+        const section = document.getElementById('newsletter');
+        if (section) {
+            setTimeout(() => section.scrollIntoView({ behavior: 'smooth' }), 300);
+        }
+    }
+});
+
+// ================================================================
+// CONTACT FORM — AJAX submit (no page refresh)
+// ================================================================
+(function() {
+    const form    = document.getElementById('contactForm');
+    const success = document.getElementById('contactSuccess');
+    const btn     = form ? form.querySelector('button[type="submit"]') : null;
+
+    if (!form) return;
+
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+
+        // Change button to loading state
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
+        btn.disabled = true;
+
+        const formData = new FormData(form);
+
+        fetch(form.action, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+            }
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'success') {
+                // Show success message
+                if (success) success.style.display = 'block';
+                // Clear all fields
+                form.querySelectorAll('input, textarea').forEach(el => el.value = '');
+                // Reset button
+                btn.innerHTML = '<i class="fas fa-check"></i> Message Sent!';
+                btn.style.background = 'var(--moss)';
+                // After 3 seconds reset button back to normal
+                setTimeout(() => {
+                    btn.innerHTML = '<i class="fas fa-paper-plane"></i> Send Message';
+                    btn.style.background = 'var(--gold)';
+                    btn.disabled = false;
+                    // Hide success after 5 seconds
+                    if (success) success.style.display = 'none';
+                }, 5000);
+            } else {
+                // Show error
+                btn.innerHTML = '<i class="fas fa-exclamation-circle"></i> Please fill all fields!';
+                btn.style.background = '#c0392b';
+                setTimeout(() => {
+                    btn.innerHTML = '<i class="fas fa-paper-plane"></i> Send Message';
+                    btn.style.background = 'var(--gold)';
+                    btn.disabled = false;
+                }, 3000);
+            }
+        })
+        .catch(() => {
+            btn.innerHTML = '<i class="fas fa-exclamation-circle"></i> Something went wrong!';
+            btn.style.background = '#c0392b';
+            setTimeout(() => {
+                btn.innerHTML = '<i class="fas fa-paper-plane"></i> Send Message';
+                btn.style.background = 'var(--gold)';
+                btn.disabled = false;
+            }, 3000);
+        });
+    });
+})();
+// ================================================================
+// SCROLL PROGRESS VINE — Offerings → Location journey indicator
+// ================================================================
+document.addEventListener('DOMContentLoaded', () => {
+    const vine = document.getElementById('scrollVine');
+    const fill = document.getElementById('scrollVineFill');
+    const leaf = document.getElementById('scrollVineLeaf');
+    const startEl = document.getElementById('services');
+    const endEl = document.getElementById('location');
+    if (!vine || !fill || !leaf || !startEl || !endEl) return;
+
+    let ticking = false;
+
+    function update() {
+        ticking = false;
+        const startTop = startEl.getBoundingClientRect().top + window.scrollY;
+        const endBottom = endEl.getBoundingClientRect().bottom + window.scrollY;
+        const total = Math.max(endBottom - startTop, 1);
+        const scrolled = window.scrollY + window.innerHeight * 0.5 - startTop;
+        const progress = Math.min(Math.max(scrolled / total, 0), 1);
+
+        const inRange = window.scrollY + window.innerHeight > startTop && window.scrollY < endBottom;
+        vine.classList.toggle('visible', inRange);
+
+        fill.style.height = (progress * 100) + '%';
+        leaf.style.bottom = (progress * 100) + '%';
+    }
+
+    function onScroll() {
+        if (!ticking) {
+            requestAnimationFrame(update);
+            ticking = true;
+        }
+    }
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll, { passive: true });
+    update();
+});
+
+// ================================================================
+// CURSOR TILT — Offering & Gallery images (desktop / mouse only)
+// Skipped entirely on touch devices so it never interferes with
+// tap targets or scroll gestures on mobile.
+// ================================================================
+document.addEventListener('DOMContentLoaded', () => {
+    const supportsHover = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+    if (!supportsHover) return;
+
+    const MAX_TILT = 6; // degrees
+    const tiltTargets = document.querySelectorAll('.offering-item, .gm-item');
+
+    tiltTargets.forEach(el => {
+        function onEnter() {
+            // Only promote a GPU layer while actually mid-tilt, not
+            // permanently — avoids paint/composite issues on devices
+            // that never even trigger this (this listener itself is
+            // desktop+mouse only, but keeping the CSS side conditional
+            // too is the safer, cheaper default).
+            el.style.willChange = 'transform';
         }
 
-
-        const WIDTH =
-            450;
-
-
-        const HEIGHT =
-            600;
-
-
-        const FLAG_W =
-            330;
-
-
-        const FLAG_H =
-            441;
-
-
-        const PAD_X =
-            60;
-
-
-        const PAD_Y =
-            78;
-
-
-        canvas.width =
-            WIDTH;
-
-
-        canvas.height =
-            HEIGHT;
-
-
-        const ctx =
-            canvas.getContext(
-                '2d',
-                {
-                    alpha: true
-                }
-            );
-
-
-        if (!ctx) {
-            return;
+        function onMove(e) {
+            const rect = el.getBoundingClientRect();
+            const x = (e.clientX - rect.left) / rect.width;
+            const y = (e.clientY - rect.top) / rect.height;
+            const rotateY = (x - 0.5) * MAX_TILT * 2;
+            const rotateX = (0.5 - y) * MAX_TILT * 2;
+            el.style.transform = `perspective(800px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
         }
 
-
-        ctx.imageSmoothingEnabled =
-            false;
-
-
-        /* ========================================================
-           ORIGINAL NEPAL FLAG SVG
-        ======================================================== */
-
-        const svg = `
-        <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="110"
-            height="147"
-            viewBox="0 0 110 147">
-
-            <path
-                d="
-                M 0.00,0.00
-                L 110.00,68.88
-                L 32.22,68.88
-                L 110.00,146.67
-                L 0.00,146.67
-                Z"
-                fill="#B80F2F"
-                stroke="#001F5B"
-                stroke-width="3.5"
-                stroke-linejoin="round"
-            />
-
-            <g transform="translate(27.50,43.05)">
-
-                <path
-                    d="
-                    M 22.27,-4.58
-                    L 21.52,-4.79
-                    L 20.33,-2.42
-                    L 15.70,3.07
-                    L 12.48,5.11
-                    L 11.18,4.57
-                    L 10.86,2.96
-                    L 12.80,1.99
-                    L 13.23,0.48
-                    L 10.00,-0.05
-                    L 10.21,-1.45
-                    L 11.93,-4.36
-                    L 7.74,-3.72
-                    L 7.95,-7.81
-                    L 6.34,-7.48
-                    L 4.18,-5.87
-                    L 2.89,-10.06
-                    L 0.52,-7.05
-                    L -0.23,-7.16
-                    L -2.17,-9.74
-                    L -3.78,-5.98
-                    L -6.69,-7.81
-                    L -7.98,-7.92
-                    L -7.33,-7.59
-                    L -7.33,-3.72
-                    L -9.38,-3.61
-                    L -11.10,-4.25
-                    L -9.81,-0.05
-                    L -13.04,0.59
-                    L -12.93,1.56
-                    L -10.89,3.18
-                    L -11.64,5.33
-                    L -13.04,5.00
-                    L -15.62,3.07
-                    L -18.43,0.16
-                    L -20.90,-3.61
-                    L -21.55,-3.61
-                    L -20.68,1.77
-                    L -17.99,6.51
-                    L -14.87,9.95
-                    L -10.24,13.30
-                    L -3.46,15.34
-                    L 1.93,15.56
-                    L 9.89,13.73
-                    L 14.74,10.39
-                    L 20.23,3.50
-                    L 22.16,-2.42
-                    Z"
-                    fill="#FFFFFF"
-                />
-
-            </g>
-
-            <path
-                d="
-                M 27.50,131.32
-                L 23.64,122.20
-                L 15.73,128.16
-                L 16.94,118.33
-                L 7.11,119.55
-                L 13.08,111.64
-                L 3.96,107.78
-                L 13.08,103.91
-                L 7.11,96.01
-                L 16.94,97.22
-                L 15.73,87.39
-                L 23.64,93.35
-                L 27.50,84.24
-                L 31.36,93.35
-                L 39.27,87.39
-                L 38.06,97.22
-                L 47.89,96.01
-                L 41.92,103.91
-                L 51.04,107.78
-                L 41.92,111.64
-                L 47.89,119.55
-                L 38.06,118.33
-                L 39.27,128.16
-                L 31.36,122.20
-                Z"
-                fill="#FFFFFF"
-            />
-
-        </svg>
-        `;
-
-
-        /* ========================================================
-           SOURCE CANVAS
-        ======================================================== */
-
-        const sourceCanvas =
-            document.createElement(
-                'canvas'
-            );
-
-
-        sourceCanvas.width =
-            WIDTH;
-
-
-        sourceCanvas.height =
-            HEIGHT;
-
-
-        const sourceCtx =
-            sourceCanvas.getContext(
-                '2d',
-                {
-                    alpha: true
-                }
-            );
-
-
-        if (!sourceCtx) {
-            return;
+        function onLeave() {
+            el.style.transform = '';
+            el.style.willChange = '';
         }
 
+        el.addEventListener('mouseenter', onEnter);
+        el.addEventListener('mousemove', onMove);
+        el.addEventListener('mouseleave', onLeave);
+    });
+});
 
-        sourceCtx.imageSmoothingEnabled =
-            false;
+// ================================================================
+// FLOAT BUTTONS REVEAL — Shop + WhatsApp fade in once the hero
+// carousel scrolls out of view (i.e. right as the About section
+// begins), instead of sitting there from the very first paint.
+//
+// Uses a direct scroll-position check rather than IntersectionObserver:
+// it measures the hero's actual rendered pixel height (via
+// getBoundingClientRect, recalculated on every scroll) instead of
+// relying on the CSS 100vh value, which mobile browsers can measure
+// inconsistently as their address bar collapses/expands.
+// ================================================================
+document.addEventListener('DOMContentLoaded', () => {
+    const floatShop = document.querySelector('.float-shop');
+    const floatWa    = document.querySelector('.float-wa');
+    const hero       = document.getElementById('hero');
+    if (!floatShop || !floatWa) return;
 
+    // On mobile AND tablet, CSS forces both buttons to always be visible
+    // (see the @media (max-width: 1024px) block in style.css) — the
+    // scroll-reveal system is a desktop-only nicety, so there's no need
+    // to run this scroll listener on phones/tablets at all.
+    const isMobile = window.matchMedia('(max-width: 1024px)').matches;
+    if (isMobile) {
+        floatShop.classList.add('visible');
+        floatWa.classList.add('visible');
+        return;
+    }
 
-        const img =
-            new Image();
+    if (!hero) {
+        // No hero on this page — just show them.
+        floatShop.classList.add('visible');
+        floatWa.classList.add('visible');
+        return;
+    }
 
+    let ticking = false;
 
-        img.decoding =
-            'async';
+    function updateVisibility() {
+        // getBoundingClientRect().bottom is relative to the current
+        // viewport, so this is always accurate regardless of how tall
+        // 100vh actually rendered on this device.
+        const heroBottom = hero.getBoundingClientRect().bottom;
+        const show = heroBottom <= 0;
+        floatShop.classList.toggle('visible', show);
+        floatWa.classList.toggle('visible', show);
+        ticking = false;
+    }
 
+    function onScroll() {
+        if (!ticking) {
+            window.requestAnimationFrame(updateVisibility);
+            ticking = true;
+        }
+    }
 
-        img.onload =
-            function () {
+    updateVisibility(); // run once immediately in case the page loads mid-scroll
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll);
+});
 
-                sourceCtx.clearRect(
-                    0,
-                    0,
-                    WIDTH,
-                    HEIGHT
-                );
+// ================================================================
+// 3D MINI-SHOP CAROUSEL — Ordering & Delivery "Ready to Order?" panel
+// Cards are rendered server-side by Django (one per featured_product);
+// this arranges however many actually exist into a rotating 3D ring,
+// with drag/swipe, autoplay, arrows, and dots. Reusable so both rows
+// (which rotate in opposite directions) share identical logic.
+// ================================================================
+function initMiniShopCarousel(sceneId, ringId, autoplayDirection, startOffsetFraction) {
+    const scene = document.getElementById(sceneId);
+    const ring = document.getElementById(ringId);
+    if (!scene || !ring) return;
 
+    const cards = Array.from(ring.querySelectorAll('.ring-card'));
+    const N = cards.length;
+    if (N === 0) return;
 
-                sourceCtx.drawImage(
-                    img,
-                    PAD_X,
-                    PAD_Y,
-                    FLAG_W,
-                    FLAG_H
-                );
+    const angleStep = 360 / N;
+    // Radius comes from a CSS custom property so desktop can use a much
+    // wider ring (more horizontal coverage) without touching JS —
+    // see the @media (min-width: 1025px) override in style.css.
+    const radius = parseFloat(getComputedStyle(scene).getPropertyValue('--carousel-radius')) || 130;
 
+    // Desktop uses a different layout entirely: a "coverflow" style
+    // arrangement (cards positioned mainly via translateX, with a
+    // gentle 3D tilt) instead of true circular ring rotation. The
+    // previous approach tried to make two cards symmetric around the
+    // front by angle alone — but a wide ring radius (needed so cards
+    // don't overlap while rotating) also pushes symmetric cards far
+    // apart in actual screen position, which is why it looked like one
+    // big center card plus two disconnected slivers. Coverflow avoids
+    // that because card spacing is a direct, independent pixel value,
+    // not a side effect of the rotation radius.
+    const showTwoFront = window.matchMedia('(min-width: 1025px)').matches;
+    const spacing = parseFloat(getComputedStyle(scene).getPropertyValue('--carousel-spacing')) || 148;
 
-                startFlagAnimation();
+    cards.forEach((card, i) => {
+        card.dataset.baseAngle = i * angleStep;
+    });
 
-            };
+    let logicalIndex = Math.round((startOffsetFraction || 0) * N); // unwrapped — keeps counting up/down, never resets/snaps backward
+    let currentRotation = -logicalIndex * angleStep;
 
+    function renderRing() {
+        ring.style.transform = `rotateY(${currentRotation}deg)`;
+        cards.forEach((card, i) => {
+            const baseAngle = i * angleStep;
+            const cardAngle = (baseAngle + currentRotation) % 360;
+            const normalized = ((cardAngle % 360) + 360) % 360;
+            const distFromFront = Math.min(normalized, 360 - normalized);
 
-        img.src =
-            'data:image/svg+xml;charset=utf-8,' +
-            encodeURIComponent(svg);
+            const t = distFromFront / 180;
+            const scale = 1.15 - t * 0.53;
+            card.style.transform = `rotateY(${baseAngle}deg) translateZ(${radius}px) scale(${scale.toFixed(3)})`;
 
+            card.classList.remove('is-front', 'is-side', 'is-back');
+            if (distFromFront < angleStep / 2) card.classList.add('is-front');
+            else if (distFromFront < 90) card.classList.add('is-side');
+            else card.classList.add('is-back');
+        });
+    }
 
-        /* ========================================================
-           DRAW FLAG
-        ======================================================== */
+    function renderCoverflow() {
+        ring.style.transform = 'none'; // positioning happens per-card, not on the ring itself
+        const continuousIndex = -currentRotation / angleStep; // fractional during drag
+        cards.forEach((card, i) => {
+            let rawOffset = i - continuousIndex;
+            // wrap to the shortest path so cards don't take the "long way around"
+            while (rawOffset > N / 2) rawOffset -= N;
+            while (rawOffset <= -N / 2) rawOffset += N;
+            // shift by 0.5 so a PAIR of cards straddles dead-center,
+            // instead of one single card sitting on it
+            const offset = rawOffset - 0.5;
+            const absOffset = Math.abs(offset);
 
-        function drawFlag(time) {
+            const xPos = offset * spacing;
+            const rotateYval = Math.max(-70, Math.min(70, offset * 32));
+            const z = -absOffset * 70;
+            const scale = Math.max(0.5, 1.35 - absOffset * 0.35);
 
-            const t =
-                time * 0.001;
+            card.style.transform =
+                `translateX(${xPos.toFixed(1)}px) translateZ(${z.toFixed(1)}px) rotateY(${rotateYval.toFixed(1)}deg) scale(${scale.toFixed(3)})`;
 
+            card.classList.remove('is-front', 'is-side', 'is-back');
+            if (absOffset < 0.75) card.classList.add('is-front');
+            else if (absOffset < 2) card.classList.add('is-side');
+            else card.classList.add('is-back');
+        });
+    }
 
-            ctx.clearRect(
+    function updateCardStates() {
+        if (showTwoFront) renderCoverflow();
+        else renderRing();
+    }
+
+    function render() {
+        updateCardStates();
+    }
+
+    function goToStep(delta) {
+        logicalIndex += delta;
+        currentRotation = -logicalIndex * angleStep;
+        render();
+    }
+
+    // ── Drag / swipe (mouse + touch) ──
+    let isDragging = false;
+    let startX = 0;
+    let startRotation = 0;
+    let dragDistance = 0; // used to tell an intentional drag apart from a tap
+    let onDragStartCb = null;
+    let onDragEndCb = null;
+
+    function dragStart(clientX) {
+        isDragging = true;
+        dragDistance = 0;
+        startX = clientX;
+        startRotation = currentRotation;
+        scene.classList.add('dragging');
+        ring.classList.add('no-transition');
+        if (onDragStartCb) onDragStartCb();
+    }
+    function dragMove(clientX) {
+        if (!isDragging) return;
+        const delta = clientX - startX;
+        dragDistance = Math.abs(delta);
+        currentRotation = startRotation + delta * 0.4;
+        updateCardStates();
+    }
+    function dragEnd() {
+        if (!isDragging) return;
+        isDragging = false;
+        scene.classList.remove('dragging');
+        ring.classList.remove('no-transition');
+        logicalIndex = Math.round(-currentRotation / angleStep);
+        currentRotation = -logicalIndex * angleStep;
+        render();
+        if (onDragEndCb) onDragEndCb();
+    }
+
+    scene.addEventListener('mousedown', e => { e.preventDefault(); dragStart(e.clientX); });
+    window.addEventListener('mousemove', e => dragMove(e.clientX));
+    window.addEventListener('mouseup', dragEnd);
+
+    scene.addEventListener('touchstart', e => dragStart(e.touches[0].clientX), { passive: true });
+    scene.addEventListener('touchmove', e => dragMove(e.touches[0].clientX), { passive: true });
+    scene.addEventListener('touchend', dragEnd);
+
+    // Prevent an intentional drag from also firing the card's link —
+    // only a genuine tap (negligible movement) should navigate.
+    cards.forEach(card => {
+        card.addEventListener('click', e => {
+            if (dragDistance > 6) e.preventDefault();
+        });
+    });
+
+    render();
+
+    // Autoplay is driven externally by a single shared clock (see the
+    // DOMContentLoaded block below) so both rows always change cards
+    // at exactly the same moment, instead of two independent timers
+    // that can drift out of sync over time.
+    return {
+        step: () => { if (!isDragging) goToStep(autoplayDirection); },
+        onDragStart: cb => { onDragStartCb = cb; },
+        onDragEnd: cb => { onDragEndCb = cb; },
+    };
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    // Row 1 spins one way, row 2 spins the opposite way (-1 vs 1), and
+    // starts halfway around the ring so the two rows never show the
+    // same product at the front simultaneously.
+    const row1 = initMiniShopCarousel('miniShopScene', 'miniShopRing', 1, 0);
+    const row2 = initMiniShopCarousel('miniShopScene2', 'miniShopRing2', -1, 0.5);
+    if (!row1 || !row2) return;
+
+    // One shared timer steps BOTH rows at the same instant, every tick —
+    // this is what keeps them properly synchronized instead of each
+    // row quietly drifting apart on its own schedule.
+    let sharedTimer = null;
+    function startShared() {
+        stopShared();
+        sharedTimer = setInterval(() => {
+            row1.step();
+            row2.step();
+        }, 3200);
+    }
+    function stopShared() {
+        if (sharedTimer) clearInterval(sharedTimer);
+    }
+
+    // Dragging either row pauses the shared clock for both, and
+    // resuming (from either row) restarts it fresh for both — so a
+    // drag on one row doesn't leave it stepping out of time with the
+    // other afterward.
+    row1.onDragStart(stopShared);
+    row2.onDragStart(stopShared);
+    row1.onDragEnd(startShared);
+    row2.onDragEnd(startShared);
+
+    startShared();
+});
+
+// ================================================================
+// OPMCM-STYLE WIND-BLOWN NEPAL FLAG — NAVBAR
+// Darker colors · crisp edges · sharp triangular silhouette
+// Smooth cloth folds · stable pole · stronger free-end flutter
+// ================================================================
+(function () {
+    const canvas = document.getElementById('navNepalFlag');
+    if (!canvas) return;
+
+    const WIDTH = 450;
+    const HEIGHT = 600;
+    const FLAG_W = 330;
+    const FLAG_H = 441;
+    const PAD_X = 60;
+    const PAD_Y = 78;
+
+    canvas.width = WIDTH;
+    canvas.height = HEIGHT;
+
+    const ctx = canvas.getContext('2d', { alpha: true });
+    if (!ctx) return;
+
+    // Keep the raster edges crisp instead of applying soft interpolation.
+    ctx.imageSmoothingEnabled = false;
+
+    const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="110" height="147" viewBox="0 0 110 147">
+        <!-- Deep, slightly darker Nepal red and blue for the OPMCM-style look -->
+        <path d="M 0.00,0.00 L 110.00,68.88 L 32.22,68.88 L 110.00,146.67 L 0.00,146.67 Z"
+              fill="#B80F2F" stroke="#001F5B" stroke-width="3.5" stroke-linejoin="round"/>
+
+        <g transform="translate(27.50,43.05)">
+            <path d="M 22.27,-4.58 L 21.52,-4.79 L 20.33,-2.42 L 15.70,3.07 L 12.48,5.11 L 11.18,4.57 L 10.86,2.96 L 12.80,1.99 L 13.23,0.48 L 10.00,-0.05 L 10.21,-1.45 L 11.93,-4.36 L 7.74,-3.72 L 7.95,-7.81 L 6.34,-7.48 L 4.18,-5.87 L 2.89,-10.06 L 0.52,-7.05 L -0.23,-7.16 L -2.17,-9.74 L -3.78,-5.98 L -6.69,-7.81 L -7.98,-7.92 L -7.33,-7.59 L -7.33,-3.72 L -9.38,-3.61 L -11.10,-4.25 L -9.81,-0.05 L -13.04,0.59 L -12.93,1.56 L -10.89,3.18 L -11.64,5.33 L -13.04,5.00 L -15.62,3.07 L -18.43,0.16 L -20.90,-3.61 L -21.55,-3.61 L -20.68,1.77 L -17.99,6.51 L -14.87,9.95 L -10.24,13.30 L -3.46,15.34 L 1.93,15.56 L 9.89,13.73 L 14.74,10.39 L 20.23,3.50 L 22.16,-2.42 Z"
+                  fill="#FFFFFF"/>
+        </g>
+
+        <path d="M 27.50,131.32 L 23.64,122.20 L 15.73,128.16 L 16.94,118.33 L 7.11,119.55 L 13.08,111.64 L 3.96,107.78 L 13.08,103.91 L 7.11,96.01 L 16.94,97.22 L 15.73,87.39 L 23.64,93.35 L 27.50,84.24 L 31.36,93.35 L 39.27,87.39 L 38.06,97.22 L 47.89,96.01 L 41.92,103.91 L 51.04,107.78 L 41.92,111.64 L 47.89,119.55 L 38.06,118.33 L 39.27,128.16 L 31.36,122.20 Z"
+              fill="#FFFFFF"/>
+    </svg>`;
+
+    const sourceCanvas = document.createElement('canvas');
+    sourceCanvas.width = WIDTH;
+    sourceCanvas.height = HEIGHT;
+    const sourceCtx = sourceCanvas.getContext('2d', { alpha: true });
+    if (!sourceCtx) return;
+    sourceCtx.imageSmoothingEnabled = false;
+
+    const img = new Image();
+    img.decoding = 'async';
+
+    img.onload = function () {
+        sourceCtx.clearRect(0, 0, WIDTH, HEIGHT);
+        sourceCtx.drawImage(img, PAD_X, PAD_Y, FLAG_W, FLAG_H);
+        startAnimation();
+    };
+
+    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+
+    function drawFlag(time) {
+        const t = time * 0.001;
+
+        ctx.clearRect(0, 0, WIDTH, HEIGHT);
+
+        // Transparent padding is intentionally preserved around the flag.
+        // This keeps both pointed ends completely visible while waving.
+        ctx.save();
+        ctx.translate(PAD_X, PAD_Y);
+
+        /*
+         * Draw the flag as narrow vertical fabric strips.
+         * Unlike pixel displacement, this preserves the sharp Nepal-flag
+         * silhouette and pointed edges while the strips move independently.
+         */
+        const strip = 3;
+
+        for (let x = 0; x < FLAG_W; x += strip) {
+            const u = x / FLAG_W;
+
+            // Pole remains stable; the free end becomes increasingly active.
+            const strength = Math.pow(u, 1.45);
+
+            // Large travelling cloth folds.
+            const wave1 = Math.sin(u * Math.PI * 1.55 - t * 4.0);
+            const wave2 = Math.sin(u * Math.PI * 3.10 - t * 4.0 + 1.15);
+
+            // Strong but smooth vertical displacement.
+            const yWave = strength * (wave1 * 34 + wave2 * 8);
+
+            // Forward/backward flutter of the free edge.
+            const xWave = strength * Math.sin(
+                u * Math.PI * 1.35 - t * 3.0 + 0.55
+            ) * 15;
+
+            // Local fabric tilt makes the folds look like cloth rather than water.
+            const slope =
+                Math.cos(u * Math.PI * 1.55 - t * 4.0) *
+                strength * 0.16 +
+                Math.cos(u * Math.PI * 3.10 - t * 4.0 + 1.15) *
+                strength * 0.035;
+
+            // Slightly narrower at the pole, fuller at the free edge.
+            const sourceWidth = Math.min(strip + 1, FLAG_W - x);
+
+            ctx.save();
+            ctx.translate(x + xWave, yWave);
+            ctx.transform(1, slope, 0, 1, 0, 0);
+
+            // Overlap neighbouring strips by 1px to avoid hairline gaps.
+            ctx.drawImage(
+                sourceCanvas,
+                PAD_X + x,
                 0,
+                sourceWidth,
+                HEIGHT,
+                -0.5,
                 0,
-                WIDTH,
+                sourceWidth + 1,
                 HEIGHT
             );
 
-
-            ctx.save();
-
-
-            ctx.translate(
-                PAD_X,
-                PAD_Y
-            );
-
-
-            /*
-             * Smaller strips create smoother
-             * cloth movement while preserving
-             * the sharp triangular edge.
-             */
-            const strip =
-                3;
-
-
-            for (
-                let x = 0;
-                x < FLAG_W;
-                x += strip
-            ) {
-
-                const u =
-                    x / FLAG_W;
-
-
-                /*
-                 * Pole remains stable.
-                 * Free edge receives stronger movement.
-                 */
-                const strength =
-                    Math.pow(
-                        u,
-                        1.45
-                    );
-
-
-                /*
-                 * MAIN WAVE
-                 *
-                 * SPEED = 4.0
-                 * STRENGTH = 34
-                 */
-                const wave1 =
-                    Math.sin(
-                        u *
-                        Math.PI *
-                        1.55
-                        -
-                        t * 4.0
-                    );
-
-
-                /*
-                 * SECONDARY WAVE
-                 *
-                 * SPEED = 4.0
-                 * STRENGTH = 6
-                 *
-                 * Lower value keeps the cloth
-                 * smooth instead of watery.
-                 */
-                const wave2 =
-                    Math.sin(
-                        u *
-                        Math.PI *
-                        3.10
-                        -
-                        t * 4.0
-                        +
-                        1.15
-                    );
-
-
-                /*
-                 * VERTICAL FABRIC MOVEMENT
-                 */
-                const yWave =
-                    strength *
-                    (
-                        wave1 * 34 +
-                        wave2 * 6
-                    );
-
-
-                /*
-                 * FREE-EDGE MOVEMENT
-                 *
-                 * Also synchronized to 4.0.
-                 */
-                const xWave =
-                    strength *
-                    Math.sin(
-                        u *
-                        Math.PI *
-                        1.35
-                        -
-                        t * 4.0
-                        +
-                        0.55
-                    ) *
-                    15;
-
-
-                /*
-                 * FABRIC TILT
-                 */
-                const slope =
-                    Math.cos(
-                        u *
-                        Math.PI *
-                        1.55
-                        -
-                        t * 4.0
-                    ) *
-                    strength *
-                    0.16
-
-                    +
-
-                    Math.cos(
-                        u *
-                        Math.PI *
-                        3.10
-                        -
-                        t * 4.0
-                        +
-                        1.15
-                    ) *
-                    strength *
-                    0.025;
-
-
-                const sourceWidth =
-                    Math.min(
-                        strip + 1,
-                        FLAG_W - x
-                    );
-
-
-                ctx.save();
-
-
-                ctx.translate(
-                    x + xWave,
-                    yWave
-                );
-
-
-                ctx.transform(
-                    1,
-                    slope,
-                    0,
-                    1,
-                    0,
-                    0
-                );
-
-
-                /*
-                 * Slight overlap prevents gaps
-                 * between individual cloth strips.
-                 */
-                ctx.drawImage(
-                    sourceCanvas,
-
-                    PAD_X + x,
-                    0,
-                    sourceWidth,
-                    HEIGHT,
-
-                    -0.5,
-                    0,
-                    sourceWidth + 1,
-                    HEIGHT
-                );
-
-
-                ctx.restore();
-
-            }
-
-
             ctx.restore();
-
-
-            /*
-             * Very subtle fabric shading.
-             */
-            ctx.save();
-
-
-            ctx.globalCompositeOperation =
-                'source-atop';
-
-
-            ctx.globalAlpha =
-                0.075;
-
-
-            const shadeGradient =
-                ctx.createLinearGradient(
-                    PAD_X,
-                    0,
-                    PAD_X + FLAG_W,
-                    0
-                );
-
-
-            shadeGradient.addColorStop(
-                0,
-                'rgba(0,0,0,0)'
-            );
-
-
-            shadeGradient.addColorStop(
-                0.35,
-                'rgba(0,0,0,0.18)'
-            );
-
-
-            shadeGradient.addColorStop(
-                0.52,
-                'rgba(255,255,255,0.10)'
-            );
-
-
-            shadeGradient.addColorStop(
-                0.72,
-                'rgba(0,0,0,0.15)'
-            );
-
-
-            shadeGradient.addColorStop(
-                1,
-                'rgba(0,0,0,0)'
-            );
-
-
-            ctx.fillStyle =
-                shadeGradient;
-
-
-            ctx.fillRect(
-                PAD_X,
-                PAD_Y,
-                FLAG_W,
-                FLAG_H
-            );
-
-
-            ctx.restore();
-
         }
 
+        ctx.restore();
 
-        /* ========================================================
-           START FLAG ANIMATION
-        ======================================================== */
+        /*
+         * Very subtle fold shading. This is intentionally restrained so
+         * the red remains dark and solid rather than becoming glossy.
+         */
+        ctx.save();
+        ctx.globalCompositeOperation = 'source-atop';
+        ctx.globalAlpha = 0.075;
 
-        function startFlagAnimation() {
-
-            function animate(time) {
-
-                drawFlag(time);
-
-                requestAnimationFrame(
-                    animate
-                );
-
-            }
-
-
-            requestAnimationFrame(
-                animate
-            );
-
-        }
-
-    })();
-
-
-    /* ============================================================
-       FLOATING BUTTONS
-    ============================================================ */
-
-    const floatingButtons =
-        document.querySelectorAll(
-            '.floating-btn'
+        const shadeGradient = ctx.createLinearGradient(
+            PAD_X, 0,
+            PAD_X + FLAG_W, 0
         );
+        shadeGradient.addColorStop(0, 'rgba(0,0,0,0)');
+        shadeGradient.addColorStop(0.35, 'rgba(0,0,0,0.18)');
+        shadeGradient.addColorStop(0.52, 'rgba(255,255,255,0.10)');
+        shadeGradient.addColorStop(0.72, 'rgba(0,0,0,0.15)');
+        shadeGradient.addColorStop(1, 'rgba(0,0,0,0)');
 
+        ctx.fillStyle = shadeGradient;
+        ctx.fillRect(PAD_X, PAD_Y, FLAG_W, FLAG_H);
+        ctx.restore();
+    }
 
-    floatingButtons.forEach(
-        function (button) {
-
-            button.addEventListener(
-                'mouseenter',
-                function () {
-
-                    this.classList.add(
-                        'hovered'
-                    );
-
-                }
-            );
-
-
-            button.addEventListener(
-                'mouseleave',
-                function () {
-
-                    this.classList.remove(
-                        'hovered'
-                    );
-
-                }
-            );
-
+    function startAnimation() {
+        function animate(time) {
+            drawFlag(time);
+            requestAnimationFrame(animate);
         }
-    );
-
-
-    /* ============================================================
-       PHONE / EMAIL LINKS
-    ============================================================ */
-
-    document
-        .querySelectorAll(
-            'a[href^="tel:"], ' +
-            'a[href^="mailto:"]'
-        )
-        .forEach(
-            function (link) {
-
-                link.addEventListener(
-                    'click',
-                    function () {
-
-                        closeDrawer();
-
-                    }
-                );
-
-            }
-        );
-
-
-    /* ============================================================
-       WINDOW RESIZE
-    ============================================================ */
-
-    let resizeTimer =
-        null;
-
-
-    window.addEventListener(
-        'resize',
-        function () {
-
-            clearTimeout(
-                resizeTimer
-            );
-
-
-            resizeTimer =
-                setTimeout(
-                    function () {
-
-                        updateDelivery();
-
-                        updateActiveNavigation();
-
-                    },
-                    150
-                );
-
-        }
-    );
-
-
-    /* ============================================================
-       PAGE READY
-    ============================================================ */
-
-    document.documentElement
-        .classList.add(
-            'js-ready'
-        );
-
-
+        requestAnimationFrame(animate);
+    }
 })();
