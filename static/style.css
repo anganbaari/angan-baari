@@ -252,7 +252,7 @@ ul { list-style: none; }
 .brand {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 2px;
     color: var(--white);
     transition: opacity var(--trans-base);
 }
@@ -316,7 +316,7 @@ ul { list-style: none; }
     justify-content: center;
     width: 60px;
     height: 82px;
-    margin-left: -5px;
+    margin-left: 0;
     flex-shrink: 0;
     overflow: visible;
     pointer-events: none;
@@ -340,31 +340,32 @@ ul { list-style: none; }
     .brand-subtag { display: block; }
 }
 
-/* Flag shrinks alongside the brand-icon at the same breakpoints instead
-   of disappearing, so phone and tablet visitors still see it wave. */
+/* Flag shrinks alongside the brand-icon at the same breakpoints, but
+   stays large enough to actually read at a glance on phone/tablet —
+   not just a token sliver next to the much bigger Nepali headline. */
 @media (max-width: 1200px) {
     .brand-flag {
-        width: 32px;
-        height: 44px;
-        transform: translateY(-9px);
-        margin-left: -3px;
+        width: 44px;
+        height: 60px;
+        transform: translateY(-13px);
+        margin-left: 0;
     }
     .nav-nepal-flag {
-        width: 32px;
-        height: 44px;
+        width: 44px;
+        height: 60px;
     }
 }
 
 @media (max-width: 480px) {
     .brand-flag {
-        width: 26px;
-        height: 36px;
-        transform: translateY(-7px);
-        margin-left: -2px;
+        width: 36px;
+        height: 49px;
+        transform: translateY(-11px);
+        margin-left: 0;
     }
     .nav-nepal-flag {
-        width: 26px;
-        height: 36px;
+        width: 36px;
+        height: 49px;
     }
 }
 
