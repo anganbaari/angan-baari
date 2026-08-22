@@ -212,7 +212,7 @@ ul { list-style: none; }
     left: 0;
     right: 0;
     z-index: 1000;
-    padding: 10px 5vw;
+    padding: 6px 5vw;
     transition: padding 0.35s var(--ease-smooth), background 0.35s var(--ease-smooth), box-shadow 0.35s var(--ease-smooth), border-color 0.35s var(--ease-smooth);
     border-bottom: 1px solid transparent;
 }
@@ -221,7 +221,7 @@ ul { list-style: none; }
     background: rgba(16, 28, 18, 0.82);
     backdrop-filter: blur(18px) saturate(160%);
     -webkit-backdrop-filter: blur(18px) saturate(160%);
-    padding: 8px 5vw;
+    padding: 5px 5vw;
     box-shadow: 0 8px 32px rgba(0,0,0,0.18);
     border-bottom-color: rgba(255,255,255,0.06);
 }
@@ -258,14 +258,16 @@ ul { list-style: none; }
 }
 
 .brand:hover { opacity: 0.85; }
+.brand:hover .brand-icon { transform: scale(1.08); }
 
 .brand-icon {
-    width: 70px;
-    height: 70px;
+    width: 56px;
+    height: 56px;
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
+    transition: transform 0.3s ease;
 }
 
 .brand-icon img {
@@ -310,12 +312,12 @@ ul { list-style: none; }
 
 .brand-flag {
     position: relative;
-    transform: translateY(-18px);
+    transform: translateY(-14px);
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 60px;
-    height: 82px;
+    width: 48px;
+    height: 66px;
     margin-left: 0;
     flex-shrink: 0;
     overflow: visible;
@@ -324,8 +326,8 @@ ul { list-style: none; }
 
 .nav-nepal-flag {
     display: block;
-    width: 60px;
-    height: 82px;
+    width: 48px;
+    height: 66px;
     overflow: visible;
     filter: drop-shadow(0 2px 5px rgba(0,0,0,0.42));
     image-rendering: crisp-edges;
@@ -507,27 +509,6 @@ ul { list-style: none; }
     transform: translateY(-1px);
 }
 
-/* Logo icon (pipal leaf mark) */
-.brand-icon {
-    width: 60px;
-    height: 60x;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    transition: transform 0.3s ease;
-}
-.brand-icon img {
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
-    display: block;
-    filter: drop-shadow(0 2px 8px rgba(0,0,0,0.35));
-}
-.brand:hover .brand-icon {
-    transform: scale(1.08);
-}
-
 /* Honeycomb texture on navbar */
 .navbar {
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='100'%3E%3Cpath d='M28 66L0 50V16L28 0l28 16v34z' fill='none' stroke='%23f5c800' stroke-width='0.5' opacity='0.08'/%3E%3Cpath d='M28 100L0 84V50l28-16 28 16v34z' fill='none' stroke='%23f5c800' stroke-width='0.5' opacity='0.08'/%3E%3C/svg%3E");
@@ -657,7 +638,7 @@ ul { list-style: none; }
    own box only reserves its flat cell-row width, so the tapered
    background tip plus this gap were reading as one big empty gap
    before the CTA hexagon. */
-.desktop-nav .hc-cta { margin-left: -10px; }
+.desktop-nav .hc-cta { margin-left: -15px; }
 
 /* Order Now — merged into the honeycomb theme as its own small
    gold hexagon button, sized to sit naturally beside the strip. */
