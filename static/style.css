@@ -212,7 +212,7 @@ ul { list-style: none; }
     left: 0;
     right: 0;
     z-index: 1000;
-    padding: 20px 5vw;
+    padding: 10px 5vw;
     transition: padding 0.35s var(--ease-smooth), background 0.35s var(--ease-smooth), box-shadow 0.35s var(--ease-smooth), border-color 0.35s var(--ease-smooth);
     border-bottom: 1px solid transparent;
 }
@@ -221,7 +221,7 @@ ul { list-style: none; }
     background: rgba(16, 28, 18, 0.82);
     backdrop-filter: blur(18px) saturate(160%);
     -webkit-backdrop-filter: blur(18px) saturate(160%);
-    padding: 13px 5vw;
+    padding: 8px 5vw;
     box-shadow: 0 8px 32px rgba(0,0,0,0.18);
     border-bottom-color: rgba(255,255,255,0.06);
 }
@@ -657,7 +657,7 @@ ul { list-style: none; }
    own box only reserves its flat cell-row width, so the tapered
    background tip plus this gap were reading as one big empty gap
    before the CTA hexagon. */
-.desktop-nav .hc-cta { margin-left: -15px; }
+.desktop-nav .hc-cta { margin-left: -10px; }
 
 /* Order Now — merged into the honeycomb theme as its own small
    gold hexagon button, sized to sit naturally beside the strip. */
