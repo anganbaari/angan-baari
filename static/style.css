@@ -331,20 +331,47 @@ ul { list-style: none; }
     image-rendering: crisp-edges;
 }
 
-/* Tagline + flag are the "nice to have" pieces — only show once the
-   desktop nav itself has room (matches the 1200px cutoff below), so
-   they never crowd the menu on tablet/narrow-desktop widths. */
-.brand-subtag, .brand-flag { display: none; }
+/* The "Organic Farm" tagline only shows once the desktop nav itself has
+   room (matches the 1200px cutoff below), so it never crowds the menu
+   on tablet/narrow-desktop widths. The flag itself now stays visible at
+   every size — it just scales down to fit the compact mobile navbar. */
+.brand-subtag { display: none; }
 @media (min-width: 1201px) {
-    .brand-subtag, .brand-flag { display: flex; }
     .brand-subtag { display: block; }
 }
 
+/* Flag shrinks alongside the brand-icon at the same breakpoints instead
+   of disappearing, so phone and tablet visitors still see it wave. */
 @media (max-width: 1200px) {
-    .brand-flag { display: none !important; }
+    .brand-flag {
+        width: 32px;
+        height: 44px;
+        transform: translateY(-9px);
+        margin-left: -3px;
+    }
+    .nav-nepal-flag {
+        width: 32px;
+        height: 44px;
+    }
+}
+
+@media (max-width: 480px) {
+    .brand-flag {
+        width: 26px;
+        height: 36px;
+        transform: translateY(-7px);
+        margin-left: -2px;
+    }
+    .nav-nepal-flag {
+        width: 26px;
+        height: 36px;
+    }
 }
 
 @media (prefers-reduced-motion: reduce) {
+    /* The animation is JS-driven (requestAnimationFrame), not CSS, so the
+       actual pause happens in script.js. This rule is kept as a harmless
+       belt-and-braces fallback. */
     .nav-nepal-flag { animation: none; }
 }
 

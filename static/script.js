@@ -1554,10 +1554,67 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function startAnimation() {
-        function animate(time) {
+        // Respect the OS-level "reduce motion" preference: draw one
+        // static frame and never animate, instead of the CSS-only rule
+        // from before (which couldn't actually stop a JS-driven loop).
+        const reduceMotionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+        let rafId = null;
+        let inView = true;
+
+        function renderLoop(time) {
             drawFlag(time);
-            requestAnimationFrame(animate);
+            rafId = requestAnimationFrame(renderLoop);
         }
-        requestAnimationFrame(animate);
+
+        function play() {
+            if (rafId !== null || reduceMotionQuery.matches) return;
+            rafId = requestAnimationFrame(renderLoop);
+        }
+
+        function pause() {
+            if (rafId !== null) {
+                cancelAnimationFrame(rafId);
+                rafId = null;
+            }
+        }
+
+        if (reduceMotionQuery.matches) {
+            drawFlag(0);
+        } else {
+            play();
+        }
+
+        // Pause the render loop whenever the flag scrolls out of view or
+        // the browser tab itself is backgrounded — a small canvas redrawn
+        // 60×/sec is wasted work (and battery) when nobody can see it.
+        const observer = new IntersectionObserver(function (entries) {
+            inView = entries[0].isIntersecting;
+            if (inView && !document.hidden) {
+                play();
+            } else {
+                pause();
+            }
+        }, { threshold: 0 });
+        observer.observe(canvas);
+
+        document.addEventListener('visibilitychange', function () {
+            if (document.hidden) {
+                pause();
+            } else if (inView) {
+                play();
+            }
+        });
+
+        // Live-respond if the user toggles the OS reduced-motion setting
+        // while the page is already open.
+        reduceMotionQuery.addEventListener('change', function (e) {
+            if (e.matches) {
+                pause();
+                drawFlag(0);
+            } else if (inView) {
+                play();
+            }
+        });
     }
 })();
