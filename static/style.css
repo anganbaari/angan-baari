@@ -495,10 +495,10 @@ ul { list-style: none; }
     transform: translateY(-1px);
 }
 
-/* Honeycomb texture on navbar */
+/* Navbar texture intentionally kept extremely subtle so it does not compete
+   with the glossy honeycomb cells. */
 .navbar {
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='100'%3E%3Cpath d='M28 66L0 50V16L28 0l28 16v34z' fill='none' stroke='%23f5c800' stroke-width='0.5' opacity='0.08'/%3E%3Cpath d='M28 100L0 84V50l28-16 28 16v34z' fill='none' stroke='%23f5c800' stroke-width='0.5' opacity='0.08'/%3E%3C/svg%3E");
-    background-size: 28px 50px;
+    background-image: none;
 }
 
 /* ─── Offers nav link — animated CTA, consistent on every page ───
@@ -624,7 +624,31 @@ ul { list-style: none; }
    own box only reserves its flat cell-row width, so the tapered
    background tip plus this gap were reading as one big empty gap
    before the CTA hexagon. */
-.desktop-nav .hc-cta { margin-left: -15px; }
+.desktop-nav .hc-cta {
+    position: relative;
+    display: flex; align-items: center; justify-content: center;
+    width: 108px; height: 46px;
+    padding: 0 6px;
+    overflow: hidden;
+    clip-path: path("M 10.04 3.55 Q 11.88 0.00 15.88 0.00 L 92.12 0.00 Q 96.12 0.00 97.96 3.55 L 106.16 19.45 Q 108.00 23.00 106.16 26.55 L 97.96 42.45 Q 96.12 46.00 92.12 46.00 L 15.88 46.00 Q 11.88 46.00 10.04 42.45 L 1.84 26.55 Q 0.00 23.00 1.84 19.45 L 10.04 3.55 Z");
+    background:
+        radial-gradient(125% 95% at 25% 8%, rgba(255,241,178,.72) 0%, rgba(255,241,178,.12) 25%, rgba(255,241,178,0) 48%),
+        linear-gradient(150deg, #F3C44B 0%, #D99018 34%, #A95205 68%, #713000 100%);
+    box-shadow:
+        inset 0 2px 5px rgba(255,240,175,.65),
+        inset 0 -8px 13px rgba(61,22,0,.48),
+        inset 0 0 0 1px rgba(255,235,165,.28),
+        0 6px 14px -4px rgba(87,35,0,.55);
+    backdrop-filter: blur(1.5px) saturate(145%);
+    color: #4a2805 !important;
+    font-family: var(--font-accent);
+    font-size: 12px; font-weight: 700; letter-spacing: .03em;
+    text-transform: uppercase;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: transform .35s cubic-bezier(0.34,1.56,0.64,1), filter .3s ease, box-shadow .3s ease;
+    flex-shrink: 0;
+}
 
 /* Order Now — merged into the honeycomb theme as its own small
    gold hexagon button, sized to sit naturally beside the strip. */
@@ -670,8 +694,13 @@ ul { list-style: none; }
     animation: hcSheenDrift 10s ease-in-out infinite;
 }
 .hc-cta:hover {
-    transform: translateY(-3px);
-    filter: brightness(1.06);
+    transform: translateY(-2px);
+    filter: brightness(1.05) saturate(1.03);
+    box-shadow:
+        inset 0 2px 5px rgba(255,240,175,.65),
+        inset 0 -8px 13px rgba(61,22,0,.48),
+        inset 0 0 0 1px rgba(255,235,165,.32),
+        0 9px 18px -5px rgba(122,53,0,.58);
 }
 .hc-cta:hover::before {
     animation: hcSheenSweep .9s cubic-bezier(0.25,0.46,0.45,0.94);
@@ -713,20 +742,51 @@ ul { list-style: none; }
    these are the same left-offset/scale values it would have computed
    for a 5-cell row, applied statically instead. */
 .hc-strip--cells5 .hc-strip-bg {
-    left: -54.17px;
-    transform: scaleX(0.6723);
+    position: absolute; top: 12.5%; width: 1113.15px; height: 75%;
+    transform-origin: left center;
+    clip-path: path("M 45.545 5.83 Q 62.575 0.00 80.575 0.00 L 1032.575 0.00 Q 1050.575 0.00 1067.605 5.83 L 1113.15 51.375 L 1067.605 96.92 Q 1050.575 102.75 1032.575 102.75 L 80.575 102.75 Q 62.575 102.75 45.545 96.92 L 0.00 51.375 Z");
+    background:
+        radial-gradient(75% 120% at 20% 10%, rgba(224,140,24,.24) 0%, rgba(224,140,24,0) 55%),
+        linear-gradient(155deg, #8B3D02 0%, #713000 48%, #542000 100%);
+    box-shadow:
+        inset 0 8px 16px rgba(255,174,47,.12),
+        inset 0 -10px 18px rgba(39,12,0,.52),
+        0 12px 24px -10px rgba(45,16,0,.62);
 }
 
 /* Offers hexagon: red-gold "honey" box to draw the eye — icon stays white */
-.hc-cell--offer .hc-link:not(.active) {
+.hc-cell--offer .hc-link {
+    position: relative;
+    display: flex; flex-direction: column; align-items: center; justify-content: space-between;
+    width: 100%; height: 100%;
+    padding: 24px 6px 20px;
+    clip-path: var(--hc-clip);
     background:
-        radial-gradient(120% 90% at 28% 12%, rgba(255,200,150,.45) 0%, rgba(255,200,150,0) 42%),
-        linear-gradient(150deg, #e8763a 0%, #c23b1f 42%, #8a2510 78%, #5c1608 100%);
+        radial-gradient(125% 95% at 24% 8%, rgba(255,232,143,.48) 0%, rgba(255,232,143,.10) 25%, rgba(255,232,143,0) 48%),
+        linear-gradient(150deg, #E7A522 0%, #C87508 35%, #9B4702 68%, #6F2F00 100%);
+    box-shadow:
+        inset 0 4px 7px rgba(255,229,137,.38),
+        inset 0 -14px 20px rgba(47,15,0,.52),
+        inset 0 0 0 1px rgba(255,226,128,.22),
+        0 7px 13px -8px rgba(50,17,0,.55);
+    backdrop-filter: blur(1.5px) saturate(145%);
+    color: #fff0c8;
+    text-decoration: none;
+    cursor: pointer;
+    transition: transform .45s cubic-bezier(0.34,1.56,0.64,1), box-shadow .4s cubic-bezier(0.25,0.46,0.45,0.94), background .4s ease, filter .35s ease;
 }
 .hc-cell--offer .hc-link.active {
     background:
-        radial-gradient(120% 90% at 28% 10%, rgba(255,220,190,.8) 0%, rgba(255,220,190,0) 45%),
-        linear-gradient(150deg, #ffb37a 0%, #ff7a3c 40%, #e8481f 75%, #b82c10 100%);
+        radial-gradient(125% 95% at 24% 7%, rgba(255,248,202,.82) 0%, rgba(255,248,202,.16) 27%, rgba(255,248,202,0) 50%),
+        linear-gradient(150deg, #FFD96A 0%, #F0B52B 35%, #C87508 68%, #914000 100%);
+    box-shadow:
+        inset 0 4px 8px rgba(255,249,207,.62),
+        inset 0 -10px 16px rgba(75,29,0,.34),
+        inset 0 0 0 1px rgba(255,244,190,.32),
+        0 12px 22px -9px rgba(206,127,8,.58);
+    color: #4a2805;
+    transform: translateY(-8px) scale(1.03);
+    z-index: 5;
 }
 
 .hc-strip {
@@ -757,8 +817,13 @@ ul { list-style: none; }
     position: absolute; top: 33.43px;
     width: 28px; height: 66px;
     clip-path: var(--hc-clip-connector);
-    background: linear-gradient(155deg, #FFDD55 0%, #F6B900 45%, #D87800 100%);
-    box-shadow: inset 0 2px 4px rgba(255,245,200,.6), 0 4px 10px rgba(169,75,0,.4);
+    background:
+        radial-gradient(110% 80% at 25% 10%, rgba(255,237,155,.55) 0%, rgba(255,237,155,0) 42%),
+        linear-gradient(155deg, #E8A326 0%, #C87508 48%, #8C3D00 100%);
+    box-shadow:
+        inset 0 2px 4px rgba(255,240,175,.5),
+        inset 0 -5px 8px rgba(61,22,0,.4),
+        0 4px 10px rgba(86,32,0,.45);
     transform: scale(1.9, .78);
     transform-origin: center;
     z-index: 3;
@@ -833,15 +898,15 @@ ul { list-style: none; }
    a flat brightness filter, so it reads as more reflective liquid honey
    rather than a generic button hover */
 .hc-cell:hover .hc-link:not(.active) {
-    transform: translateY(-8px);
+    transform: translateY(-5px);
     background:
-        radial-gradient(120% 90% at 28% 12%, rgba(255,229,120,.62) 0%, rgba(255,229,120,0) 45%),
-        linear-gradient(150deg, #FFCA33 0%, #E88A00 40%, #B85D00 75%, #7A3600 100%);
+        radial-gradient(125% 95% at 24% 8%, rgba(255,240,167,.58) 0%, rgba(255,240,167,.12) 27%, rgba(255,240,167,0) 50%),
+        linear-gradient(150deg, #F0B83A 0%, #D1840F 36%, #A95205 70%, #783400 100%);
     box-shadow:
-        inset 0 4px 8px rgba(255,229,120,.5),
-        inset 0 -12px 18px rgba(55,20,0,.5),
-        inset 0 0 0 1px rgba(255,255,255,.28),
-        0 10px 20px -6px rgba(246,185,0,.4);
+        inset 0 4px 8px rgba(255,238,160,.48),
+        inset 0 -12px 18px rgba(47,15,0,.48),
+        inset 0 0 0 1px rgba(255,238,166,.28),
+        0 8px 18px -7px rgba(181,102,7,.48);
     z-index: 4;
 }
 
@@ -1175,7 +1240,7 @@ ul { list-style: none; }
 }
 .vhc-cell.revealed{ opacity:1; transform:translateX(0); }
 
-.vhc-link{
+.vhc-link {
   position:relative;
   display:flex; align-items:center; justify-content:center;
   width:100%; height:100%;
@@ -1183,17 +1248,17 @@ ul { list-style: none; }
   overflow:hidden;
   clip-path: path("M 19.42 3.05 Q 22.00 0.00 26.00 0.00 L 62.00 0.00 Q 66.00 0.00 68.58 3.05 L 85.42 22.95 Q 88.00 26.00 85.42 29.05 L 68.58 48.95 Q 66.00 52.00 62.00 52.00 L 26.00 52.00 Q 22.00 52.00 19.42 48.95 L 2.58 29.05 Q 0.00 26.00 2.58 22.95 L 19.42 3.05 Z");
   background:
-    radial-gradient(120% 90% at 28% 12%, rgba(255,235,180,.5) 0%, rgba(255,235,180,0) 42%),
-    linear-gradient(150deg, #d9922e 0%, #b8681c 42%, #7a3d0f 78%, #5a2c0a 100%);
+    radial-gradient(125% 95% at 24% 8%, rgba(255,232,143,.46) 0%, rgba(255,232,143,0) 48%),
+    linear-gradient(150deg, #D9922E 0%, #B8660A 42%, #7E3800 78%, #5D2500 100%);
   box-shadow:
-    inset 0 3px 6px rgba(255,224,150,.4),
-    inset 0 -10px 15px rgba(35,15,3,.5),
-    inset 0 0 0 1px rgba(255,255,255,.2);
-  backdrop-filter: blur(1.5px) saturate(150%);
+    inset 0 3px 6px rgba(255,224,150,.34),
+    inset 0 -10px 15px rgba(35,15,3,.52),
+    inset 0 0 0 1px rgba(255,226,128,.2);
+  backdrop-filter: blur(1.5px) saturate(145%);
   color:#fbead0;
   text-decoration:none;
   cursor:pointer;
-  transition: transform .55s cubic-bezier(0.34,1.56,0.64,1), box-shadow .5s cubic-bezier(0.25,0.46,0.45,0.94), background .5s cubic-bezier(0.25,0.46,0.45,0.94), filter .45s cubic-bezier(0.25,0.46,0.45,0.94);
+  transition: transform .45s cubic-bezier(0.34,1.56,0.64,1), box-shadow .4s ease, background .4s ease, filter .35s ease;
 }
 .vhc-link::before{
   content:"";
@@ -1236,15 +1301,15 @@ ul { list-style: none; }
 
 .vhc-link.active{
   background:
-    radial-gradient(120% 90% at 28% 10%, rgba(255,250,220,.8) 0%, rgba(255,250,220,0) 45%),
-    linear-gradient(150deg, #ffe680 0%, #ffc93c 40%, #f0a412 75%, #d6860a 100%);
+    radial-gradient(125% 95% at 24% 7%, rgba(255,248,202,.78) 0%, rgba(255,248,202,0) 48%),
+    linear-gradient(150deg, #FFD96A 0%, #F0B52B 40%, #C87508 76%, #8E3E00 100%);
   box-shadow:
-    inset 0 3px 6px rgba(255,250,220,.6),
-    inset 0 -8px 13px rgba(120,70,10,.35),
-    8px 6px 20px -8px rgba(240,164,18,.55),
-    inset 0 0 0 1px rgba(255,255,255,.3);
+    inset 0 3px 6px rgba(255,250,220,.58),
+    inset 0 -8px 13px rgba(86,39,4,.34),
+    inset 0 0 0 1px rgba(255,244,190,.3),
+    7px 5px 18px -8px rgba(190,111,5,.55);
   color:#4a2e05;
-  transform: translateX(14px) scale(1.06);
+  transform: translateX(8px) scale(1.03);
   z-index:5;
 }
 
