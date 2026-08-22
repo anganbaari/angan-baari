@@ -402,23 +402,9 @@ ul { list-style: none; }
     );
 }
 
-/* Bee floating left of nav links */
-.nav-links::before {
-    content: "🐝";
-    position: absolute;
-    left: -30px;
-    top: 50%;
-    transform: translateY(-50%);
-    font-size: 1.05rem;
-    opacity: 0.8;
-    animation: bee-hover 2.8s ease-in-out infinite;
-    pointer-events: none;
-}
-
-@keyframes bee-hover {
-    0%, 100% { transform: translateY(-50%) rotate(-6deg); }
-    50%       { transform: translateY(calc(-50% - 5px)) rotate(6deg); }
-}
+/* Bee decoration removed — this whole .nav-links block is legacy CSS
+   from an earlier pill-style nav and isn't used by any element in the
+   current markup (the live desktop nav uses .hc-* below instead). */
 
 /* Hexagon sliding pill */
 .nav-pill {
@@ -650,13 +636,13 @@ ul { list-style: none; }
     overflow: hidden;
     clip-path: path("M 10.04 3.55 Q 11.88 0.00 15.88 0.00 L 92.12 0.00 Q 96.12 0.00 97.96 3.55 L 106.16 19.45 Q 108.00 23.00 106.16 26.55 L 97.96 42.45 Q 96.12 46.00 92.12 46.00 L 15.88 46.00 Q 11.88 46.00 10.04 42.45 L 1.84 26.55 Q 0.00 23.00 1.84 19.45 L 10.04 3.55 Z");
     background:
-        radial-gradient(120% 90% at 28% 15%, rgba(255,250,220,.7) 0%, rgba(255,250,220,0) 45%),
-        linear-gradient(150deg, #ffe680 0%, #ffc93c 40%, #f0a412 75%, #d6860a 100%);
+        radial-gradient(120% 90% at 28% 15%, rgba(255,246,200,.7) 0%, rgba(255,246,200,0) 45%),
+        linear-gradient(150deg, #FFDD55 0%, #F6B900 38%, #D87800 72%, #A94B00 100%);
     box-shadow:
-        inset 0 3px 5px rgba(255,250,220,.6),
-        inset 0 -8px 12px rgba(120,70,10,.35),
+        inset 0 3px 5px rgba(255,246,200,.6),
+        inset 0 -8px 12px rgba(90,45,0,.4),
         inset 0 0 0 1px rgba(255,255,255,.25),
-        0 6px 14px -4px rgba(180,120,10,.45);
+        0 6px 14px -4px rgba(216,120,0,.5);
     backdrop-filter: blur(1.5px) saturate(150%);
     color: #4a2e05 !important;
     font-family: var(--font-accent);
@@ -762,8 +748,8 @@ ul { list-style: none; }
     position: absolute; top: 12.5%; width: 1113.15px; height: 75%;
     transform-origin: left center;
     clip-path: path("M 45.545 5.83 Q 62.575 0.00 80.575 0.00 L 1032.575 0.00 Q 1050.575 0.00 1067.605 5.83 L 1113.15 51.375 L 1067.605 96.92 Q 1050.575 102.75 1032.575 102.75 L 80.575 102.75 Q 62.575 102.75 45.545 96.92 L 0.00 51.375 Z");
-    background: linear-gradient(155deg, #6b3a12 0%, #4a260b 60%, #371c08 100%);
-    box-shadow: inset 0 10px 18px rgba(0,0,0,.4), 0 16px 26px -8px rgba(50,26,6,.5);
+    background: linear-gradient(155deg, #A94B00 0%, #7A3B05 55%, #713000 100%);
+    box-shadow: inset 0 10px 18px rgba(40,16,0,.45), 0 16px 26px -8px rgba(90,45,0,.5);
 }
 
 /* small gold hexagon connectors bridging the notch between each pair of cells */
@@ -771,8 +757,8 @@ ul { list-style: none; }
     position: absolute; top: 33.43px;
     width: 28px; height: 66px;
     clip-path: var(--hc-clip-connector);
-    background: linear-gradient(155deg, #ffe680 0%, #ffc93c 45%, #f0a412 100%);
-    box-shadow: inset 0 2px 4px rgba(255,250,220,.6), 0 4px 10px rgba(180,120,10,.4);
+    background: linear-gradient(155deg, #FFDD55 0%, #F6B900 45%, #D87800 100%);
+    box-shadow: inset 0 2px 4px rgba(255,245,200,.6), 0 4px 10px rgba(169,75,0,.4);
     transform: scale(1.9, .78);
     transform-origin: center;
     z-index: 3;
@@ -792,14 +778,14 @@ ul { list-style: none; }
     padding: 24px 6px 20px;
     clip-path: var(--hc-clip);
     background:
-        radial-gradient(120% 90% at 28% 12%, rgba(255,235,180,.5) 0%, rgba(255,235,180,0) 42%),
-        linear-gradient(150deg, #d9922e 0%, #b8681c 42%, #7a3d0f 78%, #5a2c0a 100%);
+        radial-gradient(120% 90% at 28% 12%, rgba(255,221,85,.5) 0%, rgba(255,221,85,0) 42%),
+        linear-gradient(150deg, #F6B900 0%, #D87800 38%, #A94B00 72%, #713000 100%);
     box-shadow:
-        inset 0 4px 7px rgba(255,224,150,.4),
-        inset 0 -12px 18px rgba(35,15,3,.5),
-        inset 0 0 0 1px rgba(255,255,255,.22);
+        inset 0 4px 7px rgba(255,221,85,.45),
+        inset 0 -14px 20px rgba(55,20,0,.55),
+        inset 0 0 0 1px rgba(255,255,255,.20);
     backdrop-filter: blur(1.5px) saturate(150%);
-    color: #fbead0;
+    color: #fff3d6;
     text-decoration: none;
     cursor: pointer;
     transition: transform .55s cubic-bezier(0.34,1.56,0.64,1), box-shadow .5s cubic-bezier(0.25,0.46,0.45,0.94), background .5s cubic-bezier(0.25,0.46,0.45,0.94), filter .45s cubic-bezier(0.25,0.46,0.45,0.94);
@@ -843,23 +829,32 @@ ul { list-style: none; }
     white-space: nowrap;
 }
 
-/* hover preview lift */
+/* hover preview lift — brighter honey tone + soft warm glow, not just
+   a flat brightness filter, so it reads as more reflective liquid honey
+   rather than a generic button hover */
 .hc-cell:hover .hc-link:not(.active) {
     transform: translateY(-8px);
-    filter: brightness(1.1);
+    background:
+        radial-gradient(120% 90% at 28% 12%, rgba(255,229,120,.62) 0%, rgba(255,229,120,0) 45%),
+        linear-gradient(150deg, #FFCA33 0%, #E88A00 40%, #B85D00 75%, #7A3600 100%);
+    box-shadow:
+        inset 0 4px 8px rgba(255,229,120,.5),
+        inset 0 -12px 18px rgba(55,20,0,.5),
+        inset 0 0 0 1px rgba(255,255,255,.28),
+        0 10px 20px -6px rgba(246,185,0,.4);
     z-index: 4;
 }
 
-/* the "we are here" cell — pops up bright gold */
+/* the "we are here" cell — pops up bright, naturally illuminated honey */
 .hc-link.active {
     background:
-        radial-gradient(120% 90% at 28% 10%, rgba(255,250,220,.8) 0%, rgba(255,250,220,0) 45%),
-        linear-gradient(150deg, #ffe680 0%, #ffc93c 40%, #f0a412 75%, #d6860a 100%);
+        radial-gradient(120% 90% at 28% 10%, rgba(255,246,200,.85) 0%, rgba(255,246,200,0) 45%),
+        linear-gradient(150deg, #FFDD55 0%, #F6B900 35%, #D87800 70%, #A94B00 100%);
     box-shadow:
-        inset 0 4px 8px rgba(255,250,220,.6),
-        inset 0 -10px 16px rgba(120,70,10,.35),
-        0 18px 28px -10px rgba(240,164,18,.6);
-    color: #4a2e05;
+        inset 0 4px 8px rgba(255,246,200,.65),
+        inset 0 -10px 16px rgba(90,45,0,.35),
+        0 18px 28px -10px rgba(246,185,0,.65);
+    color: #4a2205;
     transform: translateY(-16px) scale(1.09);
     z-index: 5;
 }
