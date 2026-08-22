@@ -657,7 +657,7 @@ ul { list-style: none; }
    own box only reserves its flat cell-row width, so the tapered
    background tip plus this gap were reading as one big empty gap
    before the CTA hexagon. */
-.desktop-nav .hc-cta { margin-left: -5px; }
+.desktop-nav .hc-cta { margin-left: -10px; }
 
 /* Order Now — merged into the honeycomb theme as its own small
    gold hexagon button, sized to sit naturally beside the strip. */
