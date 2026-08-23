@@ -636,15 +636,15 @@ ul { list-style: none; }
     overflow: hidden;
     clip-path: path("M 10.04 3.55 Q 11.88 0.00 15.88 0.00 L 92.12 0.00 Q 96.12 0.00 97.96 3.55 L 106.16 19.45 Q 108.00 23.00 106.16 26.55 L 97.96 42.45 Q 96.12 46.00 92.12 46.00 L 15.88 46.00 Q 11.88 46.00 10.04 42.45 L 1.84 26.55 Q 0.00 23.00 1.84 19.45 L 10.04 3.55 Z");
     background:
-        radial-gradient(120% 90% at 28% 15%, rgba(255,246,200,.7) 0%, rgba(255,246,200,0) 45%),
-        linear-gradient(150deg, #FFDD55 0%, #F6B900 38%, #D87800 72%, #A94B00 100%);
+        radial-gradient(120% 90% at 22% 8%, rgba(255,217,106,.5) 0%, rgba(255,217,106,0) 28%),
+        linear-gradient(135deg, #D98200 0%, #B85A00 26%, #8F4000 58%, #6F2F00 100%);
     box-shadow:
-        inset 0 3px 5px rgba(255,246,200,.6),
-        inset 0 -8px 12px rgba(90,45,0,.4),
-        inset 0 0 0 1px rgba(255,255,255,.25),
-        0 6px 14px -4px rgba(216,120,0,.5);
-    backdrop-filter: blur(1.5px) saturate(150%);
-    color: #4a2e05 !important;
+        inset 0 3px 5px rgba(255,217,106,.32),
+        inset 0 -10px 15px rgba(35,12,0,.55),
+        inset 0 0 0 1px rgba(255,217,106,.16),
+        0 6px 14px -4px rgba(111,47,0,.45);
+    backdrop-filter: blur(1.5px) saturate(140%);
+    color: #fff3d6 !important;
     font-family: var(--font-accent);
     font-size: 12px; font-weight: 700; letter-spacing: .03em;
     text-transform: uppercase;
@@ -725,8 +725,8 @@ ul { list-style: none; }
 }
 .hc-cell--offer .hc-link.active {
     background:
-        radial-gradient(120% 90% at 28% 10%, rgba(255,220,190,.8) 0%, rgba(255,220,190,0) 45%),
-        linear-gradient(150deg, #ffb37a 0%, #ff7a3c 40%, #e8481f 75%, #b82c10 100%);
+        radial-gradient(120% 90% at 22% 8%, rgba(255,220,190,.75) 0%, rgba(255,220,190,0) 30%),
+        linear-gradient(135deg, #ff7a3c 0%, #e8481f 40%, #c73510 72%, #b82c10 100%);
 }
 
 .hc-strip {
@@ -748,8 +748,8 @@ ul { list-style: none; }
     position: absolute; top: 12.5%; width: 1113.15px; height: 75%;
     transform-origin: left center;
     clip-path: path("M 45.545 5.83 Q 62.575 0.00 80.575 0.00 L 1032.575 0.00 Q 1050.575 0.00 1067.605 5.83 L 1113.15 51.375 L 1067.605 96.92 Q 1050.575 102.75 1032.575 102.75 L 80.575 102.75 Q 62.575 102.75 45.545 96.92 L 0.00 51.375 Z");
-    background: linear-gradient(155deg, #A94B00 0%, #7A3B05 55%, #713000 100%);
-    box-shadow: inset 0 10px 18px rgba(40,16,0,.45), 0 16px 26px -8px rgba(90,45,0,.5);
+    background: linear-gradient(135deg, #8F4000 0%, #6F2F00 60%, #5C2600 100%);
+    box-shadow: inset 0 8px 14px rgba(30,10,0,.4), inset 0 -3px 8px rgba(255,180,60,.06), 0 16px 26px -8px rgba(70,30,0,.5);
 }
 
 /* small gold hexagon connectors bridging the notch between each pair of cells */
@@ -757,8 +757,8 @@ ul { list-style: none; }
     position: absolute; top: 33.43px;
     width: 28px; height: 66px;
     clip-path: var(--hc-clip-connector);
-    background: linear-gradient(155deg, #FFDD55 0%, #F6B900 45%, #D87800 100%);
-    box-shadow: inset 0 2px 4px rgba(255,245,200,.6), 0 4px 10px rgba(169,75,0,.4);
+    background: linear-gradient(135deg, #F0B52B 0%, #D98200 50%, #B85A00 100%);
+    box-shadow: inset 0 2px 4px rgba(255,217,106,.5), 0 4px 10px rgba(111,47,0,.4);
     transform: scale(1.9, .78);
     transform-origin: center;
     z-index: 3;
@@ -778,13 +778,13 @@ ul { list-style: none; }
     padding: 24px 6px 20px;
     clip-path: var(--hc-clip);
     background:
-        radial-gradient(120% 90% at 28% 12%, rgba(255,221,85,.5) 0%, rgba(255,221,85,0) 42%),
-        linear-gradient(150deg, #F6B900 0%, #D87800 38%, #A94B00 72%, #713000 100%);
+        radial-gradient(120% 90% at 22% 8%, rgba(255,217,106,.5) 0%, rgba(255,217,106,0) 28%),
+        linear-gradient(135deg, #D98200 0%, #B85A00 26%, #8F4000 58%, #6F2F00 100%);
     box-shadow:
-        inset 0 4px 7px rgba(255,221,85,.45),
-        inset 0 -14px 20px rgba(55,20,0,.55),
-        inset 0 0 0 1px rgba(255,255,255,.20);
-    backdrop-filter: blur(1.5px) saturate(150%);
+        inset 0 3px 5px rgba(255,217,106,.32),
+        inset 0 -16px 22px rgba(35,12,0,.6),
+        inset 0 0 0 1px rgba(255,217,106,.14);
+    backdrop-filter: blur(1.5px) saturate(140%);
     color: #fff3d6;
     text-decoration: none;
     cursor: pointer;
@@ -824,8 +824,9 @@ ul { list-style: none; }
 }
 .hc-label {
     font-family: var(--font-accent);
-    font-size: 17px; letter-spacing: .03em;
-    font-weight: 900; text-transform: uppercase; text-align: center;
+    font-size: 17px; letter-spacing: .045em;
+    font-weight: 700; text-transform: uppercase; text-align: center;
+    text-shadow: 0 1px 2px rgba(30,10,0,.35);
     white-space: nowrap;
 }
 
@@ -833,29 +834,30 @@ ul { list-style: none; }
    a flat brightness filter, so it reads as more reflective liquid honey
    rather than a generic button hover */
 .hc-cell:hover .hc-link:not(.active) {
-    transform: translateY(-8px);
+    transform: translateY(-5px);
     background:
-        radial-gradient(120% 90% at 28% 12%, rgba(255,229,120,.62) 0%, rgba(255,229,120,0) 45%),
-        linear-gradient(150deg, #FFCA33 0%, #E88A00 40%, #B85D00 75%, #7A3600 100%);
+        radial-gradient(120% 90% at 22% 8%, rgba(255,217,106,.58) 0%, rgba(255,217,106,0) 30%),
+        linear-gradient(135deg, #E8952A 0%, #C4680A 30%, #954600 64%, #6F2F00 100%);
     box-shadow:
-        inset 0 4px 8px rgba(255,229,120,.5),
-        inset 0 -12px 18px rgba(55,20,0,.5),
-        inset 0 0 0 1px rgba(255,255,255,.28),
-        0 10px 20px -6px rgba(246,185,0,.4);
+        inset 0 3px 6px rgba(255,217,106,.4),
+        inset 0 -14px 20px rgba(35,12,0,.55),
+        inset 0 0 0 1px rgba(255,217,106,.22),
+        0 8px 16px -6px rgba(217,130,0,.35);
     z-index: 4;
 }
 
 /* the "we are here" cell — pops up bright, naturally illuminated honey */
 .hc-link.active {
     background:
-        radial-gradient(120% 90% at 28% 10%, rgba(255,246,200,.85) 0%, rgba(255,246,200,0) 45%),
-        linear-gradient(150deg, #FFDD55 0%, #F6B900 35%, #D87800 70%, #A94B00 100%);
+        radial-gradient(120% 90% at 24% 8%, rgba(255,217,106,.62) 0%, rgba(255,217,106,0) 32%),
+        linear-gradient(135deg, #F0B52B 0%, #D98200 28%, #B85A00 60%, #8F4000 100%);
     box-shadow:
-        inset 0 4px 8px rgba(255,246,200,.65),
-        inset 0 -10px 16px rgba(90,45,0,.35),
-        0 18px 28px -10px rgba(246,185,0,.65);
-    color: #4a2205;
-    transform: translateY(-16px) scale(1.09);
+        inset 0 3px 6px rgba(255,217,106,.48),
+        inset 0 -14px 20px rgba(45,16,0,.5),
+        inset 0 0 0 1px rgba(255,217,106,.28),
+        0 10px 18px -8px rgba(240,181,43,.5);
+    color: #fff6e0;
+    transform: translateY(-6px) scale(1.03);
     z-index: 5;
 }
 .hc-link.active svg { transform: scale(1.08); }
@@ -875,7 +877,7 @@ ul { list-style: none; }
 
 @media (prefers-reduced-motion: reduce) {
     .hc-link { transition: none; }
-    .hc-link.active { transform: translateY(-14px); }
+    .hc-link.active { transform: translateY(-6px) scale(1.03); }
     .hc-link::before { animation: none; }
     .hc-ping { display: none; }
 }
@@ -6552,586 +6554,4 @@ ul { list-style: none; }
     .scroll-vine-leaf {
         transition: none !important;
     }
-}
-
-/* ========================================================================
-   ANGAN BAARI — CONNECTED LIQUID HONEYCOMB / BRAND COLOR REFINEMENT
-   ------------------------------------------------------------------------
-   Final visual override for the existing desktop honeycomb.
-   HTML and JavaScript are intentionally unchanged.
-========================================================================= */
-
-/* ================================================================
-   BRAND — ORGANIC FARM MATCHES THE LARGE NEPALI NAME
-================================================================ */
-.brand-subtag {
-    color: var(--gold) !important;
-    text-shadow: 0 1px 2px rgba(0,0,0,.28);
-}
-
-
-/* ================================================================
-   DESKTOP HONEYCOMB — MAKE THE CELLS LARGER + MORE CONNECTED
-================================================================ */
-@media (min-width: 1201px) {
-
-    .desktop-nav {
-        display: flex;
-        align-items: center;
-        gap: 7px;
-        height: 82px;
-    }
-
-    .hc-scale-box {
-        width: 574px;
-        height: 82px;
-        position: relative;
-        flex: 0 0 574px;
-    }
-
-    .hc-strip {
-        --cell: 112px;
-        --cells: 8;
-        --gap: 11px;
-        --H: 137px;
-
-        width: calc(var(--cell) * var(--cells) + var(--gap) * (var(--cells) - 1));
-        height: var(--H);
-        transform: scale(.555);
-        transform-origin: top left;
-    }
-
-    /* The original inline connector positions were designed for a 20px
-       native gap. These positions close the cells together visually. */
-    .hc-strip > .hc-connector:nth-of-type(2) { left: 108px !important; }
-    .hc-strip > .hc-connector:nth-of-type(3) { left: 231px !important; }
-    .hc-strip > .hc-connector:nth-of-type(4) { left: 354px !important; }
-    .hc-strip > .hc-connector:nth-of-type(5) { left: 477px !important; }
-    .hc-strip > .hc-connector:nth-of-type(6) { left: 600px !important; }
-    .hc-strip > .hc-connector:nth-of-type(7) { left: 723px !important; }
-    .hc-strip > .hc-connector:nth-of-type(8) { left: 846px !important; }
-
-    /* Continuous honey behind the cells: darker at the bottom, warm at
-       the top, with a soft reflected strip of light. */
-    .hc-strip-bg {
-        top: 10%;
-        height: 80%;
-        background:
-            radial-gradient(ellipse 78% 100% at 47% 0%,
-                rgba(255,218,111,.25) 0%,
-                rgba(255,178,43,.10) 28%,
-                rgba(255,140,15,0) 68%),
-            linear-gradient(180deg,
-                #8e4304 0%,
-                #713002 38%,
-                #552002 72%,
-                #3a1601 100%);
-        box-shadow:
-            inset 0 3px 5px rgba(255,214,105,.30),
-            inset 0 -10px 16px rgba(24,7,0,.68),
-            inset 0 0 0 1px rgba(255,183,59,.24),
-            0 9px 17px rgba(28,9,0,.42);
-    }
-
-    /* Connectors become recessed bridges instead of obvious little buttons. */
-    .hc-connector {
-        top: 34px;
-        width: 28px;
-        height: 66px;
-        background:
-            radial-gradient(ellipse 100% 70% at 28% 8%,
-                rgba(255,224,125,.68) 0%,
-                rgba(255,193,58,.18) 35%,
-                transparent 68%),
-            linear-gradient(160deg,
-                #c77708 0%,
-                #a14b03 46%,
-                #6d2901 100%);
-        box-shadow:
-            inset 0 2px 4px rgba(255,231,148,.42),
-            inset 0 -6px 8px rgba(43,12,0,.60),
-            inset 0 0 0 1px rgba(255,202,77,.22),
-            0 3px 7px rgba(38,11,0,.45);
-        transform: scale(1.72,.72);
-        z-index: 3;
-    }
-
-    /* ============================================================
-       INDIVIDUAL CELLS — LIQUID HONEY
-    ============================================================ */
-    .hc-cell {
-        position: relative;
-        width: var(--cell);
-        height: 100%;
-        z-index: 4;
-    }
-
-    .hc-link {
-        padding: 24px 6px 20px;
-        color: #fff4d5;
-
-        background:
-            /* concentrated light on upper-left shoulder */
-            radial-gradient(ellipse 88% 68% at 23% 5%,
-                rgba(255,238,169,.88) 0%,
-                rgba(255,211,91,.50) 15%,
-                rgba(245,170,28,.12) 42%,
-                transparent 68%),
-            /* liquid honey body */
-            linear-gradient(155deg,
-                #d99012 0%,
-                #c06a05 23%,
-                #9b4502 52%,
-                #742b01 76%,
-                #4c1c01 100%);
-
-        box-shadow:
-            inset 0 4px 6px rgba(255,246,198,.72),
-            inset 0 11px 16px rgba(255,185,43,.12),
-            inset 0 -15px 20px rgba(45,12,0,.68),
-            inset 0 0 0 1px rgba(255,217,109,.38),
-            0 8px 12px rgba(31,9,0,.40);
-
-        filter: drop-shadow(0 5px 6px rgba(31,9,0,.34));
-
-        transform: translateY(0) scale(1);
-        transition:
-            transform .42s cubic-bezier(.22,.80,.25,1),
-            filter .35s ease,
-            box-shadow .35s ease,
-            background .35s ease;
-    }
-
-    /* A second, very subtle internal reflection gives the surface a wet
-       appearance instead of looking like a flat gradient. */
-    .hc-link::after {
-        content: "";
-        position: absolute;
-        left: 12%;
-        right: 12%;
-        top: 7%;
-        height: 25%;
-        border-radius: 50%;
-        background: linear-gradient(180deg,
-            rgba(255,255,238,.30),
-            rgba(255,255,238,0));
-        filter: blur(5px);
-        opacity: .72;
-        pointer-events: none;
-        mix-blend-mode: screen;
-    }
-
-    .hc-link::before {
-        content: "";
-        position: absolute;
-        inset: -22%;
-        background:
-            linear-gradient(120deg,
-                transparent 35%,
-                rgba(255,255,240,.04) 43%,
-                rgba(255,255,235,.56) 48%,
-                rgba(255,231,169,.14) 53%,
-                transparent 62%);
-        background-size: 240% 240%;
-        background-position: -85% -85%;
-        mix-blend-mode: screen;
-        opacity: .65;
-        pointer-events: none;
-        animation: anganLiquidHoneySweep 13s ease-in-out infinite;
-    }
-
-    .hc-cell:nth-child(2n) .hc-link::before { animation-delay: -4.2s; }
-    .hc-cell:nth-child(3n) .hc-link::before { animation-delay: -8.1s; }
-
-    @keyframes anganLiquidHoneySweep {
-        0%,100% {
-            background-position: -80% -80%;
-            opacity: .34;
-        }
-        44% {
-            background-position: 28% 28%;
-            opacity: .72;
-        }
-        58% {
-            background-position: 48% 48%;
-            opacity: .56;
-        }
-    }
-
-    /* ============================================================
-       ICON + LABEL
-    ============================================================ */
-    .hc-link svg {
-        width: 36px;
-        height: 36px;
-        stroke-width: 2.45;
-        filter: drop-shadow(0 1px 1px rgba(43,13,0,.52));
-    }
-
-    .hc-label {
-        font-size: 15px;
-        font-weight: 700;
-        letter-spacing: .025em;
-        color: #fff1d0;
-        text-shadow:
-            0 1px 1px rgba(48,14,0,.82),
-            0 0 5px rgba(255,204,90,.12);
-    }
-
-    /* ============================================================
-       HOVER — SMALL PHYSICAL LIFT
-    ============================================================ */
-    .hc-cell:hover .hc-link:not(.active) {
-        transform: translateY(-5px) scale(1.018);
-        filter: drop-shadow(0 10px 9px rgba(31,9,0,.42)) brightness(1.055) saturate(1.05);
-        background:
-            radial-gradient(ellipse 88% 68% at 23% 5%,
-                rgba(255,246,194,.94) 0%,
-                rgba(255,219,104,.54) 16%,
-                rgba(245,174,30,.13) 44%,
-                transparent 70%),
-            linear-gradient(155deg,
-                #e0a01a 0%,
-                #c87306 24%,
-                #a14902 53%,
-                #762d01 77%,
-                #4d1c01 100%);
-        box-shadow:
-            inset 0 4px 7px rgba(255,250,211,.78),
-            inset 0 12px 18px rgba(255,193,53,.14),
-            inset 0 -15px 20px rgba(43,12,0,.64),
-            inset 0 0 0 1px rgba(255,226,131,.45),
-            0 11px 15px rgba(31,9,0,.43);
-        z-index: 8;
-    }
-
-    .hc-cell:hover .hc-link:not(.active) svg {
-        transform: translateY(-1px) scale(1.035);
-    }
-
-    /* ============================================================
-       ACTIVE CELL — BRIGHTER, BUT STILL HONEY
-    ============================================================ */
-    .hc-link.active,
-    .hc-cell .hc-link.active {
-        transform: translateY(-8px) scale(1.045) !important;
-        background:
-            radial-gradient(ellipse 100% 76% at 23% 3%,
-                rgba(255,252,218,.98) 0%,
-                rgba(255,229,132,.70) 15%,
-                rgba(249,186,42,.20) 42%,
-                transparent 70%),
-            linear-gradient(155deg,
-                #f2b72e 0%,
-                #d48709 27%,
-                #b35703 55%,
-                #813301 79%,
-                #562001 100%);
-        box-shadow:
-            inset 0 4px 7px rgba(255,252,220,.92),
-            inset 0 12px 19px rgba(255,201,55,.18),
-            inset 0 -16px 21px rgba(51,14,0,.64),
-            inset 0 0 0 1px rgba(255,233,151,.56),
-            0 14px 20px rgba(30,8,0,.50),
-            0 0 18px rgba(214,143,24,.22);
-        filter: drop-shadow(0 7px 8px rgba(30,8,0,.36));
-        color: #4b2605;
-        z-index: 12;
-    }
-
-    .hc-link.active svg {
-        transform: scale(1.035);
-        filter: drop-shadow(0 1px 1px rgba(255,245,191,.25));
-    }
-
-    .hc-link.active .hc-label {
-        color: #4b2605;
-        text-shadow: 0 1px 0 rgba(255,224,126,.30);
-    }
-
-    .hc-link.active::before {
-        opacity: .84;
-        animation: anganActiveHoneyShine 4.8s ease-in-out infinite;
-    }
-
-    @keyframes anganActiveHoneyShine {
-        0% { background-position: -90% -90%; }
-        50% { background-position: 32% 32%; }
-        100% { background-position: 120% 120%; }
-    }
-
-    /* ============================================================
-       ORDER NOW — SAME MATERIAL, SLIGHTLY LONGER
-    ============================================================ */
-    .desktop-nav .hc-cta {
-        width: 116px;
-        height: 50px;
-        margin-left: -22px;
-        background:
-            radial-gradient(ellipse 100% 80% at 23% 7%,
-                rgba(255,239,170,.82) 0%,
-                rgba(255,205,76,.30) 30%,
-                transparent 67%),
-            linear-gradient(155deg,
-                #dda016 0%,
-                #c16a05 33%,
-                #9a4302 66%,
-                #682501 100%);
-        box-shadow:
-            inset 0 3px 6px rgba(255,244,188,.70),
-            inset 0 -10px 14px rgba(47,13,0,.60),
-            inset 0 0 0 1px rgba(255,221,119,.42),
-            0 8px 14px rgba(31,9,0,.45);
-        color: #fff0ca !important;
-        filter: drop-shadow(0 5px 6px rgba(31,9,0,.30));
-    }
-
-    .desktop-nav .hc-cta:hover {
-        transform: translateY(-4px) scale(1.018);
-        filter: drop-shadow(0 9px 8px rgba(31,9,0,.38)) brightness(1.06);
-    }
-
-    /* The CTA sheen should be softer than a glass button. */
-    .hc-cta::before {
-        background:
-            linear-gradient(120deg,
-                transparent 35%,
-                rgba(255,255,235,.04) 43%,
-                rgba(255,255,235,.48) 49%,
-                rgba(255,230,170,.12) 54%,
-                transparent 63%);
-        background-size: 240% 240%;
-        background-position: -80% -80%;
-        opacity: .65;
-        animation: anganCtaHoneyShine 11s ease-in-out infinite;
-    }
-
-    @keyframes anganCtaHoneyShine {
-        0%,100% { background-position: -80% -80%; }
-        50% { background-position: 45% 45%; }
-    }
-}
-
-
-/* ================================================================
-   MOBILE/TABLET BRAND — SAME NEPALI-GOLD ORGANIC FARM COLOR
-================================================================ */
-.brand-subtag {
-    color: var(--gold) !important;
-}
-
-
-/* ================================================================
-   TOUCH DEVICES — NO HOVER LIFT
-================================================================ */
-@media (hover: none) {
-    .hc-cell:hover .hc-link:not(.active) {
-        transform: none;
-        filter: none;
-    }
-}
-
-
-/* ================================================================
-   REDUCED MOTION
-================================================================ */
-@media (prefers-reduced-motion: reduce) {
-    .hc-link::before,
-    .hc-link.active::before,
-    .hc-cta::before {
-        animation: none !important;
-    }
-}
-
-
-/* ================================================================
-   ANGAN BAARI — FINAL NAVIGATION COLOR / POPUP REFINEMENT
-   ---------------------------------------------------------------
-   Keeps the current honeycomb design exactly as-is.
-
-   Changes requested:
-   1. Small connector hexagons are a slightly different/darker honey.
-   2. Hovered nav cell gets a clear color change.
-   3. Active/pop-up nav cell gets a stronger color change.
-   4. Active icon + letters are forced above the sheen and use a
-      high-contrast dark brown so they remain clearly readable.
-   5. No JavaScript or HTML changes are required.
-================================================================ */
-
-/* ---------------------------------------------------------------
-   SMALL CONNECTOR HEXAGONS
-   Slightly darker and more amber than the main navigation cells.
----------------------------------------------------------------- */
-.hc-connector {
-    background:
-        radial-gradient(
-            ellipse 100% 70% at 28% 8%,
-            rgba(255, 218, 105, .48) 0%,
-            rgba(255, 181, 42, .12) 36%,
-            transparent 68%
-        ),
-        linear-gradient(
-            160deg,
-            #c06b06 0%,
-            #954102 48%,
-            #682400 100%
-        ) !important;
-
-    box-shadow:
-        inset 0 2px 4px rgba(255, 230, 145, .34),
-        inset 0 -6px 9px rgba(39, 10, 0, .62),
-        inset 0 0 0 1px rgba(255, 195, 64, .20),
-        0 3px 7px rgba(34, 10, 0, .40) !important;
-
-    z-index: 3 !important;
-}
-
-/* ---------------------------------------------------------------
-   HOVERED NAV CELL
-   Distinct golden color while keeping the same honey material.
----------------------------------------------------------------- */
-.hc-cell:hover .hc-link:not(.active) {
-    background:
-        radial-gradient(
-            ellipse 95% 75% at 25% 7%,
-            rgba(255, 241, 166, .88) 0%,
-            rgba(255, 211, 91, .42) 23%,
-            rgba(255, 169, 24, .08) 50%,
-            transparent 72%
-        ),
-        linear-gradient(
-            155deg,
-            #e7a923 0%,
-            #cc7608 32%,
-            #aa4c02 62%,
-            #772b01 82%,
-            #4e1a00 100%
-        ) !important;
-
-    color: #321800 !important;
-
-    transform: translateY(-8px) scale(1.045) !important;
-
-    box-shadow:
-        inset 0 4px 7px rgba(255, 249, 202, .80),
-        inset 0 12px 18px rgba(255, 190, 44, .15),
-        inset 0 -15px 20px rgba(45, 11, 0, .60),
-        inset 0 0 0 1px rgba(255, 224, 123, .48),
-        0 12px 18px rgba(31, 9, 0, .46),
-        0 0 10px rgba(223, 145, 18, .16) !important;
-
-    z-index: 14 !important;
-}
-
-.hc-cell:hover .hc-link:not(.active) .hc-label {
-    color: #321800 !important;
-    position: relative;
-    z-index: 3;
-    text-shadow: 0 1px 0 rgba(255, 229, 139, .42) !important;
-}
-
-.hc-cell:hover .hc-link:not(.active) svg {
-    color: #321800 !important;
-    stroke: #321800 !important;
-    position: relative;
-    z-index: 3;
-    transform: translateY(-1px) scale(1.05) !important;
-}
-
-/* ---------------------------------------------------------------
-   ACTIVE / POPPED-UP CELL
-   Stronger visual change than hover, with very high text contrast.
----------------------------------------------------------------- */
-.hc-link.active,
-.hc-cell .hc-link.active {
-    background:
-        radial-gradient(
-            ellipse 105% 78% at 25% 5%,
-            rgba(255, 248, 191, .98) 0%,
-            rgba(255, 218, 102, .72) 17%,
-            rgba(246, 177, 31, .22) 43%,
-            transparent 70%
-        ),
-        linear-gradient(
-            155deg,
-            #f0b832 0%,
-            #d88a0b 30%,
-            #b85a03 58%,
-            #843201 80%,
-            #592000 100%
-        ) !important;
-
-    color: #241100 !important;
-
-    transform: translateY(-10px) scale(1.055) !important;
-
-    box-shadow:
-        inset 0 4px 8px rgba(255, 253, 216, .94),
-        inset 0 12px 20px rgba(255, 199, 57, .19),
-        inset 0 -16px 22px rgba(49, 12, 0, .62),
-        inset 0 0 0 1px rgba(255, 232, 142, .60),
-        0 16px 22px rgba(28, 7, 0, .54),
-        0 0 18px rgba(228, 151, 22, .25) !important;
-
-    z-index: 20 !important;
-}
-
-/* The active sheen must stay behind the actual text/icon. */
-.hc-link.active::before {
-    opacity: .34 !important;
-    z-index: 1 !important;
-}
-
-/* ---------------------------------------------------------------
-   ACTIVE LETTERS — explicit high-contrast layer
----------------------------------------------------------------- */
-.hc-link.active .hc-label {
-    position: relative;
-    z-index: 4;
-
-    color: #241100 !important;
-    font-weight: 900 !important;
-
-    text-shadow:
-        0 1px 0 rgba(255, 236, 159, .62),
-        0 1px 2px rgba(54, 17, 0, .20) !important;
-}
-
-/* SVG icons need their own explicit stroke color because currentColor
-   can otherwise inherit an older rule from the stylesheet. */
-.hc-link.active svg {
-    position: relative;
-    z-index: 4;
-
-    color: #241100 !important;
-    stroke: #241100 !important;
-
-    transform: scale(1.055) !important;
-
-    filter:
-        drop-shadow(0 1px 1px rgba(255, 236, 159, .48)) !important;
-}
-
-/* ---------------------------------------------------------------
-   KEEP POPPED CELL ABOVE NEIGHBOURING CELLS / CONNECTORS
----------------------------------------------------------------- */
-.hc-cell:has(.hc-link.active) {
-    z-index: 20 !important;
-}
-
-/* ---------------------------------------------------------------
-   TOUCH DEVICES
-   Keep the active state visible, but don't create a hover-only pop.
----------------------------------------------------------------- */
-@media (hover: none) {
-    .hc-cell:hover .hc-link:not(.active) {
-        transform: none !important;
-    }
-}
-
-/* ---------------------------------------------------------------
-   ORGANIC FARM — same gold as आँगन बारी
----------------------------------------------------------------- */
-.brand-subtag {
-    color: var(--gold) !important;
 }
