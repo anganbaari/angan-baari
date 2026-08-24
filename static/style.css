@@ -636,15 +636,15 @@ ul { list-style: none; }
     overflow: hidden;
     clip-path: path("M 10.04 3.55 Q 11.88 0.00 15.88 0.00 L 92.12 0.00 Q 96.12 0.00 97.96 3.55 L 106.16 19.45 Q 108.00 23.00 106.16 26.55 L 97.96 42.45 Q 96.12 46.00 92.12 46.00 L 15.88 46.00 Q 11.88 46.00 10.04 42.45 L 1.84 26.55 Q 0.00 23.00 1.84 19.45 L 10.04 3.55 Z");
     background:
-        radial-gradient(120% 90% at 22% 8%, rgba(255,217,106,.5) 0%, rgba(255,217,106,0) 28%),
-        linear-gradient(135deg, #D98200 0%, #B85A00 26%, #8F4000 58%, #6F2F00 100%);
+        radial-gradient(120% 90% at 28% 15%, rgba(255,246,200,.7) 0%, rgba(255,246,200,0) 45%),
+        linear-gradient(150deg, #FFDD55 0%, #F6B900 38%, #D87800 72%, #A94B00 100%);
     box-shadow:
-        inset 0 3px 5px rgba(255,217,106,.32),
-        inset 0 -10px 15px rgba(35,12,0,.55),
-        inset 0 0 0 1px rgba(255,217,106,.16),
-        0 6px 14px -4px rgba(111,47,0,.45);
-    backdrop-filter: blur(1.5px) saturate(140%);
-    color: #fff3d6 !important;
+        inset 0 3px 5px rgba(255,246,200,.6),
+        inset 0 -8px 12px rgba(90,45,0,.4),
+        inset 0 0 0 1px rgba(255,255,255,.25),
+        0 6px 14px -4px rgba(216,120,0,.5);
+    backdrop-filter: blur(1.5px) saturate(150%);
+    color: #4a2e05 !important;
     font-family: var(--font-accent);
     font-size: 12px; font-weight: 700; letter-spacing: .03em;
     text-transform: uppercase;
@@ -725,8 +725,8 @@ ul { list-style: none; }
 }
 .hc-cell--offer .hc-link.active {
     background:
-        radial-gradient(120% 90% at 22% 8%, rgba(255,220,190,.75) 0%, rgba(255,220,190,0) 30%),
-        linear-gradient(135deg, #ff7a3c 0%, #e8481f 40%, #c73510 72%, #b82c10 100%);
+        radial-gradient(120% 90% at 28% 10%, rgba(255,220,190,.8) 0%, rgba(255,220,190,0) 45%),
+        linear-gradient(150deg, #ffb37a 0%, #ff7a3c 40%, #e8481f 75%, #b82c10 100%);
 }
 
 .hc-strip {
@@ -748,8 +748,8 @@ ul { list-style: none; }
     position: absolute; top: 12.5%; width: 1113.15px; height: 75%;
     transform-origin: left center;
     clip-path: path("M 45.545 5.83 Q 62.575 0.00 80.575 0.00 L 1032.575 0.00 Q 1050.575 0.00 1067.605 5.83 L 1113.15 51.375 L 1067.605 96.92 Q 1050.575 102.75 1032.575 102.75 L 80.575 102.75 Q 62.575 102.75 45.545 96.92 L 0.00 51.375 Z");
-    background: linear-gradient(135deg, #8F4000 0%, #6F2F00 60%, #5C2600 100%);
-    box-shadow: inset 0 8px 14px rgba(30,10,0,.4), inset 0 -3px 8px rgba(255,180,60,.06), 0 16px 26px -8px rgba(70,30,0,.5);
+    background: linear-gradient(155deg, #A94B00 0%, #7A3B05 55%, #713000 100%);
+    box-shadow: inset 0 10px 18px rgba(40,16,0,.45), 0 16px 26px -8px rgba(90,45,0,.5);
 }
 
 /* small gold hexagon connectors bridging the notch between each pair of cells */
@@ -757,8 +757,8 @@ ul { list-style: none; }
     position: absolute; top: 33.43px;
     width: 28px; height: 66px;
     clip-path: var(--hc-clip-connector);
-    background: linear-gradient(135deg, #F0B52B 0%, #D98200 50%, #B85A00 100%);
-    box-shadow: inset 0 2px 4px rgba(255,217,106,.5), 0 4px 10px rgba(111,47,0,.4);
+    background: linear-gradient(155deg, #FFDD55 0%, #F6B900 45%, #D87800 100%);
+    box-shadow: inset 0 2px 4px rgba(255,245,200,.6), 0 4px 10px rgba(169,75,0,.4);
     transform: scale(1.9, .78);
     transform-origin: center;
     z-index: 3;
@@ -778,13 +778,13 @@ ul { list-style: none; }
     padding: 24px 6px 20px;
     clip-path: var(--hc-clip);
     background:
-        radial-gradient(120% 90% at 22% 8%, rgba(255,217,106,.5) 0%, rgba(255,217,106,0) 28%),
-        linear-gradient(135deg, #D98200 0%, #B85A00 26%, #8F4000 58%, #6F2F00 100%);
+        radial-gradient(120% 90% at 28% 12%, rgba(255,221,85,.5) 0%, rgba(255,221,85,0) 42%),
+        linear-gradient(150deg, #F6B900 0%, #D87800 38%, #A94B00 72%, #713000 100%);
     box-shadow:
-        inset 0 3px 5px rgba(255,217,106,.32),
-        inset 0 -16px 22px rgba(35,12,0,.6),
-        inset 0 0 0 1px rgba(255,217,106,.14);
-    backdrop-filter: blur(1.5px) saturate(140%);
+        inset 0 4px 7px rgba(255,221,85,.45),
+        inset 0 -14px 20px rgba(55,20,0,.55),
+        inset 0 0 0 1px rgba(255,255,255,.20);
+    backdrop-filter: blur(1.5px) saturate(150%);
     color: #fff3d6;
     text-decoration: none;
     cursor: pointer;
@@ -824,9 +824,8 @@ ul { list-style: none; }
 }
 .hc-label {
     font-family: var(--font-accent);
-    font-size: 17px; letter-spacing: .045em;
-    font-weight: 700; text-transform: uppercase; text-align: center;
-    text-shadow: 0 1px 2px rgba(30,10,0,.35);
+    font-size: 17px; letter-spacing: .03em;
+    font-weight: 900; text-transform: uppercase; text-align: center;
     white-space: nowrap;
 }
 
@@ -834,30 +833,29 @@ ul { list-style: none; }
    a flat brightness filter, so it reads as more reflective liquid honey
    rather than a generic button hover */
 .hc-cell:hover .hc-link:not(.active) {
-    transform: translateY(-5px);
+    transform: translateY(-8px);
     background:
-        radial-gradient(120% 90% at 22% 8%, rgba(255,217,106,.58) 0%, rgba(255,217,106,0) 30%),
-        linear-gradient(135deg, #E8952A 0%, #C4680A 30%, #954600 64%, #6F2F00 100%);
+        radial-gradient(120% 90% at 28% 12%, rgba(255,229,120,.62) 0%, rgba(255,229,120,0) 45%),
+        linear-gradient(150deg, #FFCA33 0%, #E88A00 40%, #B85D00 75%, #7A3600 100%);
     box-shadow:
-        inset 0 3px 6px rgba(255,217,106,.4),
-        inset 0 -14px 20px rgba(35,12,0,.55),
-        inset 0 0 0 1px rgba(255,217,106,.22),
-        0 8px 16px -6px rgba(217,130,0,.35);
+        inset 0 4px 8px rgba(255,229,120,.5),
+        inset 0 -12px 18px rgba(55,20,0,.5),
+        inset 0 0 0 1px rgba(255,255,255,.28),
+        0 10px 20px -6px rgba(246,185,0,.4);
     z-index: 4;
 }
 
 /* the "we are here" cell — pops up bright, naturally illuminated honey */
 .hc-link.active {
     background:
-        radial-gradient(120% 90% at 24% 8%, rgba(255,217,106,.62) 0%, rgba(255,217,106,0) 32%),
-        linear-gradient(135deg, #F0B52B 0%, #D98200 28%, #B85A00 60%, #8F4000 100%);
+        radial-gradient(120% 90% at 28% 10%, rgba(255,246,200,.85) 0%, rgba(255,246,200,0) 45%),
+        linear-gradient(150deg, #FFDD55 0%, #F6B900 35%, #D87800 70%, #A94B00 100%);
     box-shadow:
-        inset 0 3px 6px rgba(255,217,106,.48),
-        inset 0 -14px 20px rgba(45,16,0,.5),
-        inset 0 0 0 1px rgba(255,217,106,.28),
-        0 10px 18px -8px rgba(240,181,43,.5);
-    color: #fff6e0;
-    transform: translateY(-6px) scale(1.03);
+        inset 0 4px 8px rgba(255,246,200,.65),
+        inset 0 -10px 16px rgba(90,45,0,.35),
+        0 18px 28px -10px rgba(246,185,0,.65);
+    color: #4a2205;
+    transform: translateY(-16px) scale(1.09);
     z-index: 5;
 }
 .hc-link.active svg { transform: scale(1.08); }
@@ -877,7 +875,7 @@ ul { list-style: none; }
 
 @media (prefers-reduced-motion: reduce) {
     .hc-link { transition: none; }
-    .hc-link.active { transform: translateY(-6px) scale(1.03); }
+    .hc-link.active { transform: translateY(-14px); }
     .hc-link::before { animation: none; }
     .hc-ping { display: none; }
 }
@@ -6554,4 +6552,510 @@ ul { list-style: none; }
     .scroll-vine-leaf {
         transition: none !important;
     }
+}
+
+/* ========================================================================
+   ANGAN BAARI — FINAL CONNECTED HONEYCOMB NAVIGATION
+   ------------------------------------------------------------------------
+   Clean desktop-nav revision.
+   HTML and JavaScript are unchanged.
+
+   Design goals:
+   - cells visually interlock instead of looking like separate buttons
+   - connector hexagons are subtle joints, not extra buttons
+   - warm amber / deep honey material
+   - hover and active states have clearly different colors
+   - active icon + text stay readable
+   - Organic Farm matches the Nepali brand gold
+========================================================================= */
+
+/* ================================================================
+   BRAND COLOR
+================================================================ */
+.brand-subtag {
+    color: var(--gold) !important;
+    text-shadow: 0 1px 2px rgba(0,0,0,.28);
+}
+
+
+/* ================================================================
+   DESKTOP NAV FOOTPRINT
+================================================================ */
+@media (min-width: 1201px) {
+
+    .desktop-nav {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    /* Bring the CTA close enough that the whole thing reads as one chain. */
+    .desktop-nav .hc-cta {
+        margin-left: -20px;
+    }
+
+    .hc-scale-box {
+        width: 525px;
+        height: 82px;
+    }
+
+    /* ============================================================
+       HONEYCOMB STRIP
+       ------------------------------------------------------------
+       Native cell = 112px x 137px.
+       The cells overlap by 8px at native scale. After scaling this
+       becomes a small, natural-looking interlock.
+    ============================================================ */
+    .hc-strip {
+        --cell: 112px;
+        --cells: 8;
+        --gap: 0px;
+        --H: 137px;
+
+        width: calc(var(--cell) * var(--cells));
+        height: var(--H);
+
+        transform: scale(.56);
+        transform-origin: top left;
+
+        position: absolute;
+        top: 0;
+        left: 0;
+
+        /* Keep the original organic hexagon geometry. */
+        --hc-clip: path("M 23.51 5.37 Q 28.00 0.00 35.00 0.00 L 77.00 0.00 Q 84.00 0.00 88.49 5.37 L 107.51 28.06 Q 112.00 33.43 107.69 38.94 L 93.58 56.96 Q 89.26 62.47 92.93 68.44 L 108.33 93.50 Q 112.00 99.46 107.81 105.07 L 88.19 131.39 Q 84.00 137.00 77.00 137.00 L 35.00 137.00 Q 28.00 137.00 23.81 131.39 L 4.19 105.07 Q 0.00 99.46 3.67 93.50 L 19.07 68.44 Q 22.74 62.47 18.42 56.96 L 4.31 38.94 Q 0.00 33.43 4.49 28.06 L 23.51 5.37 Z");
+    }
+
+    /* ============================================================
+       CONNECTED CELL POSITIONS
+       ------------------------------------------------------------
+       A 9px native overlap makes neighboring cells visually join.
+       The cells remain individually clickable.
+    ============================================================ */
+    .hc-cell {
+        position: relative;
+        width: var(--cell);
+        height: 100%;
+        margin-left: -9px;
+        z-index: 4;
+    }
+
+    .hc-cell:first-child {
+        margin-left: 0;
+    }
+
+    /* ============================================================
+       BACKBONE
+       ------------------------------------------------------------
+       The background is intentionally darker than the cells but
+       close enough that it reads as the honey between them.
+    ============================================================ */
+    .hc-strip-bg {
+        position: absolute;
+        top: 12%;
+        left: 0;
+        width: 1113.15px;
+        height: 76%;
+        transform-origin: left center;
+
+        clip-path: path("M 45.545 5.83 Q 62.575 0.00 80.575 0.00 L 1032.575 0.00 Q 1050.575 0.00 1067.605 5.83 L 1113.15 51.375 L 1067.605 96.92 Q 1050.575 102.75 1032.575 102.75 L 80.575 102.75 Q 62.575 102.75 45.545 96.92 L 0.00 51.375 Z");
+
+        background:
+            radial-gradient(
+                ellipse 70% 130% at 26% 0%,
+                rgba(207,112,5,.25) 0%,
+                rgba(207,112,5,0) 60%
+            ),
+            linear-gradient(
+                160deg,
+                #934004 0%,
+                #762c01 52%,
+                #5a2000 100%
+            );
+
+        box-shadow:
+            inset 0 8px 13px rgba(255,171,32,.13),
+            inset 0 -11px 18px rgba(36,9,0,.48),
+            0 7px 12px rgba(30,8,0,.30);
+
+        z-index: 1;
+    }
+
+    /* ============================================================
+       SMALL CONNECTOR HEXAGONS
+       ------------------------------------------------------------
+       They are darker and narrower than the nav cells. Their job is
+       to visually join the cells, not compete with them.
+    ============================================================ */
+    .hc-connector {
+        position: absolute;
+        top: 36px;
+        width: 25px;
+        height: 66px;
+
+        clip-path: var(--hc-clip-connector);
+
+        background:
+            radial-gradient(
+                ellipse 100% 75% at 28% 7%,
+                rgba(255,211,91,.34) 0%,
+                rgba(255,180,30,.07) 40%,
+                transparent 68%
+            ),
+            linear-gradient(
+                160deg,
+                #b55b04 0%,
+                #873601 52%,
+                #642200 100%
+            ) !important;
+
+        box-shadow:
+            inset 0 2px 3px rgba(255,223,132,.30),
+            inset 0 -6px 9px rgba(42,10,0,.60),
+            inset 0 0 0 1px rgba(255,190,56,.18),
+            0 3px 6px rgba(32,8,0,.34) !important;
+
+        transform: scale(1.35,.72);
+        transform-origin: center;
+        z-index: 3 !important;
+        pointer-events: none;
+    }
+
+    /* The HTML has the first background div followed by 7 connectors. */
+    .hc-strip > .hc-connector:nth-of-type(2) { left: 101px !important; }
+    .hc-strip > .hc-connector:nth-of-type(3) { left: 205px !important; }
+    .hc-strip > .hc-connector:nth-of-type(4) { left: 309px !important; }
+    .hc-strip > .hc-connector:nth-of-type(5) { left: 413px !important; }
+    .hc-strip > .hc-connector:nth-of-type(6) { left: 517px !important; }
+    .hc-strip > .hc-connector:nth-of-type(7) { left: 621px !important; }
+    .hc-strip > .hc-connector:nth-of-type(8) { left: 725px !important; }
+
+    /* ============================================================
+       CELL MATERIAL
+       ------------------------------------------------------------
+       Dark amber body + one warm highlight. Avoid the "yellow plastic
+       button" appearance.
+    ============================================================ */
+    .hc-link {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: space-between;
+
+        width: 100%;
+        height: 100%;
+        padding: 24px 6px 20px;
+
+        clip-path: var(--hc-clip);
+
+        background:
+            radial-gradient(
+                ellipse 105% 78% at 26% 5%,
+                rgba(255,226,132,.70) 0%,
+                rgba(255,197,52,.26) 20%,
+                rgba(255,157,18,.04) 48%,
+                transparent 70%
+            ),
+            linear-gradient(
+                155deg,
+                #d58a12 0%,
+                #bc6105 33%,
+                #9a3f02 62%,
+                #762900 82%,
+                #531b00 100%
+            );
+
+        box-shadow:
+            inset 0 4px 6px rgba(255,245,184,.64),
+            inset 0 11px 16px rgba(255,181,30,.10),
+            inset 0 -15px 20px rgba(48,11,0,.60),
+            inset 0 0 0 1px rgba(255,217,106,.32),
+            0 6px 10px rgba(29,8,0,.40);
+
+        color: #fff0c9 !important;
+        text-decoration: none;
+        cursor: pointer;
+
+        transition:
+            transform .38s cubic-bezier(.22,.8,.25,1),
+            background .30s ease,
+            color .25s ease,
+            box-shadow .32s ease,
+            filter .28s ease;
+    }
+
+    /* Put every later cell above the previous one, so the overlap
+       feels like a real honeycomb rather than a cut-off edge. */
+    .hc-cell:nth-child(2) { z-index: 5; }
+    .hc-cell:nth-child(3) { z-index: 6; }
+    .hc-cell:nth-child(4) { z-index: 7; }
+    .hc-cell:nth-child(5) { z-index: 8; }
+    .hc-cell:nth-child(6) { z-index: 9; }
+    .hc-cell:nth-child(7) { z-index: 10; }
+    .hc-cell:nth-child(8) { z-index: 11; }
+
+    /* ============================================================
+       HONEY REFLECTION
+    ============================================================ */
+    .hc-link::before {
+        content: "";
+        position: absolute;
+        inset: -18%;
+
+        background:
+            linear-gradient(
+                118deg,
+                transparent 38%,
+                rgba(255,255,255,.025) 43%,
+                rgba(255,248,221,.40) 49%,
+                rgba(255,227,170,.08) 54%,
+                transparent 61%
+            );
+
+        background-size: 250% 250%;
+        background-position: -70% -70%;
+        mix-blend-mode: screen;
+        pointer-events: none;
+        opacity: .62;
+
+        animation: anganHoneyDrift 11s ease-in-out infinite;
+    }
+
+    .hc-cell:nth-child(2n) .hc-link::before { animation-delay: -3.5s; }
+    .hc-cell:nth-child(3n) .hc-link::before { animation-delay: -7s; }
+
+    @keyframes anganHoneyDrift {
+        0%,100% { background-position: -70% -70%; opacity:.28; }
+        48% { background-position: 20% 20%; opacity:.62; }
+        58% { background-position: 42% 42%; opacity:.48; }
+    }
+
+    /* ============================================================
+       ICON + LABEL
+    ============================================================ */
+    .hc-link svg {
+        width: 37px;
+        height: 37px;
+        stroke: currentColor;
+        fill: none;
+        stroke-width: 3;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        filter: drop-shadow(0 1px 1px rgba(54,14,0,.40));
+        transition: transform .35s cubic-bezier(.22,.8,.25,1), color .25s ease;
+    }
+
+    .hc-label {
+        font-family: var(--font-accent);
+        font-size: 16px;
+        letter-spacing: .025em;
+        font-weight: 900;
+        text-transform: uppercase;
+        text-align: center;
+        white-space: nowrap;
+        color: inherit;
+        text-shadow: 0 1px 1px rgba(55,15,0,.62);
+        position: relative;
+        z-index: 4;
+    }
+
+    /* ============================================================
+       HOVER
+       ------------------------------------------------------------
+       The hover cell becomes lighter gold and rises just enough to
+       clearly communicate interaction.
+    ============================================================ */
+    .hc-cell:hover .hc-link:not(.active) {
+        transform: translateY(-7px) scale(1.025);
+
+        background:
+            radial-gradient(
+                ellipse 105% 80% at 25% 5%,
+                rgba(255,244,183,.92) 0%,
+                rgba(255,211,91,.44) 23%,
+                rgba(255,171,24,.06) 50%,
+                transparent 72%
+            ),
+            linear-gradient(
+                155deg,
+                #e7a725 0%,
+                #cf7508 34%,
+                #aa4b02 63%,
+                #782b01 83%,
+                #531b00 100%
+            ) !important;
+
+        color: #3a1d03 !important;
+
+        box-shadow:
+            inset 0 4px 7px rgba(255,249,203,.80),
+            inset 0 11px 17px rgba(255,190,45,.14),
+            inset 0 -15px 20px rgba(45,10,0,.56),
+            inset 0 0 0 1px rgba(255,226,128,.46),
+            0 11px 17px rgba(28,7,0,.48),
+            0 0 12px rgba(221,142,15,.14) !important;
+
+        z-index: 30 !important;
+    }
+
+    .hc-cell:hover .hc-link:not(.active) .hc-label,
+    .hc-cell:hover .hc-link:not(.active) svg {
+        color: #3a1d03 !important;
+    }
+
+    .hc-cell:hover .hc-link:not(.active) svg {
+        stroke: #3a1d03 !important;
+        transform: translateY(-1px) scale(1.04);
+    }
+
+    /* ============================================================
+       ACTIVE / POP-UP
+       ------------------------------------------------------------
+       This is deliberately different from hover: brighter top,
+       deeper amber bottom, stronger lift, dark readable content.
+    ============================================================ */
+    .hc-link.active,
+    .hc-cell .hc-link.active {
+        transform: translateY(-11px) scale(1.045) !important;
+
+        background:
+            radial-gradient(
+                ellipse 110% 82% at 24% 4%,
+                rgba(255,249,197,.98) 0%,
+                rgba(255,221,111,.72) 18%,
+                rgba(247,181,34,.18) 44%,
+                transparent 71%
+            ),
+            linear-gradient(
+                155deg,
+                #efb532 0%,
+                #d8890b 31%,
+                #b45703 60%,
+                #823100 81%,
+                #581e00 100%
+            ) !important;
+
+        color: #2d1502 !important;
+
+        box-shadow:
+            inset 0 4px 8px rgba(255,253,216,.94),
+            inset 0 12px 20px rgba(255,201,56,.18),
+            inset 0 -16px 22px rgba(48,11,0,.60),
+            inset 0 0 0 1px rgba(255,232,142,.60),
+            0 15px 23px rgba(25,6,0,.54),
+            0 0 16px rgba(226,150,22,.22) !important;
+
+        z-index: 50 !important;
+    }
+
+    .hc-link.active::before {
+        opacity: .26 !important;
+        z-index: 1;
+    }
+
+    .hc-link.active .hc-label {
+        color: #2d1502 !important;
+        font-weight: 900 !important;
+        text-shadow:
+            0 1px 0 rgba(255,235,157,.65),
+            0 1px 2px rgba(48,13,0,.16) !important;
+        position: relative;
+        z-index: 5;
+    }
+
+    .hc-link.active svg {
+        color: #2d1502 !important;
+        stroke: #2d1502 !important;
+        transform: scale(1.055) !important;
+        filter: drop-shadow(0 1px 1px rgba(255,238,169,.48));
+        position: relative;
+        z-index: 5;
+    }
+
+    .hc-cell:has(.hc-link.active) {
+        z-index: 60 !important;
+    }
+
+    /* ============================================================
+       ORDER NOW
+    ============================================================ */
+    .desktop-nav .hc-cta {
+        width: 116px;
+        height: 50px;
+
+        background:
+            radial-gradient(
+                ellipse 105% 82% at 24% 6%,
+                rgba(255,237,165,.82) 0%,
+                rgba(255,204,71,.30) 30%,
+                transparent 68%
+            ),
+            linear-gradient(
+                155deg,
+                #dda016 0%,
+                #c16a05 34%,
+                #994201 67%,
+                #682500 100%
+            );
+
+        box-shadow:
+            inset 0 3px 6px rgba(255,244,188,.70),
+            inset 0 -10px 14px rgba(47,13,0,.58),
+            inset 0 0 0 1px rgba(255,221,119,.42),
+            0 8px 14px rgba(31,9,0,.42);
+
+        color: #fff0ca !important;
+        filter: drop-shadow(0 5px 6px rgba(31,9,0,.28));
+    }
+
+    .desktop-nav .hc-cta:hover {
+        transform: translateY(-4px) scale(1.018);
+        filter: drop-shadow(0 9px 8px rgba(31,9,0,.36)) brightness(1.06);
+    }
+
+    /* ============================================================
+       APP 5-CELL VERSION — preserve the existing app nav footprint
+    ============================================================ */
+    .hc-scale-box--app5 {
+        width: 320px;
+        height: 68.5px;
+    }
+
+    .hc-strip--cells5 {
+        --cells: 5;
+    }
+
+    .hc-strip--cells5 .hc-strip-bg {
+        left: -54.17px;
+        transform: scaleX(.6723);
+    }
+
+    /* ============================================================
+       REDUCED MOTION / TOUCH
+    ============================================================ */
+    @media (hover: none) {
+        .hc-cell:hover .hc-link:not(.active) {
+            transform: none !important;
+            filter: none !important;
+        }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .hc-link::before,
+        .hc-link.active::before,
+        .hc-cta::before {
+            animation: none !important;
+        }
+
+        .hc-link,
+        .hc-cta {
+            transition: none !important;
+        }
+    }
+}
+
+/* Always keep Organic Farm the same gold as आँगन बारी. */
+.brand-subtag {
+    color: var(--gold) !important;
 }
