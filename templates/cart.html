@@ -344,44 +344,165 @@
     </style>
 
 <style id="exact-desktop-honeycomb-mobile">
-/* MOBILE = EXACT DESKTOP HONEYCOMB.
-   The cells/connectors/spacing are not redesigned. The whole desktop
-   honeycomb is simply scaled as one object to fit the phone. */
+/* ================================================================
+   MOBILE HONEYCOMB — FINAL COMPACT DESKTOP-STYLE VERSION
+   The desktop honeycomb markup is reused unchanged. On mobile the
+   COMPLETE honeycomb is scaled slightly smaller. No rectangular bar.
+================================================================ */
 @media (max-width:880px){
     .exact-desktop-mobile-nav{
         display:flex!important;
         position:fixed!important;
-        left:0!important;right:0!important;bottom:0!important;
-        width:100%!important;height:88px!important;
-        padding:0!important;margin:0!important;
-        background:transparent!important;border:0!important;
-        box-shadow:none!important;z-index:5000!important;
-        pointer-events:none!important;overflow:visible!important;
+        left:0!important;
+        right:0!important;
+        bottom:0!important;
+        width:100%!important;
+        height:78px!important;
+        padding:0!important;
+        margin:0!important;
+        background:transparent!important;
+        border:0!important;
+        box-shadow:none!important;
+        z-index:5000!important;
+        pointer-events:none!important;
+        overflow:visible!important;
     }
+
     .exact-mobile-hc{
         position:absolute!important;
-        left:50%!important;bottom:5px!important;
-        width:320px!important;height:68.5px!important;
+        left:50%!important;
+        bottom:2px!important;
+        width:320px!important;
+        height:68.5px!important;
         margin-left:-160px!important;
-        transform:scale(var(--mobile-hc-scale,1))!important;
+        transform:scale(.92)!important;
         transform-origin:center bottom!important;
-        pointer-events:auto!important;overflow:visible!important;
+        pointer-events:auto!important;
+        overflow:visible!important;
     }
+
+    /* Keep the original desktop honeycomb object geometry. */
     .exact-mobile-hc .hc-scale-box,
     .exact-mobile-hc .hc-scale-box--app5{
-        width:320px!important;height:68.5px!important;
-        position:relative!important;margin:0!important;padding:0!important;
-        transform:none!important;overflow:visible!important;
+        width:320px!important;
+        height:68.5px!important;
+        position:relative!important;
+        margin:0!important;
+        padding:0!important;
+        transform:none!important;
+        overflow:visible!important;
+        background:transparent!important;
     }
-    .exact-mobile-hc .hc-nav{display:flex!important;}
-    .exact-mobile-hc .hc-link{text-decoration:none!important;}
 
-    /* Kill only the old mobile-bar classes. */
+    .exact-mobile-hc .hc-strip,
+    .exact-mobile-hc .hc-strip--cells5{
+        width:320px!important;
+        height:68.5px!important;
+        position:relative!important;
+        background:transparent!important;
+        overflow:visible!important;
+    }
+
+    .exact-mobile-hc .hc-nav{
+        display:flex!important;
+        position:relative!important;
+        z-index:5!important;
+        overflow:visible!important;
+    }
+
+    /* ------------------------------------------------------------
+       THE BACKGROUND MUST BE A HEXAGON — NOT A RECTANGLE.
+       Shorter tips make the two end edges clearly visible.
+       ------------------------------------------------------------ */
+    .exact-mobile-hc .hc-strip-bg{
+        display:block!important;
+        position:absolute!important;
+        left:9px!important;
+        right:9px!important;
+        top:10px!important;
+        width:auto!important;
+        height:48px!important;
+        background:linear-gradient(
+            180deg,
+            #6b3a12 0%,
+            #4a260b 55%,
+            #371c08 100%
+        )!important;
+        box-shadow:
+            inset 0 5px 8px rgba(0,0,0,.32),
+            inset 0 -5px 8px rgba(0,0,0,.28),
+            0 5px 12px rgba(0,0,0,.22)!important;
+        clip-path:polygon(
+            6% 0%,
+            94% 0%,
+            100% 50%,
+            94% 100%,
+            6% 100%,
+            0% 50%
+        )!important;
+        z-index:0!important;
+        pointer-events:none!important;
+    }
+
+    /* ------------------------------------------------------------
+       JOINING HEXAGONS
+       Make the connector shorter so the boundary between two main
+       honeycomb cells can actually be seen.
+       ------------------------------------------------------------ */
+    .exact-mobile-hc .hc-connector{
+        width:18px!important;
+        height:20px!important;
+        top:24px!important;
+        background:linear-gradient(
+            145deg,
+            #f2a900 0%,
+            #c87500 55%,
+            #a35400 100%
+        )!important;
+        clip-path:polygon(
+            25% 0%,
+            75% 0%,
+            100% 25%,
+            100% 75%,
+            75% 100%,
+            25% 100%,
+            0% 75%,
+            0% 25%
+        )!important;
+        z-index:8!important;
+        pointer-events:none!important;
+    }
+
+    /* Preserve the four desktop connector positions, but keep their
+       visible joining pieces short. */
+    .exact-mobile-hc .hc-connector[style*="108px"]{left:108px!important;}
+    .exact-mobile-hc .hc-connector[style*="240px"]{left:240px!important;}
+    .exact-mobile-hc .hc-connector[style*="372px"]{left:372px!important;}
+    .exact-mobile-hc .hc-connector[style*="504px"]{left:504px!important;}
+
+    .exact-mobile-hc .hc-link{
+        text-decoration:none!important;
+        overflow:visible!important;
+    }
+
+    /* Never allow the old mobile rectangular navigation classes to show. */
     .exact-desktop-mobile-nav .nav-items,
     .exact-desktop-mobile-nav .nav-item,
-    .exact-desktop-mobile-nav .mbav-bg{display:none!important;}
+    .exact-desktop-mobile-nav .mbav-bg{
+        display:none!important;
+    }
 
-    body{padding-bottom:88px!important;overflow-x:hidden!important;}
+    body{
+        padding-bottom:78px!important;
+        overflow-x:hidden!important;
+    }
+}
+
+/* Very small phones: only a little extra scaling. */
+@media (max-width:360px){
+    .exact-mobile-hc{
+        transform:scale(.88)!important;
+    }
 }
 </style>
 
@@ -1527,9 +1648,13 @@
     function fitExactDesktopHoneycomb(){
         var wrap=document.querySelector('.exact-mobile-hc');
         if(!wrap || window.innerWidth>880) return;
-        var targetWidth=Math.min(window.innerWidth-20,380);
-        wrap.style.setProperty('--mobile-hc-scale',(targetWidth/320).toFixed(4));
+
+        /* Keep the desktop proportions. Only scale the complete object. */
+        var scale = window.innerWidth <= 360 ? 0.88 : 0.92;
+        wrap.style.setProperty('--mobile-hc-scale', scale.toFixed(2));
+        wrap.style.transform = 'scale(' + scale.toFixed(2) + ')';
     }
+
     fitExactDesktopHoneycomb();
     window.addEventListener('resize',fitExactDesktopHoneycomb,{passive:true});
     window.addEventListener('orientationchange',fitExactDesktopHoneycomb,{passive:true});
