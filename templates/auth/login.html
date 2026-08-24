@@ -43,9 +43,6 @@
             pointer-events: none;
         }
         .side-top { position: relative; z-index: 1; }
-        .side-logo { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; color: var(--cream); }
-        .side-logo i { font-size: 1.3rem; color: var(--gold); }
-        .side-logo span { font-family: var(--font-accent, 'Cinzel'), serif; font-size: 0.78rem; letter-spacing: 0.14em; text-transform: uppercase; }
 
         .side-greeting { position: relative; z-index: 1; font-size: 0.82rem; color: var(--gold); letter-spacing: 0.04em; margin: 40px 0 6px; display: flex; align-items: center; gap: 8px; }
         .side-headline {
@@ -230,7 +227,6 @@
             .side-nav-float.nav-left { left: 10px; }
             .side-nav-float.nav-right { right: 10px; }
             .auth-side { padding: 24px 18px 22px; }
-            .side-logo span { font-size: 0.7rem; }
             .side-headline { font-size: 1.45rem; }
             .side-highlight { flex-direction: row; padding: 10px 12px; }
             .side-highlight p { font-size: 0.8rem; }
@@ -255,7 +251,17 @@
 <div class="auth-shell">
     <aside class="auth-side">
         <div class="side-top">
-            <a href="/" class="side-logo"><i class="fas fa-seedling"></i><span>आँगन बारी · Angan Baari</span></a>
+            <a href="/" class="brand" aria-label="Angan Baari Home">
+                <span class="brand-icon"><img src="{% static 'images/logo-icon.png' %}" alt="" width="84" height="84" loading="eager"></span>
+                <div class="brand-text">
+                    <span class="brand-name">आँगन बारी</span>
+                    <span class="brand-tagline">Angan Baari</span>
+                    <span class="brand-subtag">Organic Farm</span>
+                </div>
+                <span class="brand-flag" aria-hidden="true">
+                    <canvas id="navNepalFlag" class="nav-nepal-flag" width="450" height="600"></canvas>
+                </span>
+            </a>
             <div class="side-greeting" id="sideGreeting"><i class="fas fa-sun"></i> <span></span></div>
             <h1 class="side-headline">Welcome back to<br>the <em>farm</em>.</h1>
             <div class="side-highlight"><i class="fas fa-fire"></i><p>Sign in for member pricing, festival offers, and to pick up right where your cart left off.</p></div>
@@ -353,6 +359,221 @@
         el.querySelector('i').className = 'fas ' + icon;
         el.querySelector('span').textContent = text;
     })();
+</script>
+<script>
+// ================================================================
+// OPMCM-STYLE WIND-BLOWN NEPAL FLAG — NAVBAR
+// Darker colors · crisp edges · sharp triangular silhouette
+// Smooth cloth folds · stable pole · stronger free-end flutter
+// ================================================================
+(function () {
+    const canvas = document.getElementById('navNepalFlag');
+    if (!canvas) return;
+
+    const WIDTH = 450;
+    const HEIGHT = 600;
+    const FLAG_W = 330;
+    const FLAG_H = 441;
+    const PAD_X = 60;
+    const PAD_Y = 78;
+
+    canvas.width = WIDTH;
+    canvas.height = HEIGHT;
+
+    const ctx = canvas.getContext('2d', { alpha: true });
+    if (!ctx) return;
+
+    // Keep the raster edges crisp instead of applying soft interpolation.
+    ctx.imageSmoothingEnabled = false;
+
+    const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="110" height="147" viewBox="0 0 110 147">
+        <!-- Deep, slightly darker Nepal red and blue for the OPMCM-style look -->
+        <path d="M 0.00,0.00 L 110.00,68.88 L 32.22,68.88 L 110.00,146.67 L 0.00,146.67 Z"
+              fill="#B80F2F" stroke="#001F5B" stroke-width="3.5" stroke-linejoin="round"/>
+
+        <g transform="translate(27.50,43.05)">
+            <path d="M 22.27,-4.58 L 21.52,-4.79 L 20.33,-2.42 L 15.70,3.07 L 12.48,5.11 L 11.18,4.57 L 10.86,2.96 L 12.80,1.99 L 13.23,0.48 L 10.00,-0.05 L 10.21,-1.45 L 11.93,-4.36 L 7.74,-3.72 L 7.95,-7.81 L 6.34,-7.48 L 4.18,-5.87 L 2.89,-10.06 L 0.52,-7.05 L -0.23,-7.16 L -2.17,-9.74 L -3.78,-5.98 L -6.69,-7.81 L -7.98,-7.92 L -7.33,-7.59 L -7.33,-3.72 L -9.38,-3.61 L -11.10,-4.25 L -9.81,-0.05 L -13.04,0.59 L -12.93,1.56 L -10.89,3.18 L -11.64,5.33 L -13.04,5.00 L -15.62,3.07 L -18.43,0.16 L -20.90,-3.61 L -21.55,-3.61 L -20.68,1.77 L -17.99,6.51 L -14.87,9.95 L -10.24,13.30 L -3.46,15.34 L 1.93,15.56 L 9.89,13.73 L 14.74,10.39 L 20.23,3.50 L 22.16,-2.42 Z"
+                  fill="#FFFFFF"/>
+        </g>
+
+        <path d="M 27.50,131.32 L 23.64,122.20 L 15.73,128.16 L 16.94,118.33 L 7.11,119.55 L 13.08,111.64 L 3.96,107.78 L 13.08,103.91 L 7.11,96.01 L 16.94,97.22 L 15.73,87.39 L 23.64,93.35 L 27.50,84.24 L 31.36,93.35 L 39.27,87.39 L 38.06,97.22 L 47.89,96.01 L 41.92,103.91 L 51.04,107.78 L 41.92,111.64 L 47.89,119.55 L 38.06,118.33 L 39.27,128.16 L 31.36,122.20 Z"
+              fill="#FFFFFF"/>
+    </svg>`;
+
+    const sourceCanvas = document.createElement('canvas');
+    sourceCanvas.width = WIDTH;
+    sourceCanvas.height = HEIGHT;
+    const sourceCtx = sourceCanvas.getContext('2d', { alpha: true });
+    if (!sourceCtx) return;
+    sourceCtx.imageSmoothingEnabled = false;
+
+    const img = new Image();
+    img.decoding = 'async';
+
+    img.onload = function () {
+        sourceCtx.clearRect(0, 0, WIDTH, HEIGHT);
+        sourceCtx.drawImage(img, PAD_X, PAD_Y, FLAG_W, FLAG_H);
+        startAnimation();
+    };
+
+    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+
+    function drawFlag(time) {
+        const t = time * 0.001;
+
+        ctx.clearRect(0, 0, WIDTH, HEIGHT);
+
+        // Transparent padding is intentionally preserved around the flag.
+        // This keeps both pointed ends completely visible while waving.
+        ctx.save();
+        ctx.translate(PAD_X, PAD_Y);
+
+        /*
+         * Draw the flag as narrow vertical fabric strips.
+         * Unlike pixel displacement, this preserves the sharp Nepal-flag
+         * silhouette and pointed edges while the strips move independently.
+         */
+        const strip = 3;
+
+        for (let x = 0; x < FLAG_W; x += strip) {
+            const u = x / FLAG_W;
+
+            // Pole remains stable; the free end becomes increasingly active.
+            const strength = Math.pow(u, 1.45);
+
+            // Large travelling cloth folds.
+            const wave1 = Math.sin(u * Math.PI * 1.55 - t * 4.0);
+            const wave2 = Math.sin(u * Math.PI * 3.10 - t * 4.0 + 1.15);
+
+            // Strong but smooth vertical displacement.
+            const yWave = strength * (wave1 * 34 + wave2 * 8);
+
+            // Forward/backward flutter of the free edge.
+            const xWave = strength * Math.sin(
+                u * Math.PI * 1.35 - t * 3.0 + 0.55
+            ) * 15;
+
+            // Local fabric tilt makes the folds look like cloth rather than water.
+            const slope =
+                Math.cos(u * Math.PI * 1.55 - t * 4.0) *
+                strength * 0.16 +
+                Math.cos(u * Math.PI * 3.10 - t * 4.0 + 1.15) *
+                strength * 0.035;
+
+            // Slightly narrower at the pole, fuller at the free edge.
+            const sourceWidth = Math.min(strip + 1, FLAG_W - x);
+
+            ctx.save();
+            ctx.translate(x + xWave, yWave);
+            ctx.transform(1, slope, 0, 1, 0, 0);
+
+            // Overlap neighbouring strips by 1px to avoid hairline gaps.
+            ctx.drawImage(
+                sourceCanvas,
+                PAD_X + x,
+                0,
+                sourceWidth,
+                HEIGHT,
+                -0.5,
+                0,
+                sourceWidth + 1,
+                HEIGHT
+            );
+
+            ctx.restore();
+        }
+
+        ctx.restore();
+
+        /*
+         * Very subtle fold shading. This is intentionally restrained so
+         * the red remains dark and solid rather than becoming glossy.
+         */
+        ctx.save();
+        ctx.globalCompositeOperation = 'source-atop';
+        ctx.globalAlpha = 0.075;
+
+        const shadeGradient = ctx.createLinearGradient(
+            PAD_X, 0,
+            PAD_X + FLAG_W, 0
+        );
+        shadeGradient.addColorStop(0, 'rgba(0,0,0,0)');
+        shadeGradient.addColorStop(0.35, 'rgba(0,0,0,0.18)');
+        shadeGradient.addColorStop(0.52, 'rgba(255,255,255,0.10)');
+        shadeGradient.addColorStop(0.72, 'rgba(0,0,0,0.15)');
+        shadeGradient.addColorStop(1, 'rgba(0,0,0,0)');
+
+        ctx.fillStyle = shadeGradient;
+        ctx.fillRect(PAD_X, PAD_Y, FLAG_W, FLAG_H);
+        ctx.restore();
+    }
+
+    function startAnimation() {
+        // Respect the OS-level "reduce motion" preference: draw one
+        // static frame and never animate, instead of the CSS-only rule
+        // from before (which couldn't actually stop a JS-driven loop).
+        const reduceMotionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+        let rafId = null;
+        let inView = true;
+
+        function renderLoop(time) {
+            drawFlag(time);
+            rafId = requestAnimationFrame(renderLoop);
+        }
+
+        function play() {
+            if (rafId !== null || reduceMotionQuery.matches) return;
+            rafId = requestAnimationFrame(renderLoop);
+        }
+
+        function pause() {
+            if (rafId !== null) {
+                cancelAnimationFrame(rafId);
+                rafId = null;
+            }
+        }
+
+        if (reduceMotionQuery.matches) {
+            drawFlag(0);
+        } else {
+            play();
+        }
+
+        // Pause the render loop whenever the flag scrolls out of view or
+        // the browser tab itself is backgrounded — a small canvas redrawn
+        // 60×/sec is wasted work (and battery) when nobody can see it.
+        const observer = new IntersectionObserver(function (entries) {
+            inView = entries[0].isIntersecting;
+            if (inView && !document.hidden) {
+                play();
+            } else {
+                pause();
+            }
+        }, { threshold: 0 });
+        observer.observe(canvas);
+
+        document.addEventListener('visibilitychange', function () {
+            if (document.hidden) {
+                pause();
+            } else if (inView) {
+                play();
+            }
+        });
+
+        // Live-respond if the user toggles the OS reduced-motion setting
+        // while the page is already open.
+        reduceMotionQuery.addEventListener('change', function (e) {
+            if (e.matches) {
+                pause();
+                drawFlag(0);
+            } else if (inView) {
+                play();
+            }
+        });
+    }
+})();
 </script>
 </body>
 </html>
