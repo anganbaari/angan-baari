@@ -263,34 +263,48 @@
         }
     </style>
 
-<style id="mobile-honeycomb-fix">
-@media (max-width: 880px) {
-    .mobile-honeycomb-nav{display:block!important;position:fixed!important;left:0!important;right:0!important;bottom:0!important;width:100%!important;height:82px!important;padding:0!important;margin:0!important;background:transparent!important;border:0!important;box-shadow:none!important;z-index:5000!important;pointer-events:none!important;overflow:visible!important}
-    .mobile-honeycomb-nav .mobile-hc-wrap{position:absolute!important;left:50%!important;bottom:5px!important;width:min(94vw,390px)!important;height:72px!important;transform:translateX(-50%)!important;pointer-events:auto!important;overflow:visible!important}
-    .mobile-honeycomb-nav .hc-scale-box,.mobile-honeycomb-nav .hc-scale-box--app5{position:relative!important;left:0!important;top:0!important;width:100%!important;height:72px!important;margin:0!important;padding:0!important;transform:none!important;scale:1!important;overflow:visible!important}
-    .mobile-honeycomb-nav .hc-strip,.mobile-honeycomb-nav .hc-strip--cells5{position:relative!important;left:0!important;top:0!important;width:100%!important;height:72px!important;margin:0!important;padding:0!important;transform:none!important;overflow:visible!important}
-    .mobile-honeycomb-nav .hc-strip-bg,.mobile-honeycomb-nav .hc-connector{display:none!important}
-    .mobile-honeycomb-nav .hc-nav{position:absolute!important;inset:0!important;width:100%!important;height:72px!important;margin:0!important;padding:0!important;list-style:none!important;display:flex!important;align-items:flex-start!important;justify-content:center!important;gap:0!important;transform:none!important}
-    .mobile-honeycomb-nav .hc-cell{position:relative!important;display:block!important;width:20%!important;height:72px!important;min-width:0!important;max-width:none!important;flex:0 0 20%!important;margin:0 -3px 0 0!important;padding:0!important;transform:none!important;z-index:1!important}
-    .mobile-honeycomb-nav .hc-cell:nth-child(3){z-index:3!important}
-    .mobile-honeycomb-nav .hc-link{position:relative!important;width:100%!important;height:72px!important;margin:0!important;padding:10px 2px 8px!important;display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:center!important;gap:5px!important;box-sizing:border-box!important;text-decoration:none!important;border:0!important;border-radius:0!important;clip-path:polygon(25% 0%,75% 0%,100% 50%,75% 100%,25% 100%,0% 50%)!important;background:radial-gradient(120% 100% at 28% 12%,rgba(255,235,180,.48) 0%,rgba(255,235,180,0) 42%),linear-gradient(150deg,#d9922e 0%,#b8681c 45%,#7a3d0f 80%,#5a2c0a 100%)!important;color:#fbead0!important;box-shadow:inset 0 3px 5px rgba(255,224,150,.35),inset 0 -8px 12px rgba(35,15,3,.5),0 5px 12px rgba(0,0,0,.22)!important;overflow:visible!important;transform:translateY(0)!important;transition:transform .2s ease,filter .2s ease!important}
-    .mobile-honeycomb-nav .hc-cell:not(:first-child)::before{content:""!important;position:absolute!important;left:-6px!important;top:28px!important;width:18px!important;height:18px!important;background:linear-gradient(145deg,#f1b329,#c97809)!important;clip-path:polygon(25% 0%,75% 0%,100% 50%,75% 100%,25% 100%,0% 50%)!important;box-shadow:inset 0 2px 3px rgba(255,240,170,.45)!important;z-index:-1!important}
-    .mobile-honeycomb-nav .hc-link.active{background:radial-gradient(120% 100% at 28% 10%,rgba(255,220,190,.75) 0%,rgba(255,220,190,0) 45%),linear-gradient(150deg,#ff9c5e 0%,#e84c27 45%,#a72b13 80%,#721b0a 100%)!important;color:#fff7ee!important;transform:translateY(-5px)!important;z-index:5!important;filter:brightness(1.08)!important}
-    .mobile-honeycomb-nav .hc-cell--offer .hc-link{background:radial-gradient(120% 100% at 28% 10%,rgba(255,200,150,.5) 0%,rgba(255,200,150,0) 42%),linear-gradient(150deg,#e8763a 0%,#c23b1f 45%,#8a2510 80%,#5c1608 100%)!important}
-    .mobile-honeycomb-nav .hc-cell--offer .hc-link.active{background:radial-gradient(120% 100% at 28% 10%,rgba(255,220,190,.85) 0%,rgba(255,220,190,0) 45%),linear-gradient(150deg,#ffb37a 0%,#ff7a3c 40%,#e8481f 75%,#b82c10 100%)!important}
-    .mobile-honeycomb-nav .hc-link svg{width:21px!important;height:21px!important;flex:0 0 21px!important;fill:none!important;stroke:currentColor!important;stroke-width:1.8!important;display:block!important;color:currentColor!important;margin:0!important}
-    .mobile-honeycomb-nav .hc-label{display:block!important;max-width:100%!important;overflow:hidden!important;white-space:nowrap!important;text-overflow:ellipsis!important;font-family:"Cormorant Garamond",serif!important;font-size:clamp(.60rem,2.45vw,.72rem)!important;line-height:1!important;letter-spacing:.02em!important;text-transform:uppercase!important;color:inherit!important}
-    .mobile-honeycomb-nav .hc-ping{display:none!important}
-    .mobile-honeycomb-nav .hc-cart-badge--mobile{position:absolute!important;top:10px!important;right:12px!important;min-width:15px!important;height:15px!important;padding:0 4px!important;border-radius:50%!important;background:#c0392b!important;color:white!important;border:1.5px solid #4a260b!important;font:700 .55rem/12px "DM Sans",sans-serif!important;text-align:center!important;z-index:10!important}
-    body{padding-bottom:82px!important}
-}
-@media (max-width:360px){
-    .mobile-honeycomb-nav .mobile-hc-wrap{width:94vw!important}
-    .mobile-honeycomb-nav .hc-link{height:66px!important;padding-top:8px!important;padding-bottom:7px!important}
-    .mobile-honeycomb-nav .hc-nav,.mobile-honeycomb-nav .hc-strip,.mobile-honeycomb-nav .hc-scale-box,.mobile-honeycomb-nav .hc-scale-box--app5{height:66px!important}
-    .mobile-honeycomb-nav .hc-cell{height:66px!important}
+<style id="exact-desktop-honeycomb-mobile">
+/* MOBILE = EXACT DESKTOP HONEYCOMB.
+   The cells/connectors/spacing are not redesigned. The whole desktop
+   honeycomb is simply scaled as one object to fit the phone. */
+@media (max-width:880px){
+    .exact-desktop-mobile-nav{
+        display:flex!important;
+        position:fixed!important;
+        left:0!important;right:0!important;bottom:0!important;
+        width:100%!important;height:88px!important;
+        padding:0!important;margin:0!important;
+        background:transparent!important;border:0!important;
+        box-shadow:none!important;z-index:5000!important;
+        pointer-events:none!important;overflow:visible!important;
+    }
+    .exact-mobile-hc{
+        position:absolute!important;
+        left:50%!important;bottom:5px!important;
+        width:320px!important;height:68.5px!important;
+        margin-left:-160px!important;
+        transform:scale(var(--mobile-hc-scale,1))!important;
+        transform-origin:center bottom!important;
+        pointer-events:auto!important;overflow:visible!important;
+    }
+    .exact-mobile-hc .hc-scale-box,
+    .exact-mobile-hc .hc-scale-box--app5{
+        width:320px!important;height:68.5px!important;
+        position:relative!important;margin:0!important;padding:0!important;
+        transform:none!important;overflow:visible!important;
+    }
+    .exact-mobile-hc .hc-nav{display:flex!important;}
+    .exact-mobile-hc .hc-link{text-decoration:none!important;}
+
+    /* Kill only the old mobile-bar classes. */
+    .exact-desktop-mobile-nav .nav-items,
+    .exact-desktop-mobile-nav .nav-item,
+    .exact-desktop-mobile-nav .mbav-bg{display:none!important;}
+
+    body{padding-bottom:88px!important;overflow-x:hidden!important;}
 }
 </style>
+
 </head>
 <body>
 
@@ -560,10 +574,10 @@
     </footer>
 
     <!-- MOBILE / TABLET BOTTOM NAV — same connected honeycomb structure as desktop -->
-    <nav class="mobile-bottom-nav mobile-honeycomb-nav" id="bottomNav" aria-label="Mobile navigation">
-        <div class="mobile-hc-wrap">
+    <nav class="mobile-bottom-nav exact-desktop-mobile-nav" id="bottomNav" aria-label="Mobile navigation">
+        <div class="exact-mobile-hc">
             <div class="hc-scale-box hc-scale-box--app5">
-                <div class="hc-strip hc-strip--cells5">
+                  <div class="hc-strip hc-strip--cells5">
                     <div class="hc-strip-bg" aria-hidden="true"></div>
                     <div class="hc-connector" style="left:108px" aria-hidden="true"></div>
                     <div class="hc-connector" style="left:240px" aria-hidden="true"></div>
@@ -571,38 +585,38 @@
                     <div class="hc-connector" style="left:504px" aria-hidden="true"></div>
 
                     <ul class="hc-nav" id="hcNavMobile">
-                        <li class="hc-cell"><a class="hc-link" href="{% url 'shop' %}" data-target="shop-cell">
-                            <svg viewBox="0 0 24 24"><path d="M4.5 9h15l-1.4 10.2a2 2 0 01-2 1.8H7.9a2 2 0 01-2-1.8L4.5 9z"/><path d="M8.5 9V7a3.5 3.5 0 017 0v2"/></svg>
-                            <span class="hc-label">Shop</span><span class="hc-ping"></span></a></li>
+                      <li class="hc-cell"><a class="hc-link" href="{% url 'shop' %}" data-target="shop-cell">
+                        <svg viewBox="0 0 24 24"><path d="M4.5 9h15l-1.4 10.2a2 2 0 01-2 1.8H7.9a2 2 0 01-2-1.8L4.5 9z"/><path d="M8.5 9V7a3.5 3.5 0 017 0v2"/></svg>
+                        <span class="hc-label">Shop</span><span class="hc-ping"></span></a></li>
 
-                        <li class="hc-cell"><a class="hc-link" href="{% url 'cart' %}" data-target="cart-cell">
-                            <svg viewBox="0 0 24 24"><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2.5 3h2.4l2.1 11.2a2 2 0 002 1.6h8.6a2 2 0 002-1.6L21 7H6.2"/></svg>
-                            <span class="hc-label">Cart</span><span class="hc-ping"></span>
-                            {% with total_qty=request.session.cart.values|length %}
-                            {% if total_qty > 0 %}<span id="cartBadgeMobileHoney" class="hc-cart-badge hc-cart-badge--mobile">{{ total_qty }}</span>{% endif %}
-                            {% endwith %}
-                        </a></li>
+                      <li class="hc-cell"><a class="hc-link" href="{% url 'cart' %}" data-target="cart-cell">
+                        <svg viewBox="0 0 24 24"><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2.5 3h2.4l2.1 11.2a2 2 0 002 1.6h8.6a2 2 0 002-1.6L21 7H6.2"/></svg>
+                        <span class="hc-label">Cart</span><span class="hc-ping"></span>
+                        {% with total_qty=request.session.cart.values|length %}
+                        {% if total_qty > 0 %}<span class="hc-cart-badge">{{ total_qty }}</span>{% endif %}
+                        {% endwith %}
+                      </a></li>
 
-                        <li class="hc-cell hc-cell--offer"><a class="hc-link" href="{% url 'offers' %}" data-target="offers-cell">
-                            <svg class="offer-flame" viewBox="0 0 24 24"><path d="M12 2c2 3 5 6 5 10a5 5 0 01-10 0c0-1.8.8-3 1.6-4-.1 1.6 1 2.3 1.7 1.2C9.6 7 10 4 12 2z"/></svg>
-                            <span class="hc-label">Offers</span><span class="hc-ping"></span></a></li>
+                      <li class="hc-cell hc-cell--offer"><a class="hc-link" href="{% url 'offers' %}" data-target="offers-cell">
+                        <svg class="offer-flame" viewBox="0 0 24 24"><path d="M12 2c2 3 5 6 5 10a5 5 0 01-10 0c0-1.8.8-3 1.6-4-.1 1.6 1 2.3 1.7 1.2C9.6 7 10 4 12 2z"/></svg>
+                        <span class="hc-label">Offers</span><span class="hc-ping"></span></a></li>
 
-                        {% if user.is_authenticated %}
-                        <li class="hc-cell"><a class="hc-link active" href="{% url 'profile' %}" data-target="profile-cell">
-                            <svg viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.5"/><path d="M4.5 20c0-4 3.4-7 7.5-7s7.5 3 7.5 7"/></svg>
-                            <span class="hc-label">{{ user.first_name }}</span><span class="hc-ping"></span></a></li>
-                        {% else %}
-                        <li class="hc-cell"><a class="hc-link active" href="{% url 'login' %}" data-target="login-cell">
-                            <svg viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.5"/><path d="M4.5 20c0-4 3.4-7 7.5-7s7.5 3 7.5 7"/></svg>
-                            <span class="hc-label">Login</span><span class="hc-ping"></span></a></li>
-                        {% endif %}
+                      {% if user.is_authenticated %}
+                      <li class="hc-cell"><a class="hc-link active" href="{% url 'profile' %}" data-target="profile-cell">
+                        <svg viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.5"/><path d="M4.5 20c0-4 3.4-7 7.5-7s7.5 3 7.5 7"/></svg>
+                        <span class="hc-label">{{ user.first_name }}</span><span class="hc-ping"></span></a></li>
+                      {% else %}
+                      <li class="hc-cell"><a class="hc-link active" href="{% url 'login' %}" data-target="login-cell">
+                        <svg viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.5"/><path d="M4.5 20c0-4 3.4-7 7.5-7s7.5 3 7.5 7"/></svg>
+                        <span class="hc-label">Login</span><span class="hc-ping"></span></a></li>
+                      {% endif %}
 
-                        <li class="hc-cell"><a class="hc-link" href="/" data-target="website-cell">
-                            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.7 3.8 6 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-6-3.8-9S9.5 5.7 12 3z"/></svg>
-                            <span class="hc-label">Website</span><span class="hc-ping"></span></a></li>
+                      <li class="hc-cell"><a class="hc-link" href="/" data-target="website-cell">
+                        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.7 3.8 6 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-6-3.8-9S9.5 5.7 12 3z"/></svg>
+                        <span class="hc-label">Website</span><span class="hc-ping"></span></a></li>
                     </ul>
+                  </div>
                 </div>
-            </div>
         </div>
     </nav>
 
@@ -999,5 +1013,20 @@
     }
 })();
     </script>
+
+<script>
+(function(){
+    function fitExactDesktopHoneycomb(){
+        var wrap=document.querySelector('.exact-mobile-hc');
+        if(!wrap || window.innerWidth>880) return;
+        var targetWidth=Math.min(window.innerWidth-20,380);
+        wrap.style.setProperty('--mobile-hc-scale',(targetWidth/320).toFixed(4));
+    }
+    fitExactDesktopHoneycomb();
+    window.addEventListener('resize',fitExactDesktopHoneycomb,{passive:true});
+    window.addEventListener('orientationchange',fitExactDesktopHoneycomb,{passive:true});
+})();
+</script>
+
 </body>
 </html>
