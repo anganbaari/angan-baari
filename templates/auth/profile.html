@@ -262,7 +262,114 @@
             .order-top { flex-direction: column; align-items: flex-start; gap: 6px; }
         }
     </style>
-</head>
+
+        /* ================================================================
+           MOBILE HONEYCOMB NAV — MATCH DESKTOP STRUCTURE
+           Same connected 5-cell structure as desktop:
+           Shop / Cart / Offers / Profile(Login) / Website.
+        ================================================================ */
+        @media (max-width: 880px) {
+            .mobile-honeycomb-nav {
+                display: flex !important;
+                position: fixed !important;
+                left: 0 !important;
+                right: 0 !important;
+                bottom: 0 !important;
+                height: 82px !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                background: transparent !important;
+                border: 0 !important;
+                box-shadow: none !important;
+                backdrop-filter: none !important;
+                -webkit-backdrop-filter: none !important;
+                z-index: 500 !important;
+                pointer-events: none !important;
+                overflow: visible !important;
+            }
+
+            .mobile-honeycomb-nav .mobile-hc-wrap {
+                width: 320px;
+                height: 69px;
+                position: absolute;
+                left: 50%;
+                bottom: 5px;
+                transform: translateX(-50%);
+                pointer-events: auto;
+            }
+
+            .mobile-honeycomb-nav .hc-scale-box--app5 {
+                display: block !important;
+                width: 320px !important;
+                height: 68.5px !important;
+                position: relative !important;
+                transform: none !important;
+            }
+
+            /* Disable the old glass-bar navigation rules. */
+            .mobile-honeycomb-nav .nav-items,
+            .mobile-honeycomb-nav .nav-item,
+            .mobile-honeycomb-nav .nav-icon-wrap,
+            .mobile-honeycomb-nav .nav-label,
+            .mobile-honeycomb-nav .mbav-bg {
+                display: none !important;
+            }
+
+            .mobile-honeycomb-nav .hc-strip {
+                display: block !important;
+                visibility: visible !important;
+            }
+
+            .mobile-honeycomb-nav .hc-cell {
+                display: block !important;
+                flex: none !important;
+            }
+
+            .mobile-honeycomb-nav .hc-link {
+                display: flex !important;
+                visibility: visible !important;
+                pointer-events: auto !important;
+                -webkit-tap-highlight-color: transparent;
+            }
+
+            .mobile-honeycomb-nav .hc-link svg {
+                display: block !important;
+            }
+
+            .mobile-honeycomb-nav .hc-label {
+                display: block !important;
+                visibility: visible !important;
+            }
+
+            .mobile-honeycomb-nav .hc-cart-badge--mobile {
+                top: 15px !important;
+                right: 19px !important;
+            }
+        }
+
+        /* Compact phones: scale the complete honeycomb together so its
+           internal geometry stays identical to desktop. */
+        @media (max-width: 340px) {
+            .mobile-honeycomb-nav .mobile-hc-wrap {
+                transform: translateX(-50%) scale(.90);
+                transform-origin: center bottom;
+                bottom: 4px;
+            }
+        }
+
+        @media (max-width: 300px) {
+            .mobile-honeycomb-nav .mobile-hc-wrap {
+                transform: translateX(-50%) scale(.82);
+            }
+        }
+
+        @media (max-width: 880px) {
+            body {
+                padding-bottom: max(82px, env(safe-area-inset-bottom, 82px)) !important;
+            }
+        }
+
+    </head>
 <body>
 
     <header class="navbar navbar-app" id="navbar" data-nav-mode="solid">
@@ -530,43 +637,50 @@
         </div>
     </footer>
 
-    <nav class="mobile-bottom-nav" id="bottomNav" aria-label="Mobile navigation">
-        <div class="nav-items">
-            <a href="{% url 'shop' %}" class="nav-item">
-                <span class="nav-icon-wrap"><i class="fas fa-store"></i></span>
-                <span class="nav-label">Shop</span>
-            </a>
-            <a href="{% url 'cart' %}" class="nav-item">
-                <span class="nav-icon-wrap">
-                    <i class="fas fa-shopping-cart"></i>
-                    {% with total_qty=request.session.cart.values|length %}
-                    {% if total_qty > 0 %}<span class="cart-badge">{{ total_qty }}</span>{% endif %}
-                    {% endwith %}
-                </span>
-                <span class="nav-label">Cart</span>
-            </a>
-            <a href="{% url 'offers' %}" class="nav-item nav-item-offers">
-                <span class="nav-icon-wrap">
-                    <i class="fas fa-tag"></i>
-                    <span class="offer-dot"></span>
-                </span>
-                <span class="nav-label">Offers</span>
-            </a>
-            {% if user.is_authenticated %}
-            <a href="{% url 'profile' %}" class="nav-item active">
-                <span class="nav-icon-wrap"><i class="far fa-user-circle"></i></span>
-                <span class="nav-label">Profile</span>
-            </a>
-            {% else %}
-            <a href="{% url 'login' %}" class="nav-item active">
-                <span class="nav-icon-wrap"><i class="far fa-user-circle"></i></span>
-                <span class="nav-label">Login</span>
-            </a>
-            {% endif %}
-            <a href="/" class="nav-item">
-                <span class="nav-icon-wrap"><i class="fas fa-globe"></i></span>
-                <span class="nav-label">Website</span>
-            </a>
+    <!-- MOBILE / TABLET BOTTOM NAV — same connected honeycomb structure as desktop -->
+    <nav class="mobile-bottom-nav mobile-honeycomb-nav" id="bottomNav" aria-label="Mobile navigation">
+        <div class="mobile-hc-wrap">
+            <div class="hc-scale-box hc-scale-box--app5">
+                <div class="hc-strip hc-strip--cells5">
+                    <div class="hc-strip-bg" aria-hidden="true"></div>
+                    <div class="hc-connector" style="left:108px" aria-hidden="true"></div>
+                    <div class="hc-connector" style="left:240px" aria-hidden="true"></div>
+                    <div class="hc-connector" style="left:372px" aria-hidden="true"></div>
+                    <div class="hc-connector" style="left:504px" aria-hidden="true"></div>
+
+                    <ul class="hc-nav" id="hcNavMobile">
+                        <li class="hc-cell"><a class="hc-link" href="{% url 'shop' %}" data-target="shop-cell">
+                            <svg viewBox="0 0 24 24"><path d="M4.5 9h15l-1.4 10.2a2 2 0 01-2 1.8H7.9a2 2 0 01-2-1.8L4.5 9z"/><path d="M8.5 9V7a3.5 3.5 0 017 0v2"/></svg>
+                            <span class="hc-label">Shop</span><span class="hc-ping"></span></a></li>
+
+                        <li class="hc-cell"><a class="hc-link" href="{% url 'cart' %}" data-target="cart-cell">
+                            <svg viewBox="0 0 24 24"><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2.5 3h2.4l2.1 11.2a2 2 0 002 1.6h8.6a2 2 0 002-1.6L21 7H6.2"/></svg>
+                            <span class="hc-label">Cart</span><span class="hc-ping"></span>
+                            {% with total_qty=request.session.cart.values|length %}
+                            {% if total_qty > 0 %}<span id="cartBadgeMobileHoney" class="hc-cart-badge hc-cart-badge--mobile">{{ total_qty }}</span>{% endif %}
+                            {% endwith %}
+                        </a></li>
+
+                        <li class="hc-cell hc-cell--offer"><a class="hc-link" href="{% url 'offers' %}" data-target="offers-cell">
+                            <svg class="offer-flame" viewBox="0 0 24 24"><path d="M12 2c2 3 5 6 5 10a5 5 0 01-10 0c0-1.8.8-3 1.6-4-.1 1.6 1 2.3 1.7 1.2C9.6 7 10 4 12 2z"/></svg>
+                            <span class="hc-label">Offers</span><span class="hc-ping"></span></a></li>
+
+                        {% if user.is_authenticated %}
+                        <li class="hc-cell"><a class="hc-link active" href="{% url 'profile' %}" data-target="profile-cell">
+                            <svg viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.5"/><path d="M4.5 20c0-4 3.4-7 7.5-7s7.5 3 7.5 7"/></svg>
+                            <span class="hc-label">{{ user.first_name }}</span><span class="hc-ping"></span></a></li>
+                        {% else %}
+                        <li class="hc-cell"><a class="hc-link active" href="{% url 'login' %}" data-target="login-cell">
+                            <svg viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.5"/><path d="M4.5 20c0-4 3.4-7 7.5-7s7.5 3 7.5 7"/></svg>
+                            <span class="hc-label">Login</span><span class="hc-ping"></span></a></li>
+                        {% endif %}
+
+                        <li class="hc-cell"><a class="hc-link" href="/" data-target="website-cell">
+                            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.7 3.8 6 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-6-3.8-9S9.5 5.7 12 3z"/></svg>
+                            <span class="hc-label">Website</span><span class="hc-ping"></span></a></li>
+                    </ul>
+                </div>
+            </div>
         </div>
     </nav>
 
