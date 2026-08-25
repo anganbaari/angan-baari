@@ -564,32 +564,6 @@ ul { list-style: none; }
     100% { left: 130%; }
 }
 
-/* ─── Mobile bottom nav — active pill + Offers pulse ───
-   Shared across shop/cart/offers/profile so the "magic nav" concept
-   carries through to phone and tablet, not just desktop. */
-.mobile-bottom-nav .nav-items { position: relative; }
-
-.bottom-nav-pill {
-    position: absolute;
-    bottom: 2px;
-    height: 46px;
-    border-radius: 16px;
-    background: rgba(74, 124, 89, 0.14);
-    opacity: 0;
-    pointer-events: none;
-    transition: transform 0.3s ease, width 0.3s ease, opacity 0.25s ease;
-    z-index: 0;
-}
-.mobile-bottom-nav .nav-item { position: relative; z-index: 1; }
-
-.mobile-bottom-nav .offer-dot {
-    animation: offer-dot-pulse 1.6s ease-in-out infinite;
-}
-@keyframes offer-dot-pulse {
-    0%, 100% { box-shadow: 0 0 0 0 rgba(230,126,34,0.55); }
-    50% { box-shadow: 0 0 0 5px rgba(230,126,34,0); }
-}
-
 /* ================================================================
    NAVBAR — APP PAGES (shop / cart / offers / profile)
    These pages have a short 5-item nav (Shop, Cart, Offers, Login/
@@ -597,12 +571,17 @@ ul { list-style: none; }
    9-item nav — so they can stay in desktop-nav mode further into
    tablet widths before switching to mobile nav. This is scoped to
    .navbar-app so it never affects the homepage's own breakpoint.
+   Threshold (760/761px) is chosen so the brand block + honeycomb
+   nav (~600-620px combined) always has comfortable room, while
+   still covering tablet portrait widths (768px+) with the desktop
+   layout instead of the phone one. Kept in sync with the shop
+   sidebar's own breakpoint so nav and sidebar switch together.
 ================================================================ */
-@media (min-width: 881px) {
+@media (min-width: 761px) {
     .navbar-app .desktop-nav { display: flex !important; }
     .navbar-app .filter-trigger { display: none !important; }
 }
-@media (max-width: 880px) {
+@media (max-width: 760px) {
     .navbar-app .desktop-nav { display: none !important; }
 }
 
@@ -612,7 +591,7 @@ ul { list-style: none; }
    desktop nav (--app5 5-cell variant), just fixed to the bottom of
    the screen instead of sitting in the header — so mobile and
    desktop use the identical honeycomb structure, icons, and states.
-   Toggles at the exact same 880/881px breakpoint as .desktop-nav.
+   Toggles at the exact same 760/761px breakpoint as .desktop-nav.
 ================================================================ */
 .mobile-hc-nav {
     display: none;
@@ -626,10 +605,10 @@ ul { list-style: none; }
     pointer-events: none;
 }
 .mobile-hc-nav .hc-scale-box { pointer-events: auto; }
-@media (max-width: 880px) {
+@media (max-width: 760px) {
     .mobile-hc-nav { display: flex; }
 }
-@media (min-width: 881px) {
+@media (min-width: 761px) {
     .mobile-hc-nav { display: none !important; }
 }
 

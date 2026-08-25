@@ -101,6 +101,12 @@
         @media (max-width: 560px) {
             .cart-item { flex-wrap: wrap; }
             .cart-item-subtotal { text-align: left; margin-left: 108px; }
+            .saved-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+            .saved-card-img { height: 90px; }
+            .saved-card-body { padding: 10px; }
+            .saved-card-name { font-size: 0.78rem; }
+            .saved-card-price { font-size: 0.8rem; margin-bottom: 8px; }
+            .btn-move-cart { font-size: 0.68rem; padding: 7px; }
         }
 
         /* ─── Saved for Later ─── */
@@ -111,7 +117,7 @@
         .saved-card { background: var(--white); border: 1px solid var(--mist); border-radius: 16px; overflow: hidden; transition: box-shadow 0.25s, transform 0.25s, opacity 0.2s; }
         .saved-card:hover { box-shadow: 0 10px 24px rgba(26,47,30,0.08); transform: translateY(-2px); }
         .saved-card.is-removing { opacity: 0; }
-        .saved-card-img { height: 120px; background: var(--mist); }
+        .saved-card-img { height: 120px; background: var(--mist); position: relative; }
         .saved-card-img img { width: 100%; height: 100%; object-fit: cover; }
         .saved-card-body { padding: 12px; }
         .saved-card-name { font-size: 0.83rem; font-weight: 600; color: var(--forest); margin-bottom: 4px; line-height: 1.3; min-height: 2.1em; }
@@ -119,7 +125,15 @@
         .saved-card-actions { display: flex; gap: 6px; }
         .btn-move-cart { flex: 1; background: var(--forest); color: var(--gold); border: none; padding: 8px; border-radius: 50px; font-size: 0.72rem; font-weight: 600; cursor: pointer; transition: background 0.2s; }
         .btn-move-cart:hover { background: var(--moss); }
-        .btn-remove-saved { background: none; border: 1px solid var(--mist); color: var(--text-muted); padding: 8px 10px; border-radius: 50px; cursor: pointer; font-size: 0.72rem; transition: all 0.2s; }
+        .btn-remove-saved {
+            position: absolute; top: 8px; right: 8px; z-index: 2;
+            width: 30px; height: 30px; border-radius: 50%;
+            background: rgba(255,255,255,0.9); border: none; color: #b04a3a;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; font-size: 0.78rem; transition: all 0.2s;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+        }
+        .btn-remove-saved:hover { background: #fee2e2; color: #991b1b; }
         .btn-remove-saved:hover { border-color: #c0392b; color: #c0392b; }
 
         /* ─── Recommended products ─── */
@@ -151,12 +165,12 @@
             transition: opacity 0.25s, transform 0.25s; z-index: 900; display: flex; align-items: center; gap: 8px;
         }
         #cartToast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-        @media (max-width: 1024px) { #cartToast { bottom: 90px; } }
+        @media (max-width: 760px) { #cartToast { bottom: 90px; } }
 
-        @media (min-width: 881px) {
+        @media (min-width: 761px) {
             .mobile-hc-nav { display: none !important; }
         }
-        @media (max-width: 880px) {
+        @media (max-width: 760px) {
             .cart-page { margin-bottom: 90px; }
         }
     </style>
@@ -338,13 +352,13 @@
                 <div class="saved-card" id="saved-card-{{ item.id }}" data-id="{{ item.id }}" data-price="{{ item.price }}">
                     <div class="saved-card-img">
                         {% if item.image %}<img src="{% static item.image %}" alt="{{ item.name }}">{% endif %}
+                        <button type="button" class="btn-remove-saved" data-action="remove-saved" title="Remove"><i class="fas fa-times"></i></button>
                     </div>
                     <div class="saved-card-body">
                         <div class="saved-card-name">{{ item.name }}</div>
                         <div class="saved-card-price">Rs. {{ item.price }}</div>
                         <div class="saved-card-actions">
                             <button type="button" class="btn-move-cart" data-action="move"><i class="fas fa-cart-plus"></i> Add to Cart</button>
-                            <button type="button" class="btn-remove-saved" data-action="remove-saved"><i class="fas fa-times"></i></button>
                         </div>
                     </div>
                 </div>
@@ -361,6 +375,7 @@
                 <div class="saved-card" id="wishlist-card-{{ item.product.id }}" data-id="{{ item.product.id }}">
                     <div class="saved-card-img">
                         {% if item.product.main_image %}<img src="{% static item.product.main_image %}" alt="{{ item.product.name }}">{% endif %}
+                        <button type="button" class="btn-remove-saved" data-action="remove-wishlist" title="Remove"><i class="fas fa-times"></i></button>
                     </div>
                     <div class="saved-card-body">
                         <div class="saved-card-name">{{ item.product.name }}</div>
@@ -375,7 +390,6 @@
                                 data-image="{{ item.product.main_image }}">
                                 <i class="fas fa-cart-plus"></i> Add to Cart
                             </button>
-                            <button type="button" class="btn-remove-saved" data-action="remove-wishlist"><i class="fas fa-times"></i></button>
                         </div>
                     </div>
                 </div>
@@ -647,13 +661,12 @@
             card.dataset.price = item.price;
             const imgHtml = item.image ? `<img src="/static/${item.image}" alt="${item.name}">` : '';
             card.innerHTML = `
-                <div class="saved-card-img">${imgHtml}</div>
+                <div class="saved-card-img">${imgHtml}<button type="button" class="btn-remove-saved" data-action="remove-saved" title="Remove"><i class="fas fa-times"></i></button></div>
                 <div class="saved-card-body">
                     <div class="saved-card-name">${item.name}</div>
                     <div class="saved-card-price">Rs. ${item.price}</div>
                     <div class="saved-card-actions">
                         <button type="button" class="btn-move-cart" data-action="move"><i class="fas fa-cart-plus"></i> Add to Cart</button>
-                        <button type="button" class="btn-remove-saved" data-action="remove-saved"><i class="fas fa-times"></i></button>
                     </div>
                 </div>`;
             return card;

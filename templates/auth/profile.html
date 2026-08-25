@@ -83,11 +83,22 @@
         .wishlist-variant-select { width: 100%; font-size: 0.78rem; font-weight: 600; color: var(--forest); background: var(--mist); border: 1px solid transparent; border-radius: 8px; padding: 6px 8px; margin-bottom: 6px; cursor: pointer; }
         .wishlist-variant-select:focus { outline: none; border-color: var(--moss); }
         .wishlist-card-actions { display: flex; gap: 6px; }
-        .wishlist-btn { flex: 1; text-align: center; padding: 7px 8px; border-radius: 8px; font-size: 0.76rem; font-weight: 600; text-decoration: none; cursor: pointer; border: none; transition: opacity 0.2s; }
+        .wishlist-btn { text-align: center; padding: 7px 8px; border-radius: 8px; font-size: 0.76rem; font-weight: 600; text-decoration: none; cursor: pointer; border: none; transition: opacity 0.2s; }
         .wishlist-btn:hover { opacity: 0.85; }
-        .wishlist-btn-cart { background: var(--forest); color: #fff; }
-        .wishlist-btn-remove { background: #fee2e2; color: #991b1b; }
+        .wishlist-btn-cart { flex: 1; background: var(--forest); color: #fff; }
+        .wishlist-btn-remove { flex: 0 0 auto; width: 34px; background: #fee2e2; color: #991b1b; }
         .no-wishlist, .no-coupons { text-align: center; padding: 32px 20px; color: var(--text-muted); font-size: 0.88rem; margin-bottom: 40px; background: var(--white); border: 1px dashed var(--mist); border-radius: 12px; }
+
+        @media (max-width: 560px) {
+            .wishlist-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+            .wishlist-card-img { height: 90px; }
+            .wishlist-card-body { padding: 10px; }
+            .wishlist-card-name { font-size: 0.8rem; }
+            .wishlist-card-price { font-size: 0.74rem; margin-bottom: 8px; }
+            .wishlist-btn { font-size: 0.68rem; padding: 7px 5px; }
+            .wishlist-btn-cart span { display: none; }
+            .wishlist-variant-select { font-size: 0.7rem; padding: 5px 6px; }
+        }
 
         /* ── My Coupons ── */
         .coupons-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; margin-bottom: 40px; }
@@ -119,10 +130,10 @@
         @media (max-width: 700px) { .settings-grid { grid-template-columns: 1fr; } }
 
 
-        @media (min-width: 881px) {
+        @media (min-width: 761px) {
             .mobile-hc-nav { display: none !important; }
         }
-        @media (max-width: 880px) {
+        @media (max-width: 760px) {
             .profile-page { margin-bottom: 90px; }
         }
         @media (max-width: 600px) {
@@ -293,7 +304,7 @@
 
                     <div class="wishlist-card-actions">
                         <button type="button" class="wishlist-btn wishlist-btn-cart" data-wishlist-add-cart data-product-id="{{ item.product.id }}">
-                            <i class="fas fa-cart-plus"></i> Add to Cart
+                            <i class="fas fa-cart-plus"></i> <span>Add to Cart</span>
                         </button>
                         <button type="button" class="wishlist-btn wishlist-btn-remove" data-wishlist-remove data-product-id="{{ item.product.id }}"><i class="fas fa-heart-broken"></i></button>
                     </div>

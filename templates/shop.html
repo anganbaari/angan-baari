@@ -406,7 +406,7 @@
         .no-results i { font-size: 2.5rem; color: #c5d0c7; margin-bottom: 12px; display: block; }
         .no-results p { color: #8a9e8e; font-size: 0.9rem; }
 
-        @media (max-width: 880px) {
+        @media (max-width: 760px) {
             .shop-wrapper { margin-bottom: 90px; }
         }
 
@@ -504,7 +504,7 @@
         /* ══════════════════════════════════════════
            RESPONSIVE
         ══════════════════════════════════════════ */
-        @media (max-width: 1024px) {
+        @media (max-width: 760px) {
             .shop-sidebar { display: none; }
             .shop-wrapper { padding: 12px 10px 0; gap: 0; }
         }
@@ -514,7 +514,7 @@
             .shop-banner { display: none; }
             .results-count { display: none; }
         }
-        @media (min-width: 1025px) {
+        @media (min-width: 761px) {
             .mobile-hc-nav { display: none !important; }
             .filter-trigger { display: none !important; }
         }
@@ -542,15 +542,8 @@
         }
         .filter-trigger:hover { background: rgba(255,255,255,0.15); border-color: rgba(255,255,255,0.35); }
         .filter-trigger i { font-size: 0.88rem; }
-        @media (max-width: 1024px) { .filter-trigger { display: inline-flex; } }
+        @media (max-width: 760px) { .filter-trigger { display: inline-flex; } }
         @media (max-width: 480px) { .filter-trigger span { display: none; } .filter-trigger { padding: 10px 12px; } }
-        /* The shared .navbar-app rule hides .filter-trigger above 880px,
-           but on this page the category sidebar is hidden all the way up
-           to 1024px — so the filter trigger needs to stay reachable
-           through that whole range, not just below 880px. */
-        @media (min-width: 881px) and (max-width: 1024px) {
-            .filter-trigger { display: inline-flex !important; }
-        }
 
         /* Utility: hide a cart badge without assuming its display value */
         .badge-hidden { display: none !important; }
@@ -568,7 +561,7 @@
             transition: opacity 0.25s, transform 0.25s; z-index: 900; display: flex; align-items: center; gap: 8px;
         }
         #shopToast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-        @media (max-width: 1024px) { #shopToast { bottom: 90px; } }
+        @media (max-width: 760px) { #shopToast { bottom: 90px; } }
     </style>
 </head>
 <body>
