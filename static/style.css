@@ -3778,6 +3778,60 @@ ul { list-style: none; }
     font-size: 0.85rem !important;
     margin-top: 4px;
 }
+
+/* ================================================================
+   APP-PAGE FOOTER (shop / cart / offers / profile / product_detail)
+   New classes alongside the homepage's own .footer-icon/.footer-name
+   so the homepage footer is untouched — this variant uses the real
+   logo image and a two-line Nepali(gold)/English name stack instead.
+================================================================ */
+.footer-icon img {
+    width: 56px;
+    height: 56px;
+    object-fit: contain;
+    display: block;
+    margin: 0 auto 12px;
+}
+
+.footer-name-np {
+    font-family: var(--font-display);
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--gold);
+    line-height: 1.2;
+}
+
+.footer-name-en {
+    font-family: var(--font-display);
+    font-size: 1.05rem;
+    color: var(--white);
+    margin-bottom: 6px;
+}
+
+.footer-social a.fb { background: #1877F2; border-color: #1877F2; }
+.footer-social a.ig {
+    background: linear-gradient(45deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888);
+    border-color: transparent;
+}
+.footer-social a.yt { background: #FF0000; border-color: #FF0000; }
+.footer-social a.x { background: #000; border-color: #000; }
+.footer-social a.tiktok { background: #000; border-color: #000; }
+.footer-social a.threads { background: #000; border-color: #000; }
+.footer-social a.fb,
+.footer-social a.ig,
+.footer-social a.yt,
+.footer-social a.x,
+.footer-social a.tiktok,
+.footer-social a.threads { color: #fff; }
+.footer-social a.fb:hover,
+.footer-social a.ig:hover,
+.footer-social a.yt:hover,
+.footer-social a.x:hover,
+.footer-social a.tiktok:hover,
+.footer-social a.threads:hover {
+    filter: brightness(1.15);
+    transform: translateY(-3px);
+}
  
 /* ================================================================
    19. RESPONSIVE
