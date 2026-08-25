@@ -96,22 +96,21 @@
            LAYOUT
         ══════════════════════════════════════════ */
         .shop-wrapper {
-            display: flex;
+            display: grid;
+            grid-template-columns: 190px 1fr;
             max-width: 1280px;
             margin: 0 auto 100px;
             padding: 16px 12px 0;
             gap: 16px;
+            align-items: start;
         }
 
         /* ══════════════════════════════════════════
            SIDEBAR (desktop only)
         ══════════════════════════════════════════ */
         .shop-sidebar {
-            width: 190px;
-            flex-shrink: 0;
             position: sticky;
             top: 100px;
-            align-self: flex-start;
             max-height: calc(100vh - 116px);
             overflow-y: auto;
         }
@@ -171,7 +170,7 @@
         /* ══════════════════════════════════════════
            MAIN CONTENT
         ══════════════════════════════════════════ */
-        .shop-main { flex: 1; min-width: 0; }
+        .shop-main { min-width: 0; }
 
         /* Offer nav icon animation */
         .offer-flame { animation: flicker 1.2s infinite alternate; }
@@ -511,7 +510,7 @@
         ══════════════════════════════════════════ */
         @media (max-width: 760px) {
             .shop-sidebar { display: none; }
-            .shop-wrapper { padding: 12px 10px 0; gap: 0; }
+            .shop-wrapper { grid-template-columns: 1fr; padding: 12px 10px 0; gap: 0; }
         }
         @media (max-width: 600px) {
             .product-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
