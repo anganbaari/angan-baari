@@ -80,7 +80,6 @@ body {
     background: var(--cream);
     color: var(--text-body);
     line-height: 1.7;
-    overflow-x: hidden;
     width: 100%;
     max-width: 100vw;
     -webkit-font-smoothing: antialiased;
@@ -632,7 +631,7 @@ ul { list-style: none; }
    hexagon rather than flat-ended cells). The header's edge padding
    is 2vw, which shrinks below that 27px at tablet widths — so
    without this, the taper's right tip gets sliced flat by the
-   overflow-x:hidden on <body>. This fixed margin guarantees
+   overflow-x:hidden on <html>. This fixed margin guarantees
    clearance at every width, not just wide desktop ones. */
 .navbar-app .desktop-nav { margin-right: 32px; }
 /* Pull "Order Now" in closer to the honeycomb strip — the strip's
