@@ -67,76 +67,6 @@
             padding: 108px 5vw 40px;
         }
 
-        /* ============================================================
-           FIXED HEADER — solid at all times, no transparent/scroll
-           behavior. Overrides any conflicting rules from style.css.
-        ============================================================ */
-        header#navbar {
-            position: fixed !important;
-            top: 0; left: 0; right: 0;
-            width: 100%;
-            background: var(--forest) !important;
-            box-shadow: 0 4px 20px rgba(18,24,15,0.25);
-            z-index: 1000;
-            height: 76px;
-        }
-        header#navbar .navbar-inner {
-            max-width: 1300px;
-            margin: 0 auto;
-            height: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 0 5vw;
-        }
-        header#navbar .brand { display: flex; align-items: center; gap: 12px; text-decoration: none; }
-        header#navbar .brand-icon {
-            width: 40px; height: 40px; border-radius: 50%;
-            background: var(--moss); color: white;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 1rem; flex-shrink: 0;
-        }
-        header#navbar .brand-text { display: flex; flex-direction: column; line-height: 1.15; }
-        header#navbar .brand-name {
-            font-family: var(--font-display, 'Cormorant Garamond'), serif;
-            font-size: 1.35rem; font-weight: 700; color: white;
-        }
-        header#navbar .brand-tagline { font-size: 0.68rem; color: rgba(255,255,255,0.55); letter-spacing: 0.03em; }
-
-        header#navbar .nav-links { display: flex; align-items: center; gap: 6px; }
-        header#navbar .nav-link {
-            display: flex; align-items: center; gap: 8px;
-            color: rgba(255,255,255,0.78);
-            text-decoration: none;
-            font-size: 0.86rem; font-weight: 500;
-            padding: 10px 16px;
-            border-radius: 50px;
-            transition: all 0.25s ease;
-            position: relative;
-        }
-        header#navbar .nav-link i { font-size: 0.92rem; }
-        header#navbar .nav-link:hover { background: rgba(255,255,255,0.08); color: white; }
-        header#navbar .nav-link.nav-profile {
-            background: var(--gold);
-            color: var(--forest-deep);
-            font-weight: 700;
-        }
-        header#navbar .nav-link.nav-profile:hover { background: #ffab6b; }
-        header#navbar .cart-badge {
-            position: absolute; top: 2px; right: 6px;
-            background: var(--terai-clay); color: white;
-            font-size: 0.6rem; font-weight: 700;
-            width: 16px; height: 16px; border-radius: 50%;
-            display: flex; align-items: center; justify-content: center;
-        }
-        @media (max-width: 880px) {
-            header#navbar .site-nav { display: none !important; }
-        }
-        @media (max-width: 480px) {
-            header#navbar { height: 64px; }
-            header#navbar .brand-tagline { display: none; }
-        }
-
         /* ---------------- Breadcrumb ---------------- */
         .breadcrumb {
             display: flex;
@@ -620,7 +550,7 @@
         /* ---------------- Sticky mobile CTA ---------------- */
         .sticky-mobile-bar {
             display: none;
-            position: fixed; bottom: 66px; left: 0; right: 0;
+            position: fixed; bottom: 90px; left: 0; right: 0;
             background: white; border-top: 1px solid var(--mist);
             padding: 12px 16px; z-index: 900;
             box-shadow: 0 -8px 24px -12px rgba(20,33,24,0.2);
@@ -638,56 +568,13 @@
             font-family: var(--font-body, 'DM Sans');
         }
 
-        /* ============================================================
-           MOBILE BOTTOM NAV — reuses your shared .mobile-bottom-nav /
-           .bottom-nav-pill / .offer-dot classes from style.css (the
-           pill-slide and pulse animations come from there automatically).
-           Structural layout is defined here since it isn't in style.css.
-        ============================================================ */
-        .mobile-bottom-nav {
-            display: none;
-            position: fixed; bottom: 0; left: 0; right: 0;
-            background: var(--white);
-            border-top: 1px solid var(--mist);
-            z-index: 1000;
-            height: 66px;
-            box-shadow: 0 -6px 20px -8px rgba(20,33,24,0.15);
-        }
-        .mobile-bottom-nav .nav-items {
-            display: flex;
-            height: 100%;
-            max-width: 520px;
-            margin: 0 auto;
-        }
-        .mobile-bottom-nav .nav-item {
-            flex: 1;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            gap: 3px;
-            text-decoration: none;
-            color: var(--text-muted);
-            font-size: 0.62rem;
-            font-weight: 600;
-            font-family: var(--font-body, 'DM Sans');
-        }
-        .mobile-bottom-nav .nav-item i { font-size: 1.15rem; }
-        .mobile-bottom-nav .nav-item.active { color: var(--forest); }
-        .mobile-bottom-nav .nav-item .offer-dot {
-            position: absolute;
-            width: 7px; height: 7px; border-radius: 50%;
-            background: var(--terai-clay);
-            transform: translate(10px, -10px);
-        }
-
         /* Floating Shop / WhatsApp / Back-to-top come from style.css —
-           just shifting them up on this page so they clear the bottom
-           nav bar (and the sticky add-to-cart bar when it's visible). */
-        @media (max-width: 880px) {
-            .mobile-bottom-nav { display: block; }
-        }
+           just shifting them up on this page so they clear the honeycomb
+           mobile nav bar (and the sticky add-to-cart bar when visible). */
         @media (max-width: 768px) {
-            .float-shop { bottom: 224px !important; }
-            .float-wa { bottom: 148px !important; }
-            .back-to-top { bottom: 84px !important; }
+            .float-shop { bottom: 248px !important; }
+            .float-wa { bottom: 172px !important; }
+            .back-to-top { bottom: 108px !important; }
         }
 
         /* ---------------- Responsive ---------------- */
@@ -722,41 +609,60 @@
 <body>
 
     <!-- Navbar -->
-    <header class="navbar scrolled navbar-app" id="navbar">
+    <header class="navbar scrolled navbar-app" id="navbar" data-nav-mode="solid">
         <div class="navbar-inner">
-            <a href="/" class="brand">
-                <span class="brand-icon"><i class="fas fa-seedling"></i></span>
+            <a href="/" class="brand" aria-label="Angan Baari Home">
+                <span class="brand-icon"><img src="{% static 'images/logo-icon.png' %}" alt="" width="84" height="84" loading="eager"></span>
                 <div class="brand-text">
-                    <span class="brand-name">Angan</span>
-                    <span class="brand-tagline">Baari · आँगन बारी</span>
+                    <span class="brand-name">आँगन बारी</span>
+                    <span class="brand-tagline">Angan Baari</span>
+                    <span class="brand-subtag">Organic Farm</span>
                 </div>
+                <span class="brand-flag" aria-hidden="true">
+                    <canvas id="navNepalFlag" class="nav-nepal-flag" width="450" height="600"></canvas>
+                </span>
             </a>
-            <nav class="site-nav">
-                <div class="nav-links">
-                    <a href="{% url 'shop' %}" class="nav-link">
-                        <i class="fas fa-store"></i><span>Shop</span>
-                    </a>
-                    <a href="{% url 'cart' %}" class="nav-link" style="position:relative;">
-                        <i class="fas fa-shopping-cart"></i><span>Cart</span>
+            <nav class="desktop-nav" aria-label="Main Navigation">
+                <div class="hc-scale-box hc-scale-box--app5">
+                  <div class="hc-strip hc-strip--cells5">
+                    <div class="hc-strip-bg" aria-hidden="true"></div>
+                    <div class="hc-connector" style="left:108px" aria-hidden="true"></div>
+                    <div class="hc-connector" style="left:240px" aria-hidden="true"></div>
+                    <div class="hc-connector" style="left:372px" aria-hidden="true"></div>
+                    <div class="hc-connector" style="left:504px" aria-hidden="true"></div>
+
+                    <ul class="hc-nav" id="hcNavApp">
+                      <li class="hc-cell"><a class="hc-link active" href="{% url 'shop' %}" data-target="shop-cell">
+                        <svg viewBox="0 0 24 24"><path d="M4.5 9h15l-1.4 10.2a2 2 0 01-2 1.8H7.9a2 2 0 01-2-1.8L4.5 9z"/><path d="M8.5 9V7a3.5 3.5 0 017 0v2"/></svg>
+                        <span class="hc-label">Shop</span><span class="hc-ping"></span></a></li>
+
+                      <li class="hc-cell"><a class="hc-link" href="{% url 'cart' %}" data-target="cart-cell">
+                        <svg viewBox="0 0 24 24"><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2.5 3h2.4l2.1 11.2a2 2 0 002 1.6h8.6a2 2 0 002-1.6L21 7H6.2"/></svg>
+                        <span class="hc-label">Cart</span><span class="hc-ping"></span>
                         {% with total_qty=request.session.cart.values|length %}
-                        {% if total_qty > 0 %}<span class="cart-badge">{{ total_qty }}</span>{% endif %}
+                        <span id="cartBadgeDesktop" class="hc-cart-badge{% if total_qty == 0 %} badge-hidden{% endif %}">{{ total_qty }}</span>
                         {% endwith %}
-                    </a>
-                    <a href="{% url 'offers' %}" class="nav-link">
-                        <i class="fas fa-fire"></i><span>Offers</span>
-                    </a>
-                    {% if user.is_authenticated %}
-                    <a href="{% url 'profile' %}" class="nav-link nav-profile">
-                        <i class="fas fa-user-circle"></i><span>{{ user.first_name|default:"Profile" }}</span>
-                    </a>
-                    {% else %}
-                    <a href="{% url 'login' %}" class="nav-link nav-profile">
-                        <i class="fas fa-user-circle"></i><span>Login</span>
-                    </a>
-                    {% endif %}
-                    <a href="/" class="nav-link">
-                        <i class="fas fa-globe"></i><span>Website</span>
-                    </a>
+                      </a></li>
+
+                      <li class="hc-cell hc-cell--offer"><a class="hc-link" href="{% url 'offers' %}" data-target="offers-cell">
+                        <svg class="offer-flame" viewBox="0 0 24 24"><path d="M12 2c2 3 5 6 5 10a5 5 0 01-10 0c0-1.8.8-3 1.6-4-.1 1.6 1 2.3 1.7 1.2C9.6 7 10 4 12 2z"/></svg>
+                        <span class="hc-label">Offers</span><span class="hc-ping"></span></a></li>
+
+                      {% if user.is_authenticated %}
+                      <li class="hc-cell"><a class="hc-link" href="{% url 'profile' %}" data-target="profile-cell">
+                        <svg viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.5"/><path d="M4.5 20c0-4 3.4-7 7.5-7s7.5 3 7.5 7"/></svg>
+                        <span class="hc-label">{{ user.first_name }}</span><span class="hc-ping"></span></a></li>
+                      {% else %}
+                      <li class="hc-cell"><a class="hc-link" href="{% url 'login' %}" data-target="login-cell">
+                        <svg viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.5"/><path d="M4.5 20c0-4 3.4-7 7.5-7s7.5 3 7.5 7"/></svg>
+                        <span class="hc-label">Login</span><span class="hc-ping"></span></a></li>
+                      {% endif %}
+
+                      <li class="hc-cell"><a class="hc-link" href="/" data-target="website-cell">
+                        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.7 3.8 6 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-6-3.8-9S9.5 5.7 12 3z"/></svg>
+                        <span class="hc-label">Website</span><span class="hc-ping"></span></a></li>
+                    </ul>
+                  </div>
                 </div>
             </nav>
         </div>
@@ -1181,37 +1087,48 @@
         </div>
     </footer>
 
-    <!-- ============================================================
-         MOBILE BOTTOM NAV — Shop, Cart, Offers, Profile, Website.
-         Uses your shared .mobile-bottom-nav / .bottom-nav-pill /
-         .offer-dot classes so the pill-slide + pulse animations from
-         style.css apply automatically.
-    ============================================================ -->
-    <nav class="mobile-bottom-nav">
-        <div class="nav-items" id="bottomNavItems">
-            <div class="bottom-nav-pill" id="bottomNavPill"></div>
-            <a href="{% url 'shop' %}" class="nav-item active">
-                <i class="fas fa-store"></i><span>Shop</span>
-            </a>
-            <a href="{% url 'cart' %}" class="nav-item" style="position:relative;">
-                <i class="fas fa-shopping-cart"></i><span>Cart</span>
-            </a>
-            <a href="{% url 'offers' %}" class="nav-item" style="position:relative;">
-                <i class="fas fa-fire"></i><span>Offers</span>
-                <span class="offer-dot"></span>
-            </a>
-            {% if user.is_authenticated %}
-            <a href="{% url 'profile' %}" class="nav-item">
-                <i class="fas fa-user-circle"></i><span>Profile</span>
-            </a>
-            {% else %}
-            <a href="{% url 'login' %}" class="nav-item">
-                <i class="fas fa-user-circle"></i><span>Login</span>
-            </a>
-            {% endif %}
-            <a href="/" class="nav-item">
-                <i class="fas fa-globe"></i><span>Website</span>
-            </a>
+    <!-- MOBILE BOTTOM NAV — same honeycomb chain as desktop (hidden on desktop) -->
+    <nav class="mobile-hc-nav" aria-label="Mobile navigation">
+        <div class="hc-scale-box hc-scale-box--app5">
+          <div class="hc-strip hc-strip--cells5">
+            <div class="hc-strip-bg" aria-hidden="true"></div>
+            <div class="hc-connector" style="left:108px" aria-hidden="true"></div>
+            <div class="hc-connector" style="left:240px" aria-hidden="true"></div>
+            <div class="hc-connector" style="left:372px" aria-hidden="true"></div>
+            <div class="hc-connector" style="left:504px" aria-hidden="true"></div>
+
+            <ul class="hc-nav" id="hcNavAppMobile">
+              <li class="hc-cell"><a class="hc-link active" href="{% url 'shop' %}" data-target="shop-cell">
+                <svg viewBox="0 0 24 24"><path d="M4.5 9h15l-1.4 10.2a2 2 0 01-2 1.8H7.9a2 2 0 01-2-1.8L4.5 9z"/><path d="M8.5 9V7a3.5 3.5 0 017 0v2"/></svg>
+                <span class="hc-label">Shop</span><span class="hc-ping"></span></a></li>
+
+              <li class="hc-cell"><a class="hc-link" href="{% url 'cart' %}" data-target="cart-cell">
+                <svg viewBox="0 0 24 24"><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2.5 3h2.4l2.1 11.2a2 2 0 002 1.6h8.6a2 2 0 002-1.6L21 7H6.2"/></svg>
+                <span class="hc-label">Cart</span><span class="hc-ping"></span>
+                {% with total_qty=request.session.cart.values|length %}
+                <span class="hc-cart-badge{% if total_qty == 0 %} badge-hidden{% endif %}">{{ total_qty }}</span>
+                {% endwith %}
+              </a></li>
+
+              <li class="hc-cell hc-cell--offer"><a class="hc-link" href="{% url 'offers' %}" data-target="offers-cell">
+                <svg class="offer-flame" viewBox="0 0 24 24"><path d="M12 2c2 3 5 6 5 10a5 5 0 01-10 0c0-1.8.8-3 1.6-4-.1 1.6 1 2.3 1.7 1.2C9.6 7 10 4 12 2z"/></svg>
+                <span class="hc-label">Offers</span><span class="hc-ping"></span></a></li>
+
+              {% if user.is_authenticated %}
+              <li class="hc-cell"><a class="hc-link" href="{% url 'profile' %}" data-target="profile-cell">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.5"/><path d="M4.5 20c0-4 3.4-7 7.5-7s7.5 3 7.5 7"/></svg>
+                <span class="hc-label">{{ user.first_name }}</span><span class="hc-ping"></span></a></li>
+              {% else %}
+              <li class="hc-cell"><a class="hc-link" href="{% url 'login' %}" data-target="login-cell">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.5"/><path d="M4.5 20c0-4 3.4-7 7.5-7s7.5 3 7.5 7"/></svg>
+                <span class="hc-label">Login</span><span class="hc-ping"></span></a></li>
+              {% endif %}
+
+              <li class="hc-cell"><a class="hc-link" href="/" data-target="website-cell">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.7 3.8 6 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-6-3.8-9S9.5 5.7 12 3z"/></svg>
+                <span class="hc-label">Website</span><span class="hc-ping"></span></a></li>
+            </ul>
+          </div>
         </div>
     </nav>
 
@@ -1235,23 +1152,7 @@
     </button>
 
     <script>
-        /* ---------------- Bottom nav pill + back to top ---------------- */
-        (function initBottomNavPill() {
-            const items = document.getElementById('bottomNavItems');
-            const pill = document.getElementById('bottomNavPill');
-            const active = items ? items.querySelector('.nav-item.active') : null;
-            if (!items || !pill || !active) return;
-            function positionPill() {
-                const itemRect = active.getBoundingClientRect();
-                const wrapRect = items.getBoundingClientRect();
-                pill.style.width = itemRect.width - 12 + 'px';
-                pill.style.transform = `translateX(${itemRect.left - wrapRect.left + 6}px)`;
-                pill.style.opacity = '1';
-            }
-            positionPill();
-            window.addEventListener('resize', positionPill);
-        })();
-
+        /* ---------------- Back to top ---------------- */
         (function initBackToTop() {
             const btn = document.getElementById('backToTop');
             if (!btn) return;
@@ -1489,5 +1390,220 @@
         });
     </script>
 
+    <script>
+// ================================================================
+// OPMCM-STYLE WIND-BLOWN NEPAL FLAG — NAVBAR
+// Darker colors · crisp edges · sharp triangular silhouette
+// Smooth cloth folds · stable pole · stronger free-end flutter
+// ================================================================
+(function () {
+    const canvas = document.getElementById('navNepalFlag');
+    if (!canvas) return;
+
+    const WIDTH = 450;
+    const HEIGHT = 600;
+    const FLAG_W = 330;
+    const FLAG_H = 441;
+    const PAD_X = 60;
+    const PAD_Y = 78;
+
+    canvas.width = WIDTH;
+    canvas.height = HEIGHT;
+
+    const ctx = canvas.getContext('2d', { alpha: true });
+    if (!ctx) return;
+
+    // Keep the raster edges crisp instead of applying soft interpolation.
+    ctx.imageSmoothingEnabled = false;
+
+    const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="110" height="147" viewBox="0 0 110 147">
+        <!-- Deep, slightly darker Nepal red and blue for the OPMCM-style look -->
+        <path d="M 0.00,0.00 L 110.00,68.88 L 32.22,68.88 L 110.00,146.67 L 0.00,146.67 Z"
+              fill="#B80F2F" stroke="#001F5B" stroke-width="3.5" stroke-linejoin="round"/>
+
+        <g transform="translate(27.50,43.05)">
+            <path d="M 22.27,-4.58 L 21.52,-4.79 L 20.33,-2.42 L 15.70,3.07 L 12.48,5.11 L 11.18,4.57 L 10.86,2.96 L 12.80,1.99 L 13.23,0.48 L 10.00,-0.05 L 10.21,-1.45 L 11.93,-4.36 L 7.74,-3.72 L 7.95,-7.81 L 6.34,-7.48 L 4.18,-5.87 L 2.89,-10.06 L 0.52,-7.05 L -0.23,-7.16 L -2.17,-9.74 L -3.78,-5.98 L -6.69,-7.81 L -7.98,-7.92 L -7.33,-7.59 L -7.33,-3.72 L -9.38,-3.61 L -11.10,-4.25 L -9.81,-0.05 L -13.04,0.59 L -12.93,1.56 L -10.89,3.18 L -11.64,5.33 L -13.04,5.00 L -15.62,3.07 L -18.43,0.16 L -20.90,-3.61 L -21.55,-3.61 L -20.68,1.77 L -17.99,6.51 L -14.87,9.95 L -10.24,13.30 L -3.46,15.34 L 1.93,15.56 L 9.89,13.73 L 14.74,10.39 L 20.23,3.50 L 22.16,-2.42 Z"
+                  fill="#FFFFFF"/>
+        </g>
+
+        <path d="M 27.50,131.32 L 23.64,122.20 L 15.73,128.16 L 16.94,118.33 L 7.11,119.55 L 13.08,111.64 L 3.96,107.78 L 13.08,103.91 L 7.11,96.01 L 16.94,97.22 L 15.73,87.39 L 23.64,93.35 L 27.50,84.24 L 31.36,93.35 L 39.27,87.39 L 38.06,97.22 L 47.89,96.01 L 41.92,103.91 L 51.04,107.78 L 41.92,111.64 L 47.89,119.55 L 38.06,118.33 L 39.27,128.16 L 31.36,122.20 Z"
+              fill="#FFFFFF"/>
+    </svg>`;
+
+    const sourceCanvas = document.createElement('canvas');
+    sourceCanvas.width = WIDTH;
+    sourceCanvas.height = HEIGHT;
+    const sourceCtx = sourceCanvas.getContext('2d', { alpha: true });
+    if (!sourceCtx) return;
+    sourceCtx.imageSmoothingEnabled = false;
+
+    const img = new Image();
+    img.decoding = 'async';
+
+    img.onload = function () {
+        sourceCtx.clearRect(0, 0, WIDTH, HEIGHT);
+        sourceCtx.drawImage(img, PAD_X, PAD_Y, FLAG_W, FLAG_H);
+        startAnimation();
+    };
+
+    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+
+    function drawFlag(time) {
+        const t = time * 0.001;
+
+        ctx.clearRect(0, 0, WIDTH, HEIGHT);
+
+        // Transparent padding is intentionally preserved around the flag.
+        // This keeps both pointed ends completely visible while waving.
+        ctx.save();
+        ctx.translate(PAD_X, PAD_Y);
+
+        /*
+         * Draw the flag as narrow vertical fabric strips.
+         * Unlike pixel displacement, this preserves the sharp Nepal-flag
+         * silhouette and pointed edges while the strips move independently.
+         */
+        const strip = 3;
+
+        for (let x = 0; x < FLAG_W; x += strip) {
+            const u = x / FLAG_W;
+
+            // Pole remains stable; the free end becomes increasingly active.
+            const strength = Math.pow(u, 1.45);
+
+            // Large travelling cloth folds.
+            const wave1 = Math.sin(u * Math.PI * 1.55 - t * 4.0);
+            const wave2 = Math.sin(u * Math.PI * 3.10 - t * 4.0 + 1.15);
+
+            // Strong but smooth vertical displacement.
+            const yWave = strength * (wave1 * 34 + wave2 * 8);
+
+            // Forward/backward flutter of the free edge.
+            const xWave = strength * Math.sin(
+                u * Math.PI * 1.35 - t * 3.0 + 0.55
+            ) * 15;
+
+            // Local fabric tilt makes the folds look like cloth rather than water.
+            const slope =
+                Math.cos(u * Math.PI * 1.55 - t * 4.0) *
+                strength * 0.16 +
+                Math.cos(u * Math.PI * 3.10 - t * 4.0 + 1.15) *
+                strength * 0.035;
+
+            // Slightly narrower at the pole, fuller at the free edge.
+            const sourceWidth = Math.min(strip + 1, FLAG_W - x);
+
+            ctx.save();
+            ctx.translate(x + xWave, yWave);
+            ctx.transform(1, slope, 0, 1, 0, 0);
+
+            // Overlap neighbouring strips by 1px to avoid hairline gaps.
+            ctx.drawImage(
+                sourceCanvas,
+                PAD_X + x,
+                0,
+                sourceWidth,
+                HEIGHT,
+                -0.5,
+                0,
+                sourceWidth + 1,
+                HEIGHT
+            );
+
+            ctx.restore();
+        }
+
+        ctx.restore();
+
+        /*
+         * Very subtle fold shading. This is intentionally restrained so
+         * the red remains dark and solid rather than becoming glossy.
+         */
+        ctx.save();
+        ctx.globalCompositeOperation = 'source-atop';
+        ctx.globalAlpha = 0.075;
+
+        const shadeGradient = ctx.createLinearGradient(
+            PAD_X, 0,
+            PAD_X + FLAG_W, 0
+        );
+        shadeGradient.addColorStop(0, 'rgba(0,0,0,0)');
+        shadeGradient.addColorStop(0.35, 'rgba(0,0,0,0.18)');
+        shadeGradient.addColorStop(0.52, 'rgba(255,255,255,0.10)');
+        shadeGradient.addColorStop(0.72, 'rgba(0,0,0,0.15)');
+        shadeGradient.addColorStop(1, 'rgba(0,0,0,0)');
+
+        ctx.fillStyle = shadeGradient;
+        ctx.fillRect(PAD_X, PAD_Y, FLAG_W, FLAG_H);
+        ctx.restore();
+    }
+
+    function startAnimation() {
+        // Respect the OS-level "reduce motion" preference: draw one
+        // static frame and never animate, instead of the CSS-only rule
+        // from before (which couldn't actually stop a JS-driven loop).
+        const reduceMotionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+        let rafId = null;
+        let inView = true;
+
+        function renderLoop(time) {
+            drawFlag(time);
+            rafId = requestAnimationFrame(renderLoop);
+        }
+
+        function play() {
+            if (rafId !== null || reduceMotionQuery.matches) return;
+            rafId = requestAnimationFrame(renderLoop);
+        }
+
+        function pause() {
+            if (rafId !== null) {
+                cancelAnimationFrame(rafId);
+                rafId = null;
+            }
+        }
+
+        if (reduceMotionQuery.matches) {
+            drawFlag(0);
+        } else {
+            play();
+        }
+
+        // Pause the render loop whenever the flag scrolls out of view or
+        // the browser tab itself is backgrounded — a small canvas redrawn
+        // 60×/sec is wasted work (and battery) when nobody can see it.
+        const observer = new IntersectionObserver(function (entries) {
+            inView = entries[0].isIntersecting;
+            if (inView && !document.hidden) {
+                play();
+            } else {
+                pause();
+            }
+        }, { threshold: 0 });
+        observer.observe(canvas);
+
+        document.addEventListener('visibilitychange', function () {
+            if (document.hidden) {
+                pause();
+            } else if (inView) {
+                play();
+            }
+        });
+
+        // Live-respond if the user toggles the OS reduced-motion setting
+        // while the page is already open.
+        reduceMotionQuery.addEventListener('change', function (e) {
+            if (e.matches) {
+                pause();
+                drawFlag(0);
+            } else if (inView) {
+                play();
+            }
+        });
+    }
+})();
+    </script>
 </body>
 </html>
