@@ -607,6 +607,33 @@ ul { list-style: none; }
 }
 
 /* ================================================================
+   MOBILE HONEYCOMB NAV
+   Same hc-scale-box/hc-strip/hc-nav/hc-cell/hc-link chain as the
+   desktop nav (--app5 5-cell variant), just fixed to the bottom of
+   the screen instead of sitting in the header — so mobile and
+   desktop use the identical honeycomb structure, icons, and states.
+   Toggles at the exact same 880/881px breakpoint as .desktop-nav.
+================================================================ */
+.mobile-hc-nav {
+    display: none;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 500;
+    justify-content: center;
+    padding: 10px 8px calc(10px + env(safe-area-inset-bottom, 0));
+    pointer-events: none;
+}
+.mobile-hc-nav .hc-scale-box { pointer-events: auto; }
+@media (max-width: 880px) {
+    .mobile-hc-nav { display: flex; }
+}
+@media (min-width: 881px) {
+    .mobile-hc-nav { display: none !important; }
+}
+
+/* ================================================================
    6. HONEYCOMB DESKTOP NAV
    Replaces the old pill-style .nav-links for the homepage desktop
    nav only (.navbar-app pages keep their own separate markup).

@@ -503,189 +503,9 @@
         }
         .empty-offers i { font-size: 2.5rem; color: #c5d0c7; margin-bottom: 12px; display: block; }
 
-        /* ══════════════════════════════════════════
-           MOBILE / TABLET BOTTOM NAV — honeycomb hexagon bar,
-           matching the desktop honeycomb theme. Points face top/bottom,
-           sides are flat so cells butt cleanly against each other.
-           No solid bar background — a stretched hexagon (like desktop)
-           sits behind the row instead, so the page shows through.
-        ══════════════════════════════════════════ */
-        .mobile-bottom-nav {
-            display: none;
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            z-index: 500;
-            background: transparent;
-            height: 92px;
-            padding-bottom: env(safe-area-inset-bottom, 0);
-            pointer-events: none;
+        @media (max-width: 880px) {
+            .offers-wrapper { margin-bottom: 90px; }
         }
-        .mobile-bottom-nav .mbav-bg {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 95vw;
-            height: 46px;
-            background: linear-gradient(180deg, #6b3a12 0%, #4a260b 55%, #371c08 100%);
-            box-shadow: inset 0 6px 10px rgba(0,0,0,.35), inset 0 -6px 10px rgba(0,0,0,.3), 0 8px 20px rgba(0,0,0,.3);
-            z-index: 0;
-        }
-        .mobile-bottom-nav .nav-items {
-            position: relative;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 9px;
-            width: 100%;
-            height: 100%;
-            pointer-events: auto;
-        }
-        .mobile-bottom-nav .nav-item {
-            position: relative;
-            z-index: 1;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            gap: 1px;
-            width: 54px;
-            height: 76px;
-            flex-shrink: 0;
-            text-decoration: none;
-            color: #fbead0;
-            font-size: 0.46rem;
-            font-family: 'DM Sans', sans-serif;
-            font-weight: 600;
-            letter-spacing: .01em;
-            text-transform: uppercase;
-            padding: 15px 4px 12px;
-            cursor: pointer;
-            background:
-                radial-gradient(120% 90% at 28% 12%, rgba(255,235,180,.5) 0%, rgba(255,235,180,0) 42%),
-                linear-gradient(150deg, #d9922e 0%, #b8681c 42%, #7a3d0f 78%, #5a2c0a 100%);
-            box-shadow:
-                inset 0 3px 5px rgba(255,224,150,.4),
-                inset 0 -8px 12px rgba(35,15,3,.5);
-            clip-path: path("M 22.91 2.88 Q 27.00 0.00 31.09 2.88 L 49.91 16.12 Q 54.00 19.00 54.00 24.00 L 54.00 52.00 Q 54.00 57.00 49.91 59.88 L 31.09 73.12 Q 27.00 76.00 22.91 73.12 L 4.09 59.88 Q 0.00 57.00 0.00 52.00 L 0.00 24.00 Q 0.00 19.00 4.09 16.12 L 22.91 2.88 Z");
-            border: none;
-            transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.35s ease, box-shadow 0.35s ease;
-        }
-        .mobile-bottom-nav .nav-icon-wrap {
-            position: relative;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 18px;
-            height: 18px;
-        }
-        .mobile-bottom-nav .nav-item i {
-            font-size: 0.86rem;
-            transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), color 0.3s ease;
-        }
-        /* Tap feedback — icon pops up on press so the customer sees their
-           tap registered, even before the page navigates. This uses the
-           :active pseudo-class (fires instantly on touchstart/mousedown,
-           no JS timing involved) plus a JS-driven .tap-pop class as a
-           fallback for iOS Safari, which often ignores :active on <a>
-           elements unless something else is listening for touch events. */
-        .mobile-bottom-nav .nav-item:active .nav-icon-wrap,
-        .mobile-bottom-nav .nav-item.tap-pop .nav-icon-wrap {
-            animation: navItemPop 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
-        }
-        @keyframes navItemPop {
-            0%   { transform: scale(1); }
-            45%  { transform: scale(1.28); }
-            100% { transform: scale(1); }
-        }
-        /* Active tab — pops up bright gold, same language as the desktop
-           honeycomb's active cell. */
-        .mobile-bottom-nav .nav-item.active {
-            background:
-                radial-gradient(120% 90% at 28% 10%, rgba(255,250,220,.8) 0%, rgba(255,250,220,0) 45%),
-                linear-gradient(150deg, #ffe680 0%, #ffc93c 40%, #f0a412 75%, #d6860a 100%);
-            box-shadow:
-                inset 0 3px 5px rgba(255,250,220,.6),
-                inset 0 -7px 11px rgba(120,70,10,.35),
-                0 8px 16px -5px rgba(240,164,18,.55);
-            color: #4a2e05;
-            transform: translateY(-8px) scale(1.06);
-            z-index: 2;
-        }
-        .mobile-bottom-nav .nav-item.active i { transform: translateY(-1px) scale(1.1); }
-        .mobile-bottom-nav .nav-label { transition: color 0.3s ease, font-weight 0.3s ease; }
-        .mobile-bottom-nav .nav-item.active .nav-label { color: #4a2e05; font-weight: 700; }
-        /* Cart badge */
-        .mobile-bottom-nav .cart-badge {
-            position: absolute;
-            top: -3px;
-            right: -5px;
-            background: #c0392b;
-            color: #fff;
-            font-size: 0.5rem;
-            min-width: 14px;
-            height: 14px;
-            padding: 0 3px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 700;
-            border: 1.5px solid #2a1204;
-        }
-        /* Offers — red-gold honey box like the desktop version, plus the
-           periodic wiggle draws the eye without being annoying */
-        .mobile-bottom-nav .nav-item-offers {
-            background:
-                radial-gradient(120% 90% at 28% 12%, rgba(255,200,150,.45) 0%, rgba(255,200,150,0) 42%),
-                linear-gradient(150deg, #e8763a 0%, #c23b1f 42%, #8a2510 78%, #5c1608 100%);
-        }
-        .mobile-bottom-nav .nav-item-offers.active {
-            background:
-                radial-gradient(120% 90% at 28% 10%, rgba(255,220,190,.8) 0%, rgba(255,220,190,0) 45%),
-                linear-gradient(150deg, #ffb37a 0%, #ff7a3c 40%, #e8481f 75%, #b82c10 100%);
-            color: #4a1608;
-        }
-        .mobile-bottom-nav .nav-item-offers.active .nav-label { color: #4a1608; }
-        .mobile-bottom-nav .nav-item-offers .nav-icon-wrap i {
-            animation: navOfferWiggle 2.8s ease-in-out infinite;
-        }
-        .mobile-bottom-nav .nav-item-offers.active .nav-icon-wrap i { animation: none; }
-        @keyframes navOfferWiggle {
-            0%, 92%, 100% { transform: rotate(0deg); }
-            93% { transform: rotate(-13deg); }
-            94.5% { transform: rotate(10deg); }
-            96% { transform: rotate(-7deg); }
-            97.5% { transform: rotate(4deg); }
-            99% { transform: rotate(0deg); }
-        }
-        .mobile-bottom-nav .offer-dot {
-            position: absolute;
-            top: -1px;
-            right: -2px;
-            width: 6px;
-            height: 6px;
-            border-radius: 50%;
-            background: #ffd968;
-            border: 1.5px solid #2a1204;
-        }
-        .mobile-bottom-nav .offer-dot::after {
-            content: '';
-            position: absolute;
-            inset: -2px;
-            border-radius: 50%;
-            border: 1.5px solid #ffd968;
-            animation: navOfferPing 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
-        }
-        @keyframes navOfferPing {
-            0% { transform: scale(1); opacity: 0.8; }
-            75%, 100% { transform: scale(1.5); opacity: 0; }
-        }
-
-        @media (max-width: 1024px) { .mobile-bottom-nav { display: block; } }
-        @media (min-width: 1025px) { .mobile-bottom-nav { display: none !important; } }
 
         @media (max-width: 600px) {
             .discount-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
@@ -696,49 +516,6 @@
             .dashain-hero { padding: 36px 16px 44px; margin-top: 56px; }
         }
     </style>
-
-<style id="exact-desktop-honeycomb-mobile">
-/* MOBILE = EXACT DESKTOP HONEYCOMB.
-   The cells/connectors/spacing are not redesigned. The whole desktop
-   honeycomb is simply scaled as one object to fit the phone. */
-@media (max-width:880px){
-    .exact-desktop-mobile-nav{
-        display:flex!important;
-        position:fixed!important;
-        left:0!important;right:0!important;bottom:0!important;
-        width:100%!important;height:88px!important;
-        padding:0!important;margin:0!important;
-        background:transparent!important;border:0!important;
-        box-shadow:none!important;z-index:5000!important;
-        pointer-events:none!important;overflow:visible!important;
-    }
-    .exact-mobile-hc{
-        position:absolute!important;
-        left:50%!important;bottom:5px!important;
-        width:320px!important;height:68.5px!important;
-        margin-left:-160px!important;
-        transform:scale(var(--mobile-hc-scale,1))!important;
-        transform-origin:center bottom!important;
-        pointer-events:auto!important;overflow:visible!important;
-    }
-    .exact-mobile-hc .hc-scale-box,
-    .exact-mobile-hc .hc-scale-box--app5{
-        width:320px!important;height:68.5px!important;
-        position:relative!important;margin:0!important;padding:0!important;
-        transform:none!important;overflow:visible!important;
-    }
-    .exact-mobile-hc .hc-nav{display:flex!important;}
-    .exact-mobile-hc .hc-link{text-decoration:none!important;}
-
-    /* Kill only the old mobile-bar classes. */
-    .exact-desktop-mobile-nav .nav-items,
-    .exact-desktop-mobile-nav .nav-item,
-    .exact-desktop-mobile-nav .mbav-bg{display:none!important;}
-
-    body{padding-bottom:88px!important;overflow-x:hidden!important;}
-}
-</style>
-
 </head>
 <body>
 
@@ -1055,51 +832,48 @@
         </div>
     </footer>
 
-    <!-- MOBILE / TABLET BOTTOM NAV (hidden on desktop) -->
-    <!-- MOBILE / TABLET BOTTOM NAV — same connected honeycomb structure as desktop -->
-    <nav class="mobile-bottom-nav exact-desktop-mobile-nav" id="bottomNav" aria-label="Mobile navigation">
-        <div class="exact-mobile-hc">
-            <div class="hc-scale-box hc-scale-box--app5">
-                  <div class="hc-strip hc-strip--cells5">
-                    <div class="hc-strip-bg" aria-hidden="true"></div>
-                    <div class="hc-connector" style="left:108px" aria-hidden="true"></div>
-                    <div class="hc-connector" style="left:240px" aria-hidden="true"></div>
-                    <div class="hc-connector" style="left:372px" aria-hidden="true"></div>
-                    <div class="hc-connector" style="left:504px" aria-hidden="true"></div>
+    <!-- MOBILE BOTTOM NAV — same honeycomb chain as desktop (hidden on desktop) -->
+    <nav class="mobile-hc-nav" aria-label="Mobile navigation">
+        <div class="hc-scale-box hc-scale-box--app5">
+          <div class="hc-strip hc-strip--cells5">
+            <div class="hc-strip-bg" aria-hidden="true"></div>
+            <div class="hc-connector" style="left:108px" aria-hidden="true"></div>
+            <div class="hc-connector" style="left:240px" aria-hidden="true"></div>
+            <div class="hc-connector" style="left:372px" aria-hidden="true"></div>
+            <div class="hc-connector" style="left:504px" aria-hidden="true"></div>
 
-                    <ul class="hc-nav" id="hcNavMobile">
-                      <li class="hc-cell"><a class="hc-link" href="{% url 'shop' %}" data-target="shop-cell">
-                        <svg viewBox="0 0 24 24"><path d="M4.5 9h15l-1.4 10.2a2 2 0 01-2 1.8H7.9a2 2 0 01-2-1.8L4.5 9z"/><path d="M8.5 9V7a3.5 3.5 0 017 0v2"/></svg>
-                        <span class="hc-label">Shop</span><span class="hc-ping"></span></a></li>
+            <ul class="hc-nav" id="hcNavAppMobile">
+              <li class="hc-cell"><a class="hc-link" href="{% url 'shop' %}" data-target="shop-cell">
+                <svg viewBox="0 0 24 24"><path d="M4.5 9h15l-1.4 10.2a2 2 0 01-2 1.8H7.9a2 2 0 01-2-1.8L4.5 9z"/><path d="M8.5 9V7a3.5 3.5 0 017 0v2"/></svg>
+                <span class="hc-label">Shop</span><span class="hc-ping"></span></a></li>
 
-                      <li class="hc-cell"><a class="hc-link" href="{% url 'cart' %}" data-target="cart-cell">
-                        <svg viewBox="0 0 24 24"><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2.5 3h2.4l2.1 11.2a2 2 0 002 1.6h8.6a2 2 0 002-1.6L21 7H6.2"/></svg>
-                        <span class="hc-label">Cart</span><span class="hc-ping"></span>
-                        {% with total_qty=request.session.cart.values|length %}
-                        {% if total_qty > 0 %}<span class="hc-cart-badge">{{ total_qty }}</span>{% endif %}
-                        {% endwith %}
-                      </a></li>
+              <li class="hc-cell"><a class="hc-link" href="{% url 'cart' %}" data-target="cart-cell">
+                <svg viewBox="0 0 24 24"><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2.5 3h2.4l2.1 11.2a2 2 0 002 1.6h8.6a2 2 0 002-1.6L21 7H6.2"/></svg>
+                <span class="hc-label">Cart</span><span class="hc-ping"></span>
+                {% with total_qty=request.session.cart.values|length %}
+                <span class="hc-cart-badge{% if total_qty == 0 %} badge-hidden{% endif %}">{{ total_qty }}</span>
+                {% endwith %}
+              </a></li>
 
-                      <li class="hc-cell hc-cell--offer"><a class="hc-link active" href="{% url 'offers' %}" data-target="offers-cell">
-                        <svg class="offer-flame" viewBox="0 0 24 24"><path d="M12 2c2 3 5 6 5 10a5 5 0 01-10 0c0-1.8.8-3 1.6-4-.1 1.6 1 2.3 1.7 1.2C9.6 7 10 4 12 2z"/></svg>
-                        <span class="hc-label">Offers</span><span class="hc-ping"></span></a></li>
+              <li class="hc-cell hc-cell--offer"><a class="hc-link active" href="{% url 'offers' %}" data-target="offers-cell">
+                <svg class="offer-flame" viewBox="0 0 24 24"><path d="M12 2c2 3 5 6 5 10a5 5 0 01-10 0c0-1.8.8-3 1.6-4-.1 1.6 1 2.3 1.7 1.2C9.6 7 10 4 12 2z"/></svg>
+                <span class="hc-label">Offers</span><span class="hc-ping"></span></a></li>
 
-                      {% if user.is_authenticated %}
-                      <li class="hc-cell"><a class="hc-link" href="{% url 'profile' %}" data-target="profile-cell">
-                        <svg viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.5"/><path d="M4.5 20c0-4 3.4-7 7.5-7s7.5 3 7.5 7"/></svg>
-                        <span class="hc-label">{{ user.first_name }}</span><span class="hc-ping"></span></a></li>
-                      {% else %}
-                      <li class="hc-cell"><a class="hc-link" href="{% url 'login' %}" data-target="login-cell">
-                        <svg viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.5"/><path d="M4.5 20c0-4 3.4-7 7.5-7s7.5 3 7.5 7"/></svg>
-                        <span class="hc-label">Login</span><span class="hc-ping"></span></a></li>
-                      {% endif %}
+              {% if user.is_authenticated %}
+              <li class="hc-cell"><a class="hc-link" href="{% url 'profile' %}" data-target="profile-cell">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.5"/><path d="M4.5 20c0-4 3.4-7 7.5-7s7.5 3 7.5 7"/></svg>
+                <span class="hc-label">{{ user.first_name }}</span><span class="hc-ping"></span></a></li>
+              {% else %}
+              <li class="hc-cell"><a class="hc-link" href="{% url 'login' %}" data-target="login-cell">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.5"/><path d="M4.5 20c0-4 3.4-7 7.5-7s7.5 3 7.5 7"/></svg>
+                <span class="hc-label">Login</span><span class="hc-ping"></span></a></li>
+              {% endif %}
 
-                      <li class="hc-cell"><a class="hc-link" href="/" data-target="website-cell">
-                        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.7 3.8 6 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-6-3.8-9S9.5 5.7 12 3z"/></svg>
-                        <span class="hc-label">Website</span><span class="hc-ping"></span></a></li>
-                    </ul>
-                  </div>
-                </div>
+              <li class="hc-cell"><a class="hc-link" href="/" data-target="website-cell">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.7 3.8 6 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-6-3.8-9S9.5 5.7 12 3z"/></svg>
+                <span class="hc-label">Website</span><span class="hc-ping"></span></a></li>
+            </ul>
+          </div>
         </div>
     </nav>
 
@@ -1109,31 +883,6 @@
 
         // Active bottom-nav state is now rendered server-side (see template),
         // so no JS path-matching is needed here.
-
-        // Swap the Profile/Login icon outline -> filled when it's the active page
-        document.querySelectorAll('.mobile-bottom-nav .nav-item i.fa-user-circle').forEach(icon => {
-            const item = icon.closest('.nav-item');
-            if (item && item.classList.contains('active')) {
-                icon.classList.remove('far');
-                icon.classList.add('fas');
-            }
-        });
-
-        // Tap-pop feedback for the bottom nav — :active in CSS already
-        // handles this on most browsers, but iOS Safari frequently ignores
-        // :active on <a> elements unless a touch listener is present, so
-        // this guarantees the pop is visible everywhere on tap.
-        (function () {
-            const navItems = document.querySelectorAll('.mobile-bottom-nav .nav-item');
-            navItems.forEach(function (item) {
-                item.addEventListener('touchstart', function () {
-                    item.classList.add('tap-pop');
-                }, { passive: true });
-                item.addEventListener('touchend', function () {
-                    setTimeout(function () { item.classList.remove('tap-pop'); }, 320);
-                }, { passive: true });
-            });
-        })();
 
         const dashainDate = new Date(2025, 9, 2, 0, 0, 0);
 
@@ -1449,20 +1198,5 @@
     }
 })();
     </script>
-
-<script>
-(function(){
-    function fitExactDesktopHoneycomb(){
-        var wrap=document.querySelector('.exact-mobile-hc');
-        if(!wrap || window.innerWidth>880) return;
-        var targetWidth=Math.min(window.innerWidth-20,380);
-        wrap.style.setProperty('--mobile-hc-scale',(targetWidth/320).toFixed(4));
-    }
-    fitExactDesktopHoneycomb();
-    window.addEventListener('resize',fitExactDesktopHoneycomb,{passive:true});
-    window.addEventListener('orientationchange',fitExactDesktopHoneycomb,{passive:true});
-})();
-</script>
-
 </body>
 </html>
