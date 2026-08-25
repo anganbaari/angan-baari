@@ -626,6 +626,15 @@ ul { list-style: none; }
     align-items: center;
     gap: 12px;
 }
+/* App pages (shop/cart/offers/profile/product_detail): the 5-cell
+   strip's tapered background overshoots its own reserved box by
+   ~27px on each side (by design, so it reads as one continuous
+   hexagon rather than flat-ended cells). The header's edge padding
+   is 2vw, which shrinks below that 27px at tablet widths — so
+   without this, the taper's right tip gets sliced flat by the
+   overflow-x:hidden on <body>. This fixed margin guarantees
+   clearance at every width, not just wide desktop ones. */
+.navbar-app .desktop-nav { margin-right: 32px; }
 /* Pull "Order Now" in closer to the honeycomb strip — the strip's
    own box only reserves its flat cell-row width, so the tapered
    background tip plus this gap were reading as one big empty gap
