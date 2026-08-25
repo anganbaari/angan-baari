@@ -6582,3 +6582,31 @@ ul { list-style: none; }
         transition: none !important;
     }
 }
+/* ============================================================
+   MOBILE HONEYCOMB NAV — COMPACT HEIGHT
+   ============================================================ */
+@media (max-width: 880px) {
+
+    .mobile-hc-nav .hc-scale-box--app5 {
+        height: 58px !important;
+    }
+
+    .mobile-hc-nav .hc-strip {
+        --H: 120px;
+    }
+
+    .mobile-hc-nav .hc-strip-bg {
+        top: 14px;
+        height: 92px;
+    }
+
+    .mobile-hc-nav .hc-link {
+        padding: 19px 6px 16px;
+    }
+
+    .mobile-hc-nav .hc-connector {
+        top: 31px;
+        height: 58px;
+    }
+
+}
