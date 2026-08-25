@@ -622,7 +622,7 @@ ul { list-style: none; }
     right: 0;
     z-index: 500;
     justify-content: center;
-    padding: 10px 8px calc(10px + env(safe-area-inset-bottom, 0));
+    padding: 8px 8px env(safe-area-inset-bottom, 4px);
     pointer-events: none;
 }
 .mobile-hc-nav .hc-scale-box { pointer-events: auto; }
