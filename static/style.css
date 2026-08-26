@@ -3778,6 +3778,16 @@ ul { list-style: none; }
     font-size: 0.85rem !important;
     margin-top: 4px;
 }
+/* Nepal flag sticker in footer */
+.footer-nepal .flag-sticker {
+    width: 22px;
+    height: 28px;
+    display: inline-block;
+    vertical-align: -7px;
+    margin-left: 5px;
+    object-fit: contain;
+    object-position: center;
+}
 
 /* ================================================================
    APP-PAGE FOOTER (shop / cart / offers / profile / product_detail)
