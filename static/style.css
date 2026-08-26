@@ -6639,6 +6639,6 @@ ul { list-style: none; }
 ================================================================ */
 @media (max-width: 760px) {
     .site-footer {
-        padding-bottom: 120px;
+        padding-bottom: 105px;
     }
 }
