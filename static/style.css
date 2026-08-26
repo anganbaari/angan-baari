@@ -6633,3 +6633,12 @@ ul { list-style: none; }
         transition: none !important;
     }
 }
+
+/* ================================================================
+   MOBILE FOOTER — CLEAR SPACE FOR BOTTOM HONEYCOMB NAV
+================================================================ */
+@media (max-width: 760px) {
+    .site-footer {
+        padding-bottom: 120px;
+    }
+}
