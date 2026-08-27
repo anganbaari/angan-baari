@@ -3718,22 +3718,6 @@ ul { list-style: none; }
     font-family: var(--font-accent);
 }
  
-.footer-links {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 28px;
-    justify-content: center;
-}
- 
-.footer-links a {
-    font-size: 0.85rem;
-    color: rgba(255,255,255,0.6);
-    letter-spacing: 0.05em;
-    transition: color var(--trans-base);
-}
- 
-.footer-links a:hover { color: var(--white); }
- 
 .footer-social {
     display: flex;
     gap: 14px;
@@ -5671,11 +5655,6 @@ ul { list-style: none; }
     /* Social platforms — 2 col on very small */
     .social-platforms {
         grid-template-columns: repeat(2, 1fr);
-    }
-
-    /* Footer links wrap tighter */
-    .footer-links {
-        gap: 16px;
     }
 
     /* Hero slide sub text */
