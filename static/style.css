@@ -5907,7 +5907,7 @@ ul { list-style: none; }
     -webkit-backdrop-filter: blur(18px) saturate(160%);
     border: 1px solid rgba(255,255,255,0.08);
     border-radius: 28px;
-    padding: 56px 48px;
+    padding: 28px 40px 32px;
     box-shadow: 0 20px 60px rgba(0,0,0,0.35);
 }
 
@@ -6098,7 +6098,7 @@ ul { list-style: none; }
 }
 
 @media (max-width: 480px) {
-    .newsletter-inner { padding: 40px 24px; border-radius: 22px; }
+    .newsletter-inner { padding: 22px 20px 26px; border-radius: 22px; }
     .newsletter-pill { padding: 5px 5px 5px 18px; }
     .newsletter-pill-btn { padding: 11px 18px; font-size: 0.8rem; }
     .newsletter-pill-input { font-size: 0.85rem; }
