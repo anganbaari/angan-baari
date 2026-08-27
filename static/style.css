@@ -5869,7 +5869,7 @@ ul { list-style: none; }
 ================================================================ */
 .newsletter-section {
     background: linear-gradient(160deg, var(--forest) 0%, #122115 45%, #0a120b 100%);
-    padding: 100px 5vw;
+    padding: 60px 5vw;
     position: relative;
     overflow: hidden;
 }
