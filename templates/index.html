@@ -2155,14 +2155,16 @@
                   method="POST" action="{% url 'newsletter' %}">
                 {% csrf_token %}
                 <input type="text" name="name"
-                       class="newsletter-input"
-                       placeholder="Your Name">
-                <input type="email" name="email"
-                       class="newsletter-input"
-                       placeholder="Your Email Address" required>
-                <button type="submit" class="newsletter-btn">
-                    <i class="fas fa-paper-plane"></i> Subscribe Now
-                </button>
+                       class="newsletter-input--name"
+                       placeholder="Your name (optional)">
+                <div class="newsletter-pill">
+                    <input type="email" name="email"
+                           class="newsletter-pill-input"
+                           placeholder="Your Email Address" required>
+                    <button type="submit" class="newsletter-pill-btn">
+                        <i class="fas fa-paper-plane"></i> <span class="btn-label">Subscribe</span>
+                    </button>
+                </div>
             </form>
 
             <!-- Success message (shown after submit) -->
