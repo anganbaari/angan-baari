@@ -6218,6 +6218,13 @@ ul { list-style: none; }
     font-size: 1.2rem;
     color: var(--gold);
     margin-bottom: 16px;
+    overflow: hidden;
+}
+
+.nl-popup-icon img {
+    width: 40px;
+    height: 40px;
+    object-fit: contain;
 }
 
 .nl-popup-title {

@@ -236,15 +236,18 @@ Angan Baari Team 🌱
     return redirect('home')
 
 def newsletter_unsubscribe(request, token):
-    """One-click unsubscribe — no login or confirmation step needed, since
-    the link itself (a random token) is what proves the request came from
-    the email that was sent."""
+    """Shows a confirm/cancel step first — visiting the link alone (e.g. an
+    email client pre-fetching links, or a misclick) does NOT unsubscribe
+    anyone. Only actually unsubscribes once the person clicks "Yes" and the
+    form is submitted via POST."""
     subscriber = get_object_or_404(NewsletterSubscriber, unsubscribe_token=token)
-    if subscriber.is_subscribed:
-        subscriber.is_subscribed = False
-        subscriber.save()
 
-    return HttpResponse(f"""<!DOCTYPE html>
+    if request.method == 'POST':
+        if subscriber.is_subscribed:
+            subscriber.is_subscribed = False
+            subscriber.save()
+
+        return HttpResponse(f"""<!DOCTYPE html>
 <html><head><meta charset="UTF-8"><title>Unsubscribed — Angan Baari</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
@@ -261,6 +264,43 @@ def newsletter_unsubscribe(request, token):
     <h1>You've been unsubscribed 🌿</h1>
     <p>{escape(subscriber.email)} will no longer receive newsletter emails from Angan Baari.</p>
     <p>Changed your mind? You can always resubscribe from our <a href="/">website</a>.</p>
+  </div>
+</body></html>""")
+
+    # GET — show the confirm/cancel step, nothing is changed yet
+    from django.middleware.csrf import get_token
+    csrf_token = get_token(request)
+
+    return HttpResponse(f"""<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Unsubscribe? — Angan Baari</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  body {{ font-family: -apple-system, sans-serif; background:#1a2f1e; color:#fff;
+          display:flex; align-items:center; justify-content:center; min-height:100vh;
+          margin:0; padding:24px; text-align:center; }}
+  .card {{ max-width:420px; }}
+  h1 {{ font-size:1.5rem; margin-bottom:12px; }}
+  p {{ color:rgba(255,255,255,0.7); line-height:1.6; margin-bottom:28px; }}
+  .btn-row {{ display:flex; gap:12px; justify-content:center; flex-wrap:wrap; }}
+  button, a.btn {{ padding:12px 24px; border-radius:50px; border:none; font-size:0.92rem;
+          font-weight:700; cursor:pointer; text-decoration:none; display:inline-block;
+          font-family:inherit; }}
+  .btn-yes {{ background:#c9a84c; color:#1a2f1e; }}
+  .btn-yes:hover {{ background:#e8cc84; }}
+  .btn-no {{ background:transparent; color:#fff; border:1px solid rgba(255,255,255,0.25) !important; }}
+  .btn-no:hover {{ background:rgba(255,255,255,0.08); }}
+</style></head>
+<body>
+  <div class="card">
+    <h1>Are you sure? 🌿</h1>
+    <p>Do you want to stop receiving newsletter emails from Angan Baari at<br><strong>{escape(subscriber.email)}</strong>?</p>
+    <div class="btn-row">
+      <form method="post" style="margin:0;">
+        <input type="hidden" name="csrfmiddlewaretoken" value="{csrf_token}">
+        <button type="submit" class="btn-yes">Yes, unsubscribe</button>
+      </form>
+      <a href="/" class="btn btn-no">No, keep me subscribed</a>
+    </div>
   </div>
 </body></html>""")
 
