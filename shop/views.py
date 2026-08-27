@@ -1,5 +1,6 @@
 from django.shortcuts import render, redirect, get_object_or_404
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
+from django.utils.html import escape
 from django.core.mail import send_mail
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
@@ -233,6 +234,36 @@ Angan Baari Team 🌱
                 )
         return redirect('/?subscribed=1#newsletter')
     return redirect('home')
+
+def newsletter_unsubscribe(request, token):
+    """One-click unsubscribe — no login or confirmation step needed, since
+    the link itself (a random token) is what proves the request came from
+    the email that was sent."""
+    subscriber = get_object_or_404(NewsletterSubscriber, unsubscribe_token=token)
+    if subscriber.is_subscribed:
+        subscriber.is_subscribed = False
+        subscriber.save()
+
+    return HttpResponse(f"""<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Unsubscribed — Angan Baari</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  body {{ font-family: -apple-system, sans-serif; background:#1a2f1e; color:#fff;
+          display:flex; align-items:center; justify-content:center; min-height:100vh;
+          margin:0; padding:24px; text-align:center; }}
+  .card {{ max-width:420px; }}
+  h1 {{ font-size:1.5rem; margin-bottom:12px; }}
+  p {{ color:rgba(255,255,255,0.7); line-height:1.6; }}
+  a {{ color:#c9a84c; }}
+</style></head>
+<body>
+  <div class="card">
+    <h1>You've been unsubscribed 🌿</h1>
+    <p>{escape(subscriber.email)} will no longer receive newsletter emails from Angan Baari.</p>
+    <p>Changed your mind? You can always resubscribe from our <a href="/">website</a>.</p>
+  </div>
+</body></html>""")
+
 
 def error_404(request, exception):
     return render(request, '404.html', status=404)

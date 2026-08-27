@@ -1,6 +1,12 @@
-from django.contrib import admin
+from django.contrib import admin, messages
+from django.urls import path
+from django.http import HttpResponse
+from django.shortcuts import redirect
+from django.middleware.csrf import get_token
+from django.utils.html import escape
 from .models import ContactMessage, ProductOrder, NewsletterSubscriber, Product, Review, Category
 from .models import Offer, Coupon, BundleItem, ProductVariant
+from .emails import send_newsletter_campaign
 
 
 @admin.register(Category)
@@ -98,7 +104,82 @@ class OrderAdmin(admin.ModelAdmin):
 
 @admin.register(NewsletterSubscriber)
 class NewsletterAdmin(admin.ModelAdmin):
-    list_display = ['email', 'name', 'subscribed_at']
+    list_display = ['email', 'name', 'is_subscribed', 'subscribed_at']
+    list_filter = ['is_subscribed']
+    search_fields = ['email', 'name']
+    actions = ['send_campaign_action']
+
+    def send_campaign_action(self, request, queryset):
+        """Shows a small compose form for the selected subscribers. Submitting
+        it hits process_campaign below, which sends via Resend's batch API."""
+        ids = ','.join(str(pk) for pk in queryset.values_list('id', flat=True))
+        csrf_token = get_token(request)
+        return HttpResponse(f"""<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Send Newsletter Campaign</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  body {{ font-family: -apple-system, sans-serif; background:#f4f4f4; padding:40px 16px; }}
+  .box {{ max-width:640px; margin:0 auto; background:#fff; border-radius:8px; padding:32px;
+          box-shadow:0 2px 10px rgba(0,0,0,0.08); }}
+  h1 {{ font-size:1.3rem; margin-top:0; }}
+  label {{ display:block; margin:16px 0 6px; font-weight:600; font-size:0.9rem; }}
+  input[type=text], textarea {{ width:100%; padding:10px; border:1px solid #ccc; border-radius:6px;
+          font-size:0.95rem; box-sizing:border-box; font-family:inherit; }}
+  textarea {{ min-height:220px; }}
+  button {{ margin-top:20px; padding:12px 24px; background:#1a2f1e; color:#fff; border:none;
+          border-radius:6px; font-size:0.95rem; cursor:pointer; }}
+  button:hover {{ background:#2d4a32; }}
+  .count {{ color:#666; font-size:0.85rem; }}
+  .hint {{ color:#888; font-size:0.8rem; margin-top:6px; }}
+</style></head>
+<body>
+  <div class="box">
+    <h1>📧 Send Newsletter Campaign</h1>
+    <p class="count">Sending to {queryset.count()} selected subscriber(s).</p>
+    <form method="post" action="/admin/shop/newslettersubscriber/send-campaign/">
+      <input type="hidden" name="csrfmiddlewaretoken" value="{csrf_token}">
+      <input type="hidden" name="subscriber_ids" value="{escape(ids)}">
+      <label>Subject</label>
+      <input type="text" name="subject" required placeholder="e.g. Mango season is here! 🥭">
+      <label>Message</label>
+      <textarea name="body" required placeholder="Write your update here."></textarea>
+      <p class="hint">A greeting, WhatsApp link, and working unsubscribe link are added to every email automatically — no need to write those yourself.</p>
+      <button type="submit">Send Campaign</button>
+    </form>
+  </div>
+</body></html>""")
+    send_campaign_action.short_description = '📧 Send Newsletter Campaign to Selected'
+
+    def get_urls(self):
+        urls = super().get_urls()
+        custom = [
+            path('send-campaign/', self.admin_site.admin_view(self.process_campaign),
+                 name='newsletter_send_campaign'),
+        ]
+        return custom + urls
+
+    def process_campaign(self, request):
+        if request.method != 'POST':
+            return redirect('admin:shop_newslettersubscriber_changelist')
+
+        subject = request.POST.get('subject', '').strip()
+        body = request.POST.get('body', '').strip()
+        ids_raw = request.POST.get('subscriber_ids', '')
+        ids = [int(i) for i in ids_raw.split(',') if i.strip().isdigit()]
+
+        if not subject or not body or not ids:
+            self.message_user(request, 'Subject, message, and at least one subscriber are required.', level=messages.ERROR)
+            return redirect('admin:shop_newslettersubscriber_changelist')
+
+        subscribers = NewsletterSubscriber.objects.filter(id__in=ids, is_subscribed=True)
+        skipped = len(ids) - subscribers.count()
+        sent_count = send_newsletter_campaign(subject, body, subscribers)
+
+        if skipped:
+            self.message_user(request, f'Campaign sent to {sent_count} subscriber(s)! ({skipped} selected were already unsubscribed and were skipped.)')
+        else:
+            self.message_user(request, f'Campaign sent to {sent_count} subscriber(s)! 🎉')
+        return redirect('admin:shop_newslettersubscriber_changelist')
 
 
 @admin.register(Review)

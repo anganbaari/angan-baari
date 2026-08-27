@@ -163,6 +163,16 @@ class NewsletterSubscriber(models.Model):
     email = models.EmailField(unique=True)
     name = models.CharField(max_length=100, blank=True)
     subscribed_at = models.DateTimeField(auto_now_add=True)
+    is_subscribed = models.BooleanField(
+        default=True,
+        help_text='Automatically unchecked when the subscriber clicks the unsubscribe link in an email.'
+    )
+    unsubscribe_token = models.CharField(max_length=64, blank=True)
+
+    def save(self, *args, **kwargs):
+        if not self.unsubscribe_token:
+            self.unsubscribe_token = uuid.uuid4().hex
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return self.email

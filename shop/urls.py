@@ -7,6 +7,7 @@ urlpatterns = [
     path('order/', views.place_order, name='order'),
     path('newsletter/', views.newsletter_signup, name='newsletter'),
     path('cancel/<str:token>/', views.cancel_order, name='cancel_order'),
+    path('newsletter/unsubscribe/<str:token>/', views.newsletter_unsubscribe, name='newsletter_unsubscribe'),
     path('products/<slug:slug>/', views.product_detail, name='product_detail'),
     path('products/<slug:slug>/review/', views.submit_review, name='submit_review'),
     path('shop/', views.shop, name='shop'),

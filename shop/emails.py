@@ -38,6 +38,66 @@ def send_resend_email(to, subject, body):
         pass
 
 
+def send_newsletter_campaign(subject, body, subscribers):
+    """Send a one-off newsletter campaign to a list/queryset of
+    NewsletterSubscriber objects, using Resend's batch endpoint (up to 100
+    emails per API call, so large lists are sent in chunks). Each email is
+    personalized with the subscriber's name and ends with a real,
+    subscriber-specific unsubscribe link. Returns the number of subscribers
+    the campaign was submitted for."""
+    subscribers = list(subscribers)
+    sent_count = 0
+    BATCH_SIZE = 100
+
+    for i in range(0, len(subscribers), BATCH_SIZE):
+        chunk = subscribers[i:i + BATCH_SIZE]
+        payload = []
+
+        for subscriber in chunk:
+            unsubscribe_link = f"https://anganbaari.pythonanywhere.com/newsletter/unsubscribe/{subscriber.unsubscribe_token}/"
+            greeting = f"नमस्ते {subscriber.name}! 🌿" if subscriber.name else "नमस्ते! 🌿"
+
+            full_body = f"""{greeting}
+
+{body}
+
+━━━━━━━━━━━━━━━━━━━━━━
+📱 Order via WhatsApp:
+https://wa.me/9779821025084
+
+With love,
+Angan Baari Team 🌱
+Bhulka Danda, Rupandehi, Nepal
+
+━━━━━━━━━━━━━━━━━━━━━━
+No longer want these emails? Unsubscribe here:
+{unsubscribe_link}"""
+
+            payload.append({
+                'from': 'Angan Baari <orders@anganbaari.com>',
+                'to': [subscriber.email],
+                'subject': subject,
+                'text': full_body,
+            })
+
+        try:
+            response = requests.post(
+                'https://api.resend.com/emails/batch',
+                headers={
+                    'Authorization': f'Bearer {settings.RESEND_API_KEY}',
+                    'Content-Type': 'application/json',
+                },
+                json=payload,
+                timeout=20,
+            )
+            if response.status_code < 400:
+                sent_count += len(chunk)
+        except Exception:
+            pass
+
+    return sent_count
+
+
 def send_order_received_email(order):
     cancel_link = f"https://anganbaari.pythonanywhere.com/cancel/{order.cancel_token}/"
 
