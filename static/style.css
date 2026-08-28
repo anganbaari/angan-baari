@@ -6180,9 +6180,12 @@ ul { list-style: none; }
     left: 50%;
     transform: translateX(-50%);
     width: min(480px, 92vw);
-    background: var(--forest);
+    background: rgba(16, 28, 18, 0.55);
+    backdrop-filter: blur(18px) saturate(160%);
+    -webkit-backdrop-filter: blur(18px) saturate(160%);
+    border: 1px solid rgba(255,255,255,0.08);
     border-radius: 24px 24px 0 0;
-    padding: 36px 32px 32px;
+    padding: 32px 32px 28px;
     z-index: 8001;
     border-top: 3px solid var(--gold);
     transition: bottom 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -6261,7 +6264,8 @@ ul { list-style: none; }
 .nl-popup-form {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 12px;
+    margin-bottom: 4px;
 }
 
 .nl-popup-no {
@@ -6277,8 +6281,11 @@ ul { list-style: none; }
 
 /* Responsive */
 @media (max-width: 480px) {
-    .nl-popup { padding: 28px 20px 24px; }
+    .nl-popup { padding: 24px 20px 22px; }
     .nl-popup-title { font-size: 1.4rem; }
+    .newsletter-pill { padding: 5px 5px 5px 18px; }
+    .newsletter-pill-btn { padding: 11px 18px; font-size: 0.8rem; }
+    .newsletter-pill-input { font-size: 0.85rem; }
 }
 /* ================================================================
    CONTACT FORM — FORCE VISIBLE (AOS override)
