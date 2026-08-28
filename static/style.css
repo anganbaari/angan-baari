@@ -73,6 +73,13 @@ html {
     font-size: 16px;
     overflow-x: hidden;
     width: 100%;
+    /* Belt-and-suspenders against mobile "phantom" horizontal scroll
+       caused by off-screen fixed/transformed elements (the side drawer,
+       carousel slides, etc.) — overflow-x:hidden alone doesn't always
+       stop touch/swipe panning on every mobile browser, so we also
+       explicitly restrict panning to vertical only. */
+    overscroll-behavior-x: none;
+    touch-action: pan-y;
 }
  
 body {
@@ -82,6 +89,9 @@ body {
     line-height: 1.7;
     width: 100%;
     max-width: 100vw;
+    overflow-x: hidden;
+    overscroll-behavior-x: none;
+    touch-action: pan-y;
     -webkit-font-smoothing: antialiased;
 }
  
