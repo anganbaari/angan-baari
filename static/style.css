@@ -4956,28 +4956,58 @@ ul { list-style: none; }
     .fs-body { grid-template-columns: 1fr; max-width: 680px; margin-left: auto; margin-right: auto; }
 }
 
-/* Tablet tier (768–1199px): 2/3–1/3 split (Ready to Order gets more
-   room, the three info strips take the remaining third) — this is
-   tablet-only now, not the desktop default. Since the left column's
-   content (carousel + button + quote) is naturally shorter than the
-   right column's three stacked strips, "align-items: stretch" lets
-   the left column's box grow to match the right column's height, and
-   "justify-content: space-between" on .fs-left spreads its content
-   across that full height instead of leaving one big empty gap
-   sitting under the quote block. */
+/* Tablet tier (768–1199px): restructured layout using named grid
+   areas — Ready to Order carousel top-left, Home Delivery top-right,
+   Bulk Orders moved to sit under the carousel, Farm Pickup stays
+   under Home Delivery, and the quote spans the full width underneath
+   everything. .fs-left/.fs-strips are given "display: contents" so
+   their children (which already exist as distinct real elements —
+   .fs-shop-cta, .fs-quote-block, .fs-strip-gold/green/earth) become
+   direct grid items without any HTML changes. Because Bulk Orders and
+   Farm Pickup land in the same grid row, Grid's default row-stretch
+   behavior aligns their bottoms automatically — no manual height
+   matching needed. This tier is scoped to tablet only; desktop and
+   mobile layouts are untouched. */
 @media (min-width: 768px) and (max-width: 1199px) {
     .fs-body {
         grid-template-columns: 2fr 1fr;
+        grid-template-areas:
+            "carousel delivery"
+            "bulk     pickup"
+            "quote    quote";
         gap: 18px;
         align-items: stretch;
     }
-    .fs-left {
-        justify-content: space-between;
+    .fs-left,
+    .fs-strips {
+        display: contents;
     }
-    .fs-strip { padding: 18px 20px; }
+    .fs-shop-cta   { grid-area: carousel; }
+    .fs-quote-block { grid-area: quote; }
+    .fs-strip-gold  { grid-area: delivery; }
+    .fs-strip-earth { grid-area: bulk; }
+    .fs-strip-green { grid-area: pickup; }
+
+    .fs-strip {
+        padding: 18px 20px;
+        display: flex;
+        flex-direction: column;
+    }
     .fs-strip-title { font-size: 1.1rem; }
     .fs-zone-chip { font-size: 0.72rem; padding: 3px 9px; }
     .fs-zones-label { flex-wrap: wrap; }
+    .fs-wa-btn-full,
+    .fs-wa-btn-outline { margin-top: auto; }
+
+    /* Home Delivery has the most content of the three strips, making
+       it the tallest cell in row 1 — which sets that whole row's
+       height. Tightening just this one shrinks the whole row. */
+    .fs-strip-gold .fs-strip-top { margin-bottom: 6px; }
+    .fs-strip-gold .fs-zones-box { padding: 8px 11px; margin-bottom: 6px; }
+    .fs-strip-gold .fs-zones-label-text { display: none; }
+    .fs-strip-gold .fs-zone-chip { padding: 2px 7px; font-size: 0.65rem; margin: 2px 3px 0 0; }
+    .fs-strip-gold .fs-strip-list { gap: 5px; margin-bottom: 8px; font-size: 0.74rem; }
+    .fs-strip-gold .fs-wa-btn-full { padding: 10px; font-size: 0.8rem; }
 }
 
 @media (max-width: 768px) {
