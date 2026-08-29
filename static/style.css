@@ -960,9 +960,13 @@ ul { list-style: none; }
     transform: translateY(-7px) rotate(-45deg);
 }
 
-/* Honeycomb needs more breathing room than the old compact pill nav,
-   so the desktop↔mobile-nav cutoff moves up from 1024px to 1200px. */
-@media (max-width: 1200px) {
+/* Homepage's 9-item honeycomb nav now switches to the full desktop
+   layout starting at tablet width (768px+) instead of 1200px — same
+   768px cutover already used elsewhere in this file for tablet-specific
+   layout (see "TABLET SPECIFIC FIXES" further down), and matching the
+   app-pages' own 761px switch-over. Only phones (≤767px) get the
+   hamburger + drawer now. */
+@media (max-width: 767px) {
     .hamburger {display: flex;}
 
     .desktop-nav {display: none;}
@@ -5711,13 +5715,9 @@ ul { list-style: none; }
         grid-template-columns: 1fr 1fr;
     }
 
-    /* Delivery fs-body */
-    .fs-body {
-        grid-template-columns: 1fr;
-        max-width: 680px;
-        margin-left: auto;
-        margin-right: auto;
-    }
+    /* Delivery fs-body — kept as the desktop 2-column layout on tablet
+       too; there's plenty of width (768px+) for the Ready to Order box
+       and the three info strips to sit side by side like desktop. */
 }
 /* ================================================================
    ECO PACKAGING — Vision Pillar special icon
