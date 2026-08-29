@@ -1236,10 +1236,13 @@ function initMiniShopCarousel(sceneId, ringId, autoplayDirection, startOffsetFra
     // not a side effect of the rotation radius.
     // Tablets and up use a "coverflow" style arrangement (2 cards
     // visible up front) instead of a single-card rotating ring. This
-    // breakpoint is intentionally kept in sync with the matching
-    // @media (min-width: 768px) override in style.css — if you change
-    // one, change the other too, or the JS layout math and the CSS
-    // card sizing will disagree.
+    // breakpoint is intentionally kept in sync with style.css, which
+    // now has two separate tiers above 768px — a tablet-tuned
+    // @media (min-width:768px) and (max-width:1199px) with smaller
+    // card/spacing values (so the side-card "peek" still fits in a
+    // narrower scene), and the original @media (min-width:1200px) for
+    // desktop. If you change this 768px number, update both CSS tiers
+    // too, or the JS layout math and the CSS card sizing will disagree.
     const showTwoFront = window.matchMedia('(min-width: 768px)').matches;
     const spacing = parseFloat(getComputedStyle(scene).getPropertyValue('--carousel-spacing')) || 148;
 

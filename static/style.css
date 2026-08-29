@@ -648,6 +648,13 @@ ul { list-style: none; }
    own box only reserves its flat cell-row width, so the tapered
    background tip plus this gap were reading as one big empty gap
    before the CTA hexagon. */
+.hc-cta-box {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
 .desktop-nav .hc-cta { margin-left: -15px; }
 
 /* Order Now — merged into the honeycomb theme as its own small
@@ -990,9 +997,12 @@ ul { list-style: none; }
     .hc-scale-box:not(.hc-scale-box--app5) .hc-strip {
         transform: scale(0.32);
     }
+    .hc-cta-box {
+        width: 86px;
+        height: 37px;
+    }
     .hc-cta {
         transform: scale(0.8);
-        transform-origin: right center;
     }
     .brand-icon {
         width: 40px;
@@ -4944,6 +4954,17 @@ ul { list-style: none; }
     .fs-body { grid-template-columns: 1fr; max-width: 680px; margin-left: auto; margin-right: auto; }
 }
 
+/* Tablet tier (768–1199px): the right column (Home Delivery / Farm
+   Pickup / Bulk Order) now sits at 1/3 width instead of 1/2, so the
+   desktop-tuned padding/text sizes need trimming to fit comfortably. */
+@media (min-width: 768px) and (max-width: 1199px) {
+    .fs-body { gap: 18px; }
+    .fs-strip { padding: 18px 20px; }
+    .fs-strip-title { font-size: 1.1rem; }
+    .fs-zone-chip { font-size: 0.72rem; padding: 3px 9px; }
+    .fs-zones-label { flex-wrap: wrap; }
+}
+
 @media (max-width: 768px) {
     .fs-body { max-width: 100%; }
     .fs-form-panel { padding: 28px 22px; }
@@ -6525,7 +6546,22 @@ ul { list-style: none; }
 }
 .carousel-3d-scene.dragging { cursor: grabbing; }
 
-@media (min-width: 768px) {
+@media (min-width: 768px) and (max-width: 1199px) {
+    .carousel-3d-scene {
+        max-width: 95%;
+        height: 210px;
+        perspective: 1000px;
+        --carousel-radius: 200;
+        --carousel-spacing: 105;
+    }
+    .ring-card {
+        width: 125px;
+        height: 170px;
+        margin: -85px 0 0 -63px;
+    }
+}
+
+@media (min-width: 1200px) {
     .carousel-3d-scene {
         max-width: 95%;
         height: 260px;
@@ -6544,7 +6580,13 @@ ul { list-style: none; }
     margin-top: -14px;
 }
 
-@media (min-width: 768px) {
+@media (min-width: 768px) and (max-width: 1199px) {
+    .carousel-3d-scene-row2 {
+        margin-top: -48px;
+    }
+}
+
+@media (min-width: 1200px) {
     .carousel-3d-scene-row2 {
         margin-top: -60px;
     }
