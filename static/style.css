@@ -6490,7 +6490,7 @@ ul { list-style: none; }
 }
 .carousel-3d-scene.dragging { cursor: grabbing; }
 
-@media (min-width: 1025px) {
+@media (min-width: 768px) {
     .carousel-3d-scene {
         max-width: 95%;
         height: 260px;
@@ -6509,7 +6509,7 @@ ul { list-style: none; }
     margin-top: -14px;
 }
 
-@media (min-width: 1025px) {
+@media (min-width: 768px) {
     .carousel-3d-scene-row2 {
         margin-top: -60px;
     }

@@ -1221,7 +1221,7 @@ function initMiniShopCarousel(sceneId, ringId, autoplayDirection, startOffsetFra
     const angleStep = 360 / N;
     // Radius comes from a CSS custom property so desktop can use a much
     // wider ring (more horizontal coverage) without touching JS —
-    // see the @media (min-width: 1025px) override in style.css.
+    // see the @media (min-width: 768px) override in style.css.
     const radius = parseFloat(getComputedStyle(scene).getPropertyValue('--carousel-radius')) || 130;
 
     // Desktop uses a different layout entirely: a "coverflow" style
@@ -1234,7 +1234,13 @@ function initMiniShopCarousel(sceneId, ringId, autoplayDirection, startOffsetFra
     // big center card plus two disconnected slivers. Coverflow avoids
     // that because card spacing is a direct, independent pixel value,
     // not a side effect of the rotation radius.
-    const showTwoFront = window.matchMedia('(min-width: 1025px)').matches;
+    // Tablets and up use a "coverflow" style arrangement (2 cards
+    // visible up front) instead of a single-card rotating ring. This
+    // breakpoint is intentionally kept in sync with the matching
+    // @media (min-width: 768px) override in style.css — if you change
+    // one, change the other too, or the JS layout math and the CSS
+    // card sizing will disagree.
+    const showTwoFront = window.matchMedia('(min-width: 768px)').matches;
     const spacing = parseFloat(getComputedStyle(scene).getPropertyValue('--carousel-spacing')) || 148;
 
     cards.forEach((card, i) => {
