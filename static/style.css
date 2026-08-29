@@ -984,21 +984,25 @@ ul { list-style: none; }
    since it already fits comfortably from 761px up.) */
 @media (min-width: 768px) and (max-width: 1199px) {
     .hc-scale-box:not(.hc-scale-box--app5) {
-        width: 414px;
-        height: 55px;
+        width: 331px;
+        height: 44px;
     }
     .hc-scale-box:not(.hc-scale-box--app5) .hc-strip {
-        transform: scale(0.4);
+        transform: scale(0.32);
+    }
+    .hc-cta {
+        transform: scale(0.8);
+        transform-origin: right center;
     }
     .brand-icon {
-        width: 46px;
-        height: 46px;
+        width: 40px;
+        height: 40px;
     }
     .brand-name {
-        font-size: 1.3rem;
+        font-size: 1.1rem;
     }
     .brand-tagline {
-        font-size: 0.68rem;
+        font-size: 0.6rem;
     }
 }
 
@@ -4523,7 +4527,7 @@ ul { list-style: none; }
 /* Outer two-column grid */
 .fs-body {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 2fr 1fr;
     gap: 24px;
     align-items: start;
     max-width: 1280px;
