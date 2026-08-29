@@ -974,6 +974,34 @@ ul { list-style: none; }
     .brand-icon {width: 40px;height: 40px;}
 }
 
+/* Tablet-tier sizing (768px–1199px): the honeycomb nav and brand block
+   were both built and sized for wide desktop screens, so simply
+   showing them at full desktop pixel size in this narrower range
+   crams everything together. This scales the homepage's 8-cell strip
+   and shrinks the brand block just for this range, so there's real
+   breathing room instead of a squeezed-desktop look. (App pages'
+   already-smaller 5-cell nav — .hc-scale-box--app5 — is untouched,
+   since it already fits comfortably from 761px up.) */
+@media (min-width: 768px) and (max-width: 1199px) {
+    .hc-scale-box:not(.hc-scale-box--app5) {
+        width: 414px;
+        height: 55px;
+    }
+    .hc-scale-box:not(.hc-scale-box--app5) .hc-strip {
+        transform: scale(0.4);
+    }
+    .brand-icon {
+        width: 46px;
+        height: 46px;
+    }
+    .brand-name {
+        font-size: 1.3rem;
+    }
+    .brand-tagline {
+        font-size: 0.68rem;
+    }
+}
+
  
 /* ================================================================
    SIDE DRAWER BACKDROP
@@ -4905,7 +4933,10 @@ ul { list-style: none; }
 .fs-wa-btn-outline:hover { background: rgba(37,211,102,0.16); }
 
 /* ── Responsive ── */
-@media (max-width: 1024px) {
+/* Below this, phones need the single-column stack; tablets (768px+)
+   keep the same 2-column grid as desktop — Ready to Order box on the
+   left, Home Delivery / Farm Pickup / Bulk Order strips on the right. */
+@media (max-width: 767px) {
     .fs-body { grid-template-columns: 1fr; max-width: 680px; margin-left: auto; margin-right: auto; }
 }
 
