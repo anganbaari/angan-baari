@@ -4534,10 +4534,12 @@ ul { list-style: none; }
    DELIVERY — Feature Split Layout
 ================================================================ */
 
-/* Outer two-column grid */
+/* Outer two-column grid — 50/50 on desktop. (The 2/3–1/3 split now
+   lives only in the tablet tier below, since it looked wrong at full
+   desktop width.) */
 .fs-body {
     display: grid;
-    grid-template-columns: 2fr 1fr;
+    grid-template-columns: 1fr 1fr;
     gap: 24px;
     align-items: start;
     max-width: 1280px;
@@ -4954,11 +4956,24 @@ ul { list-style: none; }
     .fs-body { grid-template-columns: 1fr; max-width: 680px; margin-left: auto; margin-right: auto; }
 }
 
-/* Tablet tier (768–1199px): the right column (Home Delivery / Farm
-   Pickup / Bulk Order) now sits at 1/3 width instead of 1/2, so the
-   desktop-tuned padding/text sizes need trimming to fit comfortably. */
+/* Tablet tier (768–1199px): 2/3–1/3 split (Ready to Order gets more
+   room, the three info strips take the remaining third) — this is
+   tablet-only now, not the desktop default. Since the left column's
+   content (carousel + button + quote) is naturally shorter than the
+   right column's three stacked strips, "align-items: stretch" lets
+   the left column's box grow to match the right column's height, and
+   "justify-content: space-between" on .fs-left spreads its content
+   across that full height instead of leaving one big empty gap
+   sitting under the quote block. */
 @media (min-width: 768px) and (max-width: 1199px) {
-    .fs-body { gap: 18px; }
+    .fs-body {
+        grid-template-columns: 2fr 1fr;
+        gap: 18px;
+        align-items: stretch;
+    }
+    .fs-left {
+        justify-content: space-between;
+    }
     .fs-strip { padding: 18px 20px; }
     .fs-strip-title { font-size: 1.1rem; }
     .fs-zone-chip { font-size: 0.72rem; padding: 3px 9px; }
