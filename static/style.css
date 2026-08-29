@@ -4281,10 +4281,10 @@ ul { list-style: none; }
 .testi-note i { color: var(--moss); }
 
 /* Responsive */
-@media (max-width: 1024px) {
+@media (max-width: 767px) {
     .testimonials-grid { grid-template-columns: 1fr; max-width: 600px; }
 }
-@media (max-width: 768px) {
+@media (max-width: 480px) {
     .testimonials-grid { grid-template-columns: 1fr; max-width: 100%; }
 }
 
@@ -5811,10 +5811,9 @@ ul { list-style: none; }
         grid-template-columns: repeat(2, 1fr);
     }
 
-    /* Testimonials */
-    .testimonials-grid {
-        grid-template-columns: 1fr 1fr;
-    }
+    /* Testimonials — removed the old 2-column override here; tablets
+       now use the same 3-column row as desktop (see .testimonials-grid
+       base rule), per request. */
 
     /* Delivery fs-body — kept as the desktop 2-column layout on tablet
        too; there's plenty of width (768px+) for the Ready to Order box
