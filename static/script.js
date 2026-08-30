@@ -745,9 +745,17 @@ document.addEventListener('DOMContentLoaded', () => {
     ];
 
     const FB_TOTAL    = FB_DATA.length;
-    const FB_CARD_W   = 210;
+    // FB_CARD_W is measured from the real rendered card below, since
+    // .fb-card's width changes across breakpoints via CSS media
+    // queries (210 desktop / 190 tablet / 175 mobile / 155 small
+    // phones). Hardcoding 210 here made every position calculation
+    // wrong below desktop width — the "center" card wasn't actually
+    // centered, and the two side cards ended up at inconsistent
+    // distances from it (one truly adjacent, one two slots away),
+    // which is why they looked different sizes.
+    let   FB_CARD_W   = 210;
     const FB_GAP      = 18;
-    const FB_STEP     = FB_CARD_W + FB_GAP;
+    let   FB_STEP     = FB_CARD_W + FB_GAP;
     const FB_DURATION = 3000;
     const FB_VISIBLE  = 9;
     const FB_CENTER   = Math.floor(FB_VISIBLE / 2);
@@ -778,6 +786,7 @@ document.addEventListener('DOMContentLoaded', () => {
         fbTrack.appendChild(el);
         fbSlots.push({ el, dataIndex: di });
     }
+    fbMeasureCardWidth();
 
     // Dots
     for (let i = 0; i < FB_TOTAL; i++) {
@@ -790,6 +799,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function fbGetDots() { return fbDotsWrap.querySelectorAll('.fb-dot'); }
     function fbGetVpW()  { return fbViewport.offsetWidth || 900; }
+
+    function fbMeasureCardWidth() {
+        // Reads the real rendered width of a card instead of trusting
+        // a hardcoded constant, so this stays correct at every screen
+        // size without needing to duplicate the CSS breakpoint numbers
+        // here and keep them in sync by hand.
+        if (fbSlots.length && fbSlots[0].el.offsetWidth) {
+            FB_CARD_W = fbSlots[0].el.offsetWidth;
+            FB_STEP = FB_CARD_W + FB_GAP;
+        }
+    }
 
     function fbApplyTrackX(x, animate) {
         if (animate) fbTrack.classList.add('fb-animating');
@@ -892,6 +912,7 @@ document.addEventListener('DOMContentLoaded', () => {
     fbStartProg();
 
     window.addEventListener('resize', () => {
+        fbMeasureCardWidth();
         fbTrackX = fbCalcX();
         fbApplyTrackX(fbTrackX, false);
     }, { passive: true });

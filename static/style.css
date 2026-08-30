@@ -5809,17 +5809,11 @@ ul { list-style: none; }
        now use the same 3-column row as desktop (see .testimonials-grid
        base rule), per request. */
 
-    /* Quick Contact (WhatsApp/Phone/Email) — the whole contact-two-col
-       grid collapses to one full-width column at this tablet range
-       (see .contact-two-col below), so there's room to lay these 3
-       buttons out horizontally instead of the always-vertical stack
-       .quick-contacts-vertical uses by default (which is designed for
-       its narrow desktop sidebar column, not a full-width block). */
-    .quick-contacts-vertical {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 12px;
-    }
+    /* Quick Contact (WhatsApp/Phone/Email) — now sits alongside "Our
+       Details" as a 2-column row instead of full-width (see
+       .contact-two-col override below), so the buttons go back to a
+       vertical stack (WhatsApp, then Call, then Email) — the same
+       order/orientation as desktop's own narrow sidebar column. */
 
     /* Route cards (Choose Your Route / location guidance) — same
        3-in-a-row as desktop; only phones need the single-column stack. */
@@ -6421,6 +6415,23 @@ ul { list-style: none; }
     .contact-two-col {
         grid-template-columns: 1fr !important;
     }
+}
+
+/* Tablet tier (768–1199px) override — form stays full-width on its own
+   row, but "Our Details" and "Quick Contact" now sit side by side as a
+   2-column row underneath, instead of both stacking fully vertically.
+   This needs !important to beat the ≤1024px rule just above, since
+   768–1199 falls inside that same range. */
+@media (min-width: 768px) and (max-width: 1199px) {
+    .contact-two-col {
+        grid-template-columns: 1fr 1fr !important;
+        grid-template-areas:
+            "form    form"
+            "details quick" !important;
+    }
+    .contact-form-wrap    { grid-area: form; }
+    .contact-details-side { grid-area: details; }
+    .contact-quick-side   { grid-area: quick; }
 }
 
 /* ================================================================
