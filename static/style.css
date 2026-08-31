@@ -1111,20 +1111,20 @@ ul { list-style: none; }
  
 .drawer-brand-name {
     font-family: var(--font-display);
-    font-size: 1rem;
-    font-weight: 600;
-    color: var(--white);
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--gold);
     line-height: 1.2;
     margin: 0;
 }
  
 .drawer-brand-tag {
     font-family: var(--font-accent);
-    font-size: 0.62rem;
-    letter-spacing: 0.14em;
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
     text-transform: uppercase;
-    color: var(--sage-light);
-    margin: 0;
+    color: var(--white);
+    margin: 2px 0 0;
 }
  
 .drawer-close {
@@ -1218,128 +1218,71 @@ ul { list-style: none; }
 }
 
 /* ================================================================
-   VERTICAL HONEYCOMB MOBILE NAV
-   Same chain theme as the desktop honeycomb, rotated 90°, for the
-   side drawer. Text-only, no connectors, left-aligned under the
-   drawer header brand.
+   MOBILE DRAWER NAV — simple list in a glass card, replacing the old
+   vertical honeycomb chain (too heavy/busy for a mobile drawer). Same
+   glass treatment already used for the newsletter section/popup, so
+   it stays visually consistent with the rest of the site.
 ================================================================ */
-.drawer-nav { padding: 8px 0 20px; }
+.drawer-nav { padding: 16px 20px 20px; }
 
-.vhc-wrap{
-  display:flex; justify-content:flex-start;
-  padding: 0 28px;
-}
-.vhc-strip{
-  --cell:88px; --cellH:52px; --cells:8; --gap:7px;
-  position:relative;
-  width:var(--cell);
-  height:calc(var(--cellH) * var(--cells) + var(--gap) * (var(--cells) - 1));
-}
-.vhc-strip-bg{
-  position:absolute; left:50%; top:0; width:52.8px; height:100%;
-  transform:translateX(-50%);
-  clip-path: path("M 6.38 15.17 Q 0.00 20.00 0.00 28.00 L 0.00 437.00 Q 0.00 445.00 6.38 449.83 L 20.02 460.17 Q 26.40 465.00 32.78 460.17 L 46.42 449.83 Q 52.80 445.00 52.80 437.00 L 52.80 28.00 Q 52.80 20.00 46.42 15.17 L 32.78 4.83 Q 26.40 0.00 20.02 4.83 L 6.38 15.17 Z");
-  background: linear-gradient(180deg, #6b3a12 0%, #4a260b 55%, #371c08 100%);
-  box-shadow: inset 4px 0 8px rgba(0,0,0,.4), inset -4px 0 8px rgba(0,0,0,.3);
+.dnav-glass {
+    background: rgba(16, 28, 18, 0.5);
+    backdrop-filter: blur(18px) saturate(160%);
+    -webkit-backdrop-filter: blur(18px) saturate(160%);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 20px;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.3);
+    overflow: hidden;
 }
 
-.vhc-nav{ position:relative; z-index:2; list-style:none; display:flex; flex-direction:column; gap:var(--gap); margin:0; padding:0; }
-.vhc-cell{
-  position:relative; width:var(--cell); height:var(--cellH);
-  opacity:0; transform:translateX(30px);
-  transition: opacity .4s ease, transform .4s ease;
-}
-.vhc-cell.revealed{ opacity:1; transform:translateX(0); }
+.dnav-list { list-style: none; margin: 0; padding: 6px 0; }
 
-.vhc-link{
-  position:relative;
-  display:flex; align-items:center; justify-content:center;
-  width:100%; height:100%;
-  padding:0 16px;
-  overflow:hidden;
-  clip-path: path("M 19.42 3.05 Q 22.00 0.00 26.00 0.00 L 62.00 0.00 Q 66.00 0.00 68.58 3.05 L 85.42 22.95 Q 88.00 26.00 85.42 29.05 L 68.58 48.95 Q 66.00 52.00 62.00 52.00 L 26.00 52.00 Q 22.00 52.00 19.42 48.95 L 2.58 29.05 Q 0.00 26.00 2.58 22.95 L 19.42 3.05 Z");
-  background:
-    radial-gradient(120% 90% at 28% 12%, rgba(255,235,180,.5) 0%, rgba(255,235,180,0) 42%),
-    linear-gradient(150deg, #d9922e 0%, #b8681c 42%, #7a3d0f 78%, #5a2c0a 100%);
-  box-shadow:
-    inset 0 3px 6px rgba(255,224,150,.4),
-    inset 0 -10px 15px rgba(35,15,3,.5),
-    inset 0 0 0 1px rgba(255,255,255,.2);
-  backdrop-filter: blur(1.5px) saturate(150%);
-  color:#fbead0;
-  text-decoration:none;
-  cursor:pointer;
-  transition: transform .55s cubic-bezier(0.34,1.56,0.64,1), box-shadow .5s cubic-bezier(0.25,0.46,0.45,0.94), background .5s cubic-bezier(0.25,0.46,0.45,0.94), filter .45s cubic-bezier(0.25,0.46,0.45,0.94);
+.dnav-item {
+    opacity: 0;
+    transform: translateX(20px);
+    transition: opacity 0.4s ease, transform 0.4s ease;
 }
-.vhc-link::before{
-  content:"";
-  position:absolute; inset:-15%;
-  background: linear-gradient(115deg,
-      rgba(255,255,255,0) 42%,
-      rgba(255,255,255,.5) 48%,
-      rgba(255,255,255,.15) 52%,
-      rgba(255,255,255,0) 58%);
-  background-size: 260% 260%;
-  background-position: -30% -30%;
-  mix-blend-mode: screen;
-  pointer-events: none;
-  animation: vhcSheenDrift 10s ease-in-out infinite;
+.dnav-item.revealed { opacity: 1; transform: translateX(0); }
+
+.dnav-link {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 18px;
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+    color: var(--white);
+    text-decoration: none;
+    font-family: var(--font-body);
+    font-size: 0.95rem;
+    font-weight: 600;
+    border-left: 3px solid transparent;
+    transition: all 0.25s ease;
 }
-.vhc-cell:nth-child(2n) .vhc-link::before{ animation-delay:-3.3s; }
-.vhc-cell:nth-child(3n) .vhc-link::before{ animation-delay:-6.6s; }
-@keyframes vhcSheenDrift{
-  0%,100%{ background-position:-30% -30%; }
-  50%{ background-position:90% 90%; }
-}
-.vhc-label{
-  position:relative; z-index:1;
-  font-family: var(--font-accent);
-  font-size:9.5px; letter-spacing:.02em;
-  font-weight:700; text-transform:uppercase; text-align:center;
+.dnav-item:last-child .dnav-link { border-bottom: none; }
+
+.dnav-link i:first-child {
+    width: 18px;
+    text-align: center;
+    color: var(--gold);
+    font-size: 0.9rem;
+    flex-shrink: 0;
 }
 
-.vhc-cell:active .vhc-link:not(.active){
-  transform: translateX(8px);
-  filter:brightness(1.1);
-}
-.vhc-cell:active .vhc-link::before{
-  animation: vhcSheenSweep .8s cubic-bezier(0.25,0.46,0.45,0.94);
-}
-@keyframes vhcSheenSweep{
-  0%{ background-position:-60% -60%; }
-  100%{ background-position:140% 140%; }
+.dnav-chev {
+    margin-left: auto;
+    font-size: 0.7rem;
+    opacity: 0.3;
 }
 
-.vhc-link.active{
-  background:
-    radial-gradient(120% 90% at 28% 10%, rgba(255,250,220,.8) 0%, rgba(255,250,220,0) 45%),
-    linear-gradient(150deg, #ffe680 0%, #ffc93c 40%, #f0a412 75%, #d6860a 100%);
-  box-shadow:
-    inset 0 3px 6px rgba(255,250,220,.6),
-    inset 0 -8px 13px rgba(120,70,10,.35),
-    8px 6px 20px -8px rgba(240,164,18,.55),
-    inset 0 0 0 1px rgba(255,255,255,.3);
-  color:#4a2e05;
-  transform: translateX(14px) scale(1.06);
-  z-index:5;
+.dnav-link.active {
+    background: linear-gradient(90deg, rgba(201,168,76,0.16) 0%, rgba(201,168,76,0.03) 100%);
+    border-left-color: var(--gold);
+    color: var(--gold-light);
 }
+.dnav-link.active i:first-child { color: var(--gold-light); }
 
-.vhc-ping{
-  position:absolute; inset:-6px; pointer-events:none;
-  clip-path: path("M 21.92 3.94 Q 25.00 0.00 30.00 0.00 L 70.00 0.00 Q 75.00 0.00 78.08 3.94 L 96.92 28.06 Q 100.00 32.00 96.92 35.94 L 78.08 60.06 Q 75.00 64.00 70.00 64.00 L 30.00 64.00 Q 25.00 64.00 21.92 60.06 L 3.08 35.94 Q 0.00 32.00 3.08 28.06 L 21.92 3.94 Z");
-  border:2px solid #ffd968;
-  opacity:0;
-}
-.vhc-ping.run{ animation: vhcPing .9s cubic-bezier(0.25,0.46,0.45,0.94); }
-@keyframes vhcPing{
-  0%{ opacity:.85; transform:scale(1); }
-  100%{ opacity:0; transform:scale(1.3); }
-}
-
-@media (prefers-reduced-motion: reduce){
-  .vhc-link{ transition:none; }
-  .vhc-link::before{ animation:none; }
-  .vhc-ping{ display:none; }
+@media (prefers-reduced-motion: reduce) {
+    .dnav-item { transition: none; }
 }
 
  

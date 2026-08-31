@@ -163,8 +163,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const sideDrawer     = document.getElementById('sideDrawer');
     const drawerBackdrop = document.getElementById('drawerBackdrop');
     const drawerClose    = document.getElementById('drawerClose');
-    const drawerCells    = document.querySelectorAll('.vhc-cell');
-    const drawerLinks    = document.querySelectorAll('.vhc-link');
+    const drawerCells    = document.querySelectorAll('.dnav-item');
+    const drawerLinks    = document.querySelectorAll('.dnav-link');
     const drawerOrderBtn = document.querySelector('.drawer-order-btn');
 
     function openDrawer() {
@@ -201,17 +201,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (drawerClose) drawerClose.addEventListener('click', closeDrawer);
     if (drawerBackdrop) drawerBackdrop.addEventListener('click', closeDrawer);
 
-    // Tap a hexagon: instant pop + ping, then close the drawer
+    // Tap a link: mark active, then close the drawer
     drawerLinks.forEach(link => {
         link.addEventListener('click', () => {
             drawerLinks.forEach(c => c.classList.remove('active'));
             link.classList.add('active');
-            const ping = link.querySelector('.vhc-ping');
-            if (ping) {
-                ping.classList.remove('run');
-                void ping.offsetWidth;
-                ping.classList.add('run');
-            }
             closeDrawer();
         });
     });
@@ -504,7 +498,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // 7. SCROLLSPY — Active nav link highlighting + pill sync
     // ============================================================
     const sections   = document.querySelectorAll('section[id], div[id]');
-    const navAnchors = document.querySelectorAll('.vhc-link[href^="#"]');
+    const navAnchors = document.querySelectorAll('.dnav-link[href^="#"]');
     // Re-query pill and navLinksWrap here so ScrollSpy can access them
     const _navLinksWrap = navbar ? navbar.querySelector('.nav-links') : null;
     const _pill = _navLinksWrap ? _navLinksWrap.querySelector('.nav-pill') : null;
