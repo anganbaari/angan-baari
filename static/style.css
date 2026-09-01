@@ -1048,7 +1048,7 @@ ul { list-style: none; }
     height: 100dvh;
     background:
         linear-gradient(180deg, rgba(16,28,18,0.5) 0%, rgba(10,18,12,0.6) 55%, rgba(8,14,10,0.7) 100%),
-        url('/static/images/Anganbaari.png');
+        url('/static/images/Anganbaari.jpg');
     background-size: cover;
     background-position: right center;
     z-index: 1200;
@@ -1218,24 +1218,13 @@ ul { list-style: none; }
 }
 
 /* ================================================================
-   MOBILE DRAWER NAV — simple list in a glass card, replacing the old
-   vertical honeycomb chain (too heavy/busy for a mobile drawer). Same
-   glass treatment already used for the newsletter section/popup, so
-   it stays visually consistent with the rest of the site.
+   MOBILE DRAWER NAV — each item is its own small glass pill, with
+   visible gaps between them so the background photo shows through,
+   rather than one large panel covering most of the drawer.
 ================================================================ */
 .drawer-nav { padding: 16px 20px 20px; }
 
-.dnav-glass {
-    background: rgba(16, 28, 18, 0.5);
-    backdrop-filter: blur(18px) saturate(160%);
-    -webkit-backdrop-filter: blur(18px) saturate(160%);
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 20px;
-    box-shadow: 0 12px 40px rgba(0,0,0,0.3);
-    overflow: hidden;
-}
-
-.dnav-list { list-style: none; margin: 0; padding: 6px 0; }
+.dnav-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
 
 .dnav-item {
     opacity: 0;
@@ -1248,17 +1237,21 @@ ul { list-style: none; }
     display: flex;
     align-items: center;
     gap: 14px;
-    padding: 14px 18px;
-    border-bottom: 1px solid rgba(255,255,255,0.07);
+    padding: 13px 18px;
+    background: rgba(16, 28, 18, 0.18);
+    backdrop-filter: blur(8px) saturate(140%);
+    -webkit-backdrop-filter: blur(8px) saturate(140%);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 14px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.15);
     color: var(--white);
     text-decoration: none;
     font-family: var(--font-body);
     font-size: 0.95rem;
     font-weight: 600;
-    border-left: 3px solid transparent;
+    text-shadow: 0 1px 4px rgba(0,0,0,0.6);
     transition: all 0.25s ease;
 }
-.dnav-item:last-child .dnav-link { border-bottom: none; }
 
 .dnav-link i:first-child {
     width: 18px;
@@ -1268,15 +1261,9 @@ ul { list-style: none; }
     flex-shrink: 0;
 }
 
-.dnav-chev {
-    margin-left: auto;
-    font-size: 0.7rem;
-    opacity: 0.3;
-}
-
 .dnav-link.active {
-    background: linear-gradient(90deg, rgba(201,168,76,0.16) 0%, rgba(201,168,76,0.03) 100%);
-    border-left-color: var(--gold);
+    background: rgba(201,168,76,0.22);
+    border-color: rgba(201,168,76,0.4);
     color: var(--gold-light);
 }
 .dnav-link.active i:first-child { color: var(--gold-light); }
