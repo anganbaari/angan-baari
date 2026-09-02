@@ -1149,80 +1149,15 @@ ul { list-style: none; }
     transform: rotate(90deg);
 }
  
-/* Drawer Nav Links */
-.drawer-nav {
-    padding: 20px 0;
-    flex: 1;
-}
- 
-.drawer-link {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    padding: 16px 28px;
-    color: rgba(255,255,255,0.75);
-    text-decoration: none;
-    transition: all 0.3s var(--ease-smooth);
-    position: relative;
-    overflow: hidden;
-    border-left: 3px solid transparent;
- 
-    /* Stagger-in animation state */
-    opacity: 0;
-    transform: translateX(30px);
-    transition: opacity 0.4s ease, transform 0.4s ease, color 0.3s ease,
-                background 0.3s ease, border-color 0.3s ease, padding 0.3s ease;
-}
- 
-.drawer-link.revealed {
-    opacity: 1;
-    transform: translateX(0);
-}
- 
-.drawer-link:hover {
-    background: rgba(255,255,255,0.05);
-    color: var(--white);
-    border-left-color: var(--gold);
-    padding-left: 34px;
-}
- 
-.drawer-link-num {
-    font-family: var(--font-accent);
-    font-size: 0.62rem;
-    letter-spacing: 0.12em;
-    color: var(--gold);
-    opacity: 0.7;
-    min-width: 22px;
-    flex-shrink: 0;
-}
- 
-.drawer-link-text {
-    font-family: var(--font-display);
-    font-size: 1.35rem;
-    font-weight: 600;
-    flex: 1;
-    line-height: 1;
-}
- 
-.drawer-link .fa-arrow-right {
-    font-size: 0.72rem;
-    color: var(--gold);
-    opacity: 0;
-    transform: translateX(-6px);
-    transition: all 0.3s ease;
-}
- 
-.drawer-link:hover .fa-arrow-right {
-    opacity: 1;
-    transform: translateX(0);
-}
-
 /* ================================================================
    MOBILE DRAWER NAV — each item is its own small glass pill, with
    visible gaps between them so the background photo shows through,
    rather than one large panel covering most of the drawer.
 ================================================================ */
-.drawer-nav { padding: 16px 20px 20px; }
+.drawer-nav {
+    padding: 20px 20px 10px;
+    flex: 1;
+}
 
 .dnav-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
 
@@ -1277,8 +1212,10 @@ ul { list-style: none; }
  
 /* Drawer CTA Button */
 .drawer-cta {
-    padding: 4px 28px 20px;
+    padding: 0 28px 18px;
     flex-shrink: 0;
+    display: flex;
+    justify-content: center;
 }
 
 .drawer-order-btn {
@@ -1286,23 +1223,30 @@ ul { list-style: none; }
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 10px;
-    width: 100%;
-    height: 52px;
-    padding: 0 34px;
-    clip-path: polygon(9% 0%, 91% 0%, 100% 50%, 91% 100%, 9% 100%, 0% 50%);
+    gap: 9px;
+    width: 200px;
+    height: 44px;
+    padding: 0 10px;
+    /* Same soft-rounded-hexagon style as .hc-cta on desktop (quadratic
+       bezier corners instead of sharp points), scaled to this button's
+       200x44 size — this only works with a fixed width, which is also
+       what makes the button smaller/more compact than the old
+       full-width bar. */
+    clip-path: path("M 18.60 3.40 Q 22.00 0.00 29.41 0.00 L 170.59 0.00 Q 178.02 0.00 181.43 3.40 L 196.59 18.61 Q 200.00 22.00 196.59 25.40 L 181.43 40.61 Q 178.02 44.00 170.59 44.00 L 29.41 44.00 Q 22.00 44.00 18.60 40.61 L 3.41 25.40 Q 0.00 22.00 3.41 18.61 L 18.60 3.40 Z");
+    /* Honey / golden-red — warmer and deeper than plain gold, without
+       tipping into straight red. */
     background:
-        radial-gradient(120% 90% at 28% 12%, rgba(255,250,220,.7) 0%, rgba(255,250,220,0) 42%),
-        linear-gradient(150deg, #ffe680 0%, #ffc93c 40%, #f0a412 75%, #d6860a 100%);
+        radial-gradient(120% 90% at 28% 12%, rgba(255,224,170,.55) 0%, rgba(255,224,170,0) 45%),
+        linear-gradient(150deg, #f2b955 0%, #e0923a 38%, #c96f28 70%, #a8481e 100%);
     box-shadow:
-        inset 0 3px 6px rgba(255,250,220,.6),
-        inset 0 -8px 13px rgba(120,70,10,.3),
-        0 0 26px rgba(240,164,18,0.4);
+        inset 0 3px 6px rgba(255,224,170,.5),
+        inset 0 -8px 13px rgba(90,40,10,.35),
+        0 0 22px rgba(217,130,30,0.4);
     color: var(--forest);
     font-family: var(--font-body);
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     font-weight: 700;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.04em;
     text-decoration: none;
     transition: all 0.3s var(--ease-smooth);
 }
@@ -1311,18 +1255,19 @@ ul { list-style: none; }
     filter: brightness(1.06);
     transform: translateY(-2px);
     box-shadow:
-        inset 0 3px 6px rgba(255,250,220,.6),
-        inset 0 -8px 13px rgba(120,70,10,.3),
-        0 10px 32px rgba(201,168,76,0.5);
+        inset 0 3px 6px rgba(255,224,170,.5),
+        inset 0 -8px 13px rgba(90,40,10,.35),
+        0 10px 28px rgba(201,111,40,0.5);
 }
 
-.drawer-order-btn i { font-size: 0.88rem; }
+.drawer-order-btn i { font-size: 0.82rem; }
  
 /* Drawer Footer */
 .drawer-footer {
     padding: 20px 28px 32px;
     border-top: 1px solid rgba(255,255,255,0.08);
     flex-shrink: 0;
+    text-align: center;
 }
  
 .drawer-tagline {
@@ -1337,6 +1282,7 @@ ul { list-style: none; }
  
 .drawer-socials {
     display: flex;
+    justify-content: center;
     gap: 10px;
     margin-bottom: 16px;
 }
@@ -1403,6 +1349,7 @@ ul { list-style: none; }
     color: rgba(255,255,255,0.4);
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: 7px;
     margin: 0;
 }
