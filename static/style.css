@@ -6769,63 +6769,178 @@ ul { list-style: none; }
         padding-bottom: 90px;
     }
 }
+
+
 /* ================================================================
-   FINAL HOMEPAGE NAV FIX — keep app-page navigation untouched
-   Center the stretched 9-cell background and make it slightly wider
-   than the previous reduced version. Equal clearance on both sides.
+   HOMEPAGE-ONLY NAVIGATION OVERRIDES
+   IMPORTANT: Do NOT modify Shop / Cart / Offers / Profile /
+   Product Detail navigation. Those use .navbar-app and .hc-strip--cells5.
+   This block affects only the homepage's non-app desktop navigation.
 ================================================================ */
-@media (min-width: 1200px) {
-    .navbar:not(.navbar-app) .hc-strip-bg {
-        left: 2% !important;
-        width: 96% !important;
-        transform: none !important;
-        transform-origin: center center !important;
-    }
-}
-@media (min-width: 768px) and (max-width: 1199px) {
-    .navbar:not(.navbar-app) .hc-strip-bg {
-        left: 2% !important;
-        width: 96% !important;
-        transform: none !important;
-        transform-origin: center center !important;
-    }
+
+/* Order Now: same full honeycomb shape as the homepage .hc-link cells.
+   HTML is intentionally unchanged. */
+.navbar:not(.navbar-app) .desktop-nav .hc-cta-box {
+    position: relative;
+    width: 56px;
+    height: 68.5px;
+    flex: 0 0 56px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: -10px;
 }
 
-/* Homepage Order Now only — same cell shape as Location/other cells. */
-.navbar:not(.navbar-app) .hc-cell--order .hc-link {
-    width: 100%;
-    height: 100%;
-    clip-path: var(--hc-clip);
+.navbar:not(.navbar-app) .desktop-nav .hc-cta {
+    position: relative;
+    z-index: 4;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     gap: 1px;
+    width: 112px;
+    height: 137px;
     padding: 24px 6px 20px;
     box-sizing: border-box;
-    background: radial-gradient(120% 90% at 22% 8%, rgba(255,224,190,.52) 0%, rgba(255,224,190,0) 28%), linear-gradient(135deg, #c9673a 0%, #a8481e 38%, #8a3919 68%, #672612 100%);
+    clip-path: var(--hc-clip);
+    overflow: hidden;
+
+    background:
+        radial-gradient(120% 90% at 22% 8%, rgba(255,185,145,.42) 0%, rgba(255,185,145,0) 28%),
+        linear-gradient(135deg, #c15a2b 0%, #a8481e 28%, #873916 60%, #642710 100%);
+
+    box-shadow:
+        inset 0 3px 5px rgba(255,190,150,.28),
+        inset 0 -16px 22px rgba(35,10,3,.60),
+        inset 0 0 0 1px rgba(255,190,150,.18),
+        0 6px 14px -4px rgba(90,28,8,.42);
+
+    color: #fff3e8 !important;
+    font-family: var(--font-accent);
+    font-size: 17px;
+    line-height: 1.05;
+    letter-spacing: .045em;
+    font-weight: 700;
+    text-transform: uppercase;
+    text-align: center;
+    text-decoration: none;
+    white-space: normal;
+    cursor: pointer;
+    transition:
+        transform .55s cubic-bezier(0.34,1.56,0.64,1),
+        box-shadow .5s cubic-bezier(0.25,0.46,0.45,0.94),
+        filter .45s ease;
 }
-.navbar:not(.navbar-app) .hc-cell--order .hc-link:hover {
-    background: radial-gradient(120% 90% at 22% 8%, rgba(255,230,205,.62) 0%, rgba(255,230,205,0) 30%), linear-gradient(135deg, #d87847 0%, #b85327 32%, #963d1a 65%, #702914 100%);
+
+/* Because the existing HTML says "Order Now" on one line, CSS forces
+   the two words onto two rows without changing the HTML. */
+.navbar:not(.navbar-app) .desktop-nav .hc-cta {
+    white-space: normal;
+    max-width: 112px;
+    text-wrap: balance;
 }
-.navbar:not(.navbar-app) .hc-order-label {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
+
+.navbar:not(.navbar-app) .desktop-nav .hc-cta::first-line {
     line-height: 1.05;
 }
-.navbar:not(.navbar-app) .hc-order-icon {
-    font-size: 30px;
-    line-height: 1;
-    color: #fff3e8;
+
+.navbar:not(.navbar-app) .desktop-nav .hc-cta::before {
+    content: "";
+    position: absolute;
+    inset: -15%;
+    background: linear-gradient(115deg,
+        rgba(255,255,255,0) 42%,
+        rgba(255,255,255,.50) 48%,
+        rgba(255,255,255,.16) 52%,
+        rgba(255,255,255,0) 58%);
+    background-size: 260% 260%;
+    background-position: -30% -30%;
+    mix-blend-mode: screen;
+    pointer-events: none;
+    animation: hcSheenDrift 10s ease-in-out infinite;
 }
-/* The connector between Location and Order Now inherits the normal
-   connector geometry; only its color follows the Order Now palette. */
-.navbar:not(.navbar-app) .hc-connector[style="left:1164px"] {
-    background: linear-gradient(135deg, #c9673a 0%, #a8481e 52%, #783016 100%);
+
+.navbar:not(.navbar-app) .desktop-nav .hc-cta:hover {
+    transform: translateY(-5px);
+    filter: brightness(1.06);
+    background:
+        radial-gradient(120% 90% at 22% 8%, rgba(255,205,170,.52) 0%, rgba(255,205,170,0) 30%),
+        linear-gradient(135deg, #cf6735 0%, #b14d20 30%, #913c18 62%, #6c2a11 100%);
+}
+
+.navbar:not(.navbar-app) .desktop-nav .hc-cta:hover::before {
+    animation: hcSheenSweep .9s cubic-bezier(0.25,0.46,0.45,0.94);
+}
+
+/* CSS-only connector between Location and Order Now.
+   The existing HTML has no extra connector after Location, so this is
+   drawn from the CTA wrapper without changing the HTML. */
+.navbar:not(.navbar-app) .desktop-nav .hc-cta-box::before {
+    content: "";
+    position: absolute;
+    z-index: 3;
+    left: -9px;
+    top: 17px;
+    width: 28px;
+    height: 66px;
+    clip-path: var(--hc-clip-connector);
+    background: linear-gradient(135deg, #c15a2b 0%, #a8481e 52%, #783016 100%);
+    box-shadow:
+        inset 0 2px 4px rgba(255,190,150,.38),
+        0 4px 10px rgba(70,25,8,.38);
+    transform: scale(1.9, .78);
+    transform-origin: center;
+    pointer-events: none;
+}
+
+/* ================================================================
+   HOMEPAGE BACKGROUND HEXAGON
+   The JS normally calculates this dynamically. These rules only
+   constrain the homepage so its background remains centered and
+   slightly wider than the previous too-small version.
+   App-page 5-cell background is deliberately NOT touched.
+================================================================ */
+
+@media (min-width: 1200px) {
+    .navbar:not(.navbar-app) .hc-strip-bg {
+        left: 4% !important;
+        width: 92% !important;
+        transform: none !important;
+        transform-origin: center center !important;
+    }
 }
 
 @media (min-width: 768px) and (max-width: 1199px) {
-    .navbar:not(.navbar-app) .hc-cell--order .hc-order-icon { font-size: 24px; }
-    .navbar:not(.navbar-app) .hc-cell--order .hc-label { font-size: 14px; }
+    .navbar:not(.navbar-app) .hc-strip-bg {
+        left: 7% !important;
+        width: 86% !important;
+        transform: none !important;
+        transform-origin: center center !important;
+    }
+
+    /* Homepage Order Now scales with the homepage tablet nav only.
+       App-page 5-cell nav is excluded. */
+    .navbar:not(.navbar-app) .desktop-nav .hc-cta-box {
+        width: 38px;
+        height: 44px;
+        flex-basis: 38px;
+        margin-left: -7px;
+    }
+
+    .navbar:not(.navbar-app) .desktop-nav .hc-cta {
+        transform: scale(.64);
+        transform-origin: center;
+        margin-left: 0;
+    }
+
+    .navbar:not(.navbar-app) .desktop-nav .hc-cta-box::before {
+        transform: scale(1.22, .50);
+        left: -5px;
+        top: 11px;
+    }
 }
+
+/* ================================================================
+   END HOMEPAGE-ONLY OVERRIDES
+================================================================ */
