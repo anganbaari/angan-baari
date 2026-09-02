@@ -242,7 +242,6 @@
                     <div class="hc-connector" style="left:636px" aria-hidden="true"></div>
                     <div class="hc-connector" style="left:768px" aria-hidden="true"></div>
                     <div class="hc-connector" style="left:900px" aria-hidden="true"></div>
-                    <div class="hc-connector" style="left:1032px" aria-hidden="true"></div>
 
                     <ul class="hc-nav" id="hcNav">
                       <li class="hc-cell"><a class="hc-link" href="#about" data-target="about">
@@ -266,14 +265,13 @@
                       <li class="hc-cell"><a class="hc-link" href="#contact" data-target="contact">
                         <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="1.2"/><path d="M3.3 6l8.7 6.8L20.7 6"/></svg>
                         <span class="hc-label">Contact</span><span class="hc-ping"></span></a></li>
-                                            <li class="hc-cell"><a class="hc-link" href="#location" data-target="location">
+                      <li class="hc-cell"><a class="hc-link" href="#location" data-target="location">
                         <svg viewBox="0 0 24 24"><path d="M12 21.5s7-7.2 7-12.2a7 7 0 10-14 0c0 5 7 12.2 7 12.2z"/><circle cx="12" cy="9.3" r="2.4"/></svg>
                         <span class="hc-label">Location</span><span class="hc-ping"></span></a></li>
-                      <li class="hc-cell"><a class="hc-link hc-link--cta" href="{% url 'shop' %}">
-                        <span class="hc-label hc-label-cta">Order<br>Now</span><span class="hc-ping"></span></a></li>
                     </ul>
                   </div>
                 </div>
+                <div class="hc-cta-box"><a href="{% url 'shop' %}" class="hc-cta">Order Now</a></div>
             </nav>
  
             <!-- Hamburger Button (mobile only) -->
@@ -308,24 +306,26 @@
  
         <!-- Drawer Nav Links — Vertical Honeycomb Chain -->
         <nav class="drawer-nav" aria-label="Mobile Navigation Links">
+            <div class="dnav-glass">
               <ul class="dnav-list" id="dnavList">
                 <li class="dnav-item" data-index="0"><a class="dnav-link" href="#about" data-target="about">
-                  <i class="fas fa-info-circle"></i><span class="dnav-label">About</span></a></li>
+                  <i class="fas fa-info-circle"></i><span class="dnav-label">About</span><i class="fas fa-chevron-right dnav-chev"></i></a></li>
                 <li class="dnav-item" data-index="1"><a class="dnav-link" href="#services" data-target="services">
-                  <i class="fas fa-leaf"></i><span class="dnav-label">Offerings</span></a></li>
+                  <i class="fas fa-leaf"></i><span class="dnav-label">Offerings</span><i class="fas fa-chevron-right dnav-chev"></i></a></li>
                 <li class="dnav-item" data-index="2"><a class="dnav-link" href="#products" data-target="products">
-                  <i class="fas fa-apple-alt"></i><span class="dnav-label">Produce</span></a></li>
+                  <i class="fas fa-apple-alt"></i><span class="dnav-label">Produce</span><i class="fas fa-chevron-right dnav-chev"></i></a></li>
                 <li class="dnav-item" data-index="3"><a class="dnav-link" href="#delivery" data-target="delivery">
-                  <i class="fas fa-shopping-bag"></i><span class="dnav-label">Shop</span></a></li>
+                  <i class="fas fa-shopping-bag"></i><span class="dnav-label">Shop</span><i class="fas fa-chevron-right dnav-chev"></i></a></li>
                 <li class="dnav-item" data-index="4"><a class="dnav-link" href="#gallery" data-target="gallery">
-                  <i class="fas fa-images"></i><span class="dnav-label">Gallery</span></a></li>
+                  <i class="fas fa-images"></i><span class="dnav-label">Gallery</span><i class="fas fa-chevron-right dnav-chev"></i></a></li>
                 <li class="dnav-item" data-index="5"><a class="dnav-link" href="#news-updates" data-target="news-updates">
-                  <i class="fas fa-newspaper"></i><span class="dnav-label">News</span></a></li>
+                  <i class="fas fa-newspaper"></i><span class="dnav-label">News</span><i class="fas fa-chevron-right dnav-chev"></i></a></li>
                 <li class="dnav-item" data-index="6"><a class="dnav-link" href="#contact" data-target="contact">
-                  <i class="fas fa-envelope"></i><span class="dnav-label">Contact</span></a></li>
+                  <i class="fas fa-envelope"></i><span class="dnav-label">Contact</span><i class="fas fa-chevron-right dnav-chev"></i></a></li>
                 <li class="dnav-item" data-index="7"><a class="dnav-link" href="#location" data-target="location">
-                  <i class="fas fa-map-marker-alt"></i><span class="dnav-label">Location</span></a></li>
+                  <i class="fas fa-map-marker-alt"></i><span class="dnav-label">Location</span><i class="fas fa-chevron-right dnav-chev"></i></a></li>
               </ul>
+            </div>
         </nav>
  
         <!-- Drawer CTA -->
