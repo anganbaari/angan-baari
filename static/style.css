@@ -644,49 +644,90 @@ ul { list-style: none; }
    overflow-x:hidden on <html>. This fixed margin guarantees
    clearance at every width, not just wide desktop ones. */
 .navbar-app .desktop-nav { margin-right: 32px; }
-/* Order Now is now a normal honeycomb cell inside .hc-nav, so it uses
-   exactly the same geometry, animation and interaction system as the
-   other desktop navigation cells. */
-.hc-cell--order .hc-link {
-    background:
-        radial-gradient(120% 90% at 22% 8%, rgba(255,224,190,.52) 0%, rgba(255,224,190,0) 28%),
-        linear-gradient(135deg, #c9673a 0%, #a8481e 38%, #8a3919 68%, #672612 100%);
-    box-shadow:
-        inset 0 3px 5px rgba(255,224,190,.34),
-        inset 0 -16px 22px rgba(45,12,3,.55),
-        inset 0 0 0 1px rgba(255,210,180,.18);
-}
-
-.hc-cell--order .hc-link:hover {
-    background:
-        radial-gradient(120% 90% at 22% 8%, rgba(255,230,205,.62) 0%, rgba(255,230,205,0) 30%),
-        linear-gradient(135deg, #d87847 0%, #b85327 32%, #963d1a 65%, #702914 100%);
-}
-
-.hc-order-icon {
-    font-size: 30px;
-    line-height: 1;
-    color: #fff3e8;
-    margin-top: 2px;
-    transition: transform .5s cubic-bezier(0.34,1.56,0.64,1);
-}
-
-.hc-cell--order:hover .hc-order-icon {
-    transform: scale(1.08) rotate(-3deg);
-}
-
-.hc-order-label {
+/* Pull "Order Now" in closer to the honeycomb strip — the strip's
+   own box only reserves its flat cell-row width, so the tapered
+   background tip plus this gap were reading as one big empty gap
+   before the CTA hexagon. */
+.hc-cta-box {
     display: flex;
-    flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 1px;
-    line-height: 1.05;
-    white-space: normal;
+    flex-shrink: 0;
 }
 
-.hc-order-label span {
-    display: block;
+.desktop-nav .hc-cta { margin-left: -6px; }
+
+/* Bridges the gap between the last nav cell (Location) and Order
+   Now, using the same connector shape/technique as the connectors
+   between regular nav cells, so the chain reads as continuous all
+   the way through instead of stopping and restarting. */
+.hc-connector-solo {
+    width: 20px;
+    height: 46px;
+    flex-shrink: 0;
+    align-self: center;
+    margin: 0 -8px;
+    clip-path: path("M 5.96 4.89 Q 7.00 0.00 12.00 0.00 L 16.00 0.00 Q 21.00 0.00 22.04 4.89 L 26.96 28.11 Q 28.00 33.00 26.96 37.89 L 22.04 61.11 Q 21.00 66.00 16.00 66.00 L 12.00 66.00 Q 7.00 66.00 5.96 61.11 L 1.04 37.89 Q 0.00 33.00 1.04 28.11 L 5.96 4.89 Z");
+    background: linear-gradient(150deg, #f2b955 0%, #e0923a 45%, #a8481e 100%);
+    box-shadow: inset 0 2px 4px rgba(255,224,170,.5), 0 4px 10px rgba(90,40,10,.4);
+}
+
+/* Order Now — merged into the honeycomb theme as its own small
+   gold hexagon button, sized to sit naturally beside the strip. */
+.hc-cta {
+    position: relative;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 1px;
+    width: 90px; height: 110px;
+    padding: 0 6px;
+    overflow: hidden;
+    /* Same hexagon geometry as the regular nav cells (--hc-clip),
+       scaled to this box's size — so it's the same shape family as
+       "About", "Shop", etc. instead of its own different landscape
+       hexagon. */
+    clip-path: path("M 18.90 4.32 Q 22.50 0.00 28.13 0.00 L 61.88 0.00 Q 67.50 0.00 71.13 4.32 L 86.40 22.55 Q 90.00 26.87 86.55 31.30 L 75.20 45.78 Q 71.73 50.21 74.70 55.01 L 87.06 75.14 Q 90.00 79.94 86.65 84.45 L 70.87 105.60 Q 67.50 110.10 61.88 110.10 L 28.13 110.10 Q 22.50 110.10 19.14 105.60 L 3.37 84.45 Q 0.00 79.94 2.95 75.14 L 15.33 55.01 Q 18.28 50.21 14.80 45.78 L 3.46 31.30 Q 0.00 26.87 3.61 22.55 L 18.90 4.32 Z");
+    /* Honey / golden-red — same gradient as the mobile drawer's
+       "Place an Order" button. */
+    background:
+        radial-gradient(120% 90% at 28% 12%, rgba(255,224,170,.55) 0%, rgba(255,224,170,0) 45%),
+        linear-gradient(150deg, #f2b955 0%, #e0923a 38%, #c96f28 70%, #a8481e 100%);
+    box-shadow:
+        inset 0 3px 5px rgba(255,224,170,.5),
+        inset 0 -10px 15px rgba(90,40,10,.4),
+        inset 0 0 0 1px rgba(255,224,170,.18),
+        0 6px 14px -4px rgba(168,72,30,.45);
+    backdrop-filter: blur(1.5px) saturate(140%);
+    color: #fff3d6 !important;
+    font-family: var(--font-accent);
+    font-size: 12px; font-weight: 700; letter-spacing: .03em;
+    text-transform: uppercase;
+    text-decoration: none;
+    line-height: 1.3;
+    transition: transform .35s cubic-bezier(0.34,1.56,0.64,1), filter .3s ease;
+    flex-shrink: 0;
+}
+/* glass sheen — same drifting highlight used on the other hexagons,
+   swept faster on hover for a satisfying "polish" response */
+.hc-cta::before {
+    content: "";
+    position: absolute; inset: -15%;
+    background: linear-gradient(115deg,
+        rgba(255,255,255,0) 42%,
+        rgba(255,255,255,.55) 48%,
+        rgba(255,255,255,.18) 52%,
+        rgba(255,255,255,0) 58%);
+    background-size: 260% 260%;
+    background-position: -30% -30%;
+    mix-blend-mode: screen;
+    pointer-events: none;
+    animation: hcSheenDrift 10s ease-in-out infinite;
+}
+.hc-cta:hover {
+    transform: translateY(-3px);
+    filter: brightness(1.06);
+}
+.hc-cta:hover::before {
+    animation: hcSheenSweep .9s cubic-bezier(0.25,0.46,0.45,0.94);
 }
 
 /* Cart badge sitting on the Cart hexagon (app pages) */
@@ -707,13 +748,13 @@ ul { list-style: none; }
 }
 
 .hc-scale-box {
-    width: 584px;
+    width: 518px;
     height: 69px;
     position: relative;
 }
 
 /* App pages (shop/cart/offers) use a 5-item honeycomb — same per-cell
-   geometry as the homepage's 9-item version, just fewer cells and a
+   geometry as the homepage's 8-item version, just fewer cells and a
    smaller reserved box. The stretched background hexagon needs no
    separate path here: fitStripBg() in script.js reads the strip's
    native width at runtime and scales the shared chamfered shape to fit
@@ -742,7 +783,7 @@ ul { list-style: none; }
 }
 
 .hc-strip {
-    --cell: 112px; --cells: 9; --gap: 20px; --H: 137px;
+    --cell: 112px; --cells: 8; --gap: 20px; --H: 137px;
     position: absolute;
     top: 0; left: 0;
     width: calc(var(--cell) * var(--cells) + var(--gap) * (var(--cells) - 1));
@@ -757,9 +798,8 @@ ul { list-style: none; }
 
 /* the stretched hexagon sitting behind every icon */
 .hc-strip-bg {
-    position: absolute; top: 12.5%; left: 2%; width: 1113.15px; height: 75%;
-    transform: scaleX(.96);
-    transform-origin: center center;
+    position: absolute; top: 12.5%; width: 1113.15px; height: 75%;
+    transform-origin: left center;
     clip-path: path("M 45.545 5.83 Q 62.575 0.00 80.575 0.00 L 1032.575 0.00 Q 1050.575 0.00 1067.605 5.83 L 1113.15 51.375 L 1067.605 96.92 Q 1050.575 102.75 1032.575 102.75 L 80.575 102.75 Q 62.575 102.75 45.545 96.92 L 0.00 51.375 Z");
     background: linear-gradient(135deg, #8F4000 0%, #6F2F00 60%, #5C2600 100%);
     box-shadow: inset 0 8px 14px rgba(30,10,0,.4), inset 0 -3px 8px rgba(255,180,60,.06), 0 16px 26px -8px rgba(70,30,0,.5);
@@ -859,19 +899,6 @@ ul { list-style: none; }
     z-index: 4;
 }
 
-/* Keep Order Now in its dedicated burnt-orange palette even when the
-   generic honeycomb hover rule above becomes active. */
-.hc-nav .hc-cell--order:hover .hc-link:not(.active) {
-    background:
-        radial-gradient(120% 90% at 22% 8%, rgba(255,230,205,.62) 0%, rgba(255,230,205,0) 30%),
-        linear-gradient(135deg, #d87847 0%, #b85327 32%, #963d1a 65%, #702914 100%);
-    box-shadow:
-        inset 0 3px 6px rgba(255,224,190,.4),
-        inset 0 -14px 20px rgba(45,12,3,.55),
-        inset 0 0 0 1px rgba(255,220,195,.22),
-        0 8px 16px -6px rgba(168,72,30,.4);
-}
-
 /* the "we are here" cell — pops up bright, naturally illuminated honey */
 .hc-link.active {
     background:
@@ -962,7 +989,7 @@ ul { list-style: none; }
     transform: translateY(-7px) rotate(-45deg);
 }
 
-/* Homepage's 9-item honeycomb nav switches to the full desktop
+/* Homepage's 9-item honeycomb nav now switches to the full desktop
    layout starting at tablet width (768px+) instead of 1200px — same
    768px cutover already used elsewhere in this file for tablet-specific
    layout (see "TABLET SPECIFIC FIXES" further down), and matching the
@@ -979,21 +1006,29 @@ ul { list-style: none; }
 /* Tablet-tier sizing (768px–1199px): the honeycomb nav and brand block
    were both built and sized for wide desktop screens, so simply
    showing them at full desktop pixel size in this narrower range
-   crams everything together. This scales the homepage's 9-cell strip
+   crams everything together. This scales the homepage's 8-cell strip
    and shrinks the brand block just for this range, so there's real
    breathing room instead of a squeezed-desktop look. (App pages'
    already-smaller 5-cell nav — .hc-scale-box--app5 — is untouched,
    since it already fits comfortably from 761px up.) */
 @media (min-width: 768px) and (max-width: 1199px) {
-    .hc-scale-box:not(.hc-scale-box--app5) .hc-strip-bg {
-        transform: scaleX(.94);
-    }
     .hc-scale-box:not(.hc-scale-box--app5) {
-        width: 374px;
+        width: 331px;
         height: 44px;
     }
     .hc-scale-box:not(.hc-scale-box--app5) .hc-strip {
         transform: scale(0.32);
+    }
+    .hc-cta-box {
+        width: 72px;
+        height: 88px;
+    }
+    .hc-cta {
+        transform: scale(0.8);
+    }
+    .hc-connector-solo {
+        transform: scale(0.8);
+        margin: 0 -10px;
     }
     .brand-icon {
         width: 40px;
@@ -6769,178 +6804,3 @@ ul { list-style: none; }
         padding-bottom: 90px;
     }
 }
-
-
-/* ================================================================
-   HOMEPAGE-ONLY NAVIGATION OVERRIDES
-   IMPORTANT: Do NOT modify Shop / Cart / Offers / Profile /
-   Product Detail navigation. Those use .navbar-app and .hc-strip--cells5.
-   This block affects only the homepage's non-app desktop navigation.
-================================================================ */
-
-/* Order Now: same full honeycomb shape as the homepage .hc-link cells.
-   HTML is intentionally unchanged. */
-.navbar:not(.navbar-app) .desktop-nav .hc-cta-box {
-    position: relative;
-    width: 56px;
-    height: 68.5px;
-    flex: 0 0 56px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-left: -10px;
-}
-
-.navbar:not(.navbar-app) .desktop-nav .hc-cta {
-    position: relative;
-    z-index: 4;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 1px;
-    width: 112px;
-    height: 137px;
-    padding: 24px 6px 20px;
-    box-sizing: border-box;
-    clip-path: var(--hc-clip);
-    overflow: hidden;
-
-    background:
-        radial-gradient(120% 90% at 22% 8%, rgba(255,185,145,.42) 0%, rgba(255,185,145,0) 28%),
-        linear-gradient(135deg, #c15a2b 0%, #a8481e 28%, #873916 60%, #642710 100%);
-
-    box-shadow:
-        inset 0 3px 5px rgba(255,190,150,.28),
-        inset 0 -16px 22px rgba(35,10,3,.60),
-        inset 0 0 0 1px rgba(255,190,150,.18),
-        0 6px 14px -4px rgba(90,28,8,.42);
-
-    color: #fff3e8 !important;
-    font-family: var(--font-accent);
-    font-size: 17px;
-    line-height: 1.05;
-    letter-spacing: .045em;
-    font-weight: 700;
-    text-transform: uppercase;
-    text-align: center;
-    text-decoration: none;
-    white-space: normal;
-    cursor: pointer;
-    transition:
-        transform .55s cubic-bezier(0.34,1.56,0.64,1),
-        box-shadow .5s cubic-bezier(0.25,0.46,0.45,0.94),
-        filter .45s ease;
-}
-
-/* Because the existing HTML says "Order Now" on one line, CSS forces
-   the two words onto two rows without changing the HTML. */
-.navbar:not(.navbar-app) .desktop-nav .hc-cta {
-    white-space: normal;
-    max-width: 112px;
-    text-wrap: balance;
-}
-
-.navbar:not(.navbar-app) .desktop-nav .hc-cta::first-line {
-    line-height: 1.05;
-}
-
-.navbar:not(.navbar-app) .desktop-nav .hc-cta::before {
-    content: "";
-    position: absolute;
-    inset: -15%;
-    background: linear-gradient(115deg,
-        rgba(255,255,255,0) 42%,
-        rgba(255,255,255,.50) 48%,
-        rgba(255,255,255,.16) 52%,
-        rgba(255,255,255,0) 58%);
-    background-size: 260% 260%;
-    background-position: -30% -30%;
-    mix-blend-mode: screen;
-    pointer-events: none;
-    animation: hcSheenDrift 10s ease-in-out infinite;
-}
-
-.navbar:not(.navbar-app) .desktop-nav .hc-cta:hover {
-    transform: translateY(-5px);
-    filter: brightness(1.06);
-    background:
-        radial-gradient(120% 90% at 22% 8%, rgba(255,205,170,.52) 0%, rgba(255,205,170,0) 30%),
-        linear-gradient(135deg, #cf6735 0%, #b14d20 30%, #913c18 62%, #6c2a11 100%);
-}
-
-.navbar:not(.navbar-app) .desktop-nav .hc-cta:hover::before {
-    animation: hcSheenSweep .9s cubic-bezier(0.25,0.46,0.45,0.94);
-}
-
-/* CSS-only connector between Location and Order Now.
-   The existing HTML has no extra connector after Location, so this is
-   drawn from the CTA wrapper without changing the HTML. */
-.navbar:not(.navbar-app) .desktop-nav .hc-cta-box::before {
-    content: "";
-    position: absolute;
-    z-index: 3;
-    left: -9px;
-    top: 17px;
-    width: 28px;
-    height: 66px;
-    clip-path: var(--hc-clip-connector);
-    background: linear-gradient(135deg, #c15a2b 0%, #a8481e 52%, #783016 100%);
-    box-shadow:
-        inset 0 2px 4px rgba(255,190,150,.38),
-        0 4px 10px rgba(70,25,8,.38);
-    transform: scale(1.9, .78);
-    transform-origin: center;
-    pointer-events: none;
-}
-
-/* ================================================================
-   HOMEPAGE BACKGROUND HEXAGON
-   The JS normally calculates this dynamically. These rules only
-   constrain the homepage so its background remains centered and
-   slightly wider than the previous too-small version.
-   App-page 5-cell background is deliberately NOT touched.
-================================================================ */
-
-@media (min-width: 1200px) {
-    .navbar:not(.navbar-app) .hc-strip-bg {
-        left: 5% !important;
-        width: 90% !important;
-        transform: none !important;
-        transform-origin: center center !important;
-    }
-}
-
-@media (min-width: 768px) and (max-width: 1199px) {
-    .navbar:not(.navbar-app) .hc-strip-bg {
-        left: 7% !important;
-        width: 86% !important;
-        transform: none !important;
-        transform-origin: center center !important;
-    }
-
-    /* Homepage Order Now scales with the homepage tablet nav only.
-       App-page 5-cell nav is excluded. */
-    .navbar:not(.navbar-app) .desktop-nav .hc-cta-box {
-        width: 38px;
-        height: 44px;
-        flex-basis: 38px;
-        margin-left: -7px;
-    }
-
-    .navbar:not(.navbar-app) .desktop-nav .hc-cta {
-        transform: scale(.64);
-        transform-origin: center;
-        margin-left: 0;
-    }
-
-    .navbar:not(.navbar-app) .desktop-nav .hc-cta-box::before {
-        transform: scale(1.22, .50);
-        left: -5px;
-        top: 11px;
-    }
-}
-
-/* ================================================================
-   END HOMEPAGE-ONLY OVERRIDES
-================================================================ */

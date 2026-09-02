@@ -121,7 +121,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.css" media="print" onload="this.media='all'">
     <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.css"></noscript>
 
-    <link rel="stylesheet" href="{% static 'style.css' %}?v=4">
+    <link rel="stylesheet" href="{% static 'style.css' %}?v=2">
 
 <style>
 .btn-shop-icon {
@@ -242,7 +242,6 @@
                     <div class="hc-connector" style="left:636px" aria-hidden="true"></div>
                     <div class="hc-connector" style="left:768px" aria-hidden="true"></div>
                     <div class="hc-connector" style="left:900px" aria-hidden="true"></div>
-                    <div class="hc-connector" style="left:1032px" aria-hidden="true"></div>
 
                     <ul class="hc-nav" id="hcNav">
                       <li class="hc-cell"><a class="hc-link" href="#about" data-target="about">
@@ -269,12 +268,11 @@
                       <li class="hc-cell"><a class="hc-link" href="#location" data-target="location">
                         <svg viewBox="0 0 24 24"><path d="M12 21.5s7-7.2 7-12.2a7 7 0 10-14 0c0 5 7 12.2 7 12.2z"/><circle cx="12" cy="9.3" r="2.4"/></svg>
                         <span class="hc-label">Location</span><span class="hc-ping"></span></a></li>
-                      <li class="hc-cell hc-cell--order"><a class="hc-link hc-link--order" href="{% url 'shop' %}" aria-label="Order Now - Shop">
-                        <i class="fas fa-leaf hc-order-icon" aria-hidden="true"></i>
-                        <span class="hc-label hc-order-label"><span>Order</span><span>Now</span></span><span class="hc-ping"></span></a></li>
                     </ul>
                   </div>
                 </div>
+                <div class="hc-connector-solo" aria-hidden="true"></div>
+                <div class="hc-cta-box"><a href="{% url 'shop' %}" class="hc-cta"><span>Order</span><span>Now</span></a></div>
             </nav>
  
             <!-- Hamburger Button (mobile only) -->
@@ -309,26 +307,24 @@
  
         <!-- Drawer Nav Links — Vertical Honeycomb Chain -->
         <nav class="drawer-nav" aria-label="Mobile Navigation Links">
-            <div class="dnav-glass">
               <ul class="dnav-list" id="dnavList">
                 <li class="dnav-item" data-index="0"><a class="dnav-link" href="#about" data-target="about">
-                  <i class="fas fa-info-circle"></i><span class="dnav-label">About</span><i class="fas fa-chevron-right dnav-chev"></i></a></li>
+                  <i class="fas fa-info-circle"></i><span class="dnav-label">About</span></a></li>
                 <li class="dnav-item" data-index="1"><a class="dnav-link" href="#services" data-target="services">
-                  <i class="fas fa-leaf"></i><span class="dnav-label">Offerings</span><i class="fas fa-chevron-right dnav-chev"></i></a></li>
+                  <i class="fas fa-leaf"></i><span class="dnav-label">Offerings</span></a></li>
                 <li class="dnav-item" data-index="2"><a class="dnav-link" href="#products" data-target="products">
-                  <i class="fas fa-apple-alt"></i><span class="dnav-label">Produce</span><i class="fas fa-chevron-right dnav-chev"></i></a></li>
+                  <i class="fas fa-apple-alt"></i><span class="dnav-label">Produce</span></a></li>
                 <li class="dnav-item" data-index="3"><a class="dnav-link" href="#delivery" data-target="delivery">
-                  <i class="fas fa-shopping-bag"></i><span class="dnav-label">Shop</span><i class="fas fa-chevron-right dnav-chev"></i></a></li>
+                  <i class="fas fa-shopping-bag"></i><span class="dnav-label">Shop</span></a></li>
                 <li class="dnav-item" data-index="4"><a class="dnav-link" href="#gallery" data-target="gallery">
-                  <i class="fas fa-images"></i><span class="dnav-label">Gallery</span><i class="fas fa-chevron-right dnav-chev"></i></a></li>
+                  <i class="fas fa-images"></i><span class="dnav-label">Gallery</span></a></li>
                 <li class="dnav-item" data-index="5"><a class="dnav-link" href="#news-updates" data-target="news-updates">
-                  <i class="fas fa-newspaper"></i><span class="dnav-label">News</span><i class="fas fa-chevron-right dnav-chev"></i></a></li>
+                  <i class="fas fa-newspaper"></i><span class="dnav-label">News</span></a></li>
                 <li class="dnav-item" data-index="6"><a class="dnav-link" href="#contact" data-target="contact">
-                  <i class="fas fa-envelope"></i><span class="dnav-label">Contact</span><i class="fas fa-chevron-right dnav-chev"></i></a></li>
+                  <i class="fas fa-envelope"></i><span class="dnav-label">Contact</span></a></li>
                 <li class="dnav-item" data-index="7"><a class="dnav-link" href="#location" data-target="location">
-                  <i class="fas fa-map-marker-alt"></i><span class="dnav-label">Location</span><i class="fas fa-chevron-right dnav-chev"></i></a></li>
+                  <i class="fas fa-map-marker-alt"></i><span class="dnav-label">Location</span></a></li>
               </ul>
-            </div>
         </nav>
  
         <!-- Drawer CTA -->
@@ -2281,53 +2277,6 @@
 
     <!-- Scripts -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.js"></script>
-    <script src="{% static 'script.js' %}?v=4"></script>
-
-<script>
-/* ================================================================
-   FINAL HOMEPAGE HONEYCOMB FIX
-   1) Order Now navigates to the Django shop URL.
-   2) The stretched background is centered and reduced equally
-      from BOTH left and right sides.
-================================================================ */
-(function () {
-    function fixHomepageHoneycombBackground() {
-        const strip = document.querySelector('.desktop-nav .hc-strip');
-        const bg = document.querySelector('.desktop-nav .hc-strip-bg');
-        if (!strip || !bg) return;
-
-        /* Keep the taper centered; shrink equally from both sides. */
-        const shrink = window.innerWidth >= 1200 ? 0.86 : 0.80;
-        bg.style.left = '50%';
-        bg.style.transform = 'translateX(-50%) scaleX(' + shrink + ')';
-    }
-
-    /* Run after the existing script's fitStripBg(). */
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', fixHomepageHoneycombBackground, { once: true });
-    } else {
-        fixHomepageHoneycombBackground();
-    }
-
-    window.addEventListener('resize', fixHomepageHoneycombBackground, { passive: true });
-
-    /* The existing honeycomb JS calls preventDefault() on every .hc-link.
-       Order Now has no data-target, so let this link perform normal
-       Django navigation and stop the old smooth-scroll handler first. */
-    document.addEventListener('click', function (event) {
-        const orderLink = event.target.closest('.hc-link--order');
-        if (!orderLink) return;
-
-        event.preventDefault();
-        event.stopImmediatePropagation();
-
-        const destination = orderLink.getAttribute('href');
-        if (destination) {
-            window.location.assign(destination);
-        }
-    }, true);
-})();
-</script>
-
+    <script src="{% static 'script.js' %}?v=3"></script>
 </body>
 </html>
