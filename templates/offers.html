@@ -4,8 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashain Offers — Angan Baari | आँगन बारी</title>
-    <meta name="description" content="Exclusive Dashain offers on fresh organic farm products from Angan Baari — honey, fruits, vegetables and more.">
+    <title>Festival Offers — Angan Baari | आँगन बारी</title>
+    <meta id="pageMetaDesc" name="description" content="Exclusive festival offers on fresh organic farm products from Angan Baari — honey, fruits, vegetables and more.">
     <link rel="shortcut icon" href="{% static 'favicon.ico' %}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -22,103 +22,155 @@
         }
 
         /* ══════════════════════════════════════════
-           DASHAIN HERO BANNER
+           FESTIVAL HERO BANNER
+           Text and countdown are populated by the Festival
+           Engine script near the closing </body> — this CSS
+           only styles the shell, so it never needs touching
+           when the active festival changes.
         ══════════════════════════════════════════ */
-        .dashain-hero {
-            background: linear-gradient(135deg, #1a2f1e 0%, #2d5a3d 60%, #3d7a50 100%);
-            padding: 48px 20px 56px;
+        .festival-hero {
+            background: linear-gradient(160deg, #1a2f1e 0%, #234a2c 55%, #2d5a3d 130%);
+            padding: 64px 20px 56px;
             text-align: center;
             position: relative;
             overflow: hidden;
             margin-top: 64px;
+            isolation: isolate;
         }
-        .dashain-hero::before {
+        .festival-hero::before {
             content: '';
             position: absolute;
-            width: 300px; height: 300px;
+            width: 340px; height: 340px;
             border-radius: 50%;
-            background: radial-gradient(circle, rgba(201,168,76,0.18) 0%, transparent 70%);
-            top: -80px; right: -60px;
+            background: radial-gradient(circle, rgba(201,168,76,0.16) 0%, transparent 72%);
+            top: -120px; right: -80px;
+            z-index: -2;
         }
-        .dashain-hero::after {
+        .festival-hero::after {
             content: '';
             position: absolute;
-            width: 200px; height: 200px;
+            width: 260px; height: 260px;
             border-radius: 50%;
-            background: radial-gradient(circle, rgba(201,168,76,0.12) 0%, transparent 70%);
-            bottom: -40px; left: -30px;
+            background: radial-gradient(circle, rgba(123,169,138,0.14) 0%, transparent 72%);
+            bottom: -80px; left: -70px;
+            z-index: -2;
         }
-        .hero-tikas {
-            font-size: 2rem;
-            margin-bottom: 10px;
-            letter-spacing: 4px;
+        .festival-hero-texture {
+            position: absolute;
+            inset: 0;
+            background-image: radial-gradient(rgba(201,168,76,0.10) 1px, transparent 1px);
+            background-size: 26px 26px;
+            -webkit-mask-image: radial-gradient(ellipse 65% 55% at 50% 15%, #000 0%, transparent 75%);
+            mask-image: radial-gradient(ellipse 65% 55% at 50% 15%, #000 0%, transparent 75%);
+            z-index: -1;
         }
+
+        .hero-icon-badge {
+            width: 52px; height: 52px;
+            margin: 0 auto 20px;
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            background: rgba(201,168,76,0.12);
+            border: 1px solid rgba(201,168,76,0.35);
+            box-shadow: 0 0 0 6px rgba(201,168,76,0.05);
+            font-size: 1.45rem;
+        }
+
+        .hero-eyebrow {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 18px;
+        }
+        .hero-eyebrow-line {
+            width: 26px; height: 1px;
+            background: linear-gradient(to right, transparent, #c9a84c);
+        }
+        .hero-eyebrow-line.right { background: linear-gradient(to left, transparent, #c9a84c); }
         .hero-label {
             font-family: 'Cinzel', serif;
-            font-size: 0.65rem;
-            letter-spacing: 0.3em;
+            font-size: 0.66rem;
+            letter-spacing: 0.26em;
             text-transform: uppercase;
-            color: #c9a84c;
-            margin-bottom: 10px;
+            color: #e0c068;
+            white-space: nowrap;
         }
         .hero-title {
             font-family: 'Cormorant Garamond', serif;
-            font-size: clamp(2rem, 6vw, 3.2rem);
+            font-size: clamp(2.1rem, 5.6vw, 3.4rem);
             color: #f7f2ea;
-            font-weight: 600;
-            line-height: 1.15;
-            margin-bottom: 8px;
+            font-weight: 500;
+            line-height: 1.16;
+            margin-bottom: 14px;
         }
-        .hero-title span { color: #c9a84c; }
+        .hero-title span {
+            color: #e0c068;
+            font-style: italic;
+            font-weight: 600;
+        }
         .hero-subtitle {
-            font-size: 0.9rem;
-            color: #9ab89e;
-            margin-bottom: 28px;
+            font-size: 0.95rem;
+            color: #a9c4ae;
+            max-width: 440px;
+            margin: 0 auto 30px;
+            line-height: 1.65;
         }
 
         .countdown-wrapper {
             display: inline-flex;
-            gap: 12px;
-            background: rgba(0,0,0,0.25);
-            border: 1px solid rgba(201,168,76,0.3);
-            border-radius: 14px;
-            padding: 14px 24px;
+            align-items: center;
+            gap: 4px;
+            background: rgba(0,0,0,0.22);
+            border: 1px solid rgba(201,168,76,0.28);
+            border-radius: 16px;
+            padding: 16px 8px;
             margin-bottom: 24px;
         }
-        .countdown-block { text-align: center; min-width: 44px; }
+        .countdown-block { text-align: center; min-width: 52px; padding: 0 10px; }
         .countdown-num {
             font-family: 'Cinzel', serif;
-            font-size: 1.6rem;
+            font-size: 1.55rem;
             font-weight: 600;
-            color: #c9a84c;
+            color: #e0c068;
             line-height: 1;
             display: block;
+            font-variant-numeric: tabular-nums;
         }
         .countdown-label {
             font-size: 0.58rem;
-            letter-spacing: 0.12em;
+            letter-spacing: 0.14em;
             text-transform: uppercase;
             color: #9ab89e;
-            margin-top: 3px;
+            margin-top: 5px;
         }
         .countdown-sep {
-            font-size: 1.4rem;
-            color: rgba(201,168,76,0.5);
-            align-self: center;
-            margin-top: -4px;
+            width: 1px;
+            height: 34px;
+            background: rgba(201,168,76,0.25);
+        }
+        .countdown-live {
+            color: #e0c068;
+            font-family: 'Cinzel', serif;
+            font-size: 0.92rem;
+            letter-spacing: 0.06em;
+            padding: 4px 8px;
+            display: inline-block;
         }
         .hero-badge {
             display: inline-flex;
             align-items: center;
-            gap: 6px;
-            background: rgba(192,57,43,0.85);
-            color: #fff;
-            font-size: 0.78rem;
+            gap: 8px;
+            background: linear-gradient(135deg, rgba(201,168,76,0.18), rgba(201,168,76,0.08));
+            border: 1px solid rgba(201,168,76,0.4);
+            color: #f0dfa8;
+            font-size: 0.76rem;
             font-weight: 600;
-            padding: 5px 14px;
+            padding: 7px 16px;
             border-radius: 50px;
-            letter-spacing: 0.05em;
+            letter-spacing: 0.03em;
         }
+        .hero-badge i { font-size: 0.7rem; }
 
         .offers-wrapper {
             max-width: 1100px;
@@ -512,7 +564,10 @@
             .coupon-strip { flex-direction: column; text-align: center; }
             .coupon-code-box { justify-content: center; }
             .steps-grid { grid-template-columns: 1fr 1fr; }
-            .dashain-hero { padding: 36px 16px 44px; margin-top: 56px; }
+            .festival-hero { padding: 44px 16px 44px; margin-top: 56px; }
+            .hero-icon-badge { width: 44px; height: 44px; font-size: 1.2rem; margin-bottom: 14px; }
+            .countdown-wrapper { gap: 2px; padding: 14px 4px; }
+            .countdown-block { min-width: 42px; padding: 0 6px; }
         }
     </style>
 </head>
@@ -577,38 +632,46 @@
         </div>
     </header>
 
-    <section class="dashain-hero">
-        <div class="hero-tikas">🪔 ᳕ 🌼</div>
-        <div class="hero-label">Dashain Special · दशैं विशेष</div>
-        <h1 class="hero-title">
-            Big Savings on<br>
-            <span>Fresh Farm Products</span>
-        </h1>
-        <p class="hero-subtitle">Celebrate Dashain with the freshest organic produce from Bhulka Danda 🌿</p>
+    <section class="festival-hero">
+        <div class="festival-hero-texture" aria-hidden="true"></div>
 
-        <div class="countdown-wrapper" id="countdown">
+        <div class="hero-icon-badge" aria-hidden="true"><span id="heroIcon">🌿</span></div>
+
+        <div class="hero-eyebrow">
+            <span class="hero-eyebrow-line" aria-hidden="true"></span>
+            <span class="hero-label" id="heroLabel">Farm Fresh · ताजा उपज</span>
+            <span class="hero-eyebrow-line right" aria-hidden="true"></span>
+        </div>
+
+        <h1 class="hero-title">
+            Big Savings for<br>
+            <span id="heroAccent">Fresh Farm Products</span>
+        </h1>
+        <p class="hero-subtitle" id="heroSubtitle">Fresh, organic produce from Bhulka Danda — delivered to your door 🌿</p>
+
+        <div class="countdown-wrapper" id="countdown" aria-live="polite">
             <div class="countdown-block">
                 <span class="countdown-num" id="cd-days">00</span>
                 <span class="countdown-label">Days</span>
             </div>
-            <span class="countdown-sep">:</span>
+            <div class="countdown-sep" aria-hidden="true"></div>
             <div class="countdown-block">
                 <span class="countdown-num" id="cd-hours">00</span>
                 <span class="countdown-label">Hours</span>
             </div>
-            <span class="countdown-sep">:</span>
+            <div class="countdown-sep" aria-hidden="true"></div>
             <div class="countdown-block">
                 <span class="countdown-num" id="cd-mins">00</span>
                 <span class="countdown-label">Mins</span>
             </div>
-            <span class="countdown-sep">:</span>
+            <div class="countdown-sep" aria-hidden="true"></div>
             <div class="countdown-block">
                 <span class="countdown-num" id="cd-secs">00</span>
                 <span class="countdown-label">Secs</span>
             </div>
         </div>
         <br>
-        <span class="hero-badge"><i class="fas fa-fire"></i> Limited Dashain Offers — Ends at Bijaya Dashami</span>
+        <span class="hero-badge"><i class="fas fa-leaf"></i> <span id="heroBadgeText">Fresh Organic Offers — New Deals Every Season</span></span>
     </section>
 
     <div class="offers-wrapper">
@@ -634,11 +697,11 @@
 
         <div class="section-head">
             <div class="section-head-line"></div>
-            <span class="section-label">🏷️ Dashain Discounts</span>
+            <span class="section-label" id="discountSectionLabel">🏷️ Seasonal Discounts</span>
             <div class="section-head-line right"></div>
         </div>
         <h2 class="section-title">Special Price Offers</h2>
-        <p class="section-sub">Fresh from our farm — limited Dashain pricing on selected products</p>
+        <p class="section-sub" id="discountSectionSub">Fresh from our farm — limited-time pricing on selected products</p>
 
         {% if discount_offers %}
         <div class="discount-grid">
@@ -693,8 +756,8 @@
             <span class="section-label">🎁 Bundle Deals</span>
             <div class="section-head-line right"></div>
         </div>
-        <h2 class="section-title">Dashain Combo Packages</h2>
-        <p class="section-sub">Save more when you buy together — perfect Dashain gift sets</p>
+        <h2 class="section-title" id="bundleSectionTitle">Combo Packages</h2>
+        <p class="section-sub" id="bundleSectionSub">Save more when you buy together — perfect gift sets</p>
 
         {% if bundle_deals %}
         <div class="bundle-grid">
@@ -729,7 +792,7 @@
         <div class="bundle-grid">
             <div class="bundle-card">
                 <div class="bundle-badge">🌿 Farmer's Pick</div>
-                <div class="bundle-title">Dashain Essentials</div>
+                <div class="bundle-title">Farm Fresh Essentials</div>
                 <div class="bundle-subtitle">Everything you need for the celebration</div>
                 <div class="bundle-items">
                     <div class="bundle-item"><i class="fas fa-check-circle"></i><span class="bundle-item-name">Pure Farm Honey</span><span class="bundle-item-qty">500g</span></div>
@@ -740,13 +803,13 @@
                 <div class="bundle-pricing">
                     <span class="bundle-price-new">Contact Us</span>
                 </div>
-                <a href="https://wa.me/9779821025084?text=Hello%20Angan%20Baari!%20I%20want%20to%20order%20the%20Dashain%20Essentials%20Bundle." target="_blank" class="btn-bundle-order">
+                <a href="https://wa.me/9779821025084?text=Hello%20Angan%20Baari!%20I%20want%20to%20order%20the%20Farm%20Fresh%20Essentials%20Bundle." target="_blank" class="btn-bundle-order">
                     <i class="fab fa-whatsapp"></i> Order This Bundle
                 </a>
             </div>
             <div class="bundle-card">
                 <div class="bundle-badge">🍯 Honey Special</div>
-                <div class="bundle-title">Sweet Dashain Gift</div>
+                <div class="bundle-title">Sweet Honey Gift</div>
                 <div class="bundle-subtitle">A perfect gift for family & friends</div>
                 <div class="bundle-items">
                     <div class="bundle-item"><i class="fas fa-check-circle"></i><span class="bundle-item-name">Pure Farm Honey</span><span class="bundle-item-qty">1 kg</span></div>
@@ -756,14 +819,14 @@
                 <div class="bundle-pricing">
                     <span class="bundle-price-new">Contact Us</span>
                 </div>
-                <a href="https://wa.me/9779821025084?text=Hello%20Angan%20Baari!%20I%20want%20to%20order%20the%20Sweet%20Dashain%20Gift%20Bundle." target="_blank" class="btn-bundle-order">
+                <a href="https://wa.me/9779821025084?text=Hello%20Angan%20Baari!%20I%20want%20to%20order%20the%20Sweet%20Honey%20Gift%20Bundle." target="_blank" class="btn-bundle-order">
                     <i class="fab fa-whatsapp"></i> Order This Bundle
                 </a>
             </div>
             <div class="bundle-card">
                 <div class="bundle-badge">🐐 Farm Special</div>
-                <div class="bundle-title">Dashain Meat Package</div>
-                <div class="bundle-subtitle">Traditional Dashain — farm-raised animals</div>
+                <div class="bundle-title">Farm Meat Package</div>
+                <div class="bundle-subtitle">Fresh, farm-raised meat for your celebration</div>
                 <div class="bundle-items">
                     <div class="bundle-item"><i class="fas fa-check-circle"></i><span class="bundle-item-name">Farm Goat (बाख्रा)</span><span class="bundle-item-qty">Whole / Half</span></div>
                     <div class="bundle-item"><i class="fas fa-check-circle"></i><span class="bundle-item-name">Free-Range Chicken</span><span class="bundle-item-qty">2 pcs</span></div>
@@ -772,7 +835,7 @@
                 <div class="bundle-pricing">
                     <span class="bundle-price-new">Contact Us</span>
                 </div>
-                <a href="https://wa.me/9779821025084?text=Hello%20Angan%20Baari!%20I%20want%20to%20order%20the%20Dashain%20Meat%20Package." target="_blank" class="btn-bundle-order">
+                <a href="https://wa.me/9779821025084?text=Hello%20Angan%20Baari!%20I%20want%20to%20order%20the%20Farm%20Meat%20Package." target="_blank" class="btn-bundle-order">
                     <i class="fab fa-whatsapp"></i> Order This Bundle
                 </a>
             </div>
@@ -811,10 +874,10 @@
 
     </div>
 
-    <a href="https://wa.me/9779821025084?text=Hello%20Angan%20Baari!%20I%20am%20interested%20in%20your%20Dashain%20offers."
-       class="float-wa" target="_blank" rel="noopener noreferrer" aria-label="Chat on WhatsApp">
+    <a href="https://wa.me/9779821025084?text=Hello%20Angan%20Baari!%20I%20am%20interested%20in%20your%20offers."
+       class="float-wa" target="_blank" rel="noopener noreferrer" id="floatWa" aria-label="Chat on WhatsApp">
         <i class="fab fa-whatsapp"></i>
-        <span class="float-wa-tooltip">Dashain Offers via WhatsApp</span>
+        <span class="float-wa-tooltip" id="floatWaTooltip">Chat With Us on WhatsApp</span>
     </a>
 
     <footer class="site-footer">
@@ -894,27 +957,152 @@
         // Active bottom-nav state is now rendered server-side (see template),
         // so no JS path-matching is needed here.
 
-        const dashainDate = new Date(2025, 9, 2, 0, 0, 0);
+        // ================================================================
+        // FESTIVAL ENGINE
+        // Shows whichever Nepali festival is currently active or coming
+        // up next, so this page never sits stuck on one festival after
+        // it has ended. Dates come from the Government of Nepal calendar
+        // / Hamro Patro (Bikram Sambat 2083) and are accurate through
+        // Nepali New Year 2084 (14 Apr 2027).
+        //
+        // → Once a year (around Baisakh / mid-April), add next year's
+        //   festivals to this list using https://www.hamropatro.com
+        //   (English: https://english.hamropatro.com). Nepali festival
+        //   dates are lunar and shift every year, so they can't be
+        //   calculated in plain JS — they have to be looked up.
+        //
+        // Each entry: windowStart = promo can start showing · peak =
+        // the main day the countdown counts down to · windowEnd = last
+        // day this festival stays on the page before the next one takes
+        // over automatically.
+        // ================================================================
+        const FESTIVALS = [
+            { id: 'teej', name: 'Haritalika Teej', nameNp: 'हरितालिका तीज', icon: '🌺',
+              windowStart: new Date(2026, 8, 13), peak: new Date(2026, 8, 14, 23, 59, 59), windowEnd: new Date(2026, 8, 16, 23, 59, 59),
+              peakLabel: 'Haritalika Teej', greeting: 'Happy Teej! 🌺',
+              heroLine: 'Celebrate Teej with the freshest organic treats for the dar 🌿' },
 
-        function updateCountdown() {
-            const now = new Date();
-            const diff = dashainDate - now;
-            if (diff <= 0) {
-                document.getElementById('countdown').innerHTML =
-                    '<span style="color:#c9a84c;font-family:Cinzel,serif;font-size:1rem;letter-spacing:0.1em;">🎉 Dashain is here! Happy Vijaya Dashami!</span>';
+            { id: 'dashain', name: 'Dashain', nameNp: 'दशैं', icon: '🪁',
+              windowStart: new Date(2026, 9, 11), peak: new Date(2026, 9, 21, 23, 59, 59), windowEnd: new Date(2026, 9, 25, 23, 59, 59),
+              peakLabel: 'Vijaya Dashami', greeting: 'Happy Vijaya Dashami! 🙏',
+              heroLine: 'Celebrate Dashain with the freshest organic produce from Bhulka Danda 🌿' },
+
+            { id: 'tihar', name: 'Tihar', nameNp: 'तिहार', icon: '🪔',
+              windowStart: new Date(2026, 10, 7), peak: new Date(2026, 10, 11, 23, 59, 59), windowEnd: new Date(2026, 10, 11, 23, 59, 59),
+              peakLabel: 'Bhai Tika', greeting: 'Happy Tihar & Bhai Tika! 🪔',
+              heroLine: 'Light up Tihar with fresh farm treats from Bhulka Danda 🌿' },
+
+            { id: 'chhath', name: 'Chhath Parva', nameNp: 'छठ पर्व', icon: '🌅',
+              windowStart: new Date(2026, 10, 13), peak: new Date(2026, 10, 15, 23, 59, 59), windowEnd: new Date(2026, 10, 16, 23, 59, 59),
+              peakLabel: 'Sandhya Arghya', greeting: 'Happy Chhath Parva! 🌅',
+              heroLine: 'Farm-fresh fruit and offerings for Chhath Parva' },
+
+            { id: 'maghe-sankranti', name: 'Maghe Sankranti', nameNp: 'माघे संक्रान्ति', icon: '🌾',
+              windowStart: new Date(2027, 0, 15), peak: new Date(2027, 0, 15, 23, 59, 59), windowEnd: new Date(2027, 0, 15, 23, 59, 59),
+              peakLabel: 'Maghe Sankranti', greeting: 'Happy Maghe Sankranti! 🌾',
+              heroLine: 'Ghee, chaku and fresh farm produce for Maghe Sankranti' },
+
+            { id: 'shivaratri', name: 'Maha Shivaratri', nameNp: 'महाशिवरात्री', icon: '🔱',
+              windowStart: new Date(2027, 2, 6), peak: new Date(2027, 2, 6, 23, 59, 59), windowEnd: new Date(2027, 2, 6, 23, 59, 59),
+              peakLabel: 'Maha Shivaratri', greeting: 'Happy Maha Shivaratri! 🔱',
+              heroLine: 'Farm-fresh fruit and essentials for your Shivaratri fast' },
+
+            { id: 'holi', name: 'Holi', nameNp: 'होली', icon: '🎨',
+              windowStart: new Date(2027, 2, 21), peak: new Date(2027, 2, 22, 23, 59, 59), windowEnd: new Date(2027, 2, 22, 23, 59, 59),
+              peakLabel: 'Holi', greeting: 'Happy Holi! 🎨',
+              heroLine: 'Sweet treats and fresh produce for a colourful Holi' },
+
+            { id: 'nepali-new-year', name: 'Nepali New Year', nameNp: 'नयाँ वर्ष', icon: '🎊',
+              windowStart: new Date(2027, 3, 14), peak: new Date(2027, 3, 14, 23, 59, 59), windowEnd: new Date(2027, 3, 14, 23, 59, 59),
+              peakLabel: 'Nepali New Year 2084', greeting: 'Happy New Year 2084! 🎊',
+              heroLine: 'Start 2084 fresh with organic produce from Bhulka Danda' },
+        ];
+
+        // Shown once every listed festival's windowEnd is in the past
+        // (i.e. this script hasn't been updated in over a year).
+        const EVERGREEN_FESTIVAL = {
+            id: 'evergreen', name: 'Seasonal', nameNp: 'मौसमी', icon: '🌿',
+            peak: null, peakLabel: null, greeting: '',
+            heroLine: 'Fresh, organic produce from Bhulka Danda — delivered to your door 🌿',
+        };
+
+        function getActiveFestival(now) {
+            for (const f of FESTIVALS) {
+                if (now <= f.windowEnd) return f;
+            }
+            return EVERGREEN_FESTIVAL;
+        }
+
+        function formatShortDate(date) {
+            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        }
+
+        function applyFestival(festival) {
+            const isEvergreen = festival.id === 'evergreen';
+
+            document.title = `${isEvergreen ? 'Farm' : festival.name} Offers — Angan Baari | आँगन बारी`;
+            const metaDesc = document.getElementById('pageMetaDesc');
+            if (metaDesc) {
+                metaDesc.setAttribute('content', isEvergreen
+                    ? 'Exclusive offers on fresh organic farm products from Angan Baari — honey, fruits, vegetables and more.'
+                    : `Exclusive ${festival.name} offers on fresh organic farm products from Angan Baari — honey, fruits, vegetables and more.`);
+            }
+
+            const setText = (id, value) => { const el = document.getElementById(id); if (el) el.textContent = value; };
+
+            setText('heroIcon', festival.icon);
+            setText('heroLabel', isEvergreen ? 'Farm Fresh · ताजा उपज' : `${festival.name} Special · ${festival.nameNp} विशेष`);
+            setText('heroAccent', isEvergreen ? 'Fresh Farm Products' : festival.name);
+            setText('heroSubtitle', festival.heroLine);
+            setText('discountSectionLabel', isEvergreen ? '🏷️ Seasonal Discounts' : `🏷️ ${festival.name} Discounts`);
+            setText('discountSectionSub', isEvergreen
+                ? 'Fresh from our farm — limited-time pricing on selected products'
+                : `Fresh from our farm — limited ${festival.name} pricing on selected products`);
+            setText('bundleSectionTitle', isEvergreen ? 'Combo Packages' : `${festival.name} Combo Packages`);
+            setText('bundleSectionSub', isEvergreen
+                ? 'Save more when you buy together — perfect gift sets'
+                : `Save more when you buy together — perfect ${festival.name} gift sets`);
+            setText('heroBadgeText', festival.windowEnd
+                ? `Limited ${festival.name} Offers — Through ${formatShortDate(festival.windowEnd)}`
+                : 'Fresh Organic Offers — New Deals Every Season');
+
+            const waText = isEvergreen
+                ? 'Hello Angan Baari! I am interested in your offers.'
+                : `Hello Angan Baari! I am interested in your ${festival.name} offers.`;
+            const floatWa = document.getElementById('floatWa');
+            if (floatWa) floatWa.href = `https://wa.me/9779821025084?text=${encodeURIComponent(waText)}`;
+            setText('floatWaTooltip', isEvergreen ? 'Chat With Us on WhatsApp' : `${festival.name} Offers via WhatsApp`);
+        }
+
+        function updateCountdown(festival) {
+            const el = document.getElementById('countdown');
+            if (!el) return;
+
+            if (!festival.peak) {
+                el.innerHTML = '<span class="countdown-live">🌿 New offers added throughout the year!</span>';
                 return;
             }
+
+            const diff = festival.peak - new Date();
+            if (diff <= 0) {
+                el.innerHTML = `<span class="countdown-live">${festival.icon} ${festival.name} is here! ${festival.greeting}</span>`;
+                return;
+            }
+
             const days  = Math.floor(diff / (1000 * 60 * 60 * 24));
             const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
             const mins  = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
             const secs  = Math.floor((diff % (1000 * 60)) / 1000);
-            document.getElementById('cd-days').textContent  = String(days).padStart(2,'0');
-            document.getElementById('cd-hours').textContent = String(hours).padStart(2,'0');
-            document.getElementById('cd-mins').textContent  = String(mins).padStart(2,'0');
-            document.getElementById('cd-secs').textContent  = String(secs).padStart(2,'0');
+            document.getElementById('cd-days').textContent  = String(days).padStart(2, '0');
+            document.getElementById('cd-hours').textContent = String(hours).padStart(2, '0');
+            document.getElementById('cd-mins').textContent  = String(mins).padStart(2, '0');
+            document.getElementById('cd-secs').textContent  = String(secs).padStart(2, '0');
         }
-        updateCountdown();
-        setInterval(updateCountdown, 1000);
+
+        const activeFestival = getActiveFestival(new Date());
+        applyFestival(activeFestival);
+        updateCountdown(activeFestival);
+        setInterval(() => updateCountdown(activeFestival), 1000);
 
         function copyCoupon(btn) {
             const codeEl = btn.closest('.coupon-code-box').querySelector('.coupon-code');

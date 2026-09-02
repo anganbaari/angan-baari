@@ -757,8 +757,8 @@ ul { list-style: none; }
 
 /* the stretched hexagon sitting behind every icon */
 .hc-strip-bg {
-    position: absolute; top: 12.5%; left: 50%; width: 1113.15px; height: 75%;
-    transform: translateX(-50%) scaleX(.86);
+    position: absolute; top: 12.5%; left: 2%; width: 1113.15px; height: 75%;
+    transform: scaleX(.96);
     transform-origin: center center;
     clip-path: path("M 45.545 5.83 Q 62.575 0.00 80.575 0.00 L 1032.575 0.00 Q 1050.575 0.00 1067.605 5.83 L 1113.15 51.375 L 1067.605 96.92 Q 1050.575 102.75 1032.575 102.75 L 80.575 102.75 Q 62.575 102.75 45.545 96.92 L 0.00 51.375 Z");
     background: linear-gradient(135deg, #8F4000 0%, #6F2F00 60%, #5C2600 100%);
@@ -986,8 +986,7 @@ ul { list-style: none; }
    since it already fits comfortably from 761px up.) */
 @media (min-width: 768px) and (max-width: 1199px) {
     .hc-scale-box:not(.hc-scale-box--app5) .hc-strip-bg {
-        left: 50%;
-        transform: translateX(-50%) scaleX(.80);
+        transform: scaleX(.94);
     }
     .hc-scale-box:not(.hc-scale-box--app5) {
         width: 374px;
@@ -6769,4 +6768,64 @@ ul { list-style: none; }
     .site-footer {
         padding-bottom: 90px;
     }
+}
+/* ================================================================
+   FINAL HOMEPAGE NAV FIX — keep app-page navigation untouched
+   Center the stretched 9-cell background and make it slightly wider
+   than the previous reduced version. Equal clearance on both sides.
+================================================================ */
+@media (min-width: 1200px) {
+    .navbar:not(.navbar-app) .hc-strip-bg {
+        left: 2% !important;
+        width: 96% !important;
+        transform: none !important;
+        transform-origin: center center !important;
+    }
+}
+@media (min-width: 768px) and (max-width: 1199px) {
+    .navbar:not(.navbar-app) .hc-strip-bg {
+        left: 2% !important;
+        width: 96% !important;
+        transform: none !important;
+        transform-origin: center center !important;
+    }
+}
+
+/* Homepage Order Now only — same cell shape as Location/other cells. */
+.navbar:not(.navbar-app) .hc-cell--order .hc-link {
+    width: 100%;
+    height: 100%;
+    clip-path: var(--hc-clip);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1px;
+    padding: 24px 6px 20px;
+    box-sizing: border-box;
+    background: radial-gradient(120% 90% at 22% 8%, rgba(255,224,190,.52) 0%, rgba(255,224,190,0) 28%), linear-gradient(135deg, #c9673a 0%, #a8481e 38%, #8a3919 68%, #672612 100%);
+}
+.navbar:not(.navbar-app) .hc-cell--order .hc-link:hover {
+    background: radial-gradient(120% 90% at 22% 8%, rgba(255,230,205,.62) 0%, rgba(255,230,205,0) 30%), linear-gradient(135deg, #d87847 0%, #b85327 32%, #963d1a 65%, #702914 100%);
+}
+.navbar:not(.navbar-app) .hc-order-label {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    line-height: 1.05;
+}
+.navbar:not(.navbar-app) .hc-order-icon {
+    font-size: 30px;
+    line-height: 1;
+    color: #fff3e8;
+}
+/* The connector between Location and Order Now inherits the normal
+   connector geometry; only its color follows the Order Now palette. */
+.navbar:not(.navbar-app) .hc-connector[style="left:1164px"] {
+    background: linear-gradient(135deg, #c9673a 0%, #a8481e 52%, #783016 100%);
+}
+
+@media (min-width: 768px) and (max-width: 1199px) {
+    .navbar:not(.navbar-app) .hc-cell--order .hc-order-icon { font-size: 24px; }
+    .navbar:not(.navbar-app) .hc-cell--order .hc-label { font-size: 14px; }
 }
