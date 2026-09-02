@@ -757,8 +757,8 @@ ul { list-style: none; }
 
 /* the stretched hexagon sitting behind every icon */
 .hc-strip-bg {
-    position: absolute; top: 12.5%; left: 2%; width: 1113.15px; height: 75%;
-    transform: scaleX(.96);
+    position: absolute; top: 12.5%; left: 50%; width: 1113.15px; height: 75%;
+    transform: translateX(-50%) scaleX(.86);
     transform-origin: center center;
     clip-path: path("M 45.545 5.83 Q 62.575 0.00 80.575 0.00 L 1032.575 0.00 Q 1050.575 0.00 1067.605 5.83 L 1113.15 51.375 L 1067.605 96.92 Q 1050.575 102.75 1032.575 102.75 L 80.575 102.75 Q 62.575 102.75 45.545 96.92 L 0.00 51.375 Z");
     background: linear-gradient(135deg, #8F4000 0%, #6F2F00 60%, #5C2600 100%);
@@ -986,7 +986,8 @@ ul { list-style: none; }
    since it already fits comfortably from 761px up.) */
 @media (min-width: 768px) and (max-width: 1199px) {
     .hc-scale-box:not(.hc-scale-box--app5) .hc-strip-bg {
-        transform: scaleX(.94);
+        left: 50%;
+        transform: translateX(-50%) scaleX(.80);
     }
     .hc-scale-box:not(.hc-scale-box--app5) {
         width: 374px;

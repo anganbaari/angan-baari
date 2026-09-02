@@ -121,7 +121,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.css" media="print" onload="this.media='all'">
     <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.css"></noscript>
 
-    <link rel="stylesheet" href="{% static 'style.css' %}?v=3">
+    <link rel="stylesheet" href="{% static 'style.css' %}?v=4">
 
 <style>
 .btn-shop-icon {
@@ -2281,6 +2281,53 @@
 
     <!-- Scripts -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.js"></script>
-    <script src="{% static 'script.js' %}?v=3"></script>
+    <script src="{% static 'script.js' %}?v=4"></script>
+
+<script>
+/* ================================================================
+   FINAL HOMEPAGE HONEYCOMB FIX
+   1) Order Now navigates to the Django shop URL.
+   2) The stretched background is centered and reduced equally
+      from BOTH left and right sides.
+================================================================ */
+(function () {
+    function fixHomepageHoneycombBackground() {
+        const strip = document.querySelector('.desktop-nav .hc-strip');
+        const bg = document.querySelector('.desktop-nav .hc-strip-bg');
+        if (!strip || !bg) return;
+
+        /* Keep the taper centered; shrink equally from both sides. */
+        const shrink = window.innerWidth >= 1200 ? 0.86 : 0.80;
+        bg.style.left = '50%';
+        bg.style.transform = 'translateX(-50%) scaleX(' + shrink + ')';
+    }
+
+    /* Run after the existing script's fitStripBg(). */
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', fixHomepageHoneycombBackground, { once: true });
+    } else {
+        fixHomepageHoneycombBackground();
+    }
+
+    window.addEventListener('resize', fixHomepageHoneycombBackground, { passive: true });
+
+    /* The existing honeycomb JS calls preventDefault() on every .hc-link.
+       Order Now has no data-target, so let this link perform normal
+       Django navigation and stop the old smooth-scroll handler first. */
+    document.addEventListener('click', function (event) {
+        const orderLink = event.target.closest('.hc-link--order');
+        if (!orderLink) return;
+
+        event.preventDefault();
+        event.stopImmediatePropagation();
+
+        const destination = orderLink.getAttribute('href');
+        if (destination) {
+            window.location.assign(destination);
+        }
+    }, true);
+})();
+</script>
+
 </body>
 </html>
