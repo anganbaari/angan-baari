@@ -643,7 +643,7 @@ ul { list-style: none; }
    without this, the taper's right tip gets sliced flat by the
    overflow-x:hidden on <html>. This fixed margin guarantees
    clearance at every width, not just wide desktop ones. */
-.navbar-app .desktop-nav { margin-right: 40px; }
+.navbar-app .desktop-nav { margin-right: 60px; }
 /* Pull "Order Now" in closer to the honeycomb strip — the strip's
    own box only reserves its flat cell-row width, so the tapered
    background tip plus this gap were reading as one big empty gap
