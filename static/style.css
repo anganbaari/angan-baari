@@ -1052,7 +1052,7 @@ ul { list-style: none; }
    since it already fits comfortably from 761px up.) */
 @media (min-width: 768px) and (max-width: 1199px) {
     .desktop-nav {
-        gap: 4px;
+        gap: 5px;
     }
     .hc-scale-box:not(.hc-scale-box--app5) {
         width: 331px;
@@ -1070,7 +1070,7 @@ ul { list-style: none; }
     }
     .hc-connector-solo {
         transform: scale(0.608, 0.2496);
-        margin: 0 -15px;
+        margin: 0 -14px;
     }
     .brand-icon {
         width: 40px;
