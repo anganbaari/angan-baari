@@ -832,11 +832,17 @@ ul { list-style: none; }
 @media (min-width: 768px) {
     .navbar:not(.navbar-app) .hc-strip-bg {
         left: 24px !important;
+        transform: scaleX(1.05) !important;
+        transform-origin: left center !important;
+    }
+}
+@media (min-width: 1200px) {
+    .navbar:not(.navbar-app) .hc-strip-bg {
+        left: 24px !important;
         transform: scaleX(1.15) !important;
         transform-origin: left center !important;
     }
 }
-
 
 /* small gold hexagon connectors bridging the notch between each pair of cells */
 .hc-connector {
