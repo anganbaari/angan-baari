@@ -655,7 +655,7 @@ ul { list-style: none; }
     flex-shrink: 0;
 }
 
-.desktop-nav .hc-cta { margin-left: 3px; }
+.desktop-nav .hc-cta { margin-left: 1%; }
 
 /* Bridges the gap between the last nav cell (Location) and Order
    Now. Real connectors between regular cells work by taking a tall
