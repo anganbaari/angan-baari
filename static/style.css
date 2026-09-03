@@ -840,7 +840,7 @@ ul { list-style: none; }
     .navbar:not(.navbar-app) .hc-strip-bg {
         left: 24px !important;
         transform: scaleX(1.15) !important;
-        transform-origin: left center !important;
+        transform-origin: center center !important;
     }
 }
 
