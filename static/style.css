@@ -1052,7 +1052,7 @@ ul { list-style: none; }
    since it already fits comfortably from 761px up.) */
 @media (min-width: 768px) and (max-width: 1199px) {
     .desktop-nav {
-        gap: 5px;
+        gap: 6px;
     }
     .hc-scale-box:not(.hc-scale-box--app5) {
         width: 331px;
