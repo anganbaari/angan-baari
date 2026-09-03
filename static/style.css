@@ -843,7 +843,34 @@ ul { list-style: none; }
         transform-origin: center center !important;
     }
 }
-
+/* Desktop-only enlargement (1200px+) — scales the whole homepage
+   honeycomb nav up by 1.3x so it reads properly on wide screens.
+   Scoped to .navbar:not(.navbar-app) and :not(.hc-scale-box--app5)
+   so app pages' (shop/cart/offers) smaller 5-cell nav is untouched,
+   and tablet/mobile are untouched since this only fires at 1200px+. */
+@media (min-width: 1200px) {
+    .navbar:not(.navbar-app) .desktop-nav {
+        gap: 16px;
+    }
+    .navbar:not(.navbar-app) .hc-scale-box:not(.hc-scale-box--app5) {
+        width: 673px;
+        height: 90px;
+    }
+    .navbar:not(.navbar-app) .hc-scale-box:not(.hc-scale-box--app5) .hc-strip {
+        transform: scale(0.65);
+    }
+    .navbar:not(.navbar-app) .hc-cta-box {
+        width: 73px;
+        height: 89px;
+    }
+    .navbar:not(.navbar-app) .hc-cta {
+        transform: scale(1.3);
+    }
+    .navbar:not(.navbar-app) .hc-connector-solo {
+        transform: scale(1.235, 0.507);
+        margin: 0 -25px;
+    }
+}
 /* small gold hexagon connectors bridging the notch between each pair of cells */
 .hc-connector {
     position: absolute; top: 33.43px;
