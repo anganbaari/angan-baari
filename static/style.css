@@ -1052,25 +1052,25 @@ ul { list-style: none; }
    since it already fits comfortably from 761px up.) */
 @media (min-width: 768px) and (max-width: 1199px) {
     .desktop-nav {
-        gap: 5px;
+        gap: 10px;
     }
     .hc-scale-box:not(.hc-scale-box--app5) {
-        width: 331px;
-        height: 44px;
+        width: 414px;
+        height: 55px;
     }
     .hc-scale-box:not(.hc-scale-box--app5) .hc-strip {
-        transform: scale(0.32);
+        transform: scale(0.40);
     }
     .hc-cta-box {
-        width: 35.84px;
-        height: 43.84px;
+        width: 44.8px;
+        height: 54.8px;
     }
     .hc-cta {
-        transform: scale(0.64);
+        transform: scale(0.80);
     }
     .hc-connector-solo {
-        transform: scale(0.608, 0.2496);
-        margin: 0 -15px;
+        transform: scale(0.76, 0.312);
+        margin: 0 -16px;
     }
     .brand-icon {
         width: 40px;
