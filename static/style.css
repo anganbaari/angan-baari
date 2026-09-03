@@ -831,8 +831,8 @@ ul { list-style: none; }
 ================================================================ */
 @media (min-width: 768px) {
     .navbar:not(.navbar-app) .hc-strip-bg {
-        left: 24px !important;
-        transform: scaleX(1.03) !important;
+        left: 21px !important;
+        transform: scaleX(1.06) !important;
         transform-origin: left center !important;
     }
 }
