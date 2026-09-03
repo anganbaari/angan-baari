@@ -1051,6 +1051,9 @@ ul { list-style: none; }
    already-smaller 5-cell nav — .hc-scale-box--app5 — is untouched,
    since it already fits comfortably from 761px up.) */
 @media (min-width: 768px) and (max-width: 1199px) {
+    .desktop-nav {
+        gap: 8px;
+    }
     .hc-scale-box:not(.hc-scale-box--app5) {
         width: 331px;
         height: 44px;
@@ -1067,7 +1070,7 @@ ul { list-style: none; }
     }
     .hc-connector-solo {
         transform: scale(0.608, 0.2496);
-        margin: 0 -10px;
+        margin: 0 -13px;
     }
     .brand-icon {
         width: 40px;
