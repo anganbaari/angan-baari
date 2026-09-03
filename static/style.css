@@ -871,6 +871,11 @@ ul { list-style: none; }
         margin: 0 -25px;
     }
 }
+@media (min-width: 1200px) {
+    .navbar-inner {
+        max-width: none;
+    }
+}
 /* small gold hexagon connectors bridging the notch between each pair of cells */
 .hc-connector {
     position: absolute; top: 33.43px;
