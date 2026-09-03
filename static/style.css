@@ -655,7 +655,7 @@ ul { list-style: none; }
     flex-shrink: 0;
 }
 
-.desktop-nav .hc-cta { margin-left: 4px; }
+.desktop-nav .hc-cta { margin-left: 3px; }
 
 /* Bridges the gap between the last nav cell (Location) and Order
    Now. Real connectors between regular cells work by taking a tall
@@ -664,46 +664,43 @@ ul { list-style: none; }
    strip scale. Since this one is a standalone sibling (not inside
    the strip), it combines both scale factors into a single net
    transform (1.9*0.5, .78*0.5) so it renders at the exact same
-   final size/shape as the connectors between the other cells.
-   Margin is pulled in only slightly now — the previous, tighter
-   negative margin was overlapping and hiding the wood background
-   strip's right-side taper. */
+   final size/shape as the connectors between the other cells. */
 .hc-connector-solo {
     width: 28px;
     height: 66px;
     flex-shrink: 0;
     align-self: center;
-    margin: 0 4px;
+    margin: 0 -19px;
     clip-path: path("M 5.96 4.89 Q 7.00 0.00 12.00 0.00 L 16.00 0.00 Q 21.00 0.00 22.04 4.89 L 26.96 28.11 Q 28.00 33.00 26.96 37.89 L 22.04 61.11 Q 21.00 66.00 16.00 66.00 L 12.00 66.00 Q 7.00 66.00 5.96 61.11 L 1.04 37.89 Q 0.00 33.00 1.04 28.11 L 5.96 4.89 Z");
-    background: linear-gradient(90deg, #c0392b, #e67e22, #c0392b);
-    box-shadow: inset 0 2px 4px rgba(255,190,120,.4), 0 4px 10px rgba(120,30,10,.4);
+    background: linear-gradient(135deg, #F0B52B 0%, #D98200 50%, #B85A00 100%);
+    box-shadow: inset 0 2px 4px rgba(255,217,106,.5), 0 4px 10px rgba(111,47,0,.4);
     transform: scale(0.95, 0.39);
 }
 
 /* Order Now — merged into the honeycomb theme as its own small
-   hexagon button. Uses the same reddish-gold gradient as the site's
-   "Offers" promotional links elsewhere (#c0392b red into #e67e22
-   amber), not the plain copper the regular nav cells use — this is
-   the one cell meant to stand out as an action, not just a link. */
+   gold hexagon button, sized to sit naturally beside the strip. */
 .hc-cta {
     position: relative;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
-    gap: 0px;
+    gap: 3px;
     width: 56px; height: 68.5px;
-    padding: 0 3px;
+    padding: 9px 3px 8px;
     overflow: hidden;
     /* Exact half-scale of the regular nav cells' --hc-clip geometry —
        this is genuinely the SAME rendered size as one cell (which
        renders at 112x137 native, inside a 0.5-scale strip = 56x68.5),
        not just the same shape at an arbitrary bigger size. */
     clip-path: path("M 11.76 2.69 Q 14.00 0.00 17.50 0.00 L 38.50 0.00 Q 42.00 0.00 44.25 2.69 L 53.76 14.03 Q 56.00 16.72 53.85 19.47 L 46.79 28.48 Q 44.63 31.24 46.47 34.22 L 54.17 46.75 Q 56.00 49.73 53.91 52.54 L 44.10 65.70 Q 42.00 68.50 38.50 68.50 L 17.50 68.50 Q 14.00 68.50 11.91 65.70 L 2.10 52.54 Q 0.00 49.73 1.84 46.75 L 9.54 34.22 Q 11.37 31.24 9.21 28.48 L 2.16 19.47 Q 0.00 16.72 2.25 14.03 L 11.76 2.69 Z");
+    /* Reddish-gold — deliberately warmer/redder than the regular honey
+       cells (About, Offerings, etc.) so Order Now reads as the one
+       call-to-action in the row instead of blending in with the rest. */
     background:
-        radial-gradient(120% 90% at 22% 8%, rgba(255,190,120,.45) 0%, rgba(255,190,120,0) 30%),
-        linear-gradient(150deg, #e67e22 0%, #d35400 45%, #c0392b 100%);
+        radial-gradient(120% 90% at 22% 8%, rgba(255,210,140,.6) 0%, rgba(255,210,140,0) 32%),
+        linear-gradient(135deg, #E8952A 0%, #D2551F 32%, #A32E12 68%, #6E1A0C 100%);
     box-shadow:
-        inset 0 3px 5px rgba(255,190,120,.35),
-        inset 0 -16px 22px rgba(80,15,5,.55),
-        inset 0 0 0 1px rgba(255,190,120,.16);
+        inset 0 3px 5px rgba(255,190,140,.32),
+        inset 0 -16px 22px rgba(35,8,0,.6),
+        inset 0 0 0 1px rgba(255,190,140,.14);
     backdrop-filter: blur(1.5px) saturate(140%);
     color: #fff3d6 !important;
     font-family: var(--font-accent);
@@ -714,6 +711,13 @@ ul { list-style: none; }
     transition: transform .35s cubic-bezier(0.34,1.56,0.64,1), filter .3s ease;
     flex-shrink: 0;
 }
+/* Icon and label get their own explicit sizes instead of inheriting
+   .hc-cta's tiny 7px font-size — that's what was making the leaf icon
+   and "Order/Now" text read as cramped/misplaced next to the other
+   cells' full-size 19px icons + bold labels. */
+.hc-cta i { font-size: 19px; line-height: 1; }
+.hc-cta span { font-size: 9px; font-weight: 700; line-height: 1.15; }
+
 /* glass sheen — same drifting highlight used on the other hexagons,
    swept faster on hover for a satisfying "polish" response */
 .hc-cta::before {
@@ -811,6 +815,26 @@ ul { list-style: none; }
     clip-path: path("M 45.545 5.83 Q 62.575 0.00 80.575 0.00 L 1032.575 0.00 Q 1050.575 0.00 1067.605 5.83 L 1113.15 51.375 L 1067.605 96.92 Q 1050.575 102.75 1032.575 102.75 L 80.575 102.75 Q 62.575 102.75 45.545 96.92 L 0.00 51.375 Z");
     background: linear-gradient(135deg, #8F4000 0%, #6F2F00 60%, #5C2600 100%);
     box-shadow: inset 0 8px 14px rgba(30,10,0,.4), inset 0 -3px 8px rgba(255,180,60,.06), 0 16px 26px -8px rgba(70,30,0,.5);
+}
+
+/* ================================================================
+   HOMEPAGE BACKGROUND HEXAGON — desktop & tablet only
+   .hc-strip-bg's left/transform are normally computed at runtime by
+   fitStripBg() in script.js. For the homepage's 8-cell row that JS
+   result sits too far left (its point pokes out past the About
+   cell's own tip) and doesn't reach far enough right. These
+   !important rules pin it to fixed values instead, scoped to the
+   homepage only (.navbar:not(.navbar-app) — app pages use their own
+   static .hc-strip--cells5 rule above) and to 768px+ so mobile
+   (which doesn't use this honeycomb nav on the homepage at all) is
+   completely unaffected.
+================================================================ */
+@media (min-width: 768px) {
+    .navbar:not(.navbar-app) .hc-strip-bg {
+        left: 24px !important;
+        transform: scaleX(1.03) !important;
+        transform-origin: left center !important;
+    }
 }
 
 /* small gold hexagon connectors bridging the notch between each pair of cells */
