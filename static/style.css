@@ -873,7 +873,27 @@ ul { list-style: none; }
 }
 @media (min-width: 1200px) {
     .navbar-inner {
-        max-width: none;
+        max-width: 1750px;
+    }
+}
+@media (min-width: 1200px) {
+    .navbar:not(.navbar-app) .brand-icon {
+        width: 68px;
+        height: 68px;
+    }
+    .navbar:not(.navbar-app) .brand-name {
+        font-size: 2rem;
+    }
+    .navbar:not(.navbar-app) .brand-tagline {
+        font-size: 0.95rem;
+    }
+    .navbar:not(.navbar-app) .brand-subtag {
+        font-size: 0.72rem;
+    }
+    .navbar:not(.navbar-app) .brand-flag,
+    .navbar:not(.navbar-app) .nav-nepal-flag {
+        width: 58px;
+        height: 80px;
     }
 }
 /* small gold hexagon connectors bridging the notch between each pair of cells */
