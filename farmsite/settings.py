@@ -83,6 +83,24 @@ ADMIN_EMAIL = 'anganbaari@gmail.com'
 TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
 TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
 
+# ImageKit (image storage/CDN)
+IMAGEKIT_PUBLIC_KEY = os.getenv('IMAGEKIT_PUBLIC_KEY')
+IMAGEKIT_PRIVATE_KEY = os.getenv('IMAGEKIT_PRIVATE_KEY')
+IMAGEKIT_URL_ENDPOINT = os.getenv('IMAGEKIT_URL_ENDPOINT')
+
+# --- Storage backend: use ONE of the two blocks below, not both ---
+# Run `python -m django --version` in a Bash console to check yours.
+
+# OPTION A — Django 4.2 or newer:
+STORAGES = {
+    "default": {
+        "BACKEND": "shop.imagekit_storage.ImageKitStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+    },
+}
+
 # Auth settings
 LOGIN_URL = '/account/login/'
 LOGIN_REDIRECT_URL = '/shop/'
