@@ -686,7 +686,7 @@
             <div class="product-images">
                 <div class="main-image" id="mainImage" onclick="openLightbox()">
                     {% if product.main_image %}
-                        <img src="{% static product.main_image %}" alt="{{ product.name }}" id="mainImg">
+                        <img src="{{ product.main_image.url }}" alt="{{ product.name }}" id="mainImg">
                     {% else %}
                         <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;">
                             <i class="fas fa-seedling" style="font-size:4rem;color:var(--sage);"></i>
@@ -696,23 +696,23 @@
                 </div>
                 <div class="thumb-grid" id="thumbRow">
                     {% if product.main_image %}
-                    <div class="thumb active" onclick="changeImage(event, '{% static product.main_image %}', this)">
-                        <img src="{% static product.main_image %}" alt="{{ product.name }}">
+                    <div class="thumb active" onclick="changeImage(event, '{{ product.main_image.url }}', this)">
+                        <img src="{{ product.main_image.url }}" alt="{{ product.name }}">
                     </div>
                     {% endif %}
                     {% if product.image2 %}
-                    <div class="thumb" onclick="changeImage(event, '{% static product.image2 %}', this)">
-                        <img src="{% static product.image2 %}" alt="{{ product.name }}">
+                    <div class="thumb" onclick="changeImage(event, '{{ product.image2.url }}', this)">
+                        <img src="{{ product.image2.url }}" alt="{{ product.name }}">
                     </div>
                     {% endif %}
                     {% if product.image3 %}
-                    <div class="thumb" onclick="changeImage(event, '{% static product.image3 %}', this)">
-                        <img src="{% static product.image3 %}" alt="{{ product.name }}">
+                    <div class="thumb" onclick="changeImage(event, '{{ product.image3.url }}', this)">
+                        <img src="{{ product.image3.url }}" alt="{{ product.name }}">
                     </div>
                     {% endif %}
                     {% if product.image4 %}
-                    <div class="thumb" onclick="changeImage(event, '{% static product.image4 %}', this)">
-                        <img src="{% static product.image4 %}" alt="{{ product.name }}">
+                    <div class="thumb" onclick="changeImage(event, '{{ product.image4.url }}', this)">
+                        <img src="{{ product.image4.url }}" alt="{{ product.name }}">
                     </div>
                     {% endif %}
                 </div>
@@ -1022,7 +1022,7 @@
                 <a href="{{ related.get_absolute_url }}" class="related-card">
                     <div class="related-img">
                         {% if related.main_image %}
-                        <img src="{% static related.main_image %}" alt="{{ related.name }}">
+                        <img src="{{ related.main_image.url }}" alt="{{ related.name }}">
                         {% else %}
                         <div style="width:100%;height:100%;background:var(--mist);display:flex;align-items:center;justify-content:center;">
                             <i class="fas fa-seedling" style="font-size:2rem;color:var(--sage);"></i>
@@ -1236,10 +1236,10 @@
 
         /* ---------------- Gallery + lightbox ---------------- */
         const images = [
-            {% if product.main_image %}"{% static product.main_image %}",{% endif %}
-            {% if product.image2 %}"{% static product.image2 %}",{% endif %}
-            {% if product.image3 %}"{% static product.image3 %}",{% endif %}
-            {% if product.image4 %}"{% static product.image4 %}",{% endif %}
+            {% if product.main_image %}"{{ product.main_image.url }}",{% endif %}
+            {% if product.image2 %}"{{ product.image2.url }}",{% endif %}
+            {% if product.image3 %}"{{ product.image3.url }}",{% endif %}
+            {% if product.image4 %}"{{ product.image4.url }}",{% endif %}
         ];
         let currentIndex = 0;
 

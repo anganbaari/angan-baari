@@ -255,7 +255,7 @@
                 <div class="cart-item" id="cart-item-{{ item.id }}" data-id="{{ item.id }}" data-price="{{ item.price }}" data-mode="{{ item.pricing_mode|default:'fixed_quantity' }}" data-weight="{{ item.weight|default:'' }}" data-step="{{ item.weight_step|default:'0.50' }}" data-unit="{{ item.weight_unit_label|default:'kg' }}">
                     <div class="cart-item-img">
                         {% if item.image %}
-                        <img src="{% static item.image %}" alt="{{ item.name }}">
+                        <img src="{{ item.image }}" alt="{{ item.name }}">
                         {% else %}
                         <div class="img-fallback"><i class="fas fa-seedling"></i></div>
                         {% endif %}
@@ -351,7 +351,7 @@
                 {% for item in saved_items %}
                 <div class="saved-card" id="saved-card-{{ item.id }}" data-id="{{ item.id }}" data-price="{{ item.price }}">
                     <div class="saved-card-img">
-                        {% if item.image %}<img src="{% static item.image %}" alt="{{ item.name }}">{% endif %}
+                        {% if item.image %}<img src="{{ item.image }}" alt="{{ item.name }}">{% endif %}
                         <button type="button" class="btn-remove-saved" data-action="remove-saved" title="Remove"><i class="fas fa-times"></i></button>
                     </div>
                     <div class="saved-card-body">
@@ -374,7 +374,7 @@
                 {% for item in wishlist_items %}
                 <div class="saved-card" id="wishlist-card-{{ item.product.id }}" data-id="{{ item.product.id }}">
                     <div class="saved-card-img">
-                        {% if item.product.main_image %}<img src="{% static item.product.main_image %}" alt="{{ item.product.name }}">{% endif %}
+                        {% if item.product.main_image %}<img src="{{ item.product.main_image.url }}" alt="{{ item.product.name }}">{% endif %}
                         <button type="button" class="btn-remove-saved" data-action="remove-wishlist" title="Remove"><i class="fas fa-times"></i></button>
                     </div>
                     <div class="saved-card-body">
@@ -387,7 +387,7 @@
                                 data-name="{{ item.product.name }}"
                                 data-price="{{ item.product.price }}"
                                 data-unit="{{ item.product.price_unit }}"
-                                data-image="{{ item.product.main_image }}">
+                                data-image="{{ item.product.main_image.url }}">
                                 <i class="fas fa-cart-plus"></i> Add to Cart
                             </button>
                         </div>
@@ -407,7 +407,7 @@
                 <div class="reco-card">
                     <a href="{{ product.get_absolute_url }}" class="reco-card-img">
                         {% if product.main_image %}
-                        <img src="{% static product.main_image %}" alt="{{ product.name }}">
+                        <img src="{{ product.main_image.url }}" alt="{{ product.name }}">
                         {% endif %}
                     </a>
                     <div class="reco-card-body">
@@ -419,7 +419,7 @@
                             data-name="{{ product.name }}"
                             data-price="{{ product.price }}"
                             data-unit="{{ product.price_unit }}"
-                            data-image="{{ product.main_image }}">
+                            data-image="{{ product.main_image.url }}">
                             Add to Cart
                         </button>
                     </div>
@@ -645,7 +645,7 @@
             wrap.dataset.step = item.weight_step || '0.50';
             wrap.dataset.unit = item.weight_unit_label || 'kg';
             const imgHtml = item.image
-                ? `<img src="/static/${item.image}" alt="${item.name}">`
+                ? `<img src="${item.image}" alt="${item.name}">`
                 : `<div class="img-fallback"><i class="fas fa-seedling"></i></div>`;
             wrap.innerHTML = `
                 <div class="cart-item-img">${imgHtml}</div>
@@ -684,7 +684,7 @@
             card.id = 'saved-card-' + item.id;
             card.dataset.id = item.id;
             card.dataset.price = item.price;
-            const imgHtml = item.image ? `<img src="/static/${item.image}" alt="${item.name}">` : '';
+            const imgHtml = item.image ? `<img src="${item.image}" alt="${item.name}">` : '';
             card.innerHTML = `
                 <div class="saved-card-img">${imgHtml}<button type="button" class="btn-remove-saved" data-action="remove-saved" title="Remove"><i class="fas fa-times"></i></button></div>
                 <div class="saved-card-body">

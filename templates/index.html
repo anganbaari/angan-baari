@@ -1047,7 +1047,7 @@
                                         <div class="ring-card-inner">
                                             <div class="ring-card-img">
                                                 {% if product.main_image %}
-                                                <img src="{% static product.main_image %}" alt="{{ product.name }}" loading="lazy">
+                                                <img src="{{ product.main_image.url }}" alt="{{ product.name }}" loading="lazy">
                                                 {% else %}
                                                 <i class="fas fa-seedling"></i>
                                                 {% endif %}
@@ -1077,7 +1077,7 @@
                                         <div class="ring-card-inner">
                                             <div class="ring-card-img">
                                                 {% if product.main_image %}
-                                                <img src="{% static product.main_image %}" alt="{{ product.name }}" loading="lazy">
+                                                <img src="{{ product.main_image.url }}" alt="{{ product.name }}" loading="lazy">
                                                 {% else %}
                                                 <i class="fas fa-seedling"></i>
                                                 {% endif %}

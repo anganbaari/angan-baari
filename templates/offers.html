@@ -710,7 +710,7 @@
                 <div class="discount-ribbon">-{{ offer.discount_percent }}%</div>
                 <div class="offer-card-img">
                     {% if offer.main_image %}
-                    <img src="{% static offer.main_image %}" alt="{{ offer.name }}" loading="lazy">
+                    <img src="{{ offer.main_image.url }}" alt="{{ offer.name }}" loading="lazy">
                     {% else %}
                     <div class="no-img">
                         <i class="fas fa-seedling"></i>
