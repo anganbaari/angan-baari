@@ -1,5 +1,6 @@
 from django.db import models
 import uuid
+from .imagekit_storage import ImageKitStorage
 
 
 class Category(models.Model):
@@ -42,10 +43,10 @@ class Product(models.Model):
     season = models.CharField(max_length=100, blank=True)
     farming_method = models.CharField(max_length=200, blank=True)
     is_available = models.BooleanField(default=True)
-    main_image = models.CharField(max_length=200, blank=True)
-    image2 = models.CharField(max_length=200, blank=True)
-    image3 = models.CharField(max_length=200, blank=True)
-    image4 = models.CharField(max_length=200, blank=True)
+    main_image = models.ImageField(storage=ImageKitStorage(), upload_to='products/', blank=True)
+    image2 = models.ImageField(storage=ImageKitStorage(), upload_to='products/', blank=True)
+    image3 = models.ImageField(storage=ImageKitStorage(), upload_to='products/', blank=True)
+    image4 = models.ImageField(storage=ImageKitStorage(), upload_to='products/', blank=True)
     whatsapp_message = models.CharField(max_length=500, blank=True)
     price = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     price_unit = models.CharField(max_length=50, blank=True, default='per kg')
@@ -293,7 +294,7 @@ class Offer(models.Model):
     start_date = models.DateTimeField()
     end_date = models.DateTimeField()
     is_active = models.BooleanField(default=True)
-    banner_image = models.CharField(max_length=200, blank=True, help_text='Optional banner image path')
+    banner_image = models.ImageField(storage=ImageKitStorage(), upload_to='offers/', blank=True, help_text='Optional banner image')
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
