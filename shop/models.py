@@ -422,3 +422,98 @@ class Coupon(models.Model):
         else:
             discount = self.discount_value
         return min(discount, subtotal)
+class InventoryMovement(models.Model):
+    """A single stock change for a product — the append-only ledger that
+    inventory is derived from, instead of one editable 'stock' number.
+    Current stock is always the sum of this table's rows for a product
+    (or one specific variant, for fixed-weight animals), so every change —
+    a harvest coming in, a sale going out, spoiled produce — stays visible
+    and auditable instead of collapsing into a single overwritten figure.
+
+    Quantity is always entered as a POSITIVE number, in whatever unit the
+    product already uses (kg for variable-weight, pieces for fixed-quantity,
+    or the variant's own weight for a fixed-weight animal). The movement
+    type below fixes the direction, so there's no sign-entry mistake."""
+
+    MOVEMENT_TYPE_CHOICES = [
+        ('harvest', 'Harvest — new stock in from the farm'),
+        ('sale', 'Sale — stock out, sold (website order or shop POS)'),
+        ('waste', 'Waste — spoiled/bad stock, not sellable'),
+        ('return', 'Return — stock back in, e.g. a cancelled order'),
+        ('adjustment_add', 'Adjustment (add) — stock count found higher than recorded'),
+        ('adjustment_remove', 'Adjustment (remove) — stock count found lower than recorded'),
+    ]
+
+    SOURCE_CHOICES = [
+        ('admin', 'Entered manually in Django admin'),
+        ('abms', 'Pushed from ABMS (farm app)'),
+        ('website', 'Website order'),
+        ('pos', 'Shop POS'),
+    ]
+
+    # Movement types that ADD to stock; every other type subtracts.
+    INCREASE_TYPES = {'harvest', 'return', 'adjustment_add'}
+
+    product = models.ForeignKey(
+        'Product', on_delete=models.CASCADE, related_name='inventory_movements'
+    )
+    variant = models.ForeignKey(
+        'ProductVariant', null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='inventory_movements',
+        help_text='Only used for "Fixed weight" products (goat/chicken) — which '
+                   'specific animal this movement is about. Left blank for every '
+                   'other pricing mode.'
+    )
+    movement_type = models.CharField(max_length=20, choices=MOVEMENT_TYPE_CHOICES)
+    source = models.CharField(max_length=20, choices=SOURCE_CHOICES, default='admin')
+    quantity = models.DecimalField(
+        max_digits=8, decimal_places=2,
+        help_text='Always a POSITIVE number, in the product\'s own unit. The '
+                   'movement type above decides whether it adds to or removes '
+                   'from stock — you never need to enter a minus sign.'
+    )
+    related_order = models.ForeignKey(
+        'ProductOrder', null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='inventory_movements',
+        help_text='Only set for "sale"/"return" movements that came from a website order.'
+    )
+    note = models.CharField(
+        max_length=300, blank=True,
+        help_text='e.g. "rain damage", "sold to walk-in customer at farm shop"'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        sign = '+' if self.movement_type in self.INCREASE_TYPES else '\u2212'
+        return f"{sign}{self.quantity} {self.product.name} ({self.get_movement_type_display()})"
+
+    def signed_quantity(self):
+        """Quantity as it actually applies to stock: positive for
+        harvest/return/adjustment_add, negative for everything else."""
+        from decimal import Decimal
+        qty = Decimal(str(self.quantity))
+        return qty if self.movement_type in self.INCREASE_TYPES else -qty
+
+    def clean(self):
+        """Goats/chickens are individual, differently-weighted animals sold
+        live (not butchered/by weight) — each is tracked one at a time, so
+        every movement on a 'fixed_weight' product must be exactly 1
+        (one animal), regardless of that animal's own weight."""
+        from django.core.exceptions import ValidationError
+        if self.product_id and self.product.pricing_mode == 'fixed_weight' and self.quantity != 1:
+            raise ValidationError({
+                'quantity': 'Fixed-weight products (goat/chicken) are tracked one '
+                            'animal at a time — quantity must be 1 for these movements.'
+            })
+
+    @classmethod
+    def current_stock(cls, product, variant=None):
+        """Current stock for a product, or for one specific variant
+        (fixed-weight animals) — derived from the ledger, never stored
+        directly. Pass variant=None for products with no variants."""
+        from decimal import Decimal
+        qs = cls.objects.filter(product=product, variant=variant)
+        return sum((m.signed_quantity() for m in qs), Decimal('0'))    
