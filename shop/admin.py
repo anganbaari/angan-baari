@@ -231,3 +231,18 @@ class CouponAdmin(admin.ModelAdmin):
     def live_status(self, obj):
         return '🟢 Live' if obj.is_live() else '🔴 Not Live'
     live_status.short_description = 'Status'
+@admin.register(InventoryMovement)
+class InventoryMovementAdmin(admin.ModelAdmin):
+    list_display = ['created_at', 'product', 'variant', 'movement_type', 'change_display', 'source', 'related_order']
+    list_filter = ['movement_type', 'source', 'created_at']
+    search_fields = ['product__name', 'note', 'related_order__order_number']
+    autocomplete_fields = ['product']
+    date_hierarchy = 'created_at'
+    ordering = ['-created_at']
+    readonly_fields = ['created_at']
+    list_select_related = ['product', 'variant', 'related_order']
+
+    def change_display(self, obj):
+        sign = '+' if obj.movement_type in obj.INCREASE_TYPES else '\u2212'
+        return f'{sign}{obj.quantity}'
+    change_display.short_description = 'Change'    
