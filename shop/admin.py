@@ -7,7 +7,7 @@ from django.utils.html import escape
 from .models import ContactMessage, ProductOrder, NewsletterSubscriber, Product, Review, Category
 from .models import Offer, Coupon, BundleItem, ProductVariant
 from .emails import send_newsletter_campaign
-
+from .models import InventoryMovement 
 
 @admin.register(Category)
 class CategoryAdmin(admin.ModelAdmin):
