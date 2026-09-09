@@ -7,7 +7,8 @@ from django.utils.html import escape
 from .models import ContactMessage, ProductOrder, NewsletterSubscriber, Product, Review, Category
 from .models import Offer, Coupon, BundleItem, ProductVariant
 from .emails import send_newsletter_campaign
-from .models import InventoryMovement 
+from .models import InventoryMovement
+
 
 @admin.register(Category)
 class CategoryAdmin(admin.ModelAdmin):
@@ -30,7 +31,7 @@ class ProductVariantInline(admin.TabularInline):
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
-    list_display = ['name', 'category', 'price', 'price_unit', 'pricing_mode', 'weight_step', 'is_available', 'season']
+    list_display = ['name', 'category', 'price', 'price_unit', 'pricing_mode', 'weight_step', 'is_available', 'season', 'current_stock_display']
     list_filter = ['category', 'is_available', 'pricing_mode']
     list_editable = ['is_available', 'price', 'price_unit']
     prepopulated_fields = {'slug': ('name',)}
@@ -62,6 +63,18 @@ class ProductAdmin(admin.ModelAdmin):
             'fields': ('is_available',)
         }),
     )
+
+    def current_stock_display(self, obj):
+        if obj.pricing_mode == 'fixed_weight':
+            variants = obj.variants.all()
+            if not variants:
+                return '\u2014'
+            available = sum(1 for v in variants if InventoryMovement.current_stock(obj, variant=v) > 0)
+            return f'{available}/{variants.count()} animals available'
+        stock = InventoryMovement.current_stock(obj)
+        unit = obj.weight_unit_label if obj.pricing_mode == 'variable_weight' else 'pcs'
+        return f'{stock} {unit}'
+    current_stock_display.short_description = 'Current stock'
 
 
 @admin.register(ContactMessage)
@@ -190,6 +203,7 @@ class ReviewAdmin(admin.ModelAdmin):
     search_fields = ('name', 'comment', 'product__name')
     ordering = ('-created_at',)
 
+
 class BundleItemInline(admin.TabularInline):
     model = BundleItem
     extra = 1
@@ -231,6 +245,8 @@ class CouponAdmin(admin.ModelAdmin):
     def live_status(self, obj):
         return '🟢 Live' if obj.is_live() else '🔴 Not Live'
     live_status.short_description = 'Status'
+
+
 @admin.register(InventoryMovement)
 class InventoryMovementAdmin(admin.ModelAdmin):
     list_display = ['created_at', 'product', 'variant', 'movement_type', 'change_display', 'source', 'related_order']
@@ -245,4 +261,4 @@ class InventoryMovementAdmin(admin.ModelAdmin):
     def change_display(self, obj):
         sign = '+' if obj.movement_type in obj.INCREASE_TYPES else '\u2212'
         return f'{sign}{obj.quantity}'
-    change_display.short_description = 'Change'    
+    change_display.short_description = 'Change'
