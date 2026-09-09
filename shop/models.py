@@ -498,16 +498,33 @@ class InventoryMovement(models.Model):
         return qty if self.movement_type in self.INCREASE_TYPES else -qty
 
     def clean(self):
-        """Goats/chickens are individual, differently-weighted animals sold
-        live (not butchered/by weight) — each is tracked one at a time, so
-        every movement on a 'fixed_weight' product must be exactly 1
-        (one animal), regardless of that animal's own weight."""
+        """Two checks before a movement is allowed to save:
+        1. Fixed-weight products (goat/chicken) are individual animals sold
+           live, not butchered/by weight — every movement on one must be
+           exactly 1, regardless of that animal's own weight.
+        2. Stock can never go negative — a sale/waste/adjustment_remove
+           can't remove more than is actually available for that exact
+           product+variant right now (this is what stops the same animal,
+           or the same kg of produce, from being "sold" twice)."""
         from django.core.exceptions import ValidationError
+        from decimal import Decimal
+
         if self.product_id and self.product.pricing_mode == 'fixed_weight' and self.quantity != 1:
             raise ValidationError({
                 'quantity': 'Fixed-weight products (goat/chicken) are tracked one '
                             'animal at a time — quantity must be 1 for these movements.'
             })
+
+        if self.product_id and self.movement_type not in self.INCREASE_TYPES:
+            existing = InventoryMovement.objects.filter(product=self.product, variant=self.variant)
+            if self.pk:
+                existing = existing.exclude(pk=self.pk)
+            available = sum((m.signed_quantity() for m in existing), Decimal('0'))
+            if available - Decimal(str(self.quantity)) < 0:
+                raise ValidationError({
+                    'quantity': f'Not enough stock — only {available} currently available '
+                                f'for this product/variant, cannot remove {self.quantity}.'
+                })
 
     @classmethod
     def current_stock(cls, product, variant=None):
@@ -516,4 +533,4 @@ class InventoryMovement(models.Model):
         directly. Pass variant=None for products with no variants."""
         from decimal import Decimal
         qs = cls.objects.filter(product=product, variant=variant)
-        return sum((m.signed_quantity() for m in qs), Decimal('0'))    
+        return sum((m.signed_quantity() for m in qs), Decimal('0'))
