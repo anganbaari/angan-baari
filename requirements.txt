@@ -5,6 +5,7 @@ certifi==2026.5.20
 charset-normalizer==3.4.7
 distro==1.9.0
 Django==5.2.2
+django-cors-headers==4.9.0
 django-sitemaps==2.0.2
 djangorestframework==3.18.1
 gunicorn==26.0.0
