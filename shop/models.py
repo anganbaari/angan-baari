@@ -52,6 +52,18 @@ class Product(models.Model):
     price_unit = models.CharField(max_length=50, blank=True, default='per kg')
     created_at = models.DateTimeField(auto_now_add=True)
 
+    ORIGIN_CHOICES = [
+        ('farm', 'Grown/Raised on our farm'),
+        ('sourced', 'Sourced from other Nepali producers'),
+    ]
+    origin = models.CharField(
+        max_length=10, choices=ORIGIN_CHOICES, default='farm',
+        help_text='Controls the "Our Farm" / "Sourced in Nepal" label shown on the '
+                   'shop and product pages. Defaults to farm-grown — flip individual '
+                   'products (e.g. Apple, Kiwi) to "sourced" if they aren\'t actually '
+                   'grown here.'
+    )
+
     PRICING_MODE_CHOICES = [
         ('variable_weight', 'Variable weight — customer picks the weight (fruits, loose pickle)'),
         ('fixed_quantity', 'Fixed quantity — sold per piece/dozen/jar, no weight (banana, jars)'),

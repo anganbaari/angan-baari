@@ -31,9 +31,10 @@ class ProductVariantInline(admin.TabularInline):
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
-    list_display = ['name', 'category', 'price', 'price_unit', 'pricing_mode', 'weight_step', 'is_available', 'season', 'current_stock_display']
-    list_filter = ['category', 'is_available', 'pricing_mode']
-    list_editable = ['is_available', 'price', 'price_unit']
+    list_display = ['name', 'category', 'price', 'price_unit', 'pricing_mode',
+                     'weight_step', 'is_available', 'season', 'current_stock_display', 'origin']
+    list_filter = ['category', 'is_available', 'pricing_mode', 'origin']
+    list_editable = ['is_available', 'price', 'price_unit', 'origin']
     prepopulated_fields = {'slug': ('name',)}
     search_fields = ['name']
     inlines = [ProductVariantInline]
@@ -60,7 +61,7 @@ class ProductAdmin(admin.ModelAdmin):
             'fields': ('main_image', 'image2', 'image3', 'image4', 'season', 'farming_method', 'whatsapp_message')
         }),
         ('Availability', {
-            'fields': ('is_available',)
+            'fields': ('is_available', 'origin')
         }),
     )
 
