@@ -348,18 +348,19 @@
             padding: 6px 8px; margin-bottom: 8px; cursor: pointer;
         }
         .card-variant-select:focus { outline: none; border-color: #8fa88a; }
-        .p-organic-badge {
+        .p-badges-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+        .p-organic-badge, .p-origin-badge {
             display: inline-flex;
             align-items: center;
             gap: 4px;
             font-size: 0.66rem;
-            color: #4a7c59;
-            background: rgba(74,124,89,0.1);
             padding: 2px 7px;
             border-radius: 50px;
-            margin-bottom: 8px;
             width: fit-content;
         }
+        .p-organic-badge { color: #4a7c59; background: rgba(74,124,89,0.1); }
+        .p-origin-farm { color: #4a7c59; background: rgba(74,124,89,0.1); }
+        .p-origin-sourced { color: #b5762e; background: rgba(181,118,46,0.12); }
         .p-card-actions { display: flex; gap: 6px; margin-top: auto; }
         .btn-detail {
             flex: 1;
@@ -829,7 +830,14 @@
                         {% else %}
                         <div class="p-price-tbd">Price on request</div>
                         {% endif %}
-                        <span class="p-organic-badge"><i class="fas fa-leaf"></i> Organic</span>
+                        <div class="p-badges-row">
+                            <span class="p-organic-badge"><i class="fas fa-leaf"></i> Organic</span>
+                            {% if product.origin == 'farm' %}
+                            <span class="p-origin-badge p-origin-farm"><i class="fas fa-tractor"></i> Our Farm</span>
+                            {% else %}
+                            <span class="p-origin-badge p-origin-sourced"><i class="fas fa-map-marker-alt"></i> Sourced</span>
+                            {% endif %}
+                        </div>
                         {% if product.pricing_mode == "fixed_weight" and product.variant_count > 1 %}
                         <select class="card-variant-select" onclick="event.stopPropagation()" data-product-id="{{ product.id }}">
                             {% for v in product.available_variants %}

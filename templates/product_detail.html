@@ -167,7 +167,7 @@
             margin-bottom: 16px;
         }
         .product-badges { display: flex; gap: 8px; flex-wrap: wrap; }
-        .badge-season, .badge-available, .badge-unavailable, .badge-discount {
+        .badge-season, .badge-available, .badge-unavailable, .badge-discount, .badge-origin-farm, .badge-origin-sourced {
             font-size: 0.72rem;
             font-family: var(--font-accent, 'DM Sans');
             letter-spacing: 0.08em;
@@ -183,6 +183,8 @@
         .badge-available { background: rgba(74,124,89,0.14); color: var(--moss); }
         .badge-unavailable { background: rgba(180,50,50,0.1); color: #c0392b; }
         .badge-discount { background: var(--terai-clay); color: white; }
+        .badge-origin-farm { background: rgba(74,124,89,0.14); color: var(--moss); }
+        .badge-origin-sourced { background: rgba(181,118,46,0.14); color: #b5762e; }
 
         .wishlist-btn {
             width: 42px; height: 42px;
@@ -723,6 +725,11 @@
             <div class="product-info">
                 <div class="info-top-row">
                     <div class="product-badges">
+                        {% if product.origin == 'farm' %}
+                        <span class="badge-origin-farm"><i class="fas fa-tractor"></i> Grown on Our Farm</span>
+                        {% else %}
+                        <span class="badge-origin-sourced"><i class="fas fa-map-marker-alt"></i> Sourced in Nepal</span>
+                        {% endif %}
                         {% if product.season %}
                         <span class="badge-season"><i class="fas fa-calendar-alt"></i> {{ product.season }}</span>
                         {% endif %}
