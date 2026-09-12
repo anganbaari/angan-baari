@@ -387,7 +387,7 @@
                                 data-name="{{ item.product.name }}"
                                 data-price="{{ item.product.price }}"
                                 data-unit="{{ item.product.price_unit }}"
-                                data-image="{{ item.product.main_image.url }}">
+                                data-image="{% if item.product.main_image %}{{ item.product.main_image.url }}{% endif %}">
                                 <i class="fas fa-cart-plus"></i> Add to Cart
                             </button>
                         </div>
@@ -419,7 +419,7 @@
                             data-name="{{ product.name }}"
                             data-price="{{ product.price }}"
                             data-unit="{{ product.price_unit }}"
-                            data-image="{{ product.main_image.url }}">
+                            data-image="{% if product.main_image %}{{ product.main_image.url }}{% endif %}">
                             Add to Cart
                         </button>
                     </div>
