@@ -107,11 +107,14 @@
 
         /* ══════════════════════════════════════════
            SIDEBAR (desktop only)
+           --sticky-offset is set by JS to the real, measured
+           navbar + search-bar height (see syncStickyOffsets), so this
+           stays pixel-perfect even if fonts/reflow change that height.
         ══════════════════════════════════════════ */
         .shop-sidebar {
             position: sticky;
-            top: 150px;
-            max-height: calc(100vh - 166px);
+            top: calc(var(--sticky-offset, 122px) + 10px);
+            max-height: calc(100vh - var(--sticky-offset, 122px) - 26px);
             overflow-y: auto;
         }
         .sidebar-box {
@@ -526,8 +529,7 @@
                and let the category sidebar sit flush at the top of the
                column, right under the search bar. Mobile is untouched. */
             .shop-banner { display: none !important; }
-            .shop-wrapper { padding-top: 12px; }
-            .shop-sidebar { top: 132px; max-height: calc(100vh - 148px); }
+            .shop-wrapper { padding-top: 8px; }
             .mobile-hc-nav { display: none !important; }
             .filter-trigger { display: none !important; }
         }
@@ -1111,6 +1113,10 @@
             stickySearchBar.style.top = navHeight + 'px';
             const barHeight = Math.ceil(stickySearchBar.getBoundingClientRect().height);
             document.body.style.paddingTop = (navHeight + barHeight) + 'px';
+            // Feed the real measured height to the category sidebar so its
+            // sticky "top" always lines up exactly under the search bar,
+            // on laptop/tablet, instead of relying on a guessed px value.
+            document.documentElement.style.setProperty('--sticky-offset', (navHeight + barHeight) + 'px');
         }
         syncStickyOffsets();
         window.addEventListener('resize', syncStickyOffsets);
