@@ -804,10 +804,10 @@
                         {% if not product.is_available %}
                         <span class="p-unavailable-badge">{% if product.season %}Out of Season{% else %}Out of Stock{% endif %}</span>
                         {% endif %}
-                        <button class="p-wish {% if product.id|stringformat:'s' in saved_ids %}wished{% endif %}"
-                                onclick="event.stopPropagation(); toggleSaveLater({{ product.id }}, this)"
+                        <button class="p-wish {% if product.id in wishlist_ids %}wished{% endif %}"
+                                onclick="event.stopPropagation(); toggleWishlist({{ product.id }}, this)"
                                 title="Save for later" data-id="{{ product.id }}">
-                            <i class="{% if product.id|stringformat:'s' in saved_ids %}fas{% else %}far{% endif %} fa-heart"></i>
+                            <i class="{% if product.id in wishlist_ids %}fas{% else %}far{% endif %} fa-heart"></i>
                         </button>
                     </div>
                     <div class="p-card-body">
@@ -976,7 +976,20 @@
                     'Content-Type': 'application/x-www-form-urlencoded',
                 },
                 body: params ? new URLSearchParams(params) : null,
-            }).then(res => res.json());
+            }).then(res => {
+                const isJson = (res.headers.get('content-type') || '').includes('application/json');
+                if (!res.ok || !isJson) {
+                    // A Django 500 page, or @login_required redirecting an
+                    // anonymous request to the login page, both come back as
+                    // HTML here rather than JSON — catch that before it
+                    // reaches res.json() and throws a confusing parse error.
+                    const err = new Error('Request failed');
+                    err.status = res.status;
+                    err.needsLogin = res.redirected || res.url.includes('/account/login/');
+                    throw err;
+                }
+                return res.json();
+            });
         }
 
         // ─── Cart badges (desktop nav, mobile header icon, bottom nav) ───
@@ -1027,7 +1040,8 @@
             });
         });
 
-        // Save for Later toggle
+        // Save for Later toggle (cart page use only — operates on an
+        // existing cart line's composite key, e.g. "14_1.50")
         function toggleSaveLater(productId, btn) {
             postJSON(`/cart/save-for-later/${productId}/`)
             .then(data => {
@@ -1044,6 +1058,36 @@
                 if (typeof data.cart_count === 'number') updateCartBadges(data.cart_count);
             })
             .catch(err => console.error('Save error:', err));
+        }
+
+        // Wishlist toggle (shop page) — a real product-level wishlist,
+        // separate from the cart's save-for-later above. Requires login,
+        // since Wishlist rows belong to a user account, not a session.
+        function toggleWishlist(productId, btn) {
+            postJSON(`/wishlist/toggle/${productId}/`)
+            .then(data => {
+                const icon = btn.querySelector('i');
+                if (data.is_saved) {
+                    btn.classList.add('wished');
+                    icon.classList.remove('far');
+                    icon.classList.add('fas');
+                    showShopToast('Saved to wishlist');
+                } else {
+                    btn.classList.remove('wished');
+                    icon.classList.remove('fas');
+                    icon.classList.add('far');
+                    showShopToast('Removed from wishlist');
+                }
+            })
+            .catch(err => {
+                if (err.needsLogin) {
+                    showShopToast('Please log in to save items to your wishlist');
+                    setTimeout(() => { window.location.href = '/account/login/?next=/shop/'; }, 1200);
+                } else {
+                    console.error('Wishlist error:', err);
+                    showShopToast('Something went wrong — please try again');
+                }
+            });
         }
 
         // Navbar always solid on shop page
