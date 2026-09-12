@@ -522,6 +522,12 @@
             .results-count { display: none; }
         }
         @media (min-width: 761px) {
+            /* Laptop & tablet only: drop the "Fresh From Our Farm" banner
+               and let the category sidebar sit flush at the top of the
+               column, right under the search bar. Mobile is untouched. */
+            .shop-banner { display: none !important; }
+            .shop-wrapper { padding-top: 12px; }
+            .shop-sidebar { top: 132px; max-height: calc(100vh - 148px); }
             .mobile-hc-nav { display: none !important; }
             .filter-trigger { display: none !important; }
         }
