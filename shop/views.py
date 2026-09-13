@@ -112,6 +112,7 @@ def cancel_order(request, token):
     if request.method == 'POST':
         order.status = 'cancelled'
         order.save()
+        create_order_inventory_movements(order, 'return')
         send_order_cancelled_email(order)
         return render(request, 'cancel.html', {
             'order': order,
@@ -557,6 +558,60 @@ def parse_line_key(line_key):
         return pid, weight_str
     return line_key, None
 
+def extract_variant_id(line_key):
+    """For fixed_weight cart lines, line_key looks like '{product_id}_v{variant_id}'
+    (see resolve_cart_line above). Returns the variant_id as int, or None for
+    every other line shape (variable_weight/fixed_quantity lines never have
+    a variant at all)."""
+    if '_v' in line_key:
+        try:
+            return int(line_key.rsplit('_v', 1)[1])
+        except (ValueError, IndexError):
+            return None
+    return None
+
+def create_order_inventory_movements(order, movement_type):
+    """Create one InventoryMovement per line in this order's cart_snapshot —
+    'sale' when an order is placed, 'return' when one is cancelled. Mirrors
+    the ABMS bridge's own rule: this must NEVER block the actual action
+    (placing or cancelling an order) — any problem here is silently skipped,
+    matching this file's existing email try/except pattern, not raised."""
+    from decimal import Decimal
+    from .models import Product, InventoryMovement
+    if not order.cart_snapshot:
+        return
+    for line in order.cart_snapshot:
+        try:
+            product = Product.objects.get(id=line.get('product_id'))
+            qty = int(line.get('qty', 0) or 0)
+            weight = line.get('weight')
+            variant_id = line.get('variant_id')
+            variant = None
+
+            if product.pricing_mode == 'fixed_weight':
+                quantity = Decimal('1')  # enforced shape — one animal per movement
+                if variant_id:
+                    variant = product.variants.filter(id=variant_id).first()
+            elif product.pricing_mode == 'variable_weight':
+                quantity = Decimal(str(qty)) * Decimal(str(weight or 0))
+            else:  # fixed_quantity
+                quantity = Decimal(str(qty))
+
+            if quantity <= 0:
+                continue
+
+            InventoryMovement.objects.create(
+                product=product,
+                variant=variant,
+                movement_type=movement_type,
+                source='website',
+                quantity=quantity,
+                related_order=order,
+                note=f"Order {order.order_number}",
+            )
+        except Exception:
+            continue
+
 def line_subtotal(item):
     try:
         if not isinstance(item, dict):
@@ -955,6 +1010,7 @@ def checkout(request):
                 'product_id': i.get('product_id'),
                 'weight': i.get('weight'),
                 'qty': i.get('qty'),
+                'variant_id': extract_variant_id(i.get('id', '')),
             }
             for i in items if i.get('product_id')
         ]
@@ -968,6 +1024,8 @@ def checkout(request):
             message=message,
             cart_snapshot=cart_snapshot,
         )
+
+        create_order_inventory_movements(order, 'sale')
 
         if coupon_applied and coupon_obj:
             coupon_obj.used_count += 1
