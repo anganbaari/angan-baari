@@ -118,132 +118,69 @@
 
         /* ══════════════════════════════════════════
            MOBILE / TABLET BOTTOM NAV
+           Same honeycomb chain as desktop exists in the markup below for
+           consistency with shop/cart, but hidden here — checkout's own
+           in-page "Place Order" button is the mobile CTA, same as cart.html.
         ══════════════════════════════════════════ */
-        .mobile-bottom-nav {
-            display: none;
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            z-index: 500;
-            background: #fff;
-            border-top: 1.5px solid #e8e2d8;
-            padding: 6px 0 env(safe-area-inset-bottom, 6px);
-            box-shadow: 0 -4px 20px rgba(0,0,0,0.08);
-        }
-        .mobile-bottom-nav .nav-items {
-            display: flex;
-            justify-content: space-around;
-            align-items: flex-end;
-            max-width: 600px;
-            margin: 0 auto;
-        }
-        .mobile-bottom-nav .nav-item {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 2px;
-            text-decoration: none;
-            color: #8a9e8e;
-            font-size: 0.6rem;
-            font-family: 'DM Sans', sans-serif;
-            font-weight: 500;
-            padding: 4px 12px;
-            border-radius: 10px;
-            transition: color 0.2s;
-            position: relative;
-            cursor: pointer;
-            background: none;
-            border: none;
-        }
-        .mobile-bottom-nav .nav-item i { font-size: 1.25rem; }
-        .mobile-bottom-nav .nav-item:hover,
-        .mobile-bottom-nav .nav-item.active { color: #2d5a3d; }
-        .mobile-bottom-nav .nav-item.home-btn {
-            background: #1a2f1e;
-            color: #c9a84c;
-            border-radius: 16px;
-            padding: 8px 20px;
-            margin-bottom: 6px;
-            box-shadow: 0 4px 16px rgba(26,47,30,0.35);
-        }
-        .mobile-bottom-nav .nav-item.home-btn i { color: #c9a84c; font-size: 1.3rem; }
-        .mobile-bottom-nav .nav-item.home-btn:hover { background: #2d5a3d; }
-        .mobile-bottom-nav .cart-badge {
-            position: absolute;
-            top: 0px;
-            right: 6px;
-            background: #c0392b;
-            color: #fff;
-            font-size: 0.58rem;
-            width: 16px;
-            height: 16px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 700;
-        }
-        .mobile-bottom-nav .offer-dot {
-            position: absolute;
-            top: 2px;
-            right: 8px;
-            width: 7px;
-            height: 7px;
-            border-radius: 50%;
-            background: #e67e22;
-            border: 1.5px solid #fff;
-        }
-        @media (min-width: 1025px) {
-            .mobile-bottom-nav { display: none !important; }
-        }
-        @media (max-width: 1024px) {
-            .mobile-bottom-nav { display: block; }
-            .checkout-page { margin-bottom: 90px; }
-        }
+        .mobile-hc-nav { display: none !important; }
     </style>
 </head>
 <body>
-    <header class="navbar scrolled">
+    {% csrf_token %}
+    <header class="navbar scrolled navbar-app" id="navbar" data-nav-mode="solid">
         <div class="navbar-inner">
             <a href="/" class="brand">
-                <span class="brand-icon"><i class="fas fa-seedling"></i></span>
+                <span class="brand-icon"><img src="https://ik.imagekit.io/anganbaari/angan-baari/site-images/logo-icon_0PorSdbpKy.png" alt="" width="84" height="84" loading="eager"></span>
                 <div class="brand-text">
                     <span class="brand-name">आँगन बारी</span>
                     <span class="brand-tagline">Angan Baari</span>
+                    <span class="brand-subtag">Organic Farm</span>
                 </div>
+                <span class="brand-flag" aria-hidden="true">
+                    <canvas id="navNepalFlag" class="nav-nepal-flag" width="450" height="600"></canvas>
+                </span>
             </a>
-            <nav class="desktop-nav">
-                <div class="nav-links">
-                    <!-- Shop -->
-                    <a href="{% url 'shop' %}" style="display:flex;align-items:center;gap:6px;padding:8px 14px;border-radius:50px;color:var(--gold);font-size:0.85rem;font-weight:500;">
-                        <i class="fas fa-store"></i> Shop
-                    </a>
-                    <!-- Cart -->
-                    <a href="{% url 'cart' %}" style="display:flex;align-items:center;gap:6px;padding:8px 16px;border-radius:50px;border:1.5px solid var(--gold);color:var(--gold);font-size:0.82rem;font-weight:500;position:relative;">
-                        <i class="fas fa-shopping-cart"></i> Cart
+            <nav class="desktop-nav" aria-label="Main Navigation">
+                <div class="hc-scale-box hc-scale-box--app5">
+                  <div class="hc-strip hc-strip--cells5">
+                    <div class="hc-strip-bg" aria-hidden="true"></div>
+                    <div class="hc-connector" style="left:108px" aria-hidden="true"></div>
+                    <div class="hc-connector" style="left:240px" aria-hidden="true"></div>
+                    <div class="hc-connector" style="left:372px" aria-hidden="true"></div>
+                    <div class="hc-connector" style="left:504px" aria-hidden="true"></div>
+
+                    <ul class="hc-nav" id="hcNavApp">
+                      <li class="hc-cell"><a class="hc-link" href="{% url 'shop' %}" data-target="shop-cell">
+                        <svg viewBox="0 0 24 24"><path d="M4.5 9h15l-1.4 10.2a2 2 0 01-2 1.8H7.9a2 2 0 01-2-1.8L4.5 9z"/><path d="M8.5 9V7a3.5 3.5 0 017 0v2"/></svg>
+                        <span class="hc-label">Shop</span><span class="hc-ping"></span></a></li>
+
+                      <li class="hc-cell"><a class="hc-link active" href="{% url 'cart' %}" data-target="cart-cell">
+                        <svg viewBox="0 0 24 24"><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2.5 3h2.4l2.1 11.2a2 2 0 002 1.6h8.6a2 2 0 002-1.6L21 7H6.2"/></svg>
+                        <span class="hc-label">Cart</span><span class="hc-ping"></span>
                         {% with total_qty=request.session.cart.values|length %}
-                        {% if total_qty > 0 %}<span style="position:absolute;top:-6px;right:-6px;background:#c0392b;color:white;font-size:0.65rem;width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;">{{ total_qty }}</span>{% endif %}
+                        <span id="cartBadgeDesktop" class="hc-cart-badge{% if total_qty == 0 %} badge-hidden{% endif %}">{{ total_qty }}</span>
                         {% endwith %}
-                    </a>
-                    <!-- Offers -->
-                    <a href="{% url 'offers' %}" class="offer-nav-link" style="display:flex;align-items:center;gap:5px;padding:8px 14px;border-radius:50px;background:#c0392b;color:white;font-size:0.8rem;font-weight:600;position:relative;">
-                        <i class="fas fa-fire offer-flame"></i> Offers
-                    </a>
-                    <!-- Login / Profile -->
-                    {% if user.is_authenticated %}
-                    <a href="{% url 'profile' %}" style="display:flex;align-items:center;gap:6px;padding:8px 16px;border-radius:50px;background:var(--moss);color:white;font-size:0.82rem;font-weight:500;">
-                        <i class="fas fa-user-circle"></i> {{ user.first_name }}
-                    </a>
-                    {% else %}
-                    <a href="{% url 'login' %}" style="display:flex;align-items:center;gap:6px;padding:8px 16px;border-radius:50px;border:1.5px solid var(--moss);color:var(--moss);font-size:0.82rem;font-weight:500;">
-                        <i class="fas fa-user-circle"></i> Login
-                    </a>
-                    {% endif %}
-                    <!-- Website -->
-                    <a href="/" style="display:flex;align-items:center;gap:6px;padding:8px 16px;border-radius:50px;color:var(--moss);font-size:0.82rem;font-weight:500;">
-                        <i class="fas fa-globe"></i> Website
-                    </a>
+                      </a></li>
+
+                      <li class="hc-cell hc-cell--offer"><a class="hc-link" href="{% url 'offers' %}" data-target="offers-cell">
+                        <svg class="offer-flame" viewBox="0 0 24 24"><path d="M12 2c2 3 5 6 5 10a5 5 0 01-10 0c0-1.8.8-3 1.6-4-.1 1.6 1 2.3 1.7 1.2C9.6 7 10 4 12 2z"/></svg>
+                        <span class="hc-label">Offers</span><span class="hc-ping"></span></a></li>
+
+                      {% if user.is_authenticated %}
+                      <li class="hc-cell"><a class="hc-link" href="{% url 'profile' %}" data-target="profile-cell">
+                        <svg viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.5"/><path d="M4.5 20c0-4 3.4-7 7.5-7s7.5 3 7.5 7"/></svg>
+                        <span class="hc-label">{{ user.first_name }}</span><span class="hc-ping"></span></a></li>
+                      {% else %}
+                      <li class="hc-cell"><a class="hc-link" href="{% url 'login' %}" data-target="login-cell">
+                        <svg viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.5"/><path d="M4.5 20c0-4 3.4-7 7.5-7s7.5 3 7.5 7"/></svg>
+                        <span class="hc-label">Login</span><span class="hc-ping"></span></a></li>
+                      {% endif %}
+
+                      <li class="hc-cell"><a class="hc-link" href="/" data-target="website-cell">
+                        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.7 3.8 6 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-6-3.8-9S9.5 5.7 12 3z"/></svg>
+                        <span class="hc-label">Website</span><span class="hc-ping"></span></a></li>
+                    </ul>
+                  </div>
                 </div>
             </nav>
         </div>
@@ -366,7 +303,7 @@
                 {% for product in recommended_products %}
                 <a href="{% url 'product_detail' product.slug %}" class="rec-card">
                     {% if product.main_image %}
-                    <img src="{% static product.main_image %}" alt="{{ product.name }}" loading="lazy">
+                    <img src="{{ product.main_image.url }}" alt="{{ product.name }}" loading="lazy">
                     {% endif %}
                     <div class="rec-card-body">
                         <div class="rec-name">{{ product.name }}</div>
@@ -380,49 +317,75 @@
 
     </div>
 
-    <!-- MOBILE / TABLET BOTTOM NAV (hidden on desktop) -->
-    <nav class="mobile-bottom-nav" id="bottomNav" aria-label="Mobile navigation">
-        <div class="nav-items">
-            <a href="{% url 'shop' %}" class="nav-item home-btn">
-                <i class="fas fa-store"></i>
-                <span>Shop</span>
-            </a>
-            <a href="{% url 'cart' %}" class="nav-item">
-                <i class="fas fa-shopping-cart"></i>
+    <footer class="site-footer">
+        <div class="footer-inner">
+            <div class="footer-brand">
+                <span class="footer-icon"><img src="https://ik.imagekit.io/anganbaari/angan-baari/site-images/logo-icon_0PorSdbpKy.png" alt="Angan Baari" width="56" height="56" loading="lazy"></span>
+                <p class="footer-name-np">आँगन बारी</p>
+                <p class="footer-name-en">Angan Baari</p>
+                <p class="footer-tagline">Fresh &middot; Organic &middot; Sustainable</p>
+            </div>
+
+            <div class="footer-social">
+                <a href="https://www.facebook.com/anganbaari/" target="_blank" rel="noopener noreferrer" aria-label="Facebook" class="fb"><i class="fab fa-facebook-f"></i></a>
+                <a href="https://www.instagram.com/anganbaari/" target="_blank" rel="noopener noreferrer" aria-label="Instagram" class="ig"><i class="fab fa-instagram"></i></a>
+                <a href="https://www.youtube.com/@AnganBaari" target="_blank" rel="noopener noreferrer" aria-label="YouTube" class="yt"><i class="fab fa-youtube"></i></a>
+                <a href="https://x.com/anganbaari" target="_blank" rel="noopener noreferrer" aria-label="X" class="x"><i class="fab fa-x-twitter"></i></a>
+                <a href="https://www.tiktok.com/@anganbaari" target="_blank" rel="noopener noreferrer" aria-label="TikTok" class="tiktok"><i class="fab fa-tiktok"></i></a>
+                <a href="https://www.threads.com/@anganbaari" target="_blank" rel="noopener noreferrer" aria-label="Threads" class="threads" style="display:flex;align-items:center;justify-content:center;"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" fill="currentColor" width="16" height="16" aria-hidden="true"><path d="M141.537 88.988a66.667 66.667 0 0 0-2.518-1.143c-1.482-27.307-16.403-42.94-41.457-43.1h-.34c-14.986 0-27.449 6.396-35.12 18.036l13.779 9.452c5.73-8.695 14.724-10.548 21.348-10.548h.229c8.249.053 14.474 2.452 18.503 7.129 2.932 3.405 4.893 8.111 5.864 14.05-7.314-1.243-15.224-1.626-23.68-1.14-23.82 1.371-39.134 15.264-38.105 34.568.522 9.792 5.4 18.216 13.735 23.719 6.995 4.708 16.008 7.005 25.403 6.493 12.38-.68 22.081-5.407 28.819-14.041 5.129-6.675 8.374-15.311 9.678-25.396 5.808 3.506 10.1 8.12 12.509 13.677 4.956 11.421 5.253 30.18-10.25 45.625-13.616 13.56-29.976 19.425-54.73 19.594-27.456-.19-48.24-9.02-61.777-26.24C9.52 140.88 3.114 121.88 2.857 97.024c.257-24.854 6.663-43.854 19.053-56.494C35.447 23.27 56.23 14.44 83.687 14.25c27.635.19 48.728 9.064 62.722 26.37 6.868 8.561 12.007 19.324 15.368 32.012l16.108-4.278c-4.027-14.927-10.305-27.739-18.745-38.146C141.329 10.804 116.55-.067 83.69.001 50.795.068 25.752 11.01 9.884 32.609-4.05 51.73-11.04 78.173-11.333 97.024v.192c.293 18.85 7.283 45.295 21.217 64.416C26.752 182.99 51.795 193.932 84.69 194c34.057-.083 57.805-10.67 74.473-27.252 22.02-21.956 21.463-49.435 14.18-66.327-5.177-11.944-14.8-21.437-31.806-27.433Z"/></svg></a>
+            </div>
+
+            <div class="footer-bottom">
+                <p>&copy; Since 2015. आँगन बारी/Angan Baari &mdash; Bhulka Danda, Rupandehi, Nepal &mdash; All rights reserved.</p>
+                <p class="footer-nepal"> JAY NEPAL<img class="flag-sticker"src="https://upload.wikimedia.org/wikipedia/commons/9/9b/Flag_of_Nepal.svg" alt="Nepal National Flag" width="18" height="24"></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- MOBILE BOTTOM NAV — same honeycomb chain as desktop (hidden via CSS, see .mobile-hc-nav rule above) -->
+    <nav class="mobile-hc-nav" aria-label="Mobile navigation">
+        <div class="hc-scale-box hc-scale-box--app5">
+          <div class="hc-strip hc-strip--cells5">
+            <div class="hc-strip-bg" aria-hidden="true"></div>
+            <div class="hc-connector" style="left:108px" aria-hidden="true"></div>
+            <div class="hc-connector" style="left:240px" aria-hidden="true"></div>
+            <div class="hc-connector" style="left:372px" aria-hidden="true"></div>
+            <div class="hc-connector" style="left:504px" aria-hidden="true"></div>
+
+            <ul class="hc-nav" id="hcNavAppMobile">
+              <li class="hc-cell"><a class="hc-link" href="{% url 'shop' %}" data-target="shop-cell">
+                <svg viewBox="0 0 24 24"><path d="M4.5 9h15l-1.4 10.2a2 2 0 01-2 1.8H7.9a2 2 0 01-2-1.8L4.5 9z"/><path d="M8.5 9V7a3.5 3.5 0 017 0v2"/></svg>
+                <span class="hc-label">Shop</span><span class="hc-ping"></span></a></li>
+
+              <li class="hc-cell"><a class="hc-link active" href="{% url 'cart' %}" data-target="cart-cell">
+                <svg viewBox="0 0 24 24"><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2.5 3h2.4l2.1 11.2a2 2 0 002 1.6h8.6a2 2 0 002-1.6L21 7H6.2"/></svg>
+                <span class="hc-label">Cart</span><span class="hc-ping"></span>
                 {% with total_qty=request.session.cart.values|length %}
-                {% if total_qty > 0 %}<span class="cart-badge">{{ total_qty }}</span>{% endif %}
+                <span id="cartBadgeMobile" class="hc-cart-badge{% if total_qty == 0 %} badge-hidden{% endif %}">{{ total_qty }}</span>
                 {% endwith %}
-                <span>Cart</span>
-            </a>
-            <a href="{% url 'offers' %}" class="nav-item">
-                <i class="fas fa-tag"></i>
-                <span class="offer-dot"></span>
-                <span>Offers</span>
-            </a>
-            {% if user.is_authenticated %}
-            <a href="{% url 'profile' %}" class="nav-item">
-                <i class="fas fa-user-circle"></i>
-                <span>Profile</span>
-            </a>
-            {% else %}
-            <a href="{% url 'login' %}" class="nav-item">
-                <i class="fas fa-user-circle"></i>
-                <span>Login</span>
-            </a>
-            {% endif %}
-            <a href="/" class="nav-item">
-                <i class="fas fa-globe"></i>
-                <span>Website</span>
-            </a>
+              </a></li>
+
+              <li class="hc-cell hc-cell--offer"><a class="hc-link" href="{% url 'offers' %}" data-target="offers-cell">
+                <svg class="offer-flame" viewBox="0 0 24 24"><path d="M12 2c2 3 5 6 5 10a5 5 0 01-10 0c0-1.8.8-3 1.6-4-.1 1.6 1 2.3 1.7 1.2C9.6 7 10 4 12 2z"/></svg>
+                <span class="hc-label">Offers</span><span class="hc-ping"></span></a></li>
+
+              {% if user.is_authenticated %}
+              <li class="hc-cell"><a class="hc-link" href="{% url 'profile' %}" data-target="profile-cell">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.5"/><path d="M4.5 20c0-4 3.4-7 7.5-7s7.5 3 7.5 7"/></svg>
+                <span class="hc-label">{{ user.first_name }}</span><span class="hc-ping"></span></a></li>
+              {% else %}
+              <li class="hc-cell"><a class="hc-link" href="{% url 'login' %}" data-target="login-cell">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.5"/><path d="M4.5 20c0-4 3.4-7 7.5-7s7.5 3 7.5 7"/></svg>
+                <span class="hc-label">Login</span><span class="hc-ping"></span></a></li>
+              {% endif %}
+
+              <li class="hc-cell"><a class="hc-link" href="/" data-target="website-cell">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.7 3.8 6 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-6-3.8-9S9.5 5.7 12 3z"/></svg>
+                <span class="hc-label">Website</span><span class="hc-ping"></span></a></li>
+            </ul>
+          </div>
         </div>
     </nav>
-
-    <script>
-        const bottomNavPath = window.location.pathname;
-        document.querySelectorAll('.mobile-bottom-nav .nav-item').forEach(item => {
-            if (item.getAttribute('href') === bottomNavPath) item.classList.add('active');
-        });
-    </script>
     <script>
         function applyCoupon() {
             const code = document.getElementById('couponInput').value.trim();
@@ -460,6 +423,221 @@
                 fields.forEach(f => sessionStorage.removeItem('co_' + f));
             }
         });
+    </script>
+    <script>
+// ================================================================
+// OPMCM-STYLE WIND-BLOWN NEPAL FLAG — NAVBAR
+// Darker colors · crisp edges · sharp triangular silhouette
+// Smooth cloth folds · stable pole · stronger free-end flutter
+// ================================================================
+(function () {
+    const canvas = document.getElementById('navNepalFlag');
+    if (!canvas) return;
+
+    const WIDTH = 450;
+    const HEIGHT = 600;
+    const FLAG_W = 330;
+    const FLAG_H = 441;
+    const PAD_X = 60;
+    const PAD_Y = 78;
+
+    canvas.width = WIDTH;
+    canvas.height = HEIGHT;
+
+    const ctx = canvas.getContext('2d', { alpha: true });
+    if (!ctx) return;
+
+    // Keep the raster edges crisp instead of applying soft interpolation.
+    ctx.imageSmoothingEnabled = false;
+
+    const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="110" height="147" viewBox="0 0 110 147">
+        <!-- Deep, slightly darker Nepal red and blue for the OPMCM-style look -->
+        <path d="M 0.00,0.00 L 110.00,68.88 L 32.22,68.88 L 110.00,146.67 L 0.00,146.67 Z"
+              fill="#B80F2F" stroke="#001F5B" stroke-width="3.5" stroke-linejoin="round"/>
+
+        <g transform="translate(27.50,43.05)">
+            <path d="M 22.27,-4.58 L 21.52,-4.79 L 20.33,-2.42 L 15.70,3.07 L 12.48,5.11 L 11.18,4.57 L 10.86,2.96 L 12.80,1.99 L 13.23,0.48 L 10.00,-0.05 L 10.21,-1.45 L 11.93,-4.36 L 7.74,-3.72 L 7.95,-7.81 L 6.34,-7.48 L 4.18,-5.87 L 2.89,-10.06 L 0.52,-7.05 L -0.23,-7.16 L -2.17,-9.74 L -3.78,-5.98 L -6.69,-7.81 L -7.98,-7.92 L -7.33,-7.59 L -7.33,-3.72 L -9.38,-3.61 L -11.10,-4.25 L -9.81,-0.05 L -13.04,0.59 L -12.93,1.56 L -10.89,3.18 L -11.64,5.33 L -13.04,5.00 L -15.62,3.07 L -18.43,0.16 L -20.90,-3.61 L -21.55,-3.61 L -20.68,1.77 L -17.99,6.51 L -14.87,9.95 L -10.24,13.30 L -3.46,15.34 L 1.93,15.56 L 9.89,13.73 L 14.74,10.39 L 20.23,3.50 L 22.16,-2.42 Z"
+                  fill="#FFFFFF"/>
+        </g>
+
+        <path d="M 27.50,131.32 L 23.64,122.20 L 15.73,128.16 L 16.94,118.33 L 7.11,119.55 L 13.08,111.64 L 3.96,107.78 L 13.08,103.91 L 7.11,96.01 L 16.94,97.22 L 15.73,87.39 L 23.64,93.35 L 27.50,84.24 L 31.36,93.35 L 39.27,87.39 L 38.06,97.22 L 47.89,96.01 L 41.92,103.91 L 51.04,107.78 L 41.92,111.64 L 47.89,119.55 L 38.06,118.33 L 39.27,128.16 L 31.36,122.20 Z"
+              fill="#FFFFFF"/>
+    </svg>`;
+
+    const sourceCanvas = document.createElement('canvas');
+    sourceCanvas.width = WIDTH;
+    sourceCanvas.height = HEIGHT;
+    const sourceCtx = sourceCanvas.getContext('2d', { alpha: true });
+    if (!sourceCtx) return;
+    sourceCtx.imageSmoothingEnabled = false;
+
+    const img = new Image();
+    img.decoding = 'async';
+
+    img.onload = function () {
+        sourceCtx.clearRect(0, 0, WIDTH, HEIGHT);
+        sourceCtx.drawImage(img, PAD_X, PAD_Y, FLAG_W, FLAG_H);
+        startAnimation();
+    };
+
+    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+
+    function drawFlag(time) {
+        const t = time * 0.001;
+
+        ctx.clearRect(0, 0, WIDTH, HEIGHT);
+
+        // Transparent padding is intentionally preserved around the flag.
+        // This keeps both pointed ends completely visible while waving.
+        ctx.save();
+        ctx.translate(PAD_X, PAD_Y);
+
+        /*
+         * Draw the flag as narrow vertical fabric strips.
+         * Unlike pixel displacement, this preserves the sharp Nepal-flag
+         * silhouette and pointed edges while the strips move independently.
+         */
+        const strip = 3;
+
+        for (let x = 0; x < FLAG_W; x += strip) {
+            const u = x / FLAG_W;
+
+            // Pole remains stable; the free end becomes increasingly active.
+            const strength = Math.pow(u, 1.45);
+
+            // Large travelling cloth folds.
+            const wave1 = Math.sin(u * Math.PI * 1.55 - t * 4.0);
+            const wave2 = Math.sin(u * Math.PI * 3.10 - t * 4.0 + 1.15);
+
+            // Strong but smooth vertical displacement.
+            const yWave = strength * (wave1 * 34 + wave2 * 8);
+
+            // Forward/backward flutter of the free edge.
+            const xWave = strength * Math.sin(
+                u * Math.PI * 1.35 - t * 3.0 + 0.55
+            ) * 15;
+
+            // Local fabric tilt makes the folds look like cloth rather than water.
+            const slope =
+                Math.cos(u * Math.PI * 1.55 - t * 4.0) *
+                strength * 0.16 +
+                Math.cos(u * Math.PI * 3.10 - t * 4.0 + 1.15) *
+                strength * 0.035;
+
+            // Slightly narrower at the pole, fuller at the free edge.
+            const sourceWidth = Math.min(strip + 1, FLAG_W - x);
+
+            ctx.save();
+            ctx.translate(x + xWave, yWave);
+            ctx.transform(1, slope, 0, 1, 0, 0);
+
+            // Overlap neighbouring strips by 1px to avoid hairline gaps.
+            ctx.drawImage(
+                sourceCanvas,
+                PAD_X + x,
+                0,
+                sourceWidth,
+                HEIGHT,
+                -0.5,
+                0,
+                sourceWidth + 1,
+                HEIGHT
+            );
+
+            ctx.restore();
+        }
+
+        ctx.restore();
+
+        /*
+         * Very subtle fold shading. This is intentionally restrained so
+         * the red remains dark and solid rather than becoming glossy.
+         */
+        ctx.save();
+        ctx.globalCompositeOperation = 'source-atop';
+        ctx.globalAlpha = 0.075;
+
+        const shadeGradient = ctx.createLinearGradient(
+            PAD_X, 0,
+            PAD_X + FLAG_W, 0
+        );
+        shadeGradient.addColorStop(0, 'rgba(0,0,0,0)');
+        shadeGradient.addColorStop(0.35, 'rgba(0,0,0,0.18)');
+        shadeGradient.addColorStop(0.52, 'rgba(255,255,255,0.10)');
+        shadeGradient.addColorStop(0.72, 'rgba(0,0,0,0.15)');
+        shadeGradient.addColorStop(1, 'rgba(0,0,0,0)');
+
+        ctx.fillStyle = shadeGradient;
+        ctx.fillRect(PAD_X, PAD_Y, FLAG_W, FLAG_H);
+        ctx.restore();
+    }
+
+    function startAnimation() {
+        // Respect the OS-level "reduce motion" preference: draw one
+        // static frame and never animate, instead of the CSS-only rule
+        // from before (which couldn't actually stop a JS-driven loop).
+        const reduceMotionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+        let rafId = null;
+        let inView = true;
+
+        function renderLoop(time) {
+            drawFlag(time);
+            rafId = requestAnimationFrame(renderLoop);
+        }
+
+        function play() {
+            if (rafId !== null || reduceMotionQuery.matches) return;
+            rafId = requestAnimationFrame(renderLoop);
+        }
+
+        function pause() {
+            if (rafId !== null) {
+                cancelAnimationFrame(rafId);
+                rafId = null;
+            }
+        }
+
+        if (reduceMotionQuery.matches) {
+            drawFlag(0);
+        } else {
+            play();
+        }
+
+        // Pause the render loop whenever the flag scrolls out of view or
+        // the browser tab itself is backgrounded — a small canvas redrawn
+        // 60×/sec is wasted work (and battery) when nobody can see it.
+        const observer = new IntersectionObserver(function (entries) {
+            inView = entries[0].isIntersecting;
+            if (inView && !document.hidden) {
+                play();
+            } else {
+                pause();
+            }
+        }, { threshold: 0 });
+        observer.observe(canvas);
+
+        document.addEventListener('visibilitychange', function () {
+            if (document.hidden) {
+                pause();
+            } else if (inView) {
+                play();
+            }
+        });
+
+        // Live-respond if the user toggles the OS reduced-motion setting
+        // while the page is already open.
+        reduceMotionQuery.addEventListener('change', function (e) {
+            if (e.matches) {
+                pause();
+                drawFlag(0);
+            } else if (inView) {
+                play();
+            }
+        });
+    }
+})();
     </script>
 </body>
 </html>
