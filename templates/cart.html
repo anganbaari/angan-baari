@@ -151,6 +151,7 @@
         .reco-card-name { font-size: 0.82rem; font-weight: 600; color: var(--forest); margin-bottom: 4px; line-height: 1.3; min-height: 2.1em; text-decoration: none; display: block; }
         .reco-card-price { font-size: 0.85rem; color: #c0392b; font-weight: 700; margin-bottom: 10px; }
         .reco-card-price .unit { color: var(--text-muted); font-weight: 400; font-size: 0.7rem; }
+        .reco-variant-select { width: 100%; font-size: 0.72rem; padding: 4px 6px; border: 1px solid var(--mist); border-radius: 6px; margin-bottom: 8px; background: var(--white); color: var(--forest); }
         .btn-reco-add { width: 100%; background: none; border: 1.5px solid var(--forest); color: var(--forest); padding: 7px; border-radius: 50px; font-size: 0.72rem; font-weight: 600; cursor: pointer; transition: all 0.2s; }
         .btn-reco-add:hover { background: var(--forest); color: var(--gold); }
         .btn-reco-add:disabled { opacity: 0.6; cursor: default; }
@@ -412,7 +413,16 @@
                     </a>
                     <div class="reco-card-body">
                         <a href="{{ product.get_absolute_url }}" class="reco-card-name">{{ product.name }}</a>
+                        {% if product.pricing_mode == 'fixed_weight' and product.variant_count > 1 %}
+                        <select class="reco-variant-select" data-product-id="{{ product.id }}">
+                            {% for v in product.available_variants %}
+                            <option value="{{ v.id }}">{{ v.weight|floatformat:2 }} kg — Rs. {{ v.total_price|floatformat:0 }}{% if v.label %} ({{ v.label }}){% endif %}</option>
+                            {% endfor %}
+                        </select>
+                        <div class="reco-card-price">{{ product.variant_count }} sizes</div>
+                        {% else %}
                         <div class="reco-card-price">Rs. {{ product.price }} <span class="unit">{{ product.price_unit }}</span></div>
+                        {% endif %}
                         <button type="button" class="btn-reco-add"
                             data-action="add"
                             data-id="{{ product.id }}"
@@ -917,13 +927,29 @@
             if (action === 'add') {
                 btn.disabled = true;
                 const productId = btn.dataset.id;
+                const card = btn.closest('.reco-card');
+                const variantSelect = card ? card.querySelector('.reco-variant-select') : null;
+                const params = variantSelect ? { variant_id: variantSelect.value } : {};
                 try {
-                    const data = await post(urlFor('add_to_cart', productId), {});
+                    const data = await post(urlFor('add_to_cart', productId), params);
                     updateBadges(data.count);
                     const lineKey = data.line_key || productId;
+                    // Use the server's authoritative subtotal to derive an
+                    // "effective price" rather than trusting the button's
+                    // static base price — for a multi-variant fixed_weight
+                    // product (goat/chicken), each variant has its own price,
+                    // separate from product.price, so the base price alone
+                    // would compute the wrong total for both this line's
+                    // display and any later cart-total recompute.
+                    const qty = data.qty || 1;
+                    const weight = data.weight ? parseFloat(data.weight) : 1;
+                    let effectivePrice = parseFloat(btn.dataset.price) || 0;
+                    if (data.subtotal && (qty * weight) > 0) {
+                        effectivePrice = parseFloat(data.subtotal) / (qty * weight);
+                    }
                     const existingRow = document.getElementById('cart-item-' + lineKey);
                     const item = {
-                        id: lineKey, name: btn.dataset.name, price: btn.dataset.price,
+                        id: lineKey, name: btn.dataset.name, price: effectivePrice,
                         price_unit: btn.dataset.unit, image: btn.dataset.image,
                         weight: data.weight || null,
                         qty: data.qty,

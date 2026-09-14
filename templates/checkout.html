@@ -107,14 +107,20 @@
         .recommend-scroll::-webkit-scrollbar-thumb { background: var(--mist); border-radius: 10px; }
         .rec-card {
             flex: 0 0 170px; scroll-snap-align: start; background: var(--white); border-radius: 16px;
-            border: 1px solid var(--mist); overflow: hidden; text-decoration: none; color: inherit;
+            border: 1px solid var(--mist); overflow: hidden;
             transition: transform 0.2s, box-shadow 0.2s;
         }
         .rec-card:hover { transform: translateY(-4px); box-shadow: 0 10px 24px rgba(26,47,30,0.1); }
-        .rec-card img { width: 100%; height: 130px; object-fit: cover; background: var(--cream); }
-        .rec-card-body { padding: 12px; }
+        .rec-card-link { display: block; text-decoration: none; color: inherit; }
+        .rec-card img { width: 100%; height: 130px; object-fit: cover; background: var(--cream); display: block; }
+        .rec-card-body { padding: 12px 12px 0; }
         .rec-name { font-size: 0.85rem; font-weight: 500; color: var(--forest); margin-bottom: 4px; line-height: 1.3; }
+        .rec-card-footer { padding: 8px 12px 12px; }
         .rec-price { font-size: 0.85rem; font-weight: 700; color: var(--moss); }
+        .rec-variant-select {
+            width: 100%; font-size: 0.72rem; padding: 4px 6px; border: 1px solid var(--mist);
+            border-radius: 6px; margin-top: 2px; background: var(--white); color: var(--forest);
+        }
         .rec-card-bottom { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 6px; }
         .rec-add-btn {
             flex-shrink: 0; width: 30px; height: 30px; border-radius: 50%; border: none;
@@ -256,11 +262,12 @@
             <div class="order-summary">
                 <div class="summary-title">
                     Your Order
-                    <span class="item-count">{{ items|length }} item{{ items|length|pluralize }}</span>
+                    <span class="item-count" id="orderItemCount">{{ items|length }} item{{ items|length|pluralize }}</span>
                 </div>
 
+                <div id="orderItemsList">
                 {% for item in items %}
-                <div class="summary-item">
+                <div class="summary-item" id="order-item-{{ item.id }}">
                     <div class="summary-item-info">
                         {% if item.image %}<img src="{{ item.image }}" alt="{{ item.name }}" class="summary-item-thumb">{% endif %}
                         <div>
@@ -268,9 +275,10 @@
                             <div style="font-size:0.78rem;color:var(--text-muted);">Rs. {{ item.price }} × {{ item.qty }}</div>
                         </div>
                     </div>
-                    <div style="font-weight:600;color:var(--forest);white-space:nowrap;">Rs. {{ item.subtotal|floatformat:0 }}</div>
+                    <div style="font-weight:600;color:var(--forest);white-space:nowrap;" id="order-item-amt-{{ item.id }}">Rs. {{ item.subtotal|floatformat:0 }}</div>
                 </div>
                 {% endfor %}
+                </div>
 
                 <!-- Coupon code -->
                 <div class="coupon-box">
@@ -288,7 +296,7 @@
 
                 <div class="summary-item" style="border-bottom:none;">
                     <span>Subtotal</span>
-                    <span>Rs. {{ subtotal|default:total|floatformat:2 }}</span>
+                    <span id="orderSubtotal">Rs. {{ subtotal|default:total|floatformat:2 }}</span>
                 </div>
                 {% if discount_amount %}
                 <div class="summary-item discount-row" style="border-bottom:none;">
@@ -299,11 +307,11 @@
 
                 <div class="summary-total">
                     <span>Total</span>
-                    <span>Rs. {{ total|floatformat:2 }}</span>
+                    <span id="orderTotal">Rs. {{ total|floatformat:2 }}</span>
                 </div>
 
-                <button type="submit" form="checkoutForm" class="btn-place-order">
-                    <i class="fas fa-check-circle"></i> Place Order — Rs. {{ total|floatformat:0 }}
+                <button type="submit" form="checkoutForm" class="btn-place-order" id="placeOrderBtn" data-coupon-applied="{% if coupon_applied %}1{% else %}0{% endif %}">
+                    <i class="fas fa-check-circle"></i> Place Order — Rs. <span id="placeOrderTotal">{{ total|floatformat:0 }}</span>
                 </button>
 
                 <div class="trust-row">
@@ -319,27 +327,42 @@
             <div class="rec-sub">Fresh picks to go with your order</div>
             <div class="recommend-scroll">
                 {% for product in recommended_products %}
-                <a href="{% url 'product_detail' product.slug %}" class="rec-card">
-                    {% if product.main_image %}
-                    <img src="{{ product.main_image.url }}" alt="{{ product.name }}" loading="lazy">
-                    {% endif %}
-                    <div class="rec-card-body">
-                        <div class="rec-name">{{ product.name }}</div>
+                <div class="rec-card">
+                    <a href="{% url 'product_detail' product.slug %}" class="rec-card-link">
+                        {% if product.main_image %}
+                        <img src="{{ product.main_image.url }}" alt="{{ product.name }}" loading="lazy">
+                        {% endif %}
+                        <div class="rec-card-body">
+                            <div class="rec-name">{{ product.name }}</div>
+                        </div>
+                    </a>
+                    <div class="rec-card-footer">
+                        {% if product.pricing_mode == 'fixed_weight' and product.variant_count > 1 %}
+                        <select class="rec-variant-select" data-product-id="{{ product.id }}">
+                            {% for v in product.available_variants %}
+                            <option value="{{ v.id }}">{{ v.weight|floatformat:2 }} kg — Rs. {{ v.total_price|floatformat:0 }}{% if v.label %} ({{ v.label }}){% endif %}</option>
+                            {% endfor %}
+                        </select>
+                        {% endif %}
                         <div class="rec-card-bottom">
-                            {% if product.price %}<div class="rec-price">Rs. {{ product.price }}</div>{% endif %}
+                            {% if product.pricing_mode == 'fixed_weight' and product.variant_count > 1 %}
+                            <div class="rec-price">{{ product.variant_count }} sizes</div>
+                            {% elif product.price %}
+                            <div class="rec-price">Rs. {{ product.price }}</div>
+                            {% endif %}
                             {% if product.is_available %}
                             <button type="button" class="rec-add-btn"
                                     data-action="add-to-cart"
                                     data-url="{% url 'add_to_cart' product.id %}"
                                     data-name="{{ product.name }}"
-                                    onclick="event.preventDefault(); event.stopPropagation();"
+                                    data-image="{% if product.main_image %}{{ product.main_image.url }}{% endif %}"
                                     aria-label="Add {{ product.name }} to cart">
                                 <i class="fas fa-cart-plus"></i>
                             </button>
                             {% endif %}
                         </div>
                     </div>
-                </a>
+                </div>
                 {% endfor %}
             </div>
         </div>
@@ -462,24 +485,78 @@
             showCheckoutToast._t = setTimeout(() => toast.classList.remove('show'), 1600);
         }
 
+        function buildOrderItemNode(item) {
+            const wrap = document.createElement('div');
+            wrap.className = 'summary-item';
+            wrap.id = 'order-item-' + item.id;
+            const imgHtml = item.image ? `<img src="${item.image}" alt="${item.name}" class="summary-item-thumb">` : '';
+            const detail = item.weight ? (item.weight + ' kg') : (item.qty ? ('Qty ' + item.qty) : '');
+            wrap.innerHTML = `
+                <div class="summary-item-info">
+                    ${imgHtml}
+                    <div>
+                        <div class="summary-item-name">${item.name}</div>
+                        <div style="font-size:0.78rem;color:var(--text-muted);">${detail}</div>
+                    </div>
+                </div>
+                <div style="font-weight:600;color:var(--forest);white-space:nowrap;" id="order-item-amt-${item.id}">Rs. ${Number(item.subtotal).toFixed(0)}</div>`;
+            return wrap;
+        }
+
         // ─── One-click Add from the recommendations strip ───
-        // No variant/weight picker here by design — resolve_cart_line already
-        // defaults sensibly for every pricing mode (weight_step for
-        // variable_weight, cheapest available animal for fixed_weight, qty=1
-        // for fixed_quantity), the same one-click behavior the shop grid uses.
+        // Fixed-weight multi-variant products (goats/chickens) get a select
+        // right on the card; everything else uses resolve_cart_line's own
+        // sensible default (weight_step for fruit, qty=1 for jars) same as
+        // the shop grid's one-click Add.
         document.querySelectorAll('[data-action="add-to-cart"]').forEach(function (btn) {
             btn.addEventListener('click', function (e) {
                 e.preventDefault();
-                e.stopPropagation();
                 if (btn.disabled) return;
                 btn.disabled = true;
                 const originalHTML = btn.innerHTML;
-                postJSON(btn.dataset.url)
+                const card = btn.closest('.rec-card');
+                const variantSelect = card ? card.querySelector('.rec-variant-select') : null;
+                const params = variantSelect ? { variant_id: variantSelect.value } : null;
+
+                postJSON(btn.dataset.url, params)
                     .then(data => {
                         updateBadges(data.count);
+
+                        // A coupon's discount depends on server-side rules
+                        // (percentage vs flat, minimums, etc.) — recalculating
+                        // that correctly on the client isn't safe, so defer
+                        // to a fresh server-rendered total instead.
+                        if (document.getElementById('placeOrderBtn')?.dataset.couponApplied === '1') {
+                            window.location.reload();
+                            return;
+                        }
+
+                        const lineKey = data.line_key;
+                        const item = {
+                            id: lineKey, name: btn.dataset.name, image: btn.dataset.image,
+                            qty: data.qty, weight: data.weight, subtotal: data.subtotal,
+                        };
+                        const existingRow = document.getElementById('order-item-' + lineKey);
+                        if (existingRow) {
+                            existingRow.replaceWith(buildOrderItemNode(item));
+                        } else {
+                            document.getElementById('orderItemsList').appendChild(buildOrderItemNode(item));
+                        }
+
+                        let newTotal = 0;
+                        document.querySelectorAll('#orderItemsList > div').forEach(row => {
+                            const amt = row.querySelector('[id^="order-item-amt-"]');
+                            if (amt) newTotal += parseFloat(amt.textContent.replace(/[^0-9.]/g, '')) || 0;
+                        });
+                        document.getElementById('orderSubtotal').textContent = 'Rs. ' + newTotal.toFixed(2);
+                        document.getElementById('orderTotal').textContent = 'Rs. ' + newTotal.toFixed(2);
+                        document.getElementById('placeOrderTotal').textContent = newTotal.toFixed(0);
+                        const itemCount = document.querySelectorAll('#orderItemsList > div').length;
+                        document.getElementById('orderItemCount').textContent = itemCount + ' item' + (itemCount === 1 ? '' : 's');
+
                         btn.innerHTML = '<i class="fas fa-check"></i>';
                         btn.classList.add('is-added');
-                        showCheckoutToast(btn.dataset.name + ' added to cart');
+                        showCheckoutToast(btn.dataset.name + ' added to your order');
                         setTimeout(() => {
                             btn.innerHTML = originalHTML;
                             btn.classList.remove('is-added');
