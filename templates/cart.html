@@ -413,13 +413,13 @@
                     </a>
                     <div class="reco-card-body">
                         <a href="{{ product.get_absolute_url }}" class="reco-card-name">{{ product.name }}</a>
-                        {% if product.pricing_mode == 'fixed_weight' and product.variant_count > 1 %}
+                        {% if product.pricing_mode == 'fixed_weight' and product.available_variant_count > 1 %}
                         <select class="reco-variant-select" data-product-id="{{ product.id }}">
                             {% for v in product.available_variants %}
                             <option value="{{ v.id }}">{{ v.weight|floatformat:2 }} kg — Rs. {{ v.total_price|floatformat:0 }}{% if v.label %} ({{ v.label }}){% endif %}</option>
                             {% endfor %}
                         </select>
-                        <div class="reco-card-price">{{ product.variant_count }} sizes</div>
+                        <div class="reco-card-price">{{ product.available_variant_count }} sizes</div>
                         {% else %}
                         <div class="reco-card-price">Rs. {{ product.price }} <span class="unit">{{ product.price_unit }}</span></div>
                         {% endif %}
@@ -985,11 +985,13 @@
                 return;
             }
 
-            // Add a wishlist item to cart (wishlist card stays put — it's a
-            // saved product, not a cart line, so adding to cart doesn't remove it)
+            // Moving a wishlist item into the cart also removes it from the
+            // wishlist — same endpoint and removal animation remove-wishlist
+            // uses below, since this is now effectively "move to cart."
             if (action === 'add-wishlist') {
                 btn.disabled = true;
                 const productId = btn.dataset.id;
+                const card = btn.closest('.saved-card');
                 try {
                     const data = await post(urlFor('add_to_cart', productId), {});
                     updateBadges(data.count);
@@ -1022,6 +1024,23 @@
                     updateCountPill();
                     toggleEmptyState();
                     showToast(item.name + ' added to cart');
+
+                    if (card) {
+                        card.classList.add('is-removing');
+                        try {
+                            await post(urlFor('wishlist_toggle', productId), {});
+                            setTimeout(() => {
+                                card.remove();
+                                const grid = document.getElementById('wishlistGrid');
+                                const section = document.getElementById('wishlistSection');
+                                const countEl = document.getElementById('wishlistCount');
+                                if (grid && !grid.children.length && section) section.style.display = 'none';
+                                if (countEl) countEl.textContent = Math.max(0, parseInt(countEl.textContent) - 1);
+                            }, 180);
+                        } catch (err) {
+                            card.classList.remove('is-removing');
+                        }
+                    }
                 } finally {
                     btn.disabled = false;
                 }

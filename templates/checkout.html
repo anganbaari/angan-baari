@@ -213,7 +213,6 @@
     <div class="checkout-page">
 
         <div class="checkout-header-row">
-            <a href="{% url 'cart' %}" class="back-link"><i class="fas fa-arrow-left"></i> Back to Cart</a>
             <h1 class="checkout-title">Checkout</h1>
             <div class="checkout-steps">Cart <span class="sep">→</span> <b>Checkout</b> <span class="sep">→</span> Confirmation</div>
         </div>
@@ -337,7 +336,7 @@
                         </div>
                     </a>
                     <div class="rec-card-footer">
-                        {% if product.pricing_mode == 'fixed_weight' and product.variant_count > 1 %}
+                        {% if product.pricing_mode == 'fixed_weight' and product.available_variant_count > 1 %}
                         <select class="rec-variant-select" data-product-id="{{ product.id }}">
                             {% for v in product.available_variants %}
                             <option value="{{ v.id }}">{{ v.weight|floatformat:2 }} kg — Rs. {{ v.total_price|floatformat:0 }}{% if v.label %} ({{ v.label }}){% endif %}</option>
@@ -345,8 +344,8 @@
                         </select>
                         {% endif %}
                         <div class="rec-card-bottom">
-                            {% if product.pricing_mode == 'fixed_weight' and product.variant_count > 1 %}
-                            <div class="rec-price">{{ product.variant_count }} sizes</div>
+                            {% if product.pricing_mode == 'fixed_weight' and product.available_variant_count > 1 %}
+                            <div class="rec-price">{{ product.available_variant_count }} sizes</div>
                             {% elif product.price %}
                             <div class="rec-price">Rs. {{ product.price }}</div>
                             {% endif %}
