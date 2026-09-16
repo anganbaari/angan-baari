@@ -8,6 +8,7 @@ from .models import ContactMessage, ProductOrder, NewsletterSubscriber, Product,
 from .models import Offer, Coupon, BundleItem, ProductVariant
 from .emails import send_newsletter_campaign
 from .models import InventoryMovement
+from .models import Offer, Coupon, BundleItem, ProductVariant, InventoryMovement, POSSale
 
 
 @admin.register(Category)
@@ -263,3 +264,17 @@ class InventoryMovementAdmin(admin.ModelAdmin):
         sign = '+' if obj.movement_type in obj.INCREASE_TYPES else '\u2212'
         return f'{sign}{obj.quantity}'
     change_display.short_description = 'Change'
+
+@admin.register(POSSale)
+class POSSaleAdmin(admin.ModelAdmin):
+    list_display = ['sale_number', 'cashier', 'payment_method', 'total_amount', 'created_at']
+    list_filter = ['payment_method', 'cashier', 'created_at']
+    search_fields = ['sale_number']
+    date_hierarchy = 'created_at'
+    ordering = ['-created_at']
+    readonly_fields = ['sale_number', 'cashier', 'payment_method', 'cart_snapshot', 'total_amount', 'created_at']
+
+    def has_add_permission(self, request):
+        # Sales are created by the POS screen itself, never by hand in admin —
+        # a manually-created "sale" here wouldn't actually move any inventory.
+        return False    
