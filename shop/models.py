@@ -64,6 +64,14 @@ class Product(models.Model):
                    'grown here.'
     )
 
+    barcode = models.CharField(
+        max_length=64, unique=True, null=True, blank=True,
+        help_text='For packaged goods only (jars, bottles). Scan a blank label '
+                   'with your barcode scanner into this field once, print that '
+                   'same code onto your product label, and the POS will recognize '
+                   'it at checkout. Leave blank for anything sold by weight/variant.'
+    )
+
     PRICING_MODE_CHOICES = [
         ('variable_weight', 'Variable weight — customer picks the weight (fruits, loose pickle)'),
         ('fixed_quantity', 'Fixed quantity — sold per piece/dozen/jar, no weight (banana, jars)'),
@@ -489,6 +497,11 @@ class InventoryMovement(models.Model):
         related_name='inventory_movements',
         help_text='Only set for "sale"/"return" movements that came from a website order.'
     )
+    related_pos_sale = models.ForeignKey(
+        'POSSale', null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='inventory_movements',
+        help_text='Only set for "sale" movements that came from the shop POS.'
+    )
     note = models.CharField(
         max_length=300, blank=True,
         help_text='e.g. "rain damage", "sold to walk-in customer at farm shop"'
@@ -546,3 +559,33 @@ class InventoryMovement(models.Model):
         from decimal import Decimal
         qs = cls.objects.filter(product=product, variant=variant)
         return sum((m.signed_quantity() for m in qs), Decimal('0'))
+
+class POSSale(models.Model):
+    PAYMENT_METHOD_CHOICES = [
+        ('cash', 'Cash'),
+        ('esewa', 'eSewa'),
+        ('khalti', 'Khalti'),
+        ('bank_transfer', 'Bank Transfer'),
+    ]
+
+    sale_number = models.CharField(max_length=20, unique=True, editable=False)
+    cashier = models.ForeignKey('auth.User', on_delete=models.PROTECT, related_name='pos_sales')
+    payment_method = models.CharField(max_length=20, choices=PAYMENT_METHOD_CHOICES)
+    cart_snapshot = models.JSONField(
+        help_text='Same shape as ProductOrder.cart_snapshot: '
+                   '[{product_id, weight, qty, variant_id}, ...]'
+    )
+    total_amount = models.DecimalField(max_digits=10, decimal_places=2)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def save(self, *args, **kwargs):
+        if not self.sale_number:
+            import uuid
+            self.sale_number = 'POS-' + uuid.uuid4().hex[:8].upper()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.sale_number} — Rs. {self.total_amount} ({self.get_payment_method_display()})"

@@ -572,15 +572,24 @@ def extract_variant_id(line_key):
 
 def create_order_inventory_movements(order, movement_type):
     """Create one InventoryMovement per line in this order's cart_snapshot —
-    'sale' when an order is placed, 'return' when one is cancelled. Mirrors
-    the ABMS bridge's own rule: this must NEVER block the actual action
-    (placing or cancelling an order) — any problem here is silently skipped,
-    matching this file's existing email try/except pattern, not raised."""
+    'sale' when an order is placed, 'return' when one is cancelled."""
+    create_inventory_movements_from_snapshot(
+        order.cart_snapshot, movement_type, source='website',
+        related_order=order, note=f"Order {order.order_number}",
+    )
+
+def create_inventory_movements_from_snapshot(cart_snapshot, movement_type, source,
+                                               related_order=None, related_pos_sale=None, note=None):
+    """Shared by website checkout/cancellation and the shop POS — creates one
+    InventoryMovement per cart line. Never raises — a failure here must NEVER
+    block the actual action (placing/cancelling an order, completing a POS
+    sale); any problem is silently skipped, matching this file's existing
+    email try/except pattern, not raised."""
     from decimal import Decimal
     from .models import Product, InventoryMovement
-    if not order.cart_snapshot:
+    if not cart_snapshot:
         return
-    for line in order.cart_snapshot:
+    for line in cart_snapshot:
         try:
             product = Product.objects.get(id=line.get('product_id'))
             qty = int(line.get('qty', 0) or 0)
@@ -604,10 +613,11 @@ def create_order_inventory_movements(order, movement_type):
                 product=product,
                 variant=variant,
                 movement_type=movement_type,
-                source='website',
+                source=source,
                 quantity=quantity,
-                related_order=order,
-                note=f"Order {order.order_number}",
+                related_order=related_order,
+                related_pos_sale=related_pos_sale,
+                note=note,
             )
         except Exception:
             continue
