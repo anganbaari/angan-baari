@@ -1,0 +1,392 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>POS — Angan Baari</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
+    <link rel="stylesheet" href="{% static 'style.css' %}">
+    <style>
+        * { box-sizing: border-box; }
+        html, body { margin: 0; height: 100%; font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--forest); }
+
+        .pos-header {
+            display: flex; align-items: center; justify-content: space-between;
+            background: var(--forest); color: var(--gold); padding: 14px 24px;
+        }
+        .pos-header h1 { font-size: 1.15rem; margin: 0; font-family: 'Cormorant Garamond', serif; font-weight: 600; }
+        .pos-header .cashier { font-size: 0.82rem; opacity: 0.85; }
+        .pos-header .cashier a { color: var(--gold); text-decoration: underline; }
+
+        .pos-layout { display: flex; height: calc(100vh - 54px); }
+        .pos-main { flex: 1; padding: 16px; overflow-y: auto; }
+        .pos-cart-panel {
+            width: 360px; flex-shrink: 0; background: var(--white); border-left: 1px solid var(--mist);
+            display: flex; flex-direction: column; padding: 16px;
+        }
+
+        .barcode-row input {
+            width: 100%; padding: 11px 16px; border: 1.5px solid var(--mist); border-radius: 8px;
+            font-size: 0.95rem; margin-bottom: 14px; font-family: inherit;
+        }
+        .barcode-row input:focus { outline: none; border-color: var(--moss); }
+
+        .cat-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+        .cat-tab {
+            padding: 8px 16px; border-radius: 50px; border: 1.5px solid var(--mist);
+            background: var(--white); color: var(--forest); font-size: 0.82rem; cursor: pointer;
+            font-family: inherit;
+        }
+        .cat-tab.active { background: var(--forest); color: var(--gold); border-color: var(--forest); }
+
+        .product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
+        .product-btn {
+            background: var(--white); border: 1px solid var(--mist); border-radius: 12px;
+            padding: 12px; cursor: pointer; text-align: left; transition: box-shadow 0.15s;
+            position: relative;
+        }
+        .product-btn:hover { box-shadow: 0 4px 14px rgba(26,47,30,0.1); }
+        .product-btn img { width: 100%; height: 80px; object-fit: cover; border-radius: 8px; margin-bottom: 8px; background: var(--cream); display: block; }
+        .product-btn .pname { font-size: 0.82rem; font-weight: 600; color: var(--forest); margin-bottom: 2px; line-height: 1.25; }
+        .product-btn .pprice { font-size: 0.76rem; color: var(--moss); font-weight: 700; }
+
+        .variant-menu {
+            position: absolute; top: 100%; left: 0; right: 0; margin-top: 4px; background: var(--white);
+            border: 1px solid var(--mist); border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+            z-index: 20; padding: 6px;
+        }
+        .variant-menu button {
+            display: block; width: 100%; text-align: left; padding: 8px 10px; border: none;
+            background: none; border-radius: 6px; font-size: 0.78rem; cursor: pointer; font-family: inherit;
+        }
+        .variant-menu button:hover { background: var(--cream); }
+
+        .cart-title { font-size: 1rem; font-weight: 700; color: var(--forest); margin-bottom: 12px; }
+        .cart-list { flex: 1; overflow-y: auto; min-height: 80px; }
+        .cart-line { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--mist); }
+        .cart-line-name { font-size: 0.85rem; color: var(--forest); font-weight: 500; }
+        .cart-line-detail { font-size: 0.72rem; color: var(--text-muted); }
+        .cart-line-amt { font-size: 0.85rem; font-weight: 700; color: var(--forest); white-space: nowrap; }
+        .cart-line-remove { background: none; border: none; color: #c0392b; cursor: pointer; font-size: 0.9rem; margin-left: 8px; }
+        .cart-empty { text-align: center; color: var(--text-muted); font-size: 0.85rem; padding: 30px 0; }
+
+        .cart-total-row {
+            display: flex; justify-content: space-between; padding: 14px 0; font-size: 1.15rem;
+            font-weight: 800; color: var(--forest); border-top: 2px solid var(--forest); margin-top: 4px;
+        }
+        .payment-methods { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 4px 0 12px; }
+        .payment-btn {
+            padding: 10px; border-radius: 8px; border: 1.5px solid var(--mist); background: var(--white);
+            font-size: 0.82rem; cursor: pointer; text-align: center; font-family: inherit;
+        }
+        .payment-btn.selected { background: var(--forest); color: var(--gold); border-color: var(--forest); }
+        .complete-sale-btn {
+            width: 100%; padding: 14px; border: none; border-radius: 10px; background: var(--forest);
+            color: var(--gold); font-size: 1rem; font-weight: 700; cursor: pointer; font-family: inherit;
+        }
+        .complete-sale-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+        #posToast {
+            position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px);
+            background: var(--forest); color: var(--gold); padding: 12px 22px; border-radius: 50px;
+            font-size: 0.85rem; font-weight: 600; box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            opacity: 0; pointer-events: none; transition: opacity 0.25s, transform 0.25s; z-index: 900;
+        }
+        #posToast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+        @media (max-width: 900px) {
+            .pos-layout { flex-direction: column; height: auto; }
+            .pos-cart-panel { width: 100%; border-left: none; border-top: 1px solid var(--mist); }
+        }
+    </style>
+</head>
+<body>
+    {% csrf_token %}
+    <div class="pos-header">
+        <h1>🌾 आँगन बारी POS</h1>
+        <div class="cashier">{{ request.user.get_full_name|default:request.user.username }} &middot; <a href="{% url 'shop' %}">Exit to site</a></div>
+    </div>
+
+    <div class="pos-layout">
+        <div class="pos-main">
+            <div class="barcode-row">
+                <input type="text" id="barcodeInput" placeholder="Scan barcode or type to search a product…" autofocus autocomplete="off">
+            </div>
+            <div class="cat-tabs" id="catTabs"></div>
+            <div class="product-grid" id="productGrid"></div>
+        </div>
+
+        <div class="pos-cart-panel">
+            <div class="cart-title">Current Sale</div>
+            <div class="cart-list" id="cartList">
+                <div class="cart-empty">No items yet — tap a product to add it.</div>
+            </div>
+            <div class="cart-total-row">
+                <span>Total</span>
+                <span id="cartTotal">Rs. 0</span>
+            </div>
+            <div class="payment-methods" id="paymentMethods">
+                {% for value, label in payment_methods %}
+                <button type="button" class="payment-btn" data-method="{{ value }}">{{ label }}</button>
+                {% endfor %}
+            </div>
+            <button type="button" class="complete-sale-btn" id="completeSaleBtn" disabled>Complete Sale</button>
+        </div>
+    </div>
+
+    <div id="posToast"></div>
+
+    <script id="posProductsData" type="application/json">{{ products_json|safe }}</script>
+    <script>
+        const PRODUCTS = JSON.parse(document.getElementById('posProductsData').textContent);
+        const CATEGORIES = [...new Set(PRODUCTS.map(p => p.category))].sort();
+        let activeCategory = CATEGORIES[0] || null;
+        let cart = []; // { product_id, name, pricing_mode, qty, weight, variant_id, detail, line_total }
+        let selectedPayment = null;
+
+        function getCookie(name) {
+            const match = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+            return match ? decodeURIComponent(match[2]) : null;
+        }
+
+        function showToast(text) {
+            const toast = document.getElementById('posToast');
+            toast.textContent = text;
+            toast.classList.add('show');
+            clearTimeout(showToast._t);
+            showToast._t = setTimeout(() => toast.classList.remove('show'), 1800);
+        }
+
+        function renderTabs() {
+            const wrap = document.getElementById('catTabs');
+            wrap.innerHTML = CATEGORIES.map(c =>
+                `<button type="button" class="cat-tab${c === activeCategory ? ' active' : ''}" data-cat="${c}">${c}</button>`
+            ).join('');
+            wrap.querySelectorAll('.cat-tab').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    activeCategory = btn.dataset.cat;
+                    renderTabs();
+                    renderGrid();
+                });
+            });
+        }
+
+        function renderGrid(filterText) {
+            const grid = document.getElementById('productGrid');
+            let list;
+            if (filterText) {
+                const q = filterText.toLowerCase();
+                list = PRODUCTS.filter(p => p.name.toLowerCase().includes(q) || p.barcode === filterText);
+            } else {
+                list = PRODUCTS.filter(p => p.category === activeCategory);
+            }
+            grid.innerHTML = list.map(p => {
+                const imgHtml = p.image ? `<img src="${p.image}" alt="${p.name}">` : '';
+                let priceLabel;
+                if (p.pricing_mode === 'fixed_weight') {
+                    priceLabel = p.variants.length ? `${p.variants.length} available` : 'Unavailable';
+                } else if (p.pricing_mode === 'variable_weight') {
+                    priceLabel = `Rs. ${p.price} / ${p.weight_unit_label}`;
+                } else {
+                    priceLabel = `Rs. ${p.price}${p.price_unit ? ' ' + p.price_unit : ''}`;
+                }
+                return `<div class="product-btn" data-id="${p.id}">
+                    ${imgHtml}
+                    <div class="pname">${p.name}</div>
+                    <div class="pprice">${priceLabel}</div>
+                </div>`;
+            }).join('');
+            grid.querySelectorAll('.product-btn').forEach(btn => {
+                btn.addEventListener('click', () => onProductTap(PRODUCTS.find(p => p.id == btn.dataset.id), btn));
+            });
+        }
+
+        function onProductTap(product, btn) {
+            if (!product) return;
+
+            if (product.pricing_mode === 'fixed_weight') {
+                if (!product.variants.length) { showToast('None available right now'); return; }
+                // No positioned button to anchor a menu to (e.g. added via
+                // barcode) — fall back to the first available one rather
+                // than fail; this is also why barcodes on animals aren't
+                // really the intended use (they're for packaged goods).
+                if (product.variants.length === 1 || !btn) {
+                    addToCart(product, { variant: product.variants[0] });
+                    return;
+                }
+                openVariantMenu(product, btn);
+                return;
+            }
+
+            if (product.pricing_mode === 'variable_weight') {
+                const input = prompt(`${product.name} — enter weight in ${product.weight_unit_label}:`);
+                if (input === null) return;
+                const weight = parseFloat(input);
+                if (isNaN(weight) || weight <= 0) { showToast('Enter a valid weight'); return; }
+                addToCart(product, { weight });
+                return;
+            }
+
+            // fixed_quantity — add 1, use the × on a repeat tap to build up quantity
+            addToCart(product, { qty: 1 });
+        }
+
+        function openVariantMenu(product, btn) {
+            document.querySelectorAll('.variant-menu').forEach(m => m.remove());
+            const menu = document.createElement('div');
+            menu.className = 'variant-menu';
+            menu.innerHTML = product.variants.map(v =>
+                `<button type="button" data-vid="${v.id}">${v.weight} kg${v.label ? ' — ' + v.label : ''} — Rs. ${v.total_price}</button>`
+            ).join('');
+            btn.appendChild(menu);
+            menu.querySelectorAll('button').forEach(b => {
+                b.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const variant = product.variants.find(v => v.id == b.dataset.vid);
+                    addToCart(product, { variant });
+                    menu.remove();
+                });
+            });
+            setTimeout(() => {
+                document.addEventListener('click', function closeMenu(ev) {
+                    if (!menu.contains(ev.target)) { menu.remove(); document.removeEventListener('click', closeMenu); }
+                });
+            }, 0);
+        }
+
+        function addToCart(product, opts) {
+            if (product.pricing_mode === 'fixed_quantity') {
+                const existing = cart.find(l => l.product_id === product.id);
+                if (existing) {
+                    existing.qty += 1;
+                    existing.detail = `Qty ${existing.qty}`;
+                    existing.line_total = parseFloat(product.price) * existing.qty;
+                    renderCart();
+                    return;
+                }
+            }
+            const line = { product_id: product.id, name: product.name, pricing_mode: product.pricing_mode };
+            if (opts.variant) {
+                line.variant_id = opts.variant.id;
+                line.detail = `${opts.variant.weight} kg${opts.variant.label ? ' — ' + opts.variant.label : ''}`;
+                line.qty = 1;
+                line.line_total = parseFloat(opts.variant.total_price);
+            } else if (opts.weight) {
+                line.weight = opts.weight;
+                line.detail = `${opts.weight} ${product.weight_unit_label}`;
+                line.qty = 1;
+                line.line_total = parseFloat(product.price) * opts.weight;
+            } else {
+                line.qty = opts.qty || 1;
+                line.detail = `Qty ${line.qty}`;
+                line.line_total = parseFloat(product.price) * line.qty;
+            }
+            cart.push(line);
+            renderCart();
+        }
+
+        function removeFromCart(index) {
+            cart.splice(index, 1);
+            renderCart();
+        }
+
+        function renderCart() {
+            const list = document.getElementById('cartList');
+            if (!cart.length) {
+                list.innerHTML = '<div class="cart-empty">No items yet — tap a product to add it.</div>';
+            } else {
+                list.innerHTML = cart.map((line, i) => `
+                    <div class="cart-line">
+                        <div>
+                            <div class="cart-line-name">${line.name}</div>
+                            <div class="cart-line-detail">${line.detail}</div>
+                        </div>
+                        <div style="display:flex;align-items:center;">
+                            <span class="cart-line-amt">Rs. ${line.line_total.toFixed(0)}</span>
+                            <button type="button" class="cart-line-remove" data-i="${i}"><i class="fas fa-times"></i></button>
+                        </div>
+                    </div>`
+                ).join('');
+                list.querySelectorAll('.cart-line-remove').forEach(b => {
+                    b.addEventListener('click', () => removeFromCart(parseInt(b.dataset.i)));
+                });
+            }
+            const total = cart.reduce((s, l) => s + l.line_total, 0);
+            document.getElementById('cartTotal').textContent = 'Rs. ' + total.toFixed(0);
+            updateCompleteBtn();
+        }
+
+        function updateCompleteBtn() {
+            document.getElementById('completeSaleBtn').disabled = !(cart.length && selectedPayment);
+        }
+
+        document.getElementById('paymentMethods').addEventListener('click', (e) => {
+            const btn = e.target.closest('.payment-btn');
+            if (!btn) return;
+            document.querySelectorAll('.payment-btn').forEach(b => b.classList.remove('selected'));
+            btn.classList.add('selected');
+            selectedPayment = btn.dataset.method;
+            updateCompleteBtn();
+        });
+
+        document.getElementById('completeSaleBtn').addEventListener('click', () => {
+            const btn = document.getElementById('completeSaleBtn');
+            btn.disabled = true;
+            const originalText = btn.textContent;
+            btn.textContent = 'Processing…';
+            const payload = {
+                payment_method: selectedPayment,
+                cart: cart.map(l => ({ product_id: l.product_id, qty: l.qty, weight: l.weight || null, variant_id: l.variant_id || null })),
+            };
+            fetch('{% url "pos_create_sale" %}', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
+                body: JSON.stringify(payload),
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'ok') {
+                    showToast(`Sale ${data.sale_number} — Rs. ${data.total} recorded`);
+                    cart = [];
+                    selectedPayment = null;
+                    document.querySelectorAll('.payment-btn').forEach(b => b.classList.remove('selected'));
+                    renderCart();
+                } else {
+                    showToast(data.message || 'Something went wrong');
+                }
+            })
+            .catch(() => showToast('Network error — please try again'))
+            .finally(() => {
+                btn.textContent = originalText;
+                updateCompleteBtn();
+            });
+        });
+
+        // Barcode scanners act like a keyboard — they type the code into
+        // whatever's focused, then send Enter. Same field also works as a
+        // plain text search when no exact barcode matches.
+        const barcodeInput = document.getElementById('barcodeInput');
+        barcodeInput.addEventListener('keydown', (e) => {
+            if (e.key !== 'Enter') return;
+            const value = barcodeInput.value.trim();
+            if (!value) { renderGrid(); return; }
+            const exact = PRODUCTS.find(p => p.barcode && p.barcode === value);
+            if (exact) {
+                onProductTap(exact, null);
+                barcodeInput.value = '';
+                renderGrid();
+                return;
+            }
+            renderGrid(value);
+        });
+        barcodeInput.addEventListener('input', () => {
+            if (!barcodeInput.value) renderGrid();
+        });
+
+        renderTabs();
+        renderGrid();
+    </script>
+</body>
+</html>

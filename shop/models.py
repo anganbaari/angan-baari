@@ -531,7 +531,7 @@ class InventoryMovement(models.Model):
            can't remove more than is actually available for that exact
            product+variant right now (this is what stops the same animal,
            or the same kg of produce, from being "sold" twice)."""
-        from django.core.exceptions import ValidationError
+        from django.ce.exceptions import ValidationError
         from decimal import Decimal
 
         if self.product_id and self.product.pricing_mode == 'fixed_weight' and self.quantity != 1:

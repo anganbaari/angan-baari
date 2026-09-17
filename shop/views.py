@@ -4,6 +4,8 @@ from django.utils.html import escape
 from django.core.mail import send_mail
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
+from django.contrib.admin.views.decorators import staff_member_required
+from django.views.decorators.http import require_POST
 from django.urls import reverse
 from django.contrib import messages
 from .models import NewsletterSubscriber, ContactMessage, ProductOrder, Review, Wishlist
@@ -621,6 +623,111 @@ def create_inventory_movements_from_snapshot(cart_snapshot, movement_type, sourc
             )
         except Exception:
             continue
+
+
+@staff_member_required
+def pos_view(request):
+    """The shop POS screen. Staff-only (Django's own is_staff flag — same
+    login as admin, no separate token/auth system needed)."""
+    import json
+    from .models import Product, POSSale
+    products = Product.objects.filter(is_available=True).select_related('category')
+    products_data = []
+    for p in products:
+        entry = {
+            'id': p.id,
+            'name': p.name,
+            'category': p.category.name if p.category else 'Other',
+            'pricing_mode': p.pricing_mode,
+            'price': str(p.price) if p.price is not None else None,
+            'price_unit': p.price_unit or '',
+            'weight_step': str(p.weight_step) if p.weight_step else None,
+            'weight_unit_label': p.weight_unit_label or 'kg',
+            'barcode': p.barcode or '',
+            'image': p.main_image.url if p.main_image else '',
+        }
+        if p.pricing_mode == 'fixed_weight':
+            entry['variants'] = [
+                {
+                    'id': v.id,
+                    'weight': str(v.weight),
+                    'label': v.label or '',
+                    'total_price': str(v.total_price()),
+                }
+                for v in p.available_variants()
+            ]
+        products_data.append(entry)
+
+    categories = sorted({p['category'] for p in products_data})
+
+    return render(request, 'pos.html', {
+        'products_json': json.dumps(products_data),
+        'categories': categories,
+        'payment_methods': POSSale.PAYMENT_METHOD_CHOICES,
+    })
+
+
+@staff_member_required
+@require_POST
+def pos_create_sale(request):
+    """Complete a POS sale: recompute the total server-side (never trust a
+    client-submitted price), create the POSSale record, and write the same
+    InventoryMovement rows the website checkout writes — same helper, same
+    guarantees, just source='pos' and linked via related_pos_sale instead
+    of related_order."""
+    import json
+    from decimal import Decimal, InvalidOperation
+    from .models import Product, POSSale
+
+    try:
+        data = json.loads(request.body)
+    except (json.JSONDecodeError, TypeError):
+        return JsonResponse({'status': 'error', 'message': 'Invalid request body.'}, status=400)
+
+    cart = data.get('cart') or []
+    payment_method = data.get('payment_method')
+
+    if not cart:
+        return JsonResponse({'status': 'error', 'message': 'Cart is empty.'}, status=400)
+    if payment_method not in dict(POSSale.PAYMENT_METHOD_CHOICES):
+        return JsonResponse({'status': 'error', 'message': 'Choose a payment method.'}, status=400)
+
+    total = Decimal('0')
+    cart_snapshot = []
+    try:
+        for line in cart:
+            product = Product.objects.get(id=line.get('product_id'), is_available=True)
+            qty = int(line.get('qty', 1) or 1)
+            weight = line.get('weight')
+            variant_id = line.get('variant_id')
+
+            if product.pricing_mode == 'fixed_weight':
+                variant = product.variants.filter(id=variant_id, is_available=True).first() if variant_id else None
+                if not variant:
+                    return JsonResponse({'status': 'error', 'message': f'{product.name}: that animal is no longer available.'}, status=400)
+                line_total = variant.total_price()
+            elif product.pricing_mode == 'variable_weight':
+                line_total = Decimal(str(product.price)) * Decimal(str(weight or 0))
+            else:
+                line_total = Decimal(str(product.price)) * qty
+
+            total += line_total
+            cart_snapshot.append({'product_id': product.id, 'weight': weight, 'qty': qty, 'variant_id': variant_id})
+    except (Product.DoesNotExist, InvalidOperation, TypeError, ValueError):
+        return JsonResponse({'status': 'error', 'message': 'One of the items in this cart is no longer valid.'}, status=400)
+
+    sale = POSSale.objects.create(
+        cashier=request.user,
+        payment_method=payment_method,
+        cart_snapshot=cart_snapshot,
+        total_amount=total,
+    )
+    create_inventory_movements_from_snapshot(
+        cart_snapshot, 'sale', source='pos',
+        related_pos_sale=sale, note=f"POS sale {sale.sale_number}",
+    )
+
+    return JsonResponse({'status': 'ok', 'sale_number': sale.sale_number, 'total': str(total)})
 
 def line_subtotal(item):
     try:
