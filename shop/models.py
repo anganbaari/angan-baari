@@ -589,3 +589,14 @@ class POSSale(models.Model):
 
     def __str__(self):
         return f"{self.sale_number} — Rs. {self.total_amount} ({self.get_payment_method_display()})"
+
+
+    client_sale_id = models.CharField(
+        max_length=64, unique=True, null=True, blank=True,
+        help_text='A UUID generated on the POS device itself, before the sale is '
+                   'ever sent to the server. If the same ID arrives twice — a '
+                   'double-tap on Complete Sale, a retried request after a dropped '
+                   'connection, or a queued offline sale being synced — the second '
+                   'attempt returns the original result instead of creating a '
+                   'second sale. Null only for sales that predate this field.'
+    )    

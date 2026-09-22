@@ -581,12 +581,27 @@ def create_order_inventory_movements(order, movement_type):
     )
 
 def create_inventory_movements_from_snapshot(cart_snapshot, movement_type, source,
-                                               related_order=None, related_pos_sale=None, note=None):
+                                               related_order=None, related_pos_sale=None, note=None,
+                                               strict=False):
     """Shared by website checkout/cancellation and the shop POS — creates one
-    InventoryMovement per cart line. Never raises — a failure here must NEVER
-    block the actual action (placing/cancelling an order, completing a POS
-    sale); any problem is silently skipped, matching this file's existing
-    email try/except pattern, not raised."""
+    InventoryMovement per cart line.
+
+    strict=False (the default, used by the website): never raises. A bad
+    line is silently skipped rather than losing a customer's whole order
+    over one problem line — matching this file's existing email
+    try/except pattern.
+
+    strict=True (used by the POS): re-raises any failure, AND calls
+    full_clean() on each movement so the model's own oversell/quantity
+    rules are actually enforced — skipped everywhere else in this file,
+    since full_clean() isn't called automatically on save(). The caller is
+    expected to wrap this in transaction.atomic() so a failure on any line
+    rolls back the whole sale rather than leaving a partial one. This is a
+    deliberate difference from the website: an in-person sale hasn't been
+    promised to anyone yet, so blocking it here (and letting the cashier
+    handle it face to face) is more correct than silently allowing an
+    oversell the way we accept for an already-placed online order.
+    """
     from decimal import Decimal
     from .models import Product, InventoryMovement
     if not cart_snapshot:
@@ -611,7 +626,7 @@ def create_inventory_movements_from_snapshot(cart_snapshot, movement_type, sourc
             if quantity <= 0:
                 continue
 
-            InventoryMovement.objects.create(
+            movement = InventoryMovement(
                 product=product,
                 variant=variant,
                 movement_type=movement_type,
@@ -621,7 +636,12 @@ def create_inventory_movements_from_snapshot(cart_snapshot, movement_type, sourc
                 related_pos_sale=related_pos_sale,
                 note=note,
             )
+            if strict:
+                movement.full_clean()
+            movement.save()
         except Exception:
+            if strict:
+                raise
             continue
 
 
@@ -673,16 +693,38 @@ def pos_create_sale(request):
     """Complete a POS sale: recompute the total server-side (never trust a
     client-submitted price), create the POSSale record, and write the same
     InventoryMovement rows the website checkout writes — same helper, same
-    guarantees, just source='pos' and linked via related_pos_sale instead
-    of related_order."""
+    quantity math, just source='pos', strict=True, and linked via
+    related_pos_sale instead of related_order.
+
+    Idempotent on client_sale_id: a repeated request with the same ID
+    (double-tap, retried request, a queued offline sale being synced)
+    returns the original result rather than creating a second sale. The
+    actual write is wrapped in one atomic transaction — either the sale
+    and every one of its inventory movements are all saved together, or
+    none of them are; there's no state where a sale exists with only some
+    of its stock movements recorded.
+    """
     import json
     from decimal import Decimal, InvalidOperation
+    from django.db import transaction
+    from django.core.exceptions import ValidationError
     from .models import Product, POSSale
 
     try:
         data = json.loads(request.body)
     except (json.JSONDecodeError, TypeError):
         return JsonResponse({'status': 'error', 'message': 'Invalid request body.'}, status=400)
+
+    client_sale_id = data.get('client_sale_id')
+    if not client_sale_id:
+        return JsonResponse({'status': 'error', 'message': 'Missing client_sale_id.'}, status=400)
+
+    # Idempotency check — if this exact sale was already processed (this is
+    # a retry, not a new sale), return the original result rather than
+    # creating a duplicate.
+    existing = POSSale.objects.filter(client_sale_id=client_sale_id).first()
+    if existing:
+        return JsonResponse({'status': 'ok', 'sale_number': existing.sale_number, 'total': str(existing.total_amount)})
 
     cart = data.get('cart') or []
     payment_method = data.get('payment_method')
@@ -716,16 +758,29 @@ def pos_create_sale(request):
     except (Product.DoesNotExist, InvalidOperation, TypeError, ValueError):
         return JsonResponse({'status': 'error', 'message': 'One of the items in this cart is no longer valid.'}, status=400)
 
-    sale = POSSale.objects.create(
-        cashier=request.user,
-        payment_method=payment_method,
-        cart_snapshot=cart_snapshot,
-        total_amount=total,
-    )
-    create_inventory_movements_from_snapshot(
-        cart_snapshot, 'sale', source='pos',
-        related_pos_sale=sale, note=f"POS sale {sale.sale_number}",
-    )
+    try:
+        with transaction.atomic():
+            sale = POSSale.objects.create(
+                client_sale_id=client_sale_id,
+                cashier=request.user,
+                payment_method=payment_method,
+                cart_snapshot=cart_snapshot,
+                total_amount=total,
+            )
+            create_inventory_movements_from_snapshot(
+                cart_snapshot, 'sale', source='pos',
+                related_pos_sale=sale, note=f"POS sale {sale.sale_number}",
+                strict=True,
+            )
+    except ValidationError as e:
+        # Almost always the oversell guard firing — someone else (website,
+        # another POS device, ABMS) already sold the stock this cart was
+        # counting on. Nothing was saved; transaction.atomic() rolled the
+        # whole attempt back.
+        message = '; '.join(e.messages) if hasattr(e, 'messages') else str(e)
+        return JsonResponse({'status': 'error', 'message': f'Not enough stock: {message}'}, status=409)
+    except Exception:
+        return JsonResponse({'status': 'error', 'message': 'Could not complete this sale — nothing was charged or recorded. Please try again.'}, status=400)
 
     return JsonResponse({'status': 'ok', 'sale_number': sale.sale_number, 'total': str(total)})
 
