@@ -28,6 +28,13 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    # Must run BEFORE corsheaders' CorsMiddleware: corsheaders short-circuits
+    # *any* OPTIONS preflight globally (regardless of origin) before calling
+    # down to the next middleware, so if it ran first it would swallow
+    # /api/v1/ preflights before this middleware ever saw them. Placed here,
+    # this middleware gets first refusal on /api/v1/ requests and defers
+    # everything else (including ABMS's own preflights) to corsheaders below.
+    'api.middleware.ApiV1CorsMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -36,9 +43,22 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
- 
+
+# CORS for the ABMS bridge only (/api/inventory/movements/, token-authed,
+# POST). Untouched by the new /api/v1/ API — see api/middleware.py for why
+# that gets its own separate, narrower CORS layer instead of sharing this one.
 CORS_ALLOWED_ORIGINS = [
     'https://angan-baari.web.app',
+]
+
+# CORS for the new /api/v1/ read API only, used by a Next.js frontend on its
+# own domain (enforced in api/middleware.py, not django-cors-headers).
+# Comma-separated env var so the real deployed domain can be added later
+# without a code change. Defaults to the Next.js dev server for local testing.
+API_V1_CORS_ALLOWED_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv('API_V1_CORS_ALLOWED_ORIGINS', 'http://localhost:3000').split(',')
+    if origin.strip()
 ]
 
 REST_FRAMEWORK = {

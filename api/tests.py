@@ -247,3 +247,56 @@ class OrderApiTests(ApiTestBase):
         }
         response = self.client.post(reverse('v1_order_create'), payload, format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+class ApiV1CorsMiddlewareTests(ApiTestBase):
+    allowed_origin = 'http://localhost:3000'
+
+    def test_get_from_allowed_origin_gets_cors_header(self):
+        response = self.client.get(reverse('v1_product_list'), HTTP_ORIGIN=self.allowed_origin)
+        self.assertEqual(response['Access-Control-Allow-Origin'], self.allowed_origin)
+
+    def test_get_from_disallowed_origin_gets_no_cors_header(self):
+        response = self.client.get(reverse('v1_product_list'), HTTP_ORIGIN='https://evil.example.com')
+        self.assertNotIn('Access-Control-Allow-Origin', response)
+
+    def test_preflight_for_get_is_allowed(self):
+        response = self.client.options(
+            reverse('v1_product_list'),
+            HTTP_ORIGIN=self.allowed_origin,
+            HTTP_ACCESS_CONTROL_REQUEST_METHOD='GET',
+        )
+        self.assertEqual(response.status_code, 204)
+        self.assertEqual(response['Access-Control-Allow-Origin'], self.allowed_origin)
+        self.assertIn('GET', response['Access-Control-Allow-Methods'])
+
+    def test_preflight_for_post_does_not_allow_post(self):
+        """The browser preflight response must never list POST, or a real
+        browser would go ahead and send the actual cross-origin POST."""
+        response = self.client.options(
+            reverse('v1_order_create'),
+            HTTP_ORIGIN=self.allowed_origin,
+            HTTP_ACCESS_CONTROL_REQUEST_METHOD='POST',
+        )
+        self.assertEqual(response.status_code, 204)
+        self.assertNotIn('POST', response['Access-Control-Allow-Methods'])
+
+    def test_actual_post_is_not_blocked_but_gets_no_cors_header(self):
+        """CORS never blocks the request itself -- only whether a browser
+        exposes the response to foreign-origin JS. The order is still
+        created; a real browser just wouldn't have gotten this far without
+        first passing the (restrictive) preflight above."""
+        payload = {
+            'name': 'Test Customer',
+            'email': 'customer@example.com',
+            'cart': [{'product_id': self.jar.id, 'qty': 1}],
+        }
+        response = self.client.post(
+            reverse('v1_order_create'), payload, format='json', HTTP_ORIGIN=self.allowed_origin,
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertNotIn('Access-Control-Allow-Origin', response)
+
+    def test_non_v1_paths_are_unaffected(self):
+        response = self.client.get(reverse('shop'), HTTP_ORIGIN=self.allowed_origin)
+        self.assertNotIn('Access-Control-Allow-Origin', response)

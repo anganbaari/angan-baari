@@ -133,6 +133,63 @@ change — don't assume it happens automatically.**
   bundles with a fixed total price. Both check `is_live()` against
   `is_active` + date range; coupons additionally check `max_uses`.
 
+## REST API (v1)
+
+A versioned REST API now exists under `/api/v1/`, built with Django REST
+Framework in a new `api/` app (`api/serializers.py`, `api/views.py`,
+`api/urls.py`, `api/permissions.py`, `api/tests.py`).
+
+**Additive only** — the existing server-rendered website and POS
+(`templates/pos.html`, vanilla JS) are untouched and still work exactly as
+before. Nothing currently calls this API in production — it exists in
+parallel, for future use, starting with a planned Next.js
+product-browsing frontend.
+
+Endpoints:
+
+- `GET /api/v1/products/` — public, paginated, filterable by `?category=`
+- `GET /api/v1/products/{id}/` — public
+- `GET /api/v1/categories/` — public
+- `GET /api/v1/inventory/movements/` — staff-only. A separate v1
+  GET-capable view; the original `/api/inventory/movements/` (POST-only,
+  token-authed, used by ABMS) is untouched.
+- `GET/POST /api/v1/sales/` — staff-only, session-authed. POST recomputes
+  totals server-side, enforces stock, supports `client_sale_id`
+  idempotency, and reuses `create_inventory_movements_from_snapshot(...,
+  strict=True)` inside `transaction.atomic()` — the same helper
+  `pos_create_sale()` uses.
+- `POST /api/v1/orders/` — public, guest checkout. Reuses
+  `create_order_inventory_movements()` /
+  `create_inventory_movements_from_snapshot(..., strict=False)`.
+- `GET /api/v1/orders/{id}/` — returns only status fields (`id`,
+  `order_number`, `status`, `ordered_at`, `product_interest`) by default.
+  Returns the FULL order (name, email, phone, address, cart_snapshot,
+  can_cancel) only when called with `?token=<cancel_token>` matching that
+  order's own `cancel_token` (compared via `secrets.compare_digest`).
+  `cancel_token` itself is never echoed back in either response. This
+  reuses the token already generated on `ProductOrder` and already
+  emailed via `send_order_received_email` — no new secret was introduced.
+
+17/17 tests pass locally (`python manage.py test api`). Manually verified
+in production via the DRF browsable API on 2026-09-27: category list
+matches local exactly (13/13), product list matches (32/32, including the
+fixed_weight Goat variant case), a POS sale POST correctly recomputed
+total and deducted stock, idempotent resubmission returned the same
+`sale_number`, a stock-insufficient sale correctly returned 409, guest
+order creation worked with no auth, and the order token gate correctly
+limited/expanded fields as designed.
+
+**Known non-blocking technical debt:** `POSSaleView.post()` in
+`api/views.py` duplicates the per-`pricing_mode` total computation logic
+that already exists in `pos_create_sale()` in `shop/views.py` — a future
+refactor should extract this into one shared function both call, to avoid
+the two drifting apart if pricing rules change.
+
+**Gotcha:** DRF's `SessionAuthentication` does its own CSRF check
+independent of Django's middleware — this matters once/if `pos.html`'s JS
+is ever pointed at this API; it must keep sending its existing
+`X-CSRFToken` header.
+
 ## Deferred work (known, intentional, not yet built)
 
 - Local Egg / Vermicompost inventory bridge from ABMS (hook into ABMS's
