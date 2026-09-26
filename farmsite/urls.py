@@ -13,7 +13,8 @@ handler500 = 'shop.views.error_500'
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('api/inventory/', include('shop.api_urls')),   
+    path('api/inventory/', include('shop.api_urls')),
+    path('api/v1/', include('api.urls')),
     path('', include('shop.urls')),
     path('account/', include('shop.auth_urls')),
     path('sitemap.xml', sitemap, {'sitemaps': sitemaps},

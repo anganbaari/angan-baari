@@ -4,3 +4,6 @@ __pycache__/
 db.sqlite3
 staticfiles/
 .env
+
+# Obsidian local workspace state (machine-specific UI layout, not knowledge content)
+Angan-Baari-Knowledge/.obsidian/
