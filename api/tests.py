@@ -76,6 +76,15 @@ class ProductAndCategoryReadTests(ApiTestBase):
         self.assertEqual(len(response.data['variants']), 1)
         self.assertEqual(response.data['variants'][0]['weight'], '20.00')
 
+    def test_product_detail_by_slug(self):
+        response = self.client.get(reverse('v1_product_detail_by_slug', args=[self.goat.slug]))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['id'], self.goat.id)
+
+    def test_product_detail_by_slug_404_for_unknown_slug(self):
+        response = self.client.get(reverse('v1_product_detail_by_slug', args=['no-such-product']))
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
     def test_category_list_is_public(self):
         response = self.client.get(reverse('v1_category_list'))
         self.assertEqual(response.status_code, status.HTTP_200_OK)

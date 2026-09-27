@@ -47,6 +47,20 @@ class ProductDetailView(generics.RetrieveAPIView):
     permission_classes = [permissions.AllowAny]
 
 
+class ProductDetailBySlugView(generics.RetrieveAPIView):
+    """Slug-based lookup, for frontends (e.g. the Next.js shop) that only
+    know the slug, matching how the Django site's own product_detail view
+    looks products up. Additive alongside ProductDetailView (by id) —
+    neither replaces the other."""
+
+    queryset = Product.objects.select_related('category').prefetch_related('variants')
+    serializer_class = ProductSerializer
+    authentication_classes = []
+    permission_classes = [permissions.AllowAny]
+    lookup_field = 'slug'
+    lookup_url_kwarg = 'slug'
+
+
 class CategoryListView(generics.ListAPIView):
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
