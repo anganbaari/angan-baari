@@ -53,11 +53,14 @@ CORS_ALLOWED_ORIGINS = [
 
 # CORS for the new /api/v1/ read API only, used by a Next.js frontend on its
 # own domain (enforced in api/middleware.py, not django-cors-headers).
-# Comma-separated env var so the real deployed domain can be added later
-# without a code change. Defaults to the Next.js dev server for local testing.
+# Comma-separated env var so this list can be changed without a code change;
+# the default covers the Next.js dev server plus its deployed Vercel domain.
 API_V1_CORS_ALLOWED_ORIGINS = [
     origin.strip()
-    for origin in os.getenv('API_V1_CORS_ALLOWED_ORIGINS', 'http://localhost:3000').split(',')
+    for origin in os.getenv(
+        'API_V1_CORS_ALLOWED_ORIGINS',
+        'http://localhost:3000,https://angan-baari-shop.vercel.app',
+    ).split(',')
     if origin.strip()
 ]
 
