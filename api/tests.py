@@ -279,22 +279,30 @@ class ApiV1CorsMiddlewareTests(ApiTestBase):
         self.assertEqual(response['Access-Control-Allow-Origin'], self.allowed_origin)
         self.assertIn('GET', response['Access-Control-Allow-Methods'])
 
-    def test_preflight_for_post_does_not_allow_post(self):
-        """The browser preflight response must never list POST, or a real
-        browser would go ahead and send the actual cross-origin POST."""
+    def test_preflight_for_post_allows_post_on_orders_only(self):
+        """Guest checkout (POST /api/v1/orders/) is public/AllowAny with no
+        session or CSRF involved, so it's the one path allowed to preflight
+        for POST cross-origin."""
         response = self.client.options(
             reverse('v1_order_create'),
             HTTP_ORIGIN=self.allowed_origin,
             HTTP_ACCESS_CONTROL_REQUEST_METHOD='POST',
         )
         self.assertEqual(response.status_code, 204)
+        self.assertIn('POST', response['Access-Control-Allow-Methods'])
+
+    def test_preflight_for_post_still_blocked_on_sales(self):
+        """/api/v1/sales/ is staff/session-authed -- must stay GET-only
+        cross-origin until the login phase adds real credential support."""
+        response = self.client.options(
+            reverse('v1_sale_list_create'),
+            HTTP_ORIGIN=self.allowed_origin,
+            HTTP_ACCESS_CONTROL_REQUEST_METHOD='POST',
+        )
+        self.assertEqual(response.status_code, 204)
         self.assertNotIn('POST', response['Access-Control-Allow-Methods'])
 
-    def test_actual_post_is_not_blocked_but_gets_no_cors_header(self):
-        """CORS never blocks the request itself -- only whether a browser
-        exposes the response to foreign-origin JS. The order is still
-        created; a real browser just wouldn't have gotten this far without
-        first passing the (restrictive) preflight above."""
+    def test_actual_post_to_orders_succeeds_and_gets_cors_header(self):
         payload = {
             'name': 'Test Customer',
             'email': 'customer@example.com',
@@ -302,6 +310,24 @@ class ApiV1CorsMiddlewareTests(ApiTestBase):
         }
         response = self.client.post(
             reverse('v1_order_create'), payload, format='json', HTTP_ORIGIN=self.allowed_origin,
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response['Access-Control-Allow-Origin'], self.allowed_origin)
+        self.assertNotIn('Access-Control-Allow-Credentials', response)
+
+    def test_actual_post_to_sales_gets_no_cors_header(self):
+        """CORS never blocks the request itself -- only whether a browser
+        exposes the response to foreign-origin JS. A real staff sale would
+        still need to be authenticated regardless; this just confirms
+        cross-origin JS still can't read the response."""
+        self.client.login(username='cashier', password='pw')
+        payload = {
+            'client_sale_id': 'cors-test-sale-1',
+            'payment_method': 'cash',
+            'cart': [{'product_id': self.jar.id, 'qty': 1}],
+        }
+        response = self.client.post(
+            reverse('v1_sale_list_create'), payload, format='json', HTTP_ORIGIN=self.allowed_origin,
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertNotIn('Access-Control-Allow-Origin', response)
