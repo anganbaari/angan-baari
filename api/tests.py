@@ -390,6 +390,63 @@ class ApiV1CorsMiddlewareTests(ApiTestBase):
             self.assertEqual(response.status_code, 204, name)
             self.assertIn('POST', response['Access-Control-Allow-Methods'], name)
 
+    def test_actual_post_to_phase4_endpoints_gets_cors_header(self):
+        """Regression test: these 7 endpoints were added in Phase 4 but
+        never added to the CORS middleware's allowlist, so the actual
+        response (success or error) never carried Access-Control-Allow-
+        Origin -- the browser sent the request (it landed and, for
+        wishlist/toggle specifically, could even succeed server-side) but
+        then refused to let frontend JS read *any* response, surfacing as a
+        generic network-error toast/silent failure regardless of what the
+        API actually returned. A bad/missing token (401) is enough to prove
+        the CORS header itself is present; the request doesn't need to
+        succeed for this check."""
+        cases = [
+            ('post', reverse('v1_wishlist_toggle'), {'product_id': self.jar.id}),
+            ('post', reverse('v1_wishlist_set_variant'), {'product_id': self.jar.id, 'variant_id': 1}),
+            ('post', reverse('v1_wishlist_move_to_cart'), {'product_id': self.jar.id}),
+            ('post', reverse('v1_order_cancel', args=[1]), None),
+            ('post', reverse('v1_order_reorder', args=[1]), None),
+            ('post', reverse('v1_profile_change_password'), {}),
+            ('patch', reverse('v1_profile_update'), {'name': 'X', 'email': 'x@example.com'}),
+        ]
+        for method, url, payload in cases:
+            client_method = getattr(self.client, method)
+            kwargs = {'HTTP_ORIGIN': self.allowed_origin, 'HTTP_AUTHORIZATION': 'Token not-a-real-token'}
+            if payload is not None:
+                kwargs['data'] = payload
+                kwargs['format'] = 'json'
+            response = client_method(url, **kwargs)
+            self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED, url)
+            self.assertEqual(response['Access-Control-Allow-Origin'], self.allowed_origin, url)
+
+    def test_preflight_allows_patch_on_profile_update_only(self):
+        response = self.client.options(
+            reverse('v1_profile_update'),
+            HTTP_ORIGIN=self.allowed_origin,
+            HTTP_ACCESS_CONTROL_REQUEST_METHOD='PATCH',
+        )
+        self.assertEqual(response.status_code, 204)
+        self.assertIn('PATCH', response['Access-Control-Allow-Methods'])
+
+        # A path that was never granted PATCH must not get it either.
+        other_response = self.client.options(
+            reverse('v1_product_list'),
+            HTTP_ORIGIN=self.allowed_origin,
+            HTTP_ACCESS_CONTROL_REQUEST_METHOD='PATCH',
+        )
+        self.assertNotIn('PATCH', other_response['Access-Control-Allow-Methods'])
+
+    def test_order_detail_path_still_excluded_from_post_cross_origin(self):
+        """/api/v1/orders/<id>/ (GET-only status lookup) must not be swept
+        in by the new /orders/<id>/cancel|reorder/ regex patterns."""
+        response = self.client.options(
+            reverse('v1_order_detail', args=[1]),
+            HTTP_ORIGIN=self.allowed_origin,
+            HTTP_ACCESS_CONTROL_REQUEST_METHOD='POST',
+        )
+        self.assertNotIn('POST', response['Access-Control-Allow-Methods'])
+
 
 class AuthApiTests(ApiTestBase):
     """Covers the token-auth endpoints under /api/v1/auth/. These create
