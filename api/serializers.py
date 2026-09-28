@@ -29,12 +29,13 @@ class ProductSerializer(serializers.ModelSerializer):
     starting_weight_label = serializers.SerializerMethodField()
     locked_total_price = serializers.SerializerMethodField()
     main_image = serializers.SerializerMethodField()
+    images = serializers.SerializerMethodField()
 
     class Meta:
         model = Product
         fields = [
             'id', 'name', 'slug', 'category', 'description', 'detail_description',
-            'season', 'farming_method', 'is_available', 'main_image',
+            'season', 'farming_method', 'is_available', 'main_image', 'images',
             'price', 'price_unit', 'origin', 'barcode', 'pricing_mode',
             'weight_step', 'fixed_weight', 'weight_unit_label',
             'variants', 'starting_price', 'starting_weight_label',
@@ -62,6 +63,26 @@ class ProductSerializer(serializers.ModelSerializer):
 
     def get_main_image(self, obj):
         return obj.main_image.url if obj.main_image else None
+
+    def get_images(self, obj):
+        """Every photo this product has, in gallery order.
+
+        There is no ProductImage/M2M model — Product carries four flat
+        ImageFields (main_image, image2, image3, image4, all blank=True),
+        and product_detail.html builds its thumb grid + lightbox from
+        exactly these four, in this order, skipping the blank ones. This
+        mirrors that, so a frontend gallery can consume `images` wholesale.
+
+        main_image is included as images[0] (same as the reference page,
+        whose first thumbnail IS the main image) — so don't render
+        main_image separately on top of this list. `main_image` is kept as
+        its own field for existing consumers.
+        """
+        return [
+            field.url
+            for field in (obj.main_image, obj.image2, obj.image3, obj.image4)
+            if field
+        ]
 
 
 class InventoryMovementReadSerializer(serializers.ModelSerializer):

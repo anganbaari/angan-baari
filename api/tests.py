@@ -81,6 +81,46 @@ class ProductAndCategoryReadTests(ApiTestBase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['id'], self.goat.id)
 
+    def test_images_lists_every_photo_in_gallery_order_skipping_blanks(self):
+        """Product stores photos as four flat ImageFields; `images` collects
+        the non-blank ones in the same order product_detail.html's thumb grid
+        uses, with main_image first. image3 is deliberately left blank here."""
+        self.fruit.main_image = 'https://ik.imagekit.io/x/main.jpg'
+        self.fruit.image2 = 'https://ik.imagekit.io/x/two.jpg'
+        self.fruit.image4 = 'https://ik.imagekit.io/x/four.jpg'
+        self.fruit.save()
+
+        response = self.client.get(reverse('v1_product_detail_by_slug', args=[self.fruit.slug]))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            response.data['images'],
+            [
+                'https://ik.imagekit.io/x/main.jpg',
+                'https://ik.imagekit.io/x/two.jpg',
+                'https://ik.imagekit.io/x/four.jpg',
+            ],
+        )
+        # main_image is unchanged for existing consumers, and is images[0].
+        self.assertEqual(response.data['main_image'], 'https://ik.imagekit.io/x/main.jpg')
+        self.assertEqual(response.data['images'][0], response.data['main_image'])
+
+    def test_images_is_empty_list_when_product_has_no_photos(self):
+        response = self.client.get(reverse('v1_product_detail_by_slug', args=[self.jar.slug]))
+        self.assertEqual(response.data['main_image'], None)
+        self.assertEqual(response.data['images'], [])
+
+    def test_images_present_on_list_endpoint_too(self):
+        self.fruit.main_image = 'https://ik.imagekit.io/x/main.jpg'
+        self.fruit.image3 = 'https://ik.imagekit.io/x/three.jpg'
+        self.fruit.save()
+
+        response = self.client.get(reverse('v1_product_list'))
+        mango = next(p for p in response.data['results'] if p['id'] == self.fruit.id)
+        self.assertEqual(
+            mango['images'],
+            ['https://ik.imagekit.io/x/main.jpg', 'https://ik.imagekit.io/x/three.jpg'],
+        )
+
     def test_product_detail_by_slug_404_for_unknown_slug(self):
         response = self.client.get(reverse('v1_product_detail_by_slug', args=['no-such-product']))
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
