@@ -406,9 +406,9 @@ class PasswordResetRequestView(APIView):
 
     The emailed link points at FRONTEND_BASE_URL (the Next.js app) rather
     than the traditional site's own reset page, since this endpoint exists
-    for that frontend — see settings.py. That frontend does not have a
-    /reset-password/<token>/ route built yet, so the link will 404 until
-    that page exists; flagging rather than hiding this."""
+    for that frontend — see settings.py. That frontend's
+    /reset-password/[token] route was built in the Phase 3 (Auth) frontend
+    work and confirmed end-to-end against this endpoint."""
 
     authentication_classes = []
     permission_classes = [permissions.AllowAny]

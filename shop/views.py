@@ -1,7 +1,6 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse, HttpResponse
 from django.utils.html import escape
-from django.core.mail import send_mail
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.contrib.admin.views.decorators import staff_member_required
@@ -12,6 +11,7 @@ from .models import NewsletterSubscriber, ContactMessage, ProductOrder, Review, 
 from .emails import (
     send_order_received_email,
     send_order_cancelled_email,
+    send_resend_email,
 )
 
 def home(request):
@@ -37,9 +37,10 @@ def contact(request):
                 subject=subject,
                 message=message,
             )
-            send_mail(
+            send_resend_email(
+                to=settings.ADMIN_EMAIL,
                 subject=f'📩 New Message from {name} — Angan Baari',
-                message=f'''
+                body=f'''
 New contact message received!
 
 ━━━━━━━━━━━━━━━━━━━━━━
@@ -52,13 +53,11 @@ Subject : {subject}
 Message : {message}
 ━━━━━━━━━━━━━━━━━━━━━━
                 ''',
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                recipient_list=[settings.ADMIN_EMAIL],
-                fail_silently=True,
             )
-            send_mail(
+            send_resend_email(
+                to=email,
                 subject='✅ Message Received — Angan Baari',
-                message=f'''
+                body=f'''
 नमस्ते {name}! 🌿
 
 Thank you for contacting Angan Baari!
@@ -71,9 +70,6 @@ Message : {message}
 
 Angan Baari Team 🌱
                 ''',
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                recipient_list=[email],
-                fail_silently=True,
             )
             return JsonResponse({'status': 'success'})
         return JsonResponse({'status': 'error'})
@@ -213,9 +209,10 @@ def newsletter_signup(request):
             if created:
                 subscriber.name = name
                 subscriber.save()
-                send_mail(
+                send_resend_email(
+                    to=email,
                     subject='🌿 Welcome to Angan Baari Newsletter!',
-                    message=f'''
+                    body=f'''
 नमस्ते {name or 'valued customer'}! 🌿
 
 Thank you for subscribing to Angan Baari newsletter!
@@ -231,9 +228,6 @@ https://wa.me/9779821025084
 
 Angan Baari Team 🌱
                     ''',
-                    from_email=settings.DEFAULT_FROM_EMAIL,
-                    recipient_list=[email],
-                    fail_silently=True,
                 )
         return redirect('/?subscribed=1#newsletter')
     return redirect('home')

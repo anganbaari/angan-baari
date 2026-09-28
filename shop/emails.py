@@ -1,5 +1,9 @@
+import logging
+
 import requests
 from django.conf import settings
+
+logger = logging.getLogger(__name__)
 
 
 def send_telegram(message):
@@ -20,7 +24,7 @@ def send_telegram(message):
 def send_resend_email(to, subject, body):
     """Send an email via Resend API."""
     try:
-        requests.post(
+        response = requests.post(
             'https://api.resend.com/emails',
             headers={
                 'Authorization': f'Bearer {settings.RESEND_API_KEY}',
@@ -34,8 +38,13 @@ def send_resend_email(to, subject, body):
             },
             timeout=10,
         )
+        if not response.ok:
+            logger.warning(
+                'send_resend_email: Resend API rejected email to %s (status %s): %s',
+                to, response.status_code, response.text,
+            )
     except Exception:
-        pass
+        logger.warning('send_resend_email: failed to send email to %s', to, exc_info=True)
 
 
 def send_newsletter_campaign(subject, body, subscribers):
