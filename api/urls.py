@@ -11,4 +11,13 @@ urlpatterns = [
     path('sales/', views.POSSaleView.as_view(), name='v1_sale_list_create'),
     path('orders/', views.OrderCreateView.as_view(), name='v1_order_create'),
     path('orders/<int:pk>/', views.OrderDetailView.as_view(), name='v1_order_detail'),
+    path('auth/signup/', views.SignupView.as_view(), name='v1_auth_signup'),
+    path('auth/login/', views.LoginView.as_view(), name='v1_auth_login'),
+    path('auth/logout/', views.LogoutView.as_view(), name='v1_auth_logout'),
+    path('auth/password-reset/', views.PasswordResetRequestView.as_view(), name='v1_auth_password_reset'),
+    path(
+        'auth/password-reset-confirm/',
+        views.PasswordResetConfirmView.as_view(),
+        name='v1_auth_password_reset_confirm',
+    ),
 ]

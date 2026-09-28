@@ -2,9 +2,11 @@ import uuid
 from decimal import Decimal
 
 from django.contrib.auth.models import User
+from django.core.cache import cache
 from django.test import TestCase
 from django.urls import reverse
 from rest_framework import status
+from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
 
 from shop.models import Category, InventoryMovement, Product, ProductVariant
@@ -375,3 +377,166 @@ class ApiV1CorsMiddlewareTests(ApiTestBase):
     def test_non_v1_paths_are_unaffected(self):
         response = self.client.get(reverse('shop'), HTTP_ORIGIN=self.allowed_origin)
         self.assertNotIn('Access-Control-Allow-Origin', response)
+
+    def test_preflight_for_post_allows_post_on_auth_endpoints(self):
+        for name in ('v1_auth_signup', 'v1_auth_login', 'v1_auth_password_reset'):
+            response = self.client.options(
+                reverse(name),
+                HTTP_ORIGIN=self.allowed_origin,
+                HTTP_ACCESS_CONTROL_REQUEST_METHOD='POST',
+            )
+            self.assertEqual(response.status_code, 204, name)
+            self.assertIn('POST', response['Access-Control-Allow-Methods'], name)
+
+
+class AuthApiTests(ApiTestBase):
+    """Covers the token-auth endpoints under /api/v1/auth/. These create
+    real auth.User rows in the same table shop/auth_views.py's traditional
+    signup/login/forgot-password views use — not a parallel user system."""
+
+    def test_signup_creates_user_and_returns_token(self):
+        payload = {
+            'name': 'Ramesh Thapa',
+            'email': 'ramesh@example.com',
+            'password': 'a-strong-p4ssword',
+            'confirm_password': 'a-strong-p4ssword',
+        }
+        response = self.client.post(reverse('v1_auth_signup'), payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertEqual(response.data['user']['email'], 'ramesh@example.com')
+        self.assertEqual(response.data['user']['name'], 'Ramesh Thapa')
+        self.assertTrue(response.data['token'])
+
+        # Same table the traditional site's signup() uses -- username=email.
+        user = User.objects.get(email='ramesh@example.com')
+        self.assertEqual(user.username, 'ramesh@example.com')
+        self.assertEqual(user.first_name, 'Ramesh')
+        self.assertEqual(user.last_name, 'Thapa')
+        self.assertTrue(user.check_password('a-strong-p4ssword'))
+
+        # The returned token is real and actually authenticates.
+        self.assertEqual(Token.objects.get(user=user).key, response.data['token'])
+
+    def test_signup_rejects_duplicate_email(self):
+        User.objects.create_user(username='dup@example.com', email='dup@example.com', password='whatever123')
+        payload = {
+            'name': 'Someone Else',
+            'email': 'dup@example.com',
+            'password': 'a-strong-p4ssword',
+            'confirm_password': 'a-strong-p4ssword',
+        }
+        response = self.client.post(reverse('v1_auth_signup'), payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('email', response.data)
+
+    def test_signup_rejects_mismatched_passwords(self):
+        payload = {
+            'name': 'X', 'email': 'x@example.com',
+            'password': 'a-strong-p4ssword', 'confirm_password': 'different-password',
+        }
+        response = self.client.post(reverse('v1_auth_signup'), payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('confirm_password', response.data)
+
+    def test_signup_rejects_weak_password(self):
+        payload = {
+            'name': 'X', 'email': 'x2@example.com',
+            'password': '1234', 'confirm_password': '1234',
+        }
+        response = self.client.post(reverse('v1_auth_signup'), payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('password', response.data)
+        self.assertFalse(User.objects.filter(email='x2@example.com').exists())
+
+    def test_login_succeeds_with_correct_credentials(self):
+        User.objects.create_user(username='shopper2@example.com', email='shopper2@example.com', password='correct-horse')
+        response = self.client.post(
+            reverse('v1_auth_login'),
+            {'email': 'shopper2@example.com', 'password': 'correct-horse'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['user']['email'], 'shopper2@example.com')
+        self.assertTrue(response.data['token'])
+
+    def test_login_rejects_wrong_password(self):
+        User.objects.create_user(username='shopper3@example.com', email='shopper3@example.com', password='correct-horse')
+        response = self.client.post(
+            reverse('v1_auth_login'),
+            {'email': 'shopper3@example.com', 'password': 'wrong-password'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_login_rejects_unknown_email(self):
+        response = self.client.post(
+            reverse('v1_auth_login'),
+            {'email': 'nobody@example.com', 'password': 'whatever'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_logout_deletes_token_and_requires_auth(self):
+        user = User.objects.create_user(username='logout@example.com', email='logout@example.com', password='whatever123')
+        token = Token.objects.create(user=user)
+
+        # No token presented at all -- rejected.
+        anon_response = self.client.post(reverse('v1_auth_logout'), format='json')
+        self.assertIn(anon_response.status_code, (status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN))
+
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {token.key}')
+        response = self.client.post(reverse('v1_auth_logout'), format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertFalse(Token.objects.filter(user=user).exists())
+
+    def test_password_reset_request_always_returns_ok(self):
+        User.objects.create_user(username='hasaccount@example.com', email='hasaccount@example.com', password='whatever123')
+
+        real_response = self.client.post(
+            reverse('v1_auth_password_reset'), {'email': 'hasaccount@example.com'}, format='json',
+        )
+        unknown_response = self.client.post(
+            reverse('v1_auth_password_reset'), {'email': 'nobody@example.com'}, format='json',
+        )
+        # Same response either way -- no account-existence signal (matches
+        # forgot_password()'s own anti-enumeration behavior).
+        self.assertEqual(real_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(unknown_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(real_response.data['message'], unknown_response.data['message'])
+
+    def test_password_reset_confirm_with_valid_token(self):
+        user = User.objects.create_user(username='reset@example.com', email='reset@example.com', password='old-password-1')
+        cache.set('pwd_reset_test-token-abc', user.id, 3600)
+
+        response = self.client.post(
+            reverse('v1_auth_password_reset_confirm'),
+            {'token': 'test-token-abc', 'password': 'brand-new-p4ssword', 'confirm_password': 'brand-new-p4ssword'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+
+        user.refresh_from_db()
+        self.assertTrue(user.check_password('brand-new-p4ssword'))
+        # Token is single-use -- consumed on success.
+        self.assertIsNone(cache.get('pwd_reset_test-token-abc'))
+
+    def test_password_reset_confirm_with_invalid_token(self):
+        response = self.client.post(
+            reverse('v1_auth_password_reset_confirm'),
+            {'token': 'no-such-token', 'password': 'brand-new-p4ssword', 'confirm_password': 'brand-new-p4ssword'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('token', response.data)
+
+    def test_password_reset_confirm_rejects_mismatched_passwords(self):
+        user = User.objects.create_user(username='reset2@example.com', email='reset2@example.com', password='old-password-1')
+        cache.set('pwd_reset_test-token-xyz', user.id, 3600)
+
+        response = self.client.post(
+            reverse('v1_auth_password_reset_confirm'),
+            {'token': 'test-token-xyz', 'password': 'brand-new-p4ssword', 'confirm_password': 'does-not-match'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('confirm_password', response.data)

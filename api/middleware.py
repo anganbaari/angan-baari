@@ -4,14 +4,22 @@ from django.utils.cache import patch_vary_headers
 
 READ_METHODS = ('GET', 'HEAD')
 
-# POST is allowed cross-origin for exactly this one path — guest checkout
-# (POST /api/v1/orders/) is public/AllowAny with no session or CSRF
-# involved at all, so it carries none of the credential/CSRF-trust concerns
-# that /api/v1/sales/ (staff, session-authed) would. Deliberately an exact
-# path match, not a prefix: /api/v1/orders/<id>/ (order status, GET-only)
-# is untouched, and /api/v1/sales/ stays GET-only cross-origin until the
-# login phase gives it real cross-origin session support.
-POST_ALLOWED_PATHS = {'/api/v1/orders/'}
+# POST is allowed cross-origin only for these exact paths. Each one is
+# either public/AllowAny (orders, signup, login, password-reset*) or
+# authenticates itself via a per-request Authorization header rather than a
+# cookie (logout) — none of them carry the session/CSRF-trust concerns
+# /api/v1/sales/ (staff, SessionAuthentication) would, so that one stays
+# GET-only cross-origin until it gets real cross-origin session support.
+# Deliberately exact matches, not a prefix: /api/v1/orders/<id>/ (order
+# status, GET-only) is untouched.
+POST_ALLOWED_PATHS = {
+    '/api/v1/orders/',
+    '/api/v1/auth/signup/',
+    '/api/v1/auth/login/',
+    '/api/v1/auth/logout/',
+    '/api/v1/auth/password-reset/',
+    '/api/v1/auth/password-reset-confirm/',
+}
 
 
 class ApiV1CorsMiddleware:
@@ -26,10 +34,13 @@ class ApiV1CorsMiddleware:
     cross-origin POST there. So django-cors-headers is left completely
     untouched for /api/inventory/, and this middleware independently
     handles /api/v1/ with its own origin list and its own method
-    restriction — GET/HEAD/OPTIONS everywhere, plus POST for exactly
-    /api/v1/orders/ (see POST_ALLOWED_PATHS above). No credentials
-    (session/CSRF cookies) are allowed here yet — that's held for the
-    login phase, since guest checkout needs none of it.
+    restriction — GET/HEAD/OPTIONS everywhere, plus POST for the specific
+    paths in POST_ALLOWED_PATHS above (guest orders, and now the token-auth
+    endpoints). No session/CSRF cookies are involved anywhere in this
+    middleware — the auth endpoints use a per-request Authorization header
+    instead (see api/views.py's AUTH section), so the SESSION_COOKIE_*/
+    CSRF_TRUSTED_ORIGINS changes drafted during Phase 2 stayed unnecessary
+    and were never applied.
 
     Origins come from settings.API_V1_CORS_ALLOWED_ORIGINS (env-driven, see
     farmsite/settings.py), so the real deployed Next.js domain can be added

@@ -1,3 +1,8 @@
+from django.contrib.auth import authenticate
+from django.contrib.auth.models import User
+from django.contrib.auth.password_validation import validate_password
+from django.core.cache import cache
+from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
 from shop.models import (
@@ -174,3 +179,78 @@ class OrderDetailSerializer(serializers.ModelSerializer):
 
     def get_can_cancel(self, obj):
         return obj.can_cancel()
+
+
+# ─── AUTH (token-based, cross-origin) ──────────────────────────
+# Same underlying user system as shop/auth_views.py (signup/login_view/
+# forgot_password/reset_password) — same auth.User table, username=email,
+# same create_user()/authenticate() calls, same cache-based reset-token
+# scheme (a token minted here is interchangeable with one minted by the
+# traditional /account/ views, and vice versa). This is a second, additive
+# entry point onto that one user system, not a parallel one. It differs
+# from the traditional views in one deliberate way: password strength is
+# checked with Django's own validate_password() (all 4
+# AUTH_PASSWORD_VALIDATORS already configured in settings.py), not the
+# traditional signup/reset views' plain len(password) < 8 check — that gap
+# already exists there today and isn't touched by this addition.
+
+class SignupSerializer(serializers.Serializer):
+    name = serializers.CharField(max_length=150)
+    email = serializers.EmailField()
+    password = serializers.CharField(write_only=True)
+    confirm_password = serializers.CharField(write_only=True)
+
+    def validate_email(self, value):
+        if User.objects.filter(email__iexact=value).exists():
+            raise serializers.ValidationError('An account with this email already exists.')
+        return value
+
+    def validate(self, data):
+        if data['password'] != data['confirm_password']:
+            raise serializers.ValidationError({'confirm_password': ['Passwords do not match.']})
+        try:
+            validate_password(data['password'])
+        except DjangoValidationError as e:
+            raise serializers.ValidationError({'password': e.messages})
+        return data
+
+
+class LoginSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    password = serializers.CharField(write_only=True)
+
+    def validate(self, data):
+        user = authenticate(username=data['email'], password=data['password'])
+        if not user:
+            raise serializers.ValidationError('Invalid email or password.')
+        data['user'] = user
+        return data
+
+
+class PasswordResetRequestSerializer(serializers.Serializer):
+    """Shape validation only — deliberately never raises for an unknown
+    email (the view always responds the same way either way), matching
+    forgot_password()'s own anti-enumeration behavior exactly."""
+
+    email = serializers.EmailField()
+
+
+class PasswordResetConfirmSerializer(serializers.Serializer):
+    token = serializers.CharField()
+    password = serializers.CharField(write_only=True)
+    confirm_password = serializers.CharField(write_only=True)
+
+    def validate(self, data):
+        user_id = cache.get(f"pwd_reset_{data['token']}")
+        if not user_id:
+            raise serializers.ValidationError(
+                {'token': ['This reset link is invalid or has expired.']}
+            )
+        if data['password'] != data['confirm_password']:
+            raise serializers.ValidationError({'confirm_password': ['Passwords do not match.']})
+        try:
+            validate_password(data['password'])
+        except DjangoValidationError as e:
+            raise serializers.ValidationError({'password': e.messages})
+        data['user_id'] = user_id
+        return data

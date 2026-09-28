@@ -64,6 +64,13 @@ API_V1_CORS_ALLOWED_ORIGINS = [
     if origin.strip()
 ]
 
+# The Next.js frontend's own base URL — used to build links that must point
+# at that app rather than this Django site's own pages, e.g. the
+# password-reset email sent from api/views.py's PasswordResetRequestView.
+# Single value (not a list like API_V1_CORS_ALLOWED_ORIGINS above), since a
+# reset link can only point at one place. No trailing slash.
+FRONTEND_BASE_URL = os.getenv('FRONTEND_BASE_URL', 'https://angan-baari-shop.vercel.app')
+
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework.authentication.TokenAuthentication',
