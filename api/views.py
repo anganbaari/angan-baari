@@ -7,30 +7,44 @@ from django.contrib.auth.models import User
 from django.core.cache import cache
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
+from django.shortcuts import get_object_or_404
 from rest_framework import generics, permissions, status
 from rest_framework.authentication import SessionAuthentication, TokenAuthentication
 from rest_framework.authtoken.models import Token
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from shop.emails import send_order_received_email, send_resend_email
-from shop.models import Category, InventoryMovement, POSSale, Product, ProductOrder
-from shop.views import create_inventory_movements_from_snapshot, create_order_inventory_movements
+from shop.emails import send_order_cancelled_email, send_order_received_email, send_resend_email
+from shop.models import Category, InventoryMovement, POSSale, Product, ProductOrder, Wishlist, get_live_coupons
+from shop.views import (
+    create_inventory_movements_from_snapshot,
+    create_order_inventory_movements,
+    format_weight,
+)
 
 from .permissions import IsStaffUser
 from .serializers import (
     CategorySerializer,
+    ChangePasswordSerializer,
+    CouponSerializer,
     InventoryMovementReadSerializer,
     LoginSerializer,
     OrderCreateSerializer,
     OrderDetailSerializer,
+    OrderHistorySerializer,
     OrderStatusSerializer,
     PasswordResetConfirmSerializer,
     PasswordResetRequestSerializer,
     POSSaleCreateSerializer,
     POSSaleReadSerializer,
     ProductSerializer,
+    ProductVariantSerializer,
+    ProfileUpdateSerializer,
     SignupSerializer,
+    WishlistItemSerializer,
+    WishlistMoveToCartSerializer,
+    WishlistSetVariantSerializer,
+    WishlistToggleSerializer,
 )
 
 
@@ -466,3 +480,303 @@ class PasswordResetConfirmView(APIView):
         cache.delete(f"pwd_reset_{data['token']}")
 
         return Response({'status': 'ok', 'message': 'Password reset successfully.'})
+
+
+# ─── PROFILE PAGE (token-authenticated) ─────────────────────────
+# Backs the Next.js Profile page (Phase 4). ProductOrder has no User FK, so
+# "my orders" is matched by email the same way profile()'s own query does;
+# Coupon has no per-user relation either, so /coupons/ is the same global
+# get_live_coupons() list the public offers() page and the traditional
+# profile page's "My Coupons" section already show everyone.
+
+class ProfileOrderListView(generics.ListAPIView):
+    """GET /api/v1/profile/orders/ -- same email-match ProductOrder query
+    profile() uses, same ordering (newest first)."""
+
+    serializer_class = OrderHistorySerializer
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return ProductOrder.objects.filter(email=self.request.user.email).order_by('-ordered_at')
+
+
+class OrderCancelView(APIView):
+    """POST /api/v1/orders/<pk>/cancel/ -- ownership proven by the caller's
+    token + email match (same scoping as ProfileOrderListView), not by the
+    emailed cancel_token -- that flow stays at the existing
+    /cancel/<token>/ page and OrderDetailView's ?token= gate, both untouched.
+    A pk belonging to another user's order 404s, same as it not existing --
+    this view never reveals whether the id exists at all to a non-owner.
+    Mirrors cancel_order()'s two rejection states from cancel.html: already
+    cancelled, and the 30-minute window expired."""
+
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk, *args, **kwargs):
+        order = get_object_or_404(ProductOrder, pk=pk, email=request.user.email)
+
+        if order.status == 'cancelled':
+            return Response(
+                {'status': 'error', 'message': 'This order has already been cancelled.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if not order.can_cancel():
+            return Response(
+                {'status': 'error', 'message': 'The 30-minute cancellation window for this order has expired.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        order.status = 'cancelled'
+        order.save()
+        create_order_inventory_movements(order, 'return')
+        send_order_cancelled_email(order)
+
+        return Response({'status': 'ok', 'order': OrderHistorySerializer(order).data})
+
+
+class OrderReorderView(APIView):
+    """POST /api/v1/orders/<pk>/reorder/ -- the traditional reorder() view
+    adds straight into the session cart; the Next.js cart is client-side
+    localStorage (lib/cart.ts), so this resolves the same per-line rules
+    reorder() uses (skip a product that's gone/unavailable, always skip
+    fixed_weight -- each listing is one unique animal, unlikely to still be
+    around -- snap variable_weight to the nearest step) and hands back
+    resolved product+weight+qty per line for the frontend to call its own
+    addItem(product, {weight, qty}) with, instead of mutating a cart here."""
+
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk, *args, **kwargs):
+        order = get_object_or_404(ProductOrder, pk=pk, email=request.user.email)
+
+        if not order.cart_snapshot:
+            return Response(
+                {
+                    'status': 'error',
+                    'message': "This order can't be reordered — it was placed before this feature existed.",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        items = []
+        skipped_count = 0
+
+        for line in order.cart_snapshot:
+            try:
+                product = Product.objects.get(id=line.get('product_id'), is_available=True)
+            except (Product.DoesNotExist, TypeError, ValueError):
+                skipped_count += 1
+                continue
+
+            if product.pricing_mode == 'fixed_weight':
+                skipped_count += 1
+                continue
+
+            try:
+                qty = max(1, int(line.get('qty') or 1))
+            except (TypeError, ValueError):
+                qty = 1
+
+            if product.pricing_mode == 'variable_weight':
+                step = product.weight_step or '0.50'
+                weight_str = format_weight(line.get('weight') or step, step)
+                qty_to_add = 1  # each variable-weight line is one weight-slice, same as reorder()
+            else:  # fixed_quantity
+                weight_str = None
+                qty_to_add = qty
+
+            items.append({
+                'product': ProductSerializer(product).data,
+                'weight': weight_str,
+                'qty': qty_to_add,
+            })
+
+        response = {'status': 'ok', 'items': items, 'skipped_count': skipped_count}
+        if not items:
+            response['message'] = 'None of the items from this order are available to reorder right now.'
+        return Response(response)
+
+
+class WishlistListView(generics.ListAPIView):
+    """GET /api/v1/wishlist/ -- same Wishlist rows profile() passes to
+    profile.html's wishlist section."""
+
+    serializer_class = WishlistItemSerializer
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return Wishlist.objects.filter(user=self.request.user).select_related('product', 'variant')
+
+
+class WishlistToggleView(APIView):
+    """POST /api/v1/wishlist/toggle/ -- mirrors wishlist_toggle() exactly,
+    with product_id/variant_id in the body instead of the URL path (this is
+    a flat endpoint, not /wishlist/toggle/<id>/)."""
+
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        serializer = WishlistToggleSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        product = get_object_or_404(Product, id=data['product_id'])
+        existing = Wishlist.objects.filter(user=request.user, product=product).first()
+        if existing:
+            existing.delete()
+            is_saved = False
+        else:
+            variant = None
+            if product.pricing_mode == 'fixed_weight':
+                variant_id = data.get('variant_id')
+                if variant_id:
+                    variant = product.variants.filter(id=variant_id, is_available=True).first()
+                if not variant:
+                    available = sorted(product.available_variants(), key=lambda v: v.total_price())
+                    variant = available[0] if available else None
+            Wishlist.objects.create(user=request.user, product=product, variant=variant)
+            is_saved = True
+
+        return Response({'status': 'ok', 'is_saved': is_saved})
+
+
+class WishlistSetVariantView(APIView):
+    """POST /api/v1/wishlist/set-variant/ -- mirrors wishlist_set_variant()
+    exactly, including the 400 when the requested size is no longer
+    available (and the 404 when this product was never wishlisted at all --
+    wishlist_set_variant() uses get_object_or_404 the same way)."""
+
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        serializer = WishlistSetVariantSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        product = get_object_or_404(Product, id=data['product_id'])
+        wishlist_item = get_object_or_404(Wishlist, user=request.user, product=product)
+
+        variant = product.variants.filter(id=data['variant_id'], is_available=True).first()
+        if not variant:
+            return Response(
+                {'status': 'error', 'message': 'That size is no longer available'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        wishlist_item.variant = variant
+        wishlist_item.save(update_fields=['variant'])
+        return Response({
+            'status': 'ok',
+            'weight': f"{variant.weight:.2f}",
+            'price': str(variant.total_price()),
+        })
+
+
+class WishlistMoveToCartView(APIView):
+    """POST /api/v1/wishlist/move-to-cart/ -- doesn't touch any server-side
+    cart (the Next.js cart is client-side localStorage, see lib/cart.ts).
+    Resolves which variant applies using the same fixed_weight defaulting
+    resolve_cart_line() uses, then removes the wishlist row -- matching
+    wishlist_move_to_cart()'s "claimed once it's in the cart" behavior --
+    and leaves it to the frontend to call its own addItem(product,
+    {variant}), which builds the identical cart line resolve_cart_line()
+    would. variable_weight/fixed_quantity products get variant: null; the
+    traditional wishlist UI never sends a weight/quantity for those modes
+    either, so both sides default the same way (one step / one unit) inside
+    addItem() itself. Also mirrors wishlist_move_to_cart()'s unconditional
+    delete -- calling this for a product never actually wishlisted is a
+    no-op on the Wishlist side, not a 404."""
+
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        serializer = WishlistMoveToCartSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        product = get_object_or_404(Product, id=data['product_id'])
+
+        variant = None
+        if product.pricing_mode == 'fixed_weight':
+            variant_id = data.get('variant_id')
+            if variant_id:
+                variant = product.variants.filter(id=variant_id, is_available=True).first()
+            if not variant:
+                available = sorted(product.available_variants(), key=lambda v: v.total_price())
+                variant = available[0] if available else None
+
+        Wishlist.objects.filter(user=request.user, product=product).delete()
+
+        return Response({
+            'status': 'ok',
+            'product': ProductSerializer(product).data,
+            'variant': ProductVariantSerializer(variant).data if variant else None,
+        })
+
+
+class CouponListView(generics.ListAPIView):
+    """GET /api/v1/coupons/ -- the same global get_live_coupons() list the
+    public offers() page and the traditional profile page's "My Coupons"
+    section already show every visitor/user identically; there is no
+    per-user coupon relation to filter by (see Coupon model)."""
+
+    serializer_class = CouponSerializer
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return get_live_coupons()
+
+
+class ProfileUpdateView(APIView):
+    """PATCH /api/v1/profile/ -- matches edit_profile() exactly: only name
+    and email are editable, and changing email also changes username since
+    signup uses email as username (see SignupView / shop/auth_views.signup())."""
+
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [permissions.IsAuthenticated]
+
+    def patch(self, request, *args, **kwargs):
+        serializer = ProfileUpdateSerializer(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        user = request.user
+        parts = data['name'].split()
+        user.first_name = parts[0]
+        user.last_name = ' '.join(parts[1:]) if len(parts) > 1 else ''
+        user.email = data['email']
+        user.username = data['email']
+        user.save()
+
+        return Response({'status': 'ok', 'user': _serialize_user(user)})
+
+
+class ChangePasswordView(APIView):
+    """POST /api/v1/profile/change-password/ -- validation matches
+    change_password()'s PasswordChangeForm (correct old password, new1==
+    new2, Django's full password-validator chain). Doesn't rotate the
+    caller's token: a DRF token isn't derived from the password hash (unlike
+    a session, which update_session_auth_hash() has to specifically keep
+    alive after a password change), so it stays valid on its own -- same
+    "stay logged in" outcome, no extra step needed."""
+
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        serializer = ChangePasswordSerializer(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+
+        user = request.user
+        user.set_password(serializer.validated_data['new_password1'])
+        user.save()
+
+        return Response({'status': 'ok', 'message': 'Password changed successfully.'})

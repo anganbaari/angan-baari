@@ -442,6 +442,19 @@ class Coupon(models.Model):
         else:
             discount = self.discount_value
         return min(discount, subtotal)
+
+
+def get_live_coupons():
+    """Every currently-live coupon (active, within date range, under its use
+    cap) — shared by the public offers page, the traditional profile page's
+    "My Coupons" section, and the /api/v1/coupons/ endpoint, so all three
+    stay in sync instead of re-implementing the same filter three times."""
+    from django.utils import timezone
+    now = timezone.now()
+    candidates = Coupon.objects.filter(is_active=True, start_date__lte=now, end_date__gte=now)
+    return [c for c in candidates if c.is_live()]
+
+
 class InventoryMovement(models.Model):
     """A single stock change for a product — the append-only ledger that
     inventory is derived from, instead of one editable 'stock' number.

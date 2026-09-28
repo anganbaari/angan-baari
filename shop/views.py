@@ -1321,7 +1321,7 @@ def shop(request):
 
 @login_required(login_url='login')
 def offers(request):
-    from .models import Offer, Coupon
+    from .models import Offer, get_live_coupons
     from django.utils import timezone
     now = timezone.now()
 
@@ -1334,10 +1334,7 @@ def offers(request):
     )
 
     # Festival coupons currently live (e.g. Dashain, Tihar)
-    candidate_coupons = Coupon.objects.filter(
-        is_active=True, start_date__lte=now, end_date__gte=now
-    )
-    live_coupons = [c for c in candidate_coupons if c.is_live()]
+    live_coupons = get_live_coupons()
 
     discount_offers = []
     for offer in live_offers:

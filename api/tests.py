@@ -1,15 +1,17 @@
 import uuid
+from datetime import timedelta
 from decimal import Decimal
 
 from django.contrib.auth.models import User
 from django.core.cache import cache
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
 
-from shop.models import Category, InventoryMovement, Product, ProductVariant
+from shop.models import Category, Coupon, InventoryMovement, Product, ProductOrder, ProductVariant, Wishlist
 
 
 class ApiTestBase(TestCase):
@@ -540,3 +542,359 @@ class AuthApiTests(ApiTestBase):
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('confirm_password', response.data)
+
+
+class ProfileApiTestBase(ApiTestBase):
+    """Shared setup for the Phase 4 profile-page endpoints: a logged-in
+    'owner' (token-authed) plus a second unrelated user, so ownership checks
+    can be proven to actually exclude someone else's data, not just
+    coincidentally pass because there was nothing else in the database."""
+
+    def setUp(self):
+        super().setUp()
+        self.owner = User.objects.create_user(
+            username='owner@example.com', email='owner@example.com',
+            password='whatever123', first_name='Owner', last_name='One',
+        )
+        self.owner_token = Token.objects.create(user=self.owner)
+        self.other = User.objects.create_user(
+            username='other@example.com', email='other@example.com', password='whatever123',
+        )
+        self.other_token = Token.objects.create(user=self.other)
+
+    def authenticate_as_owner(self):
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.owner_token.key}')
+
+    def authenticate_as_other(self):
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.other_token.key}')
+
+
+class ProfileOrderApiTests(ProfileApiTestBase):
+    """GET /api/v1/profile/orders/, POST /api/v1/orders/<pk>/cancel/,
+    POST /api/v1/orders/<pk>/reorder/ -- ProductOrder has no User FK, so
+    ownership here is the same email-match profile() itself uses."""
+
+    def make_order(self, email=None, **kwargs):
+        defaults = dict(
+            name='Test Customer', email=email or self.owner.email, phone='9800000000',
+            address='Bhulka Danda', product_interest='Mango x1', status='pending',
+            cart_snapshot=[{'product_id': self.jar.id, 'weight': None, 'qty': 1, 'variant_id': None}],
+        )
+        defaults.update(kwargs)
+        return ProductOrder.objects.create(**defaults)
+
+    def test_list_requires_auth(self):
+        response = self.client.get(reverse('v1_profile_orders'))
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_list_returns_only_my_orders(self):
+        mine = self.make_order()
+        self.make_order(email=self.other.email)  # someone else's -- must not appear
+
+        self.authenticate_as_owner()
+        response = self.client.get(reverse('v1_profile_orders'))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        results = response.data['results']
+        ids = [row['id'] for row in results]
+        self.assertEqual(ids, [mine.id])
+        self.assertIn('status_display', results[0])
+        self.assertIn('can_cancel', results[0])
+        self.assertIn('has_cart_snapshot', results[0])
+        # No PII beyond what the owner already knows from being logged in.
+        self.assertNotIn('cancel_token', results[0])
+        self.assertNotIn('email', results[0])
+
+    def test_cancel_happy_path(self):
+        order = self.make_order()
+        self.authenticate_as_owner()
+        response = self.client.post(reverse('v1_order_cancel', args=[order.id]))
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        order.refresh_from_db()
+        self.assertEqual(order.status, 'cancelled')
+        self.assertTrue(
+            InventoryMovement.objects.filter(related_order=order, movement_type='return').exists()
+        )
+
+    def test_cancel_already_cancelled_returns_400(self):
+        order = self.make_order(status='cancelled')
+        self.authenticate_as_owner()
+        response = self.client.post(reverse('v1_order_cancel', args=[order.id]))
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('already been cancelled', response.data['message'])
+
+    def test_cancel_expired_window_returns_400(self):
+        order = self.make_order()
+        ProductOrder.objects.filter(id=order.id).update(ordered_at=timezone.now() - timedelta(minutes=40))
+        self.authenticate_as_owner()
+        response = self.client.post(reverse('v1_order_cancel', args=[order.id]))
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('expired', response.data['message'])
+        order.refresh_from_db()
+        self.assertEqual(order.status, 'pending')
+
+    def test_cannot_cancel_someone_elses_order(self):
+        order = self.make_order(email=self.other.email)
+        self.authenticate_as_owner()
+        response = self.client.post(reverse('v1_order_cancel', args=[order.id]))
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        order.refresh_from_db()
+        self.assertEqual(order.status, 'pending')
+
+    def test_reorder_no_snapshot_returns_400(self):
+        order = self.make_order(cart_snapshot=None)
+        self.authenticate_as_owner()
+        response = self.client.post(reverse('v1_order_reorder', args=[order.id]))
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_reorder_resolves_lines_and_skips_fixed_weight_and_unavailable(self):
+        order = self.make_order(cart_snapshot=[
+            {'product_id': self.fruit.id, 'weight': '1.3', 'qty': 1, 'variant_id': None},
+            {'product_id': self.jar.id, 'weight': None, 'qty': 2, 'variant_id': None},
+            {'product_id': self.goat.id, 'weight': '20.00', 'qty': 1, 'variant_id': self.goat_variant.id},
+            {'product_id': 999999, 'weight': None, 'qty': 1, 'variant_id': None},
+        ])
+        self.authenticate_as_owner()
+        response = self.client.post(reverse('v1_order_reorder', args=[order.id]))
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.data['skipped_count'], 2)  # goat (fixed_weight) + missing product
+        items = response.data['items']
+        self.assertEqual(len(items), 2)
+
+        fruit_line = next(i for i in items if i['product']['id'] == self.fruit.id)
+        self.assertEqual(fruit_line['weight'], '1.50')  # snapped to the 0.50 step, same as format_weight()
+        self.assertEqual(fruit_line['qty'], 1)
+
+        jar_line = next(i for i in items if i['product']['id'] == self.jar.id)
+        self.assertIsNone(jar_line['weight'])
+        self.assertEqual(jar_line['qty'], 2)
+
+    def test_reorder_someone_elses_order_404s(self):
+        order = self.make_order(email=self.other.email, cart_snapshot=[
+            {'product_id': self.jar.id, 'weight': None, 'qty': 1, 'variant_id': None},
+        ])
+        self.authenticate_as_owner()
+        response = self.client.post(reverse('v1_order_reorder', args=[order.id]))
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+
+class WishlistApiTests(ProfileApiTestBase):
+    """GET /api/v1/wishlist/, POST toggle/set-variant/move-to-cart -- mirror
+    wishlist_toggle()/wishlist_set_variant()/wishlist_move_to_cart() exactly."""
+
+    def test_list_requires_auth(self):
+        response = self.client.get(reverse('v1_wishlist_list'))
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_list_returns_only_my_items(self):
+        Wishlist.objects.create(user=self.owner, product=self.fruit)
+        Wishlist.objects.create(user=self.other, product=self.jar)
+
+        self.authenticate_as_owner()
+        response = self.client.get(reverse('v1_wishlist_list'))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        results = response.data['results']
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]['product']['id'], self.fruit.id)
+
+    def test_toggle_adds_then_removes(self):
+        self.authenticate_as_owner()
+        url = reverse('v1_wishlist_toggle')
+
+        add_response = self.client.post(url, {'product_id': self.jar.id}, format='json')
+        self.assertEqual(add_response.status_code, status.HTTP_200_OK)
+        self.assertTrue(add_response.data['is_saved'])
+        self.assertTrue(Wishlist.objects.filter(user=self.owner, product=self.jar).exists())
+
+        remove_response = self.client.post(url, {'product_id': self.jar.id}, format='json')
+        self.assertEqual(remove_response.status_code, status.HTTP_200_OK)
+        self.assertFalse(remove_response.data['is_saved'])
+        self.assertFalse(Wishlist.objects.filter(user=self.owner, product=self.jar).exists())
+
+    def test_toggle_fixed_weight_defaults_to_cheapest_available_variant(self):
+        cheaper = ProductVariant.objects.create(product=self.goat, weight=Decimal('12.00'))  # cheaper than self.goat_variant
+        self.authenticate_as_owner()
+        response = self.client.post(reverse('v1_wishlist_toggle'), {'product_id': self.goat.id}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        item = Wishlist.objects.get(user=self.owner, product=self.goat)
+        self.assertEqual(item.variant_id, cheaper.id)
+
+    def test_set_variant_happy_path(self):
+        second_variant = ProductVariant.objects.create(product=self.goat, weight=Decimal('25.00'))
+        Wishlist.objects.create(user=self.owner, product=self.goat, variant=self.goat_variant)
+
+        self.authenticate_as_owner()
+        response = self.client.post(
+            reverse('v1_wishlist_set_variant'),
+            {'product_id': self.goat.id, 'variant_id': second_variant.id},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        item = Wishlist.objects.get(user=self.owner, product=self.goat)
+        self.assertEqual(item.variant_id, second_variant.id)
+
+    def test_set_variant_rejects_unavailable_variant(self):
+        unavailable = ProductVariant.objects.create(product=self.goat, weight=Decimal('30.00'), is_available=False)
+        Wishlist.objects.create(user=self.owner, product=self.goat, variant=self.goat_variant)
+
+        self.authenticate_as_owner()
+        response = self.client.post(
+            reverse('v1_wishlist_set_variant'),
+            {'product_id': self.goat.id, 'variant_id': unavailable.id},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_move_to_cart_returns_product_and_clears_wishlist_row(self):
+        Wishlist.objects.create(user=self.owner, product=self.goat, variant=self.goat_variant)
+        self.authenticate_as_owner()
+        response = self.client.post(
+            reverse('v1_wishlist_move_to_cart'),
+            {'product_id': self.goat.id, 'variant_id': self.goat_variant.id},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.data['product']['id'], self.goat.id)
+        self.assertEqual(response.data['variant']['id'], self.goat_variant.id)
+        self.assertFalse(Wishlist.objects.filter(user=self.owner, product=self.goat).exists())
+
+    def test_move_to_cart_non_fixed_weight_returns_null_variant(self):
+        Wishlist.objects.create(user=self.owner, product=self.fruit)
+        self.authenticate_as_owner()
+        response = self.client.post(
+            reverse('v1_wishlist_move_to_cart'),
+            {'product_id': self.fruit.id},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIsNone(response.data['variant'])
+        self.assertEqual(response.data['product']['id'], self.fruit.id)
+
+
+class CouponApiTests(ProfileApiTestBase):
+    """GET /api/v1/coupons/ -- same get_live_coupons() list the public
+    offers() page and the traditional profile page already show everyone;
+    no per-user filtering exists (Coupon has no User relation)."""
+
+    def make_coupon(self, code, **kwargs):
+        now = timezone.now()
+        defaults = dict(
+            code=code, discount_type='percent', discount_value=Decimal('10'),
+            start_date=now - timedelta(days=1), end_date=now + timedelta(days=1), is_active=True,
+        )
+        defaults.update(kwargs)
+        return Coupon.objects.create(**defaults)
+
+    def test_requires_auth(self):
+        response = self.client.get(reverse('v1_coupon_list'))
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_returns_only_currently_live_coupons(self):
+        live = self.make_coupon('DASHAIN25')
+        self.make_coupon('EXPIRED10', start_date=timezone.now() - timedelta(days=10), end_date=timezone.now() - timedelta(days=5))
+        self.make_coupon('INACTIVE10', is_active=False)
+        self.make_coupon('USEDUP10', max_uses=5, used_count=5)
+
+        self.authenticate_as_owner()
+        response = self.client.get(reverse('v1_coupon_list'))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        codes = [c['code'] for c in response.data['results']]
+        self.assertEqual(codes, [live.code])
+
+    def test_same_list_is_shared_across_users(self):
+        """Coupons are global, not per-user -- confirms this isn't
+        accidentally filtered by the requesting user."""
+        self.make_coupon('SHARED10')
+
+        self.authenticate_as_owner()
+        owner_response = self.client.get(reverse('v1_coupon_list'))
+        self.authenticate_as_other()
+        other_response = self.client.get(reverse('v1_coupon_list'))
+
+        self.assertEqual(
+            [c['code'] for c in owner_response.data['results']],
+            [c['code'] for c in other_response.data['results']],
+        )
+
+
+class ProfileUpdateApiTests(ProfileApiTestBase):
+    """PATCH /api/v1/profile/, POST /api/v1/profile/change-password/ --
+    mirror edit_profile()/change_password() exactly: only name+email are
+    editable, and email uniqueness + the username-follows-email coupling
+    both apply the same way."""
+
+    def test_update_requires_auth(self):
+        response = self.client.patch(reverse('v1_profile_update'), {'name': 'X', 'email': 'x@example.com'}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_update_name_and_email_happy_path(self):
+        self.authenticate_as_owner()
+        response = self.client.patch(
+            reverse('v1_profile_update'),
+            {'name': 'New Full Name', 'email': 'newemail@example.com'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.owner.refresh_from_db()
+        self.assertEqual(self.owner.first_name, 'New')
+        self.assertEqual(self.owner.last_name, 'Full Name')
+        self.assertEqual(self.owner.email, 'newemail@example.com')
+        # Changing email also changes username, same as edit_profile().
+        self.assertEqual(self.owner.username, 'newemail@example.com')
+
+    def test_update_rejects_email_already_used_by_another_account(self):
+        self.authenticate_as_owner()
+        response = self.client.patch(
+            reverse('v1_profile_update'),
+            {'name': 'Owner One', 'email': self.other.email},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('email', response.data)
+
+    def test_update_allows_keeping_own_current_email(self):
+        self.authenticate_as_owner()
+        response = self.client.patch(
+            reverse('v1_profile_update'),
+            {'name': 'Owner One', 'email': self.owner.email},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+
+    def test_change_password_requires_auth(self):
+        response = self.client.post(reverse('v1_profile_change_password'), {}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_change_password_happy_path(self):
+        self.authenticate_as_owner()
+        response = self.client.post(
+            reverse('v1_profile_change_password'),
+            {'old_password': 'whatever123', 'new_password1': 'a-strong-p4ssword', 'new_password2': 'a-strong-p4ssword'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.owner.refresh_from_db()
+        self.assertTrue(self.owner.check_password('a-strong-p4ssword'))
+        # Token stays valid -- no session to keep alive, nothing to rotate.
+        self.assertTrue(Token.objects.filter(user=self.owner, key=self.owner_token.key).exists())
+
+    def test_change_password_rejects_wrong_old_password(self):
+        self.authenticate_as_owner()
+        response = self.client.post(
+            reverse('v1_profile_change_password'),
+            {'old_password': 'not-the-real-password', 'new_password1': 'a-strong-p4ssword', 'new_password2': 'a-strong-p4ssword'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('old_password', response.data)
+        self.owner.refresh_from_db()
+        self.assertTrue(self.owner.check_password('whatever123'))
+
+    def test_change_password_rejects_mismatched_new_passwords(self):
+        self.authenticate_as_owner()
+        response = self.client.post(
+            reverse('v1_profile_change_password'),
+            {'old_password': 'whatever123', 'new_password1': 'a-strong-p4ssword', 'new_password2': 'different-one'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('new_password2', response.data)

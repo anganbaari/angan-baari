@@ -7,6 +7,7 @@ from rest_framework import serializers
 
 from shop.models import (
     Category, Product, ProductVariant, InventoryMovement, POSSale, ProductOrder,
+    Wishlist, Coupon,
 )
 
 
@@ -254,3 +255,120 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
             raise serializers.ValidationError({'password': e.messages})
         data['user_id'] = user_id
         return data
+
+
+# ─── PROFILE PAGE (token-authenticated) ─────────────────────────
+# Backs the Next.js Profile page (Phase 4). Every endpoint here reuses the
+# same data/logic the traditional profile.html + shop/auth_views.py +
+# shop/views.py already use — see the Phase 4 scoping report for the
+# investigation this is built from. ProductOrder has no User FK (orders are
+# matched to the logged-in user by email, same as profile()'s own query),
+# and Coupon has no per-user relation either (this is the same global
+# active-coupon list get_live_coupons() already returns to the public
+# offers() page and the traditional profile page's "My Coupons" section).
+
+class OrderHistorySerializer(serializers.ModelSerializer):
+    """One row of 'my orders' — deliberately excludes cancel_token (cancel
+    ownership here is proven by the caller's auth token + email match, not
+    by presenting the token, unlike the anonymous OrderDetailSerializer
+    flow) and excludes name/phone (already known to the logged-in caller)."""
+
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    can_cancel = serializers.SerializerMethodField()
+    has_cart_snapshot = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ProductOrder
+        fields = [
+            'id', 'order_number', 'ordered_at', 'status', 'status_display',
+            'product_interest', 'address', 'can_cancel', 'has_cart_snapshot',
+        ]
+
+    def get_can_cancel(self, obj):
+        return obj.can_cancel()
+
+    def get_has_cart_snapshot(self, obj):
+        return bool(obj.cart_snapshot)
+
+
+class WishlistItemSerializer(serializers.ModelSerializer):
+    """Reuses ProductSerializer wholesale (including its `variants` field,
+    already scoped to available_variants() for fixed_weight products) so the
+    frontend has everything needed to reproduce profile.html's wishlist
+    card — including the size/animal dropdown — without a second request."""
+
+    product = ProductSerializer(read_only=True)
+    variant = ProductVariantSerializer(read_only=True)
+
+    class Meta:
+        model = Wishlist
+        fields = ['id', 'product', 'variant', 'added_at']
+
+
+class CouponSerializer(serializers.ModelSerializer):
+    """Only the fields profile.html's coupon card and the public offers page
+    actually display — not start_date/end_date/max_uses/used_count, which
+    are backend-only bookkeeping."""
+
+    class Meta:
+        model = Coupon
+        fields = [
+            'id', 'code', 'festival_name', 'description',
+            'discount_type', 'discount_value', 'max_discount_amount', 'min_order_amount',
+        ]
+
+
+class ProfileUpdateSerializer(serializers.Serializer):
+    """Matches edit_profile() exactly: only name and email are editable,
+    email must be unique account-wide (excluding the caller's own row)."""
+
+    name = serializers.CharField(max_length=150)
+    email = serializers.EmailField()
+
+    def validate_email(self, value):
+        request = self.context['request']
+        if User.objects.filter(email=value).exclude(id=request.user.id).exists():
+            raise serializers.ValidationError('Another account already uses that email.')
+        return value
+
+
+class ChangePasswordSerializer(serializers.Serializer):
+    """Same validation change_password()'s PasswordChangeForm performs:
+    correct old password, new1==new2, and Django's full password-validator
+    chain (unlike signup/reset, change_password() already ran through
+    validate_password()-equivalent checks via PasswordChangeForm, so there's
+    no gap to preserve here)."""
+
+    old_password = serializers.CharField(write_only=True)
+    new_password1 = serializers.CharField(write_only=True)
+    new_password2 = serializers.CharField(write_only=True)
+
+    def validate_old_password(self, value):
+        user = self.context['request'].user
+        if not user.check_password(value):
+            raise serializers.ValidationError('Your old password was entered incorrectly.')
+        return value
+
+    def validate(self, data):
+        if data['new_password1'] != data['new_password2']:
+            raise serializers.ValidationError({'new_password2': ["The two password fields didn't match."]})
+        try:
+            validate_password(data['new_password1'], user=self.context['request'].user)
+        except DjangoValidationError as e:
+            raise serializers.ValidationError({'new_password1': e.messages})
+        return data
+
+
+class WishlistToggleSerializer(serializers.Serializer):
+    product_id = serializers.IntegerField()
+    variant_id = serializers.IntegerField(required=False, allow_null=True)
+
+
+class WishlistSetVariantSerializer(serializers.Serializer):
+    product_id = serializers.IntegerField()
+    variant_id = serializers.IntegerField()
+
+
+class WishlistMoveToCartSerializer(serializers.Serializer):
+    product_id = serializers.IntegerField()
+    variant_id = serializers.IntegerField(required=False, allow_null=True)

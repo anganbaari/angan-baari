@@ -6,7 +6,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import PasswordChangeForm
 from django.contrib import messages
 from django.core.cache import cache
-from .models import ProductOrder, Wishlist, Coupon
+from .models import ProductOrder, Wishlist, get_live_coupons
 from .emails import send_resend_email
 
 
@@ -97,7 +97,7 @@ def logout_view(request):
 def profile(request):
     orders = ProductOrder.objects.filter(email=request.user.email).order_by('-ordered_at')
     wishlist_items = Wishlist.objects.filter(user=request.user).select_related('product')
-    live_coupons = [c for c in Coupon.objects.filter(is_active=True) if c.is_live()]
+    live_coupons = get_live_coupons()
     return render(request, 'auth/profile.html', {
         'orders': orders,
         'wishlist_items': wishlist_items,
