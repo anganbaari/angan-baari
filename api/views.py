@@ -1,5 +1,6 @@
 import secrets
 import uuid
+from datetime import timedelta
 from decimal import Decimal, InvalidOperation
 
 from django.conf import settings
@@ -8,6 +9,8 @@ from django.core.cache import cache
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 from rest_framework import generics, permissions, status
 from rest_framework.authentication import SessionAuthentication, TokenAuthentication
 from rest_framework.authtoken.models import Token
@@ -15,7 +18,9 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from shop.emails import send_order_cancelled_email, send_order_received_email, send_resend_email
-from shop.models import Category, InventoryMovement, POSSale, Product, ProductOrder, Wishlist, get_live_coupons
+from shop.models import (
+    Category, InventoryMovement, POSSale, Product, ProductOrder, UserProfile, Wishlist, get_live_coupons,
+)
 from shop.views import (
     create_inventory_movements_from_snapshot,
     create_order_inventory_movements,
@@ -35,6 +40,7 @@ from .serializers import (
     OrderStatusSerializer,
     PasswordResetConfirmSerializer,
     PasswordResetRequestSerializer,
+    PosUnlockSerializer,
     POSSaleCreateSerializer,
     POSSaleReadSerializer,
     ProductSerializer,
@@ -207,6 +213,73 @@ class POSSaleView(generics.ListAPIView):
             )
 
         return Response({'status': 'ok', 'sale_number': sale.sale_number, 'total': str(total)}, status=status.HTTP_201_CREATED)
+
+
+class PosUnlockView(APIView):
+    """POST /api/v1/pos/unlock/ — POS Phase A: identifies which staff member
+    is actually standing at a shared POS terminal right now, layered on top
+    of (not instead of) the terminal's own is_staff session login, which
+    stays active all day regardless of who's currently operating it.
+
+    Lockout state lives in request.session — per terminal/browser session,
+    not per user — matching that same "one login, many operators" model:
+    the failed-attempt counter tracks bad guesses at THIS register, not
+    against any particular staff account.
+    """
+
+    authentication_classes = [SessionAuthentication]
+    permission_classes = [IsStaffUser]
+
+    MAX_ATTEMPTS = 7
+    LOCKOUT_SECONDS = 5 * 60
+
+    def post(self, request, *args, **kwargs):
+        serializer = PosUnlockSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        pin = serializer.validated_data['pin']
+
+        lockout_until_raw = request.session.get('pos_lockout_until')
+        if lockout_until_raw:
+            lockout_until = parse_datetime(lockout_until_raw)
+            now = timezone.now()
+            if lockout_until and lockout_until > now:
+                return Response(
+                    {'error': 'locked_out', 'retry_after_seconds': int((lockout_until - now).total_seconds())},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+            # Lockout has expired -- clear it so a fresh set of attempts can start.
+            del request.session['pos_lockout_until']
+
+        matched_profile = None
+        for profile in UserProfile.objects.exclude(pin_hash='').filter(
+            user__is_staff=True, user__is_active=True,
+        ).select_related('user'):
+            if profile.check_pin(pin):
+                matched_profile = profile
+                break
+
+        if matched_profile:
+            request.session['pos_failed_attempts'] = 0
+            user = matched_profile.user
+            return Response({
+                'id': user.id,
+                'name': user.get_full_name() or user.username,
+                'role': matched_profile.role,
+            })
+
+        attempts = request.session.get('pos_failed_attempts', 0) + 1
+        if attempts >= self.MAX_ATTEMPTS:
+            request.session['pos_lockout_until'] = (
+                timezone.now() + timedelta(seconds=self.LOCKOUT_SECONDS)
+            ).isoformat()
+            request.session['pos_failed_attempts'] = 0
+            return Response({'error': 'invalid_pin'}, status=status.HTTP_401_UNAUTHORIZED)
+
+        request.session['pos_failed_attempts'] = attempts
+        return Response(
+            {'error': 'invalid_pin', 'attempts_remaining': self.MAX_ATTEMPTS - attempts},
+            status=status.HTTP_401_UNAUTHORIZED,
+        )
 
 
 # ─── WEBSITE ORDERS (public, guest checkout) ───────────────────

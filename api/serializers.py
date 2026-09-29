@@ -139,6 +139,14 @@ class POSSaleCreateSerializer(serializers.Serializer):
     cart = serializers.ListField(child=serializers.DictField(), allow_empty=False)
 
 
+class PosUnlockSerializer(serializers.Serializer):
+    """Shape validation only — a non-4-digit PIN can never match any
+    check_pin() anyway, but rejecting it here keeps a malformed/huge value
+    from being hashed-compared against every staff profile for nothing."""
+
+    pin = serializers.RegexField(regex=r'^\d{4}$', error_messages={'invalid': 'PIN must be exactly 4 digits.'})
+
+
 class OrderCreateSerializer(serializers.Serializer):
     """Input-shape validation only, mirroring checkout()'s POST fields plus
     an explicit cart line list (this API has no session cart to read from)."""

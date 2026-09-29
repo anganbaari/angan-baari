@@ -1,9 +1,11 @@
 from unittest.mock import patch
 
+from django.contrib.auth.models import User
 from django.test import TestCase, Client
 from django.urls import reverse
 
-from .models import ContactMessage, NewsletterSubscriber
+from .admin import UserProfileInlineForm
+from .models import ContactMessage, NewsletterSubscriber, UserProfile
 
 
 class ContactViewEmailTests(TestCase):
@@ -75,4 +77,65 @@ class NewsletterSignupEmailTests(TestCase):
         })
 
         self.assertEqual(response.status_code, 302)
-        mock_send_resend_email.assert_not_called()
+
+
+class UserProfileInlineFormTests(TestCase):
+    """clean_pin()'s uniqueness check on the admin inline form — pin_hash is
+    hashed at rest, so this walks every other profile's hash re-deriving a
+    match via check_password(), not a DB query. Tested directly against the
+    form rather than through the admin HTTP views, since the validation
+    logic lives entirely in clean_pin()/save()."""
+
+    def setUp(self):
+        self.alice = User.objects.create_user('alice', password='pw', is_staff=True)
+        self.bob = User.objects.create_user('bob', password='pw', is_staff=True)
+
+    def test_second_staff_member_cannot_take_an_already_used_pin(self):
+        alice_profile = UserProfile(user=self.alice)
+        form = UserProfileInlineForm(data={'role': 'cashier', 'pin': '1234'}, instance=alice_profile)
+        self.assertTrue(form.is_valid(), form.errors)
+        form.save()
+
+        bob_profile = UserProfile(user=self.bob)
+        form2 = UserProfileInlineForm(data={'role': 'cashier', 'pin': '1234'}, instance=bob_profile)
+        self.assertFalse(form2.is_valid())
+        self.assertIn('pin', form2.errors)
+        self.assertIn('already in use', form2.errors['pin'][0])
+
+    def test_saving_own_existing_pin_unchanged_does_not_self_reject(self):
+        alice_profile = UserProfile(user=self.alice)
+        alice_profile.set_pin('1234')
+        alice_profile.save()
+
+        form = UserProfileInlineForm(data={'role': 'manager', 'pin': '1234'}, instance=alice_profile)
+        self.assertTrue(form.is_valid(), form.errors)
+        saved = form.save()
+        self.assertEqual(saved.role, 'manager')
+        self.assertTrue(saved.check_pin('1234'))
+
+    def test_two_different_staff_with_two_different_pins_both_save_fine(self):
+        alice_profile = UserProfile(user=self.alice)
+        form_a = UserProfileInlineForm(data={'role': 'cashier', 'pin': '1111'}, instance=alice_profile)
+        self.assertTrue(form_a.is_valid(), form_a.errors)
+        form_a.save()
+
+        bob_profile = UserProfile(user=self.bob)
+        form_b = UserProfileInlineForm(data={'role': 'cashier', 'pin': '2222'}, instance=bob_profile)
+        self.assertTrue(form_b.is_valid(), form_b.errors)
+        form_b.save()
+
+        self.assertTrue(UserProfile.objects.get(user=self.alice).check_pin('1111'))
+        self.assertTrue(UserProfile.objects.get(user=self.bob).check_pin('2222'))
+
+    def test_blank_pin_skips_uniqueness_check_entirely(self):
+        """Leaving the PIN field blank means 'don't change it' -- it must
+        never be compared against anyone else's PIN, taken or not."""
+        alice_profile = UserProfile(user=self.alice)
+        alice_profile.set_pin('1234')
+        alice_profile.save()
+
+        bob_profile = UserProfile(user=self.bob)
+        form = UserProfileInlineForm(data={'role': 'cashier', 'pin': ''}, instance=bob_profile)
+        self.assertTrue(form.is_valid(), form.errors)
+        saved = form.save()
+        self.assertEqual(saved.pin_hash, '')

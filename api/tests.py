@@ -224,6 +224,110 @@ class POSSaleApiTests(ApiTestBase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
 
+class PosUnlockApiTests(ApiTestBase):
+    """POST /api/v1/pos/unlock/ — POS Phase A's PIN-identify layer. Session
+    auth + IsStaffUser (the terminal's own day-long login) gates access to
+    the endpoint at all; the PIN itself identifies which UserProfile is
+    behind the register right now, independent of who the terminal session
+    belongs to."""
+
+    def setUp(self):
+        super().setUp()
+        # 'cashier'/'shopper' already exist on ApiTestBase (self.staff /
+        # self.customer) with no UserProfile at all -- a separate, named
+        # profile-holder keeps "who's logged into the terminal" and "whose
+        # PIN is being checked" clearly distinct in these tests, matching
+        # how the real feature allows them to be different people.
+        self.pin_holder = User.objects.create_user('priya', password='pw', is_staff=True, first_name='Priya')
+        from shop.models import UserProfile
+        self.profile = UserProfile.objects.create(user=self.pin_holder, role='cashier')
+        self.profile.set_pin('4471')
+        self.profile.save()
+
+    def test_valid_pin_succeeds_and_returns_right_user(self):
+        self.client.login(username='cashier', password='pw')
+        response = self.client.post(reverse('v1_pos_unlock'), {'pin': '4471'}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.data['id'], self.pin_holder.id)
+        self.assertEqual(response.data['name'], 'Priya')
+        self.assertEqual(response.data['role'], 'cashier')
+
+    def test_wrong_pin_fails_and_counts_down_attempts_remaining(self):
+        self.client.login(username='cashier', password='pw')
+
+        first = self.client.post(reverse('v1_pos_unlock'), {'pin': '0000'}, format='json')
+        self.assertEqual(first.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(first.data['error'], 'invalid_pin')
+        self.assertEqual(first.data['attempts_remaining'], 6)
+
+        second = self.client.post(reverse('v1_pos_unlock'), {'pin': '0000'}, format='json')
+        self.assertEqual(second.data['attempts_remaining'], 5)
+
+    def test_seventh_wrong_attempt_locks_out_even_the_correct_pin(self):
+        self.client.login(username='cashier', password='pw')
+
+        for _ in range(6):
+            response = self.client.post(reverse('v1_pos_unlock'), {'pin': '0000'}, format='json')
+            self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+        seventh = self.client.post(reverse('v1_pos_unlock'), {'pin': '0000'}, format='json')
+        self.assertEqual(seventh.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(seventh.data['error'], 'invalid_pin')
+        self.assertNotIn('attempts_remaining', seventh.data)
+
+        # Locked out now -- even the genuinely correct PIN is rejected without
+        # being checked, and the response shape switches to locked_out.
+        eighth = self.client.post(reverse('v1_pos_unlock'), {'pin': '4471'}, format='json')
+        self.assertEqual(eighth.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(eighth.data['error'], 'locked_out')
+        self.assertGreater(eighth.data['retry_after_seconds'], 0)
+        self.assertLessEqual(eighth.data['retry_after_seconds'], 300)
+
+    def test_lockout_clears_once_cooldown_passes(self):
+        self.client.login(username='cashier', password='pw')
+        session = self.client.session
+        session['pos_failed_attempts'] = 0
+        session['pos_lockout_until'] = (timezone.now() - timedelta(seconds=1)).isoformat()
+        session.save()
+
+        response = self.client.post(reverse('v1_pos_unlock'), {'pin': '4471'}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+
+    def test_non_staff_user_gets_403_regardless_of_pin(self):
+        self.client.login(username='shopper', password='pw')
+        response = self.client.post(reverse('v1_pos_unlock'), {'pin': '4471'}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_malformed_pin_is_rejected_before_any_lookup(self):
+        self.client.login(username='cashier', password='pw')
+        response = self.client.post(reverse('v1_pos_unlock'), {'pin': '12345'}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        # A malformed PIN must not itself count as a failed attempt.
+        self.assertIsNone(self.client.session.get('pos_failed_attempts'))
+
+    def test_lockout_is_per_session_not_global(self):
+        """Two different terminals (test clients) must not share lockout
+        state -- one register going into cooldown shouldn't lock out every
+        other register in the shop."""
+        client_a = APIClient()
+        client_a.login(username='cashier', password='pw')
+        client_b = APIClient()
+        client_b.login(username='cashier', password='pw')
+
+        for _ in range(7):
+            client_a.post(reverse('v1_pos_unlock'), {'pin': '0000'}, format='json')
+
+        locked = client_a.post(reverse('v1_pos_unlock'), {'pin': '4471'}, format='json')
+        self.assertEqual(locked.status_code, status.HTTP_403_FORBIDDEN)
+
+        # Client B has made zero attempts of its own -- a fresh first guess
+        # there must behave like a fresh first guess, not an already-locked
+        # terminal.
+        fresh = client_b.post(reverse('v1_pos_unlock'), {'pin': '0000'}, format='json')
+        self.assertEqual(fresh.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(fresh.data['attempts_remaining'], 6)
+
+
 class OrderApiTests(ApiTestBase):
     def test_guest_can_create_order(self):
         payload = {

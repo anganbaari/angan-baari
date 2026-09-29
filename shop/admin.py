@@ -1,4 +1,7 @@
+from django import forms
 from django.contrib import admin, messages
+from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
+from django.contrib.auth.models import User
 from django.urls import path
 from django.http import HttpResponse
 from django.shortcuts import redirect
@@ -8,7 +11,7 @@ from .models import ContactMessage, ProductOrder, NewsletterSubscriber, Product,
 from .models import Offer, Coupon, BundleItem, ProductVariant
 from .emails import send_newsletter_campaign
 from .models import InventoryMovement
-from .models import Offer, Coupon, BundleItem, ProductVariant, InventoryMovement, POSSale
+from .models import Offer, Coupon, BundleItem, ProductVariant, InventoryMovement, POSSale, UserProfile
 
 
 @admin.register(Category)
@@ -277,4 +280,68 @@ class POSSaleAdmin(admin.ModelAdmin):
     def has_add_permission(self, request):
         # Sales are created by the POS screen itself, never by hand in admin —
         # a manually-created "sale" here wouldn't actually move any inventory.
-        return False    
+        return False
+
+
+class UserProfileInlineForm(forms.ModelForm):
+    """Swaps the raw pin_hash field for a plain 4-digit PIN input — the
+    admin should never show or accept a hash directly. Left blank, the
+    existing PIN (if any) is kept as-is; there's no way to display it back
+    since only the hash is ever stored, so this field always renders empty
+    regardless of whether a PIN is already set."""
+
+    pin = forms.CharField(
+        label='PIN', required=False,
+        widget=forms.TextInput(attrs={'placeholder': '••••', 'autocomplete': 'off', 'inputmode': 'numeric', 'maxlength': 4}),
+        help_text='4 digits. Leave blank to keep the current PIN unchanged.',
+    )
+
+    class Meta:
+        model = UserProfile
+        fields = ['role']
+
+    def clean_pin(self):
+        from django.contrib.auth.hashers import check_password
+
+        pin = self.cleaned_data.get('pin', '').strip()
+        if not pin:
+            return pin
+        if not (pin.isdigit() and len(pin) == 4):
+            raise forms.ValidationError('PIN must be exactly 4 digits.')
+
+        # pin_hash is hashed at rest, so there's no query that can check this
+        # directly -- has to walk every other profile's hash and re-derive
+        # whether the submitted raw PIN matches it, same as a login check.
+        others = UserProfile.objects.exclude(pin_hash='')
+        if self.instance.pk:
+            others = others.exclude(pk=self.instance.pk)
+        for other in others:
+            if check_password(pin, other.pin_hash):
+                raise forms.ValidationError('This PIN is already in use by another staff member.')
+
+        return pin
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        pin = self.cleaned_data.get('pin')
+        if pin:
+            instance.set_pin(pin)
+        if commit:
+            instance.save()
+        return instance
+
+
+class UserProfileInline(admin.StackedInline):
+    model = UserProfile
+    form = UserProfileInlineForm
+    can_delete = False
+    verbose_name_plural = 'POS profile (role & PIN)'
+    fields = ['role', 'pin']
+
+
+class UserAdmin(BaseUserAdmin):
+    inlines = [UserProfileInline]
+
+
+admin.site.unregister(User)
+admin.site.register(User, UserAdmin)

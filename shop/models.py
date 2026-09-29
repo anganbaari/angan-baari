@@ -3,6 +3,35 @@ import uuid
 from .imagekit_storage import ImageKitStorage
 
 
+class UserProfile(models.Model):
+    """POS role + PIN-unlock identity for a staff account. Separate from the
+    Django login that stays active on a shared POS terminal all day — the PIN
+    answers "who is actually standing at the register right now", not "is
+    this browser session allowed on /pos/ at all" (that's still is_staff).
+
+    role currently only labels who someone is; it doesn't gate anything by
+    itself yet (POS Phase A is staff-roles + PIN unlock only — refunds/
+    discount limits/reports come in later phases and will check this field
+    then). pin_hash is never set directly — always go through set_pin(), same
+    reasoning as never hand-hashing a login password."""
+
+    user = models.OneToOneField('auth.User', on_delete=models.CASCADE, related_name='profile')
+    ROLE_CHOICES = [('admin', 'Admin'), ('manager', 'Manager'), ('cashier', 'Cashier')]
+    role = models.CharField(max_length=10, choices=ROLE_CHOICES, default='cashier')
+    pin_hash = models.CharField(max_length=128, blank=True, help_text='Set via set_pin() — never store or edit this as plaintext.')
+
+    def set_pin(self, raw_pin: str):
+        from django.contrib.auth.hashers import make_password
+        self.pin_hash = make_password(raw_pin)
+
+    def check_pin(self, raw_pin: str) -> bool:
+        from django.contrib.auth.hashers import check_password
+        return bool(self.pin_hash) and check_password(raw_pin, self.pin_hash)
+
+    def __str__(self):
+        return f"{self.user.username} ({self.get_role_display()})"
+
+
 class Category(models.Model):
     name = models.CharField(max_length=100)
     parent = models.ForeignKey(
