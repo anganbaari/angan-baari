@@ -93,7 +93,15 @@
         .receipt-table th, .receipt-table td { border: 1px solid var(--pos-border-dark); padding: 4px 8px; font-size: 0.78rem; text-align: center; color: var(--pos-text-black); line-height: 1.15; }
         .receipt-table th { background: var(--pos-bg); font-weight: 700; font-family: 'Noto Sans Devanagari', 'DM Sans', sans-serif; }
         .receipt-table td.name-cell { text-align: left; }
-        .receipt-table .row-remove { background: none; border: none; color: #c0392b; cursor: pointer; font-size: 0.85rem; margin-left: 6px; }
+        .name-cell-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+        .receipt-table .row-remove {
+            background: #fdecea; border: 1.5px solid #c0392b; color: #c0392b; cursor: pointer;
+            width: 20px; height: 20px; border-radius: 50%; font-size: 0.62rem; line-height: 1;
+            display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; padding: 0;
+        }
+        .receipt-table .qty-cell { cursor: pointer; }
+        .receipt-table .qty-cell:hover { background: #f3f8f0; }
+        .qty-edit-icon { font-size: 0.6rem; opacity: 0.5; margin-left: 2px; }
         .receipt-blank-row td { height: 28px; }
         .table-pager { width: 40px; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; }
         .pager-btn {
@@ -729,10 +737,74 @@
             document.getElementById('itemModal').classList.remove('active');
         }
 
-        function openWeightModal(product) {
-            const step = parseFloat(product.weight_step) || 0.5;
-            let weight = step;
+        // editIndex is null when adding a new line, or a cart index when
+        // re-opened from tapping an existing row's qty/weight cell -- same
+        // modal either way, just "Add to Cart" becomes "Update" and confirm
+        // rewrites the existing line instead of pushing a new one.
+        // Display convention for "exact" gram-entry products: under 1000g
+        // shows as whole grams ("230g"), 1000g and up shows as kg with 3
+        // decimal places ("1.150kg", "2.785kg").
+        function formatWeightDisplay(weightKg) {
+            const grams = Math.round(weightKg * 1000);
+            if (grams < 1000) return `${grams}g`;
+            return `${(grams / 1000).toFixed(3)}kg`;
+        }
+
+        function confirmWeightLine(product, editIndex, finalWeight, detail) {
+            if (editIndex != null) {
+                const line = cart[editIndex];
+                line.weight = finalWeight;
+                line.detail = detail;
+                line.unit_price = parseFloat(product.price);
+                line.line_total = parseFloat(product.price) * finalWeight;
+                renderReceipt();
+                updateCartIndicator();
+            } else {
+                addToCart(product, { weight: finalWeight, detailOverride: detail });
+            }
+            closeItemModal();
+        }
+
+        function openWeightModal(product, editIndex) {
             const body = document.getElementById('itemModalBody');
+
+            if (product.weight_entry_mode === 'exact') {
+                // Free-typed scale reading in grams, not a fixed-step stepper --
+                // real produce weight doesn't land on round 0.25/0.50kg values.
+                let grams = editIndex != null ? Math.round(cart[editIndex].weight * 1000) : '';
+                function render() {
+                    const kg = parseFloat(grams) > 0 ? parseFloat(grams) / 1000 : 0;
+                    body.innerHTML = `
+                        <h3>${product.name}</h3>
+                        <div style="text-align:center;margin-bottom:10px;">
+                            <input type="number" id="gramsInput" inputmode="numeric" placeholder="Weight in grams"
+                                   value="${grams}" style="width:70%;padding:12px;font-size:1.2rem;text-align:center;
+                                   border:1.5px solid var(--mist);border-radius:8px;font-family:inherit;">
+                            <div style="font-size:0.82rem;color:var(--text-muted);margin-top:6px;">${kg > 0 ? formatWeightDisplay(kg) : 'Enter the scale reading'}</div>
+                        </div>
+                        <div class="item-modal-price">Rs. ${Math.round(parseFloat(product.price) * kg)}</div>
+                        <div class="item-modal-actions">
+                            <button type="button" class="btn-cancel" id="wCancel">Cancel</button>
+                            <button type="button" class="btn-confirm" id="wConfirm" ${kg > 0 ? '' : 'disabled'}>${editIndex != null ? 'Update' : 'Add to Cart'}</button>
+                        </div>`;
+                    const input = document.getElementById('gramsInput');
+                    input.addEventListener('input', () => { grams = input.value; render(); input.focus(); input.selectionStart = input.selectionEnd = input.value.length; });
+                    document.getElementById('wCancel').addEventListener('click', closeItemModal);
+                    const confirmBtn = document.getElementById('wConfirm');
+                    if (kg > 0) {
+                        confirmBtn.addEventListener('click', () => {
+                            confirmWeightLine(product, editIndex, kg, formatWeightDisplay(kg));
+                        });
+                    }
+                }
+                render();
+                document.getElementById('itemModal').classList.add('active');
+                document.getElementById('gramsInput').focus();
+                return;
+            }
+
+            const step = parseFloat(product.weight_step) || 0.5;
+            let weight = editIndex != null ? cart[editIndex].weight : step;
             function render() {
                 body.innerHTML = `
                     <h3>${product.name}</h3>
@@ -744,13 +816,51 @@
                     <div class="item-modal-price">Rs. ${Math.round(parseFloat(product.price) * weight)}</div>
                     <div class="item-modal-actions">
                         <button type="button" class="btn-cancel" id="wCancel">Cancel</button>
-                        <button type="button" class="btn-confirm" id="wConfirm">Add to Cart</button>
+                        <button type="button" class="btn-confirm" id="wConfirm">${editIndex != null ? 'Update' : 'Add to Cart'}</button>
                     </div>`;
                 document.getElementById('wStepDown').addEventListener('click', () => { weight = Math.max(step, weight - step); render(); });
                 document.getElementById('wStepUp').addEventListener('click', () => { weight = weight + step; render(); });
                 document.getElementById('wCancel').addEventListener('click', closeItemModal);
                 document.getElementById('wConfirm').addEventListener('click', () => {
-                    addToCart(product, { weight: parseFloat(weight.toFixed(2)) });
+                    const finalWeight = parseFloat(weight.toFixed(2));
+                    confirmWeightLine(product, editIndex, finalWeight, `${finalWeight} ${product.weight_unit_label}`);
+                });
+            }
+            render();
+            document.getElementById('itemModal').classList.add('active');
+        }
+
+        function openQtyModal(product, editIndex) {
+            let qty = editIndex != null ? cart[editIndex].qty : 1;
+            const body = document.getElementById('itemModalBody');
+            function render() {
+                body.innerHTML = `
+                    <h3>${product.name}</h3>
+                    <div class="weight-stepper">
+                        <button type="button" id="qStepDown">−</button>
+                        <span class="weight-value">${qty}</span>
+                        <button type="button" id="qStepUp">+</button>
+                    </div>
+                    <div class="item-modal-price">Rs. ${Math.round(parseFloat(product.price) * qty)}</div>
+                    <div class="item-modal-actions">
+                        <button type="button" class="btn-cancel" id="qCancel">Cancel</button>
+                        <button type="button" class="btn-confirm" id="qConfirm">${editIndex != null ? 'Update' : 'Add to Cart'}</button>
+                    </div>`;
+                document.getElementById('qStepDown').addEventListener('click', () => { qty = Math.max(1, qty - 1); render(); });
+                document.getElementById('qStepUp').addEventListener('click', () => { qty = qty + 1; render(); });
+                document.getElementById('qCancel').addEventListener('click', closeItemModal);
+                document.getElementById('qConfirm').addEventListener('click', () => {
+                    if (editIndex != null) {
+                        const line = cart[editIndex];
+                        line.qty = qty;
+                        line.detail = `Qty ${qty}`;
+                        line.unit_price = parseFloat(product.price);
+                        line.line_total = parseFloat(product.price) * qty;
+                        renderReceipt();
+                        updateCartIndicator();
+                    } else {
+                        addToCart(product, { qty });
+                    }
                     closeItemModal();
                 });
             }
@@ -758,7 +868,7 @@
             document.getElementById('itemModal').classList.add('active');
         }
 
-        function openVariantModal(product) {
+        function openVariantModal(product, editIndex) {
             const body = document.getElementById('itemModalBody');
             body.innerHTML = `<h3>${product.name} — choose one</h3>` +
                 product.variants.map(v => `
@@ -770,12 +880,39 @@
             body.querySelectorAll('.variant-option').forEach(b => {
                 b.addEventListener('click', () => {
                     const variant = product.variants.find(v => v.id == b.dataset.vid);
-                    addToCart(product, { variant });
+                    if (editIndex != null) {
+                        const line = cart[editIndex];
+                        line.variant_id = variant.id;
+                        line.detail = `${variant.weight} kg${variant.label ? ' — ' + variant.label : ''}`;
+                        line.unit_price = parseFloat(variant.total_price);
+                        line.line_total = parseFloat(variant.total_price);
+                        renderReceipt();
+                        updateCartIndicator();
+                    } else {
+                        addToCart(product, { variant });
+                    }
                     closeItemModal();
                 });
             });
             document.getElementById('vCancel').addEventListener('click', closeItemModal);
             document.getElementById('itemModal').classList.add('active');
+        }
+
+        // Tapping an existing row's qty/weight cell reopens the same modal
+        // that added it, pre-filled with the current value, and rewrites
+        // that line in place on confirm instead of adding a new one.
+        function editCartLine(index) {
+            const line = cart[index];
+            const product = PRODUCTS.find(p => p.id === line.product_id);
+            if (!product) { showToast('This product is no longer available to edit'); return; }
+            if (line.pricing_mode === 'variable_weight') {
+                openWeightModal(product, index);
+            } else if (line.pricing_mode === 'fixed_weight') {
+                if (!product.variants.length) { showToast('No other options available right now'); return; }
+                openVariantModal(product, index);
+            } else {
+                openQtyModal(product, index);
+            }
         }
 
         function onProductTap(product) {
@@ -825,7 +962,7 @@
                 line.line_total = parseFloat(opts.variant.total_price);
             } else if (opts.weight) {
                 line.weight = opts.weight;
-                line.detail = `${opts.weight} ${product.weight_unit_label}`;
+                line.detail = opts.detailOverride || `${opts.weight} ${product.weight_unit_label}`;
                 line.qty = 1;
                 line.unit_price = parseFloat(product.price);
                 line.line_total = parseFloat(product.price) * opts.weight;
@@ -861,6 +998,16 @@
         const RECEIPT_PAGE_SIZE = 7;
         let receiptPage = 0;
 
+        // line.detail already holds the correctly formatted weight string
+        // for both stepper ("0.50 kg") and exact-gram-entry ("230g" /
+        // "1.150kg") lines -- reuse it here instead of showing the raw
+        // number, which for exact-entry lines wouldn't be gram-formatted.
+        function qtyCellDisplay(line) {
+            if (line.pricing_mode === 'fixed_weight') return '1';
+            if (line.weight) return line.detail;
+            return line.qty;
+        }
+
         function renderReceipt() {
             const body = document.getElementById('receiptBody');
             const totalPages = Math.max(1, Math.ceil(cart.length / RECEIPT_PAGE_SIZE));
@@ -871,11 +1018,14 @@
             let rowsHtml = pageLines.map((line, i) => `
                 <tr>
                     <td>${start + i + 1}</td>
-                    <td class="name-cell">${line.name}<br><span style="font-size:0.72rem;color:var(--text-muted);">${line.detail}</span>
-                        <button type="button" class="row-remove" data-i="${start + i}"><i class="fas fa-times"></i></button>
+                    <td class="name-cell">
+                        <div class="name-cell-row">
+                            <div>${line.name}<br><span style="font-size:0.72rem;color:var(--text-muted);">${line.detail}</span></div>
+                            <button type="button" class="row-remove" data-i="${start + i}" title="Remove"><i class="fas fa-times"></i></button>
+                        </div>
                     </td>
                     <td>Rs. ${Math.round(line.unit_price)}</td>
-                    <td>${line.pricing_mode === 'fixed_weight' ? '1' : (line.weight ? line.weight : line.qty)}</td>
+                    <td class="qty-cell" data-i="${start + i}" title="Tap to change">${qtyCellDisplay(line)} <i class="fas fa-pen qty-edit-icon"></i></td>
                     <td>Rs. ${Math.round(line.line_total)}</td>
                     <td>Rs. ${Math.round(lineTax(line))}</td>
                 </tr>`
@@ -886,6 +1036,9 @@
             body.innerHTML = rowsHtml;
             body.querySelectorAll('.row-remove').forEach(b => {
                 b.addEventListener('click', (e) => { e.stopPropagation(); removeFromCart(parseInt(b.dataset.i)); });
+            });
+            body.querySelectorAll('.qty-cell').forEach(cell => {
+                cell.addEventListener('click', () => editCartLine(parseInt(cell.dataset.i)));
             });
 
             document.getElementById('pageIndicator').innerHTML = `${receiptPage + 1}<span>/</span>${totalPages}`;

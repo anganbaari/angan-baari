@@ -859,6 +859,7 @@ def pos_view(request):
             'price_unit': p.price_unit or '',
             'weight_step': str(p.weight_step) if p.weight_step else None,
             'weight_unit_label': p.weight_unit_label or 'kg',
+            'weight_entry_mode': p.weight_entry_mode,
             'barcode': p.barcode or '',
             'image': p.main_image.url if p.main_image else '',
             # POS Phase B: lets the frontend mirror create_pos_sale()'s
