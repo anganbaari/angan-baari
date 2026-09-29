@@ -19,6 +19,12 @@ class UserProfile(models.Model):
     ROLE_CHOICES = [('admin', 'Admin'), ('manager', 'Manager'), ('cashier', 'Cashier')]
     role = models.CharField(max_length=10, choices=ROLE_CHOICES, default='cashier')
     pin_hash = models.CharField(max_length=128, blank=True, help_text='Set via set_pin() — never store or edit this as plaintext.')
+    staff_number = models.CharField(
+        max_length=10, blank=True,
+        help_text='Shown on the POS header once this person unlocks (e.g. "NIKESH 001") — '
+                   'deliberately separate from both the PIN and the DB id, since neither of '
+                   'those should ever be displayed on screen. Set once per staff member.'
+    )
 
     def set_pin(self, raw_pin: str):
         from django.contrib.auth.hashers import make_password

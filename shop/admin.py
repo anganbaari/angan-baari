@@ -323,7 +323,7 @@ class UserProfileInlineForm(forms.ModelForm):
 
     class Meta:
         model = UserProfile
-        fields = ['role']
+        fields = ['role', 'staff_number']
 
     def clean_pin(self):
         from django.contrib.auth.hashers import check_password
@@ -361,7 +361,7 @@ class UserProfileInline(admin.StackedInline):
     form = UserProfileInlineForm
     can_delete = False
     verbose_name_plural = 'POS profile (role & PIN)'
-    fields = ['role', 'pin']
+    fields = ['role', 'staff_number', 'pin']
 
 
 class UserAdmin(BaseUserAdmin):

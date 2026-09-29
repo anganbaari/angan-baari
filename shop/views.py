@@ -837,14 +837,23 @@ def pos_view(request):
     """The shop POS screen. Staff-only (Django's own is_staff flag — same
     login as admin, no separate token/auth system needed)."""
     import json
-    from .models import Product, POSSale
-    products = Product.objects.filter(is_available=True).select_related('category')
+    from .models import BusinessSettings, Category, Product, POSSale
+
+    def top_level_category(category):
+        # The POS category row shows broad groups (Fruits, Vegetables, ...),
+        # not the finer subcategories the shop site uses (Mangoes, Lychee,
+        # ... under Fruits) -- walk up to whichever ancestor has no parent.
+        while category.parent_id:
+            category = category.parent
+        return category
+
+    products = Product.objects.filter(is_available=True).select_related('category', 'category__parent')
     products_data = []
     for p in products:
         entry = {
             'id': p.id,
             'name': p.name,
-            'category': p.category.name if p.category else 'Other',
+            'category': top_level_category(p.category).name if p.category else 'Other',
             'pricing_mode': p.pricing_mode,
             'price': str(p.price) if p.price is not None else None,
             'price_unit': p.price_unit or '',
@@ -852,6 +861,10 @@ def pos_view(request):
             'weight_unit_label': p.weight_unit_label or 'kg',
             'barcode': p.barcode or '',
             'image': p.main_image.url if p.main_image else '',
+            # POS Phase B: lets the frontend mirror create_pos_sale()'s
+            # taxable/exempt split for a live tax-box preview while
+            # shopping, before any POSSale row exists to read it from.
+            'is_taxable': p.is_taxable,
         }
         if p.pricing_mode == 'fixed_weight':
             entry['variants'] = [
@@ -865,12 +878,33 @@ def pos_view(request):
             ]
         products_data.append(entry)
 
-    categories = sorted({p['category'] for p in products_data})
+    # Every top-level category a product could belong to (via itself or any
+    # subcategory), independent of whether anything in it is currently in
+    # stock — a category must never disappear from the row just because
+    # it's temporarily sold out. (Previously derived from products_data
+    # itself, which only ever contained is_available=True products, so an
+    # out-of-stock category would silently vanish entirely; it also used
+    # to list subcategories like "Mangoes" alongside top-level ones like
+    # "Fruits" instead of grouping under it, which doesn't match the POS
+    # screen's flat category row.)
+    categories_with_products = Category.objects.filter(products__isnull=False).select_related('parent').distinct()
+    top_level_ids_with_products = {top_level_category(c).id for c in categories_with_products}
+    categories = list(
+        Category.objects.filter(parent__isnull=True, id__in=top_level_ids_with_products)
+        .order_by('order', 'name').values_list('name', flat=True)
+    )
+    if Product.objects.filter(category__isnull=True).exists():
+        categories.append('Other')
+
+    vat_settings = BusinessSettings.get_solo()
 
     return render(request, 'pos.html', {
         'products_json': json.dumps(products_data),
         'categories': categories,
+        'categories_json': json.dumps(categories),
         'payment_methods': POSSale.PAYMENT_METHOD_CHOICES,
+        'is_vat_enabled': vat_settings.is_vat_enabled,
+        'vat_rate': VAT_RATE,
     })
 
 

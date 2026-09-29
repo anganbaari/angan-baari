@@ -10,83 +10,177 @@
     <link rel="stylesheet" href="{% static 'style.css' %}">
     <style>
         * { box-sizing: border-box; }
-        html, body { margin: 0; height: 100%; font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--forest); }
+        html, body { margin: 0; height: 100%; font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--forest); overflow: hidden; }
 
+        /* ── Header ── */
         .pos-header {
-            display: flex; align-items: center; justify-content: space-between;
-            background: var(--forest); color: var(--gold); padding: 14px 24px;
+            display: flex; align-items: center; gap: 18px; background: var(--cream);
+            border-bottom: 3px solid var(--forest); padding: 10px 20px;
         }
-        .pos-header h1 { font-size: 1.15rem; margin: 0; font-family: 'Cormorant Garamond', serif; font-weight: 600; }
-        .pos-header .cashier { font-size: 0.82rem; opacity: 0.85; }
-        .pos-header .cashier a { color: var(--gold); text-decoration: underline; }
-
-        .pos-layout { display: flex; height: calc(100vh - 54px); }
-        .pos-main { flex: 1; padding: 16px; overflow-y: auto; }
-        .pos-cart-panel {
-            width: 360px; flex-shrink: 0; background: var(--white); border-left: 1px solid var(--mist);
-            display: flex; flex-direction: column; padding: 16px;
+        .pos-clock { background: var(--cream); border: 1.5px solid var(--mist); border-radius: 10px; padding: 6px 14px; text-align: center; min-width: 90px; }
+        .pos-clock .pos-date { font-size: 0.78rem; font-weight: 700; color: var(--forest); }
+        .pos-clock .pos-time { font-size: 1.15rem; font-weight: 800; color: var(--forest); }
+        .pos-brand { display: flex; align-items: center; gap: 10px; }
+        .pos-brand img.logo { width: 46px; height: 46px; object-fit: contain; }
+        .pos-brand .brand-text h1 { margin: 0; font-family: 'Cormorant Garamond', serif; font-size: 1.5rem; color: var(--forest); line-height: 1.1; }
+        .pos-brand .brand-text span { font-size: 0.72rem; color: var(--moss); font-weight: 600; letter-spacing: 0.03em; }
+        .pos-brand img.flag { width: 34px; height: auto; margin-left: 6px; }
+        .pos-header-divider { width: 1.5px; align-self: stretch; background: var(--mist); }
+        .pos-header-right { flex: 1; display: flex; align-items: center; justify-content: flex-end; gap: 14px; text-align: right; }
+        .pos-lock-instruction { font-size: 0.82rem; color: var(--forest); line-height: 1.4; font-weight: 600; }
+        .pos-operator { font-size: 1.05rem; font-weight: 800; color: var(--forest); letter-spacing: 0.03em; }
+        .pos-search-wrap { flex-shrink: 0; width: 260px; }
+        .pos-search-wrap input {
+            width: 100%; padding: 9px 14px; border: 1.5px solid var(--mist); border-radius: 8px;
+            font-size: 0.88rem; font-family: inherit; background: var(--white);
         }
+        .pos-search-wrap input:focus { outline: none; border-color: var(--moss); }
 
-        .barcode-row input {
-            width: 100%; padding: 11px 16px; border: 1.5px solid var(--mist); border-radius: 8px;
-            font-size: 0.95rem; margin-bottom: 14px; font-family: inherit;
+        /* ── Main layout: everything below header, category row pinned to bottom ── */
+        .pos-body { height: calc(100vh - 74px); display: flex; flex-direction: column; position: relative; }
+        .pos-content { flex: 1; overflow-y: auto; padding: 16px 20px; position: relative; }
+
+        /* ── Sticky category row (always full list, always visible) ── */
+        .cat-row { display: flex; gap: 10px; padding: 10px 20px; background: var(--cream); border-top: 1px solid var(--mist); overflow-x: auto; flex-shrink: 0; }
+        .cat-card {
+            flex-shrink: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+            gap: 4px; width: 92px; padding: 10px 6px; border-radius: 12px; border: 1.5px solid var(--mist);
+            background: var(--white); cursor: pointer; font-family: inherit;
         }
-        .barcode-row input:focus { outline: none; border-color: var(--moss); }
+        .cat-card i { font-size: 1.3rem; color: var(--moss); }
+        .cat-card span { font-size: 0.72rem; font-weight: 700; color: var(--forest); text-align: center; line-height: 1.15; }
+        .cat-card.active { background: #e3efe3; border-color: var(--moss); }
 
-        .cat-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
-        .cat-tab {
-            padding: 8px 16px; border-radius: 50px; border: 1.5px solid var(--mist);
-            background: var(--white); color: var(--forest); font-size: 0.82rem; cursor: pointer;
-            font-family: inherit;
+        /* ── Receipt view ── */
+        .receipt-table { width: 100%; border-collapse: collapse; background: var(--white); border: 1.5px solid var(--forest); }
+        .receipt-table th, .receipt-table td { border: 1px solid var(--mist); padding: 8px 10px; font-size: 0.85rem; text-align: center; }
+        .receipt-table th { background: #eef3ea; color: var(--forest); font-weight: 700; }
+        .receipt-table td.name-cell { text-align: left; }
+        .receipt-table .row-remove { background: none; border: none; color: #c0392b; cursor: pointer; font-size: 0.85rem; margin-left: 6px; }
+        .receipt-empty-row td { color: var(--text-muted); padding: 18px 10px; }
+
+        .reminder-card {
+            margin-top: 14px; background: #fdf6e3; border: 1.5px solid #f0dca0; border-radius: 12px; padding: 12px 16px;
         }
-        .cat-tab.active { background: var(--forest); color: var(--gold); border-color: var(--forest); }
+        .reminder-card .reminder-title { font-weight: 700; color: var(--forest); font-size: 0.88rem; margin-bottom: 6px; }
+        .reminder-card ul { margin: 0; padding-left: 18px; font-size: 0.82rem; color: var(--forest); line-height: 1.6; }
 
-        .product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
+        .receipt-bottom-row { display: flex; gap: 14px; margin-top: 14px; align-items: stretch; flex-wrap: wrap; }
+        .tax-box { flex: 1; min-width: 260px; background: var(--white); border: 1.5px solid var(--forest); border-radius: 10px; overflow: hidden; }
+        .tax-box .tax-row { display: flex; justify-content: space-between; padding: 9px 14px; font-size: 0.85rem; border-bottom: 1px solid var(--mist); }
+        .tax-box .tax-row:last-child { border-bottom: none; }
+        .tax-box .tax-row span:first-child { font-weight: 600; color: var(--forest); }
+        .tax-box .tax-row span:last-child { font-weight: 700; color: var(--forest); }
+
+        .side-actions { display: flex; flex-direction: column; gap: 8px; width: 170px; flex-shrink: 0; }
+        .side-btn {
+            border: none; border-radius: 10px; padding: 12px 10px; font-family: inherit; font-weight: 700;
+            font-size: 0.85rem; cursor: pointer; color: #fff; text-align: center; line-height: 1.3;
+        }
+        .side-btn.counter-btn { background: #c17a3d; cursor: default; }
+        .side-btn.payment-btn-main { background: var(--moss); }
+        .side-btn.payment-btn-main:disabled { opacity: 0.45; cursor: not-allowed; }
+        .side-btn.repay-btn { background: var(--forest); }
+
+        /* ── Shopping view ── */
+        #shoppingView { display: none; }
+        .shopping-topbar { display: flex; justify-content: flex-end; margin-bottom: 10px; }
+        .cart-indicator {
+            background: var(--forest); color: var(--gold); border: none; border-radius: 50px;
+            padding: 9px 18px; font-family: inherit; font-weight: 700; font-size: 0.85rem; cursor: pointer;
+        }
+        .product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; }
         .product-btn {
             background: var(--white); border: 1px solid var(--mist); border-radius: 12px;
             padding: 12px; cursor: pointer; text-align: left; transition: box-shadow 0.15s;
-            position: relative;
         }
         .product-btn:hover { box-shadow: 0 4px 14px rgba(26,47,30,0.1); }
-        .product-btn img { width: 100%; height: 80px; object-fit: cover; border-radius: 8px; margin-bottom: 8px; background: var(--cream); display: block; }
-        .product-btn .pname { font-size: 0.82rem; font-weight: 600; color: var(--forest); margin-bottom: 2px; line-height: 1.25; }
+        .product-btn img { width: 100%; height: 90px; object-fit: cover; border-radius: 8px; margin-bottom: 8px; background: var(--cream); display: block; }
+        .product-btn .pname { font-size: 0.83rem; font-weight: 600; color: var(--forest); margin-bottom: 2px; line-height: 1.25; }
         .product-btn .pprice { font-size: 0.76rem; color: var(--moss); font-weight: 700; }
+        .product-btn.unavailable { opacity: 0.5; cursor: default; }
 
-        .variant-menu {
-            position: absolute; top: 100%; left: 0; right: 0; margin-top: 4px; background: var(--white);
-            border: 1px solid var(--mist); border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.15);
-            z-index: 20; padding: 6px;
+        /* ── Lock banner (overlaid across the receipt table, per mockup — not a modal popup) ── */
+        #lockBanner {
+            display: none; position: fixed; z-index: 500; flex-direction: column; gap: 6px;
         }
-        .variant-menu button {
-            display: block; width: 100%; text-align: left; padding: 8px 10px; border: none;
-            background: none; border-radius: 6px; font-size: 0.78rem; cursor: pointer; font-family: inherit;
+        #lockBanner.active { display: flex; }
+        .lock-bar {
+            display: flex; align-items: stretch; border-radius: 8px; overflow: hidden;
+            box-shadow: 0 6px 20px rgba(26,47,30,0.25); border: 2px solid var(--forest);
         }
-        .variant-menu button:hover { background: var(--cream); }
+        .lock-bar-label {
+            display: flex; align-items: center; gap: 10px; background: var(--moss); color: #fff;
+            padding: 10px 16px; font-size: 0.82rem; font-weight: 700; line-height: 1.3; flex-shrink: 0;
+        }
+        .lock-bar-label i { font-size: 1.4rem; }
+        .lock-bar input {
+            flex: 1; border: none; outline: none; font: inherit; font-size: 1.1rem; text-align: center;
+            letter-spacing: 0.3em; color: var(--forest); font-weight: 700; background: var(--white); min-width: 0;
+        }
+        .lock-bar-enter {
+            border: none; background: #c17a3d; color: #1a1a1a; font-family: inherit; font-weight: 800;
+            font-size: 1rem; letter-spacing: 0.05em; padding: 0 28px; cursor: pointer; flex-shrink: 0;
+        }
+        .lock-bar-enter:active { background: #a8672f; }
+        .lock-msg { min-height: 20px; font-size: 0.8rem; font-weight: 700; text-align: center; background: rgba(255,255,255,0.9); border-radius: 6px; padding: 2px 0; }
+        .lock-msg.error { color: #c0392b; }
 
-        .cart-title { font-size: 1rem; font-weight: 700; color: var(--forest); margin-bottom: 12px; }
-        .cart-list { flex: 1; overflow-y: auto; min-height: 80px; }
-        .cart-line { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--mist); }
-        .cart-line-name { font-size: 0.85rem; color: var(--forest); font-weight: 500; }
-        .cart-line-detail { font-size: 0.72rem; color: var(--text-muted); }
-        .cart-line-amt { font-size: 0.85rem; font-weight: 700; color: var(--forest); white-space: nowrap; }
-        .cart-line-remove { background: none; border: none; color: #c0392b; cursor: pointer; font-size: 0.9rem; margin-left: 8px; }
-        .cart-empty { text-align: center; color: var(--text-muted); font-size: 0.85rem; padding: 30px 0; }
+        /* Disables the rest of the screen while locked -- still visible, not interactive. */
+        .pos-body.locked, .pos-header-right.locked-disabled { pointer-events: none; opacity: 0.55; }
 
-        .cart-total-row {
-            display: flex; justify-content: space-between; padding: 14px 0; font-size: 1.15rem;
-            font-weight: 800; color: var(--forest); border-top: 2px solid var(--forest); margin-top: 4px;
+        /* ── Shared modal (weight stepper / variant picker) ── */
+        #itemModal { display: none; position: fixed; inset: 0; z-index: 400; background: rgba(26,47,30,0.45); align-items: center; justify-content: center; }
+        #itemModal.active { display: flex; }
+        .item-modal-card { background: var(--white); border-radius: 16px; padding: 24px; width: 100%; max-width: 360px; }
+        .item-modal-card h3 { margin: 0 0 16px; font-family: 'Cormorant Garamond', serif; color: var(--forest); font-size: 1.25rem; text-align: center; }
+        .weight-stepper { display: flex; align-items: center; justify-content: center; gap: 16px; margin-bottom: 12px; }
+        .weight-stepper button { width: 44px; height: 44px; border-radius: 50%; border: none; background: var(--mist); color: var(--forest); font-size: 1.3rem; cursor: pointer; }
+        .weight-stepper .weight-value { font-size: 1.3rem; font-weight: 800; color: var(--forest); min-width: 90px; text-align: center; }
+        .item-modal-price { text-align: center; font-size: 1rem; font-weight: 700; color: var(--moss); margin-bottom: 16px; }
+        .variant-option {
+            display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 12px 14px;
+            border: 1.5px solid var(--mist); border-radius: 10px; margin-bottom: 8px; background: var(--white);
+            cursor: pointer; font-family: inherit; font-size: 0.85rem; color: var(--forest); font-weight: 600;
         }
-        .payment-methods { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 4px 0 12px; }
-        .payment-btn {
-            padding: 10px; border-radius: 8px; border: 1.5px solid var(--mist); background: var(--white);
-            font-size: 0.82rem; cursor: pointer; text-align: center; font-family: inherit;
+        .variant-option:hover { border-color: var(--moss); background: #f3f8f3; }
+        .item-modal-actions { display: flex; gap: 10px; margin-top: 6px; }
+        .item-modal-actions button { flex: 1; padding: 12px; border-radius: 10px; border: none; font-family: inherit; font-weight: 700; cursor: pointer; }
+        .item-modal-actions .btn-confirm { background: var(--forest); color: var(--gold); }
+        .item-modal-actions .btn-cancel { background: var(--mist); color: var(--forest); }
+
+        /* ── Payment panel (slide-in) ── */
+        #paymentBackdrop { display: none; position: fixed; inset: 0; background: rgba(26,47,30,0.35); z-index: 300; }
+        #paymentBackdrop.active { display: block; }
+        #paymentPanel {
+            position: fixed; top: 0; right: -420px; width: 400px; max-width: 92vw; height: 100vh; background: var(--white);
+            box-shadow: -6px 0 24px rgba(0,0,0,0.15); z-index: 310; transition: right 0.25s; padding: 22px;
+            overflow-y: auto;
         }
-        .payment-btn.selected { background: var(--forest); color: var(--gold); border-color: var(--forest); }
-        .complete-sale-btn {
+        #paymentPanel.active { right: 0; }
+        #paymentPanel h2 { font-family: 'Cormorant Garamond', serif; color: var(--forest); margin: 0 0 16px; }
+        .pay-method-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+        .pay-method-row label { flex: 1; font-size: 0.85rem; font-weight: 600; color: var(--forest); }
+        .pay-method-row input { width: 110px; padding: 8px 10px; border: 1.5px solid var(--mist); border-radius: 8px; font-family: inherit; text-align: right; }
+        .pay-remaining { text-align: right; font-size: 0.9rem; font-weight: 700; color: var(--forest); margin: 10px 0 16px; }
+        .pay-remaining.settled { color: var(--moss); }
+        .credit-section { border-top: 1px dashed var(--mist); margin-top: 10px; padding-top: 14px; }
+        .credit-section input[type="text"] { width: 100%; padding: 9px 12px; border: 1.5px solid var(--mist); border-radius: 8px; font-family: inherit; margin-bottom: 8px; }
+        .customer-card {
+            display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; border: 1.5px solid var(--mist);
+            border-radius: 8px; margin-bottom: 6px; cursor: pointer; font-size: 0.82rem;
+        }
+        .customer-card:hover { border-color: var(--moss); }
+        .customer-card.selected { background: #eef6ee; border-color: var(--moss); }
+        .new-customer-form { display: none; flex-direction: column; gap: 8px; margin-top: 8px; }
+        .new-customer-form.active { display: flex; }
+        .new-customer-form input { padding: 9px 12px; border: 1.5px solid var(--mist); border-radius: 8px; font-family: inherit; }
+        #completeSaleBtn {
             width: 100%; padding: 14px; border: none; border-radius: 10px; background: var(--forest);
-            color: var(--gold); font-size: 1rem; font-weight: 700; cursor: pointer; font-family: inherit;
+            color: var(--gold); font-size: 1rem; font-weight: 700; cursor: pointer; font-family: inherit; margin-top: 18px;
         }
-        .complete-sale-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+        #completeSaleBtn:disabled { opacity: 0.45; cursor: not-allowed; }
+        .panel-close { position: absolute; top: 18px; right: 18px; background: none; border: none; font-size: 1.2rem; color: var(--text-muted); cursor: pointer; }
 
         #posToast {
             position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px);
@@ -95,60 +189,183 @@
             opacity: 0; pointer-events: none; transition: opacity 0.25s, transform 0.25s; z-index: 900;
         }
         #posToast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-
-        @media (max-width: 900px) {
-            .pos-layout { flex-direction: column; height: auto; }
-            .pos-cart-panel { width: 100%; border-left: none; border-top: 1px solid var(--mist); }
-        }
     </style>
 </head>
 <body>
     {% csrf_token %}
+
     <div class="pos-header">
-        <h1>🌾 आँगन बारी POS</h1>
-        <div class="cashier">{{ request.user.get_full_name|default:request.user.username }} &middot; <a href="{% url 'shop' %}">Exit to site</a></div>
+        <div class="pos-clock">
+            <div class="pos-date" id="posDate">--/-- (--)</div>
+            <div class="pos-time" id="posTime">--:--</div>
+        </div>
+        <div class="pos-brand">
+            <img class="logo" src="{% static 'images/logo-icon.png' %}" alt="">
+            <div class="brand-text">
+                <h1>आँगन बारी</h1>
+                <span>AnganBaari</span>
+            </div>
+            <img class="flag" src="https://upload.wikimedia.org/wikipedia/commons/9/9b/Flag_of_Nepal.svg" alt="Nepal">
+        </div>
+        <div class="pos-header-divider"></div>
+        <div class="pos-header-right" id="headerRight">
+            <div class="pos-search-wrap">
+                <input type="text" id="barcodeInput" placeholder="Scan barcode or type to search…" autocomplete="off">
+            </div>
+            <div id="headerStatus">
+                <div class="pos-lock-instruction">टर्मिनल लक छ — PIN हाल्नुहोस्</div>
+            </div>
+        </div>
     </div>
 
-    <div class="pos-layout">
-        <div class="pos-main">
-            <div class="barcode-row">
-                <input type="text" id="barcodeInput" placeholder="Scan barcode or type to search a product…" autofocus autocomplete="off">
+    <div class="pos-body" id="posBody">
+        <div class="pos-content">
+            <!-- Receipt view -->
+            <div id="receiptView">
+                <table class="receipt-table">
+                    <thead>
+                        <tr>
+                            <th style="width:6%;">क्र.सं.</th>
+                            <th style="width:34%;">उत्पादनको नाम</th>
+                            <th style="width:15%;">एकाइ मूल्य</th>
+                            <th style="width:13%;">परिमाण</th>
+                            <th style="width:17%;">जम्मा मूल्य</th>
+                            <th style="width:15%;">कर</th>
+                        </tr>
+                    </thead>
+                    <tbody id="receiptBody">
+                        <tr class="receipt-empty-row"><td colspan="6">No items yet — tap a category below to start a sale.</td></tr>
+                    </tbody>
+                </table>
+
+                <div class="reminder-card">
+                    <div class="reminder-title">📢 पैसा तिर्नु अघि ग्राहकलाई सोध्नुपर्नो कुरा</div>
+                    <ul>
+                        <li>नमस्ते 🙏</li>
+                        <li>झोला ल्याउनु भष ?</li>
+                        <li>तपाईंलाई झोला चाहिन्छ ?</li>
+                        <li>झोलामा सामान हालिदिऊ ?</li>
+                    </ul>
+                </div>
+
+                <div class="receipt-bottom-row">
+                    <div class="tax-box">
+                        <div class="tax-row"><span>कुल कर</span><span id="taxVat">Rs. 0</span></div>
+                        <div class="tax-row"><span>कर बा. मूल्य</span><span id="taxTaxable">Rs. 0</span></div>
+                        <div class="tax-row"><span>कर स. मूल्य</span><span id="taxExempt">Rs. 0</span></div>
+                    </div>
+                    <div class="tax-box" style="max-width:150px;">
+                        <div class="tax-row" style="font-size:0.95rem;"><span>जम्मा</span><span id="cartTotal">Rs. 0</span></div>
+                    </div>
+                    <div class="side-actions">
+                        <button type="button" class="side-btn counter-btn"><i class="fas fa-broom"></i><br>Counter<br>सफा राख्नुहोस्।</button>
+                        <button type="button" class="side-btn payment-btn-main" id="openPaymentBtn" disabled><i class="fas fa-rupee-sign"></i> payment method&gt;&gt;&gt;</button>
+                        <button type="button" class="side-btn repay-btn" id="openRepayBtn">उधारो तिर्नुहोस्<br><span style="font-weight:500;font-size:0.72rem;">Repay Credit</span></button>
+                    </div>
+                </div>
             </div>
-            <div class="cat-tabs" id="catTabs"></div>
-            <div class="product-grid" id="productGrid"></div>
+
+            <!-- Shopping view -->
+            <div id="shoppingView">
+                <div class="shopping-topbar">
+                    <button type="button" class="cart-indicator" id="cartIndicator">0 items · Rs. 0</button>
+                </div>
+                <div class="product-grid" id="productGrid"></div>
+            </div>
         </div>
 
-        <div class="pos-cart-panel">
-            <div class="cart-title">Current Sale</div>
-            <div class="cart-list" id="cartList">
-                <div class="cart-empty">No items yet — tap a product to add it.</div>
+        <div class="cat-row" id="catRow"></div>
+    </div>
+
+    <!-- Lock banner — overlaid across the receipt table, per mockup (not a modal popup) -->
+    <div id="lockBanner">
+        <div class="lock-bar">
+            <div class="lock-bar-label"><i class="fas fa-user-circle"></i><span>आफ्नो नम्बर दर्ता गरी<br>ENTER बटन थिच्नुहोस्।</span></div>
+            <input type="text" id="lockPinInput" inputmode="numeric" autocomplete="off" maxlength="4">
+            <button type="button" class="lock-bar-enter" id="lockEnterBtn">ENTER</button>
+        </div>
+        <div class="lock-msg" id="lockMsg"></div>
+    </div>
+
+    <!-- Shared weight/variant modal -->
+    <div id="itemModal">
+        <div class="item-modal-card" id="itemModalBody"></div>
+    </div>
+
+    <!-- Payment panel -->
+    <div id="paymentBackdrop"></div>
+    <div id="paymentPanel">
+        <button type="button" class="panel-close" id="closePaymentBtn"><i class="fas fa-times"></i></button>
+        <h2>Payment</h2>
+        <div id="payMethodRows"></div>
+        <div class="pay-remaining" id="payRemaining">Remaining: Rs. 0</div>
+
+        <div class="credit-section" id="creditSection" style="display:none;">
+            <div style="font-weight:700;font-size:0.85rem;color:var(--forest);margin-bottom:8px;">Credit customer</div>
+            <input type="text" id="customerPhoneInput" placeholder="Customer phone number" inputmode="numeric">
+            <button type="button" class="side-btn payment-btn-main" style="width:100%;margin-bottom:10px;" id="lookupCustomerBtn">Look up</button>
+            <div id="customerResults"></div>
+            <div id="selectedCustomerLabel" style="font-size:0.82rem;color:var(--moss);font-weight:700;display:none;"></div>
+            <div class="new-customer-form" id="newCustomerForm">
+                <input type="text" id="newCustName" placeholder="Full name">
+                <input type="text" id="newCustNickname" placeholder="Nickname (optional)">
+                <input type="text" id="newCustPhone" placeholder="Phone">
+                <input type="text" id="newCustAddress" placeholder="Address (optional)">
+                <button type="button" class="side-btn payment-btn-main" id="createCustomerBtn">Create customer</button>
             </div>
-            <div class="cart-total-row">
-                <span>Total</span>
-                <span id="cartTotal">Rs. 0</span>
+        </div>
+
+        <button type="button" id="completeSaleBtn" disabled>Complete Sale</button>
+    </div>
+
+    <!-- Repay credit modal (reuses #itemModal chrome via its own simple overlay) -->
+    <div id="repayBackdrop" style="display:none;position:fixed;inset:0;background:rgba(26,47,30,0.45);z-index:320;align-items:center;justify-content:center;">
+        <div class="item-modal-card" style="max-width:380px;">
+            <h3>Repay Credit / उधारो तिर्नुहोस्</h3>
+            <input type="text" id="repayPhoneInput" placeholder="Customer phone number" inputmode="numeric"
+                   style="width:100%;padding:9px 12px;border:1.5px solid var(--mist);border-radius:8px;font-family:inherit;margin-bottom:8px;">
+            <button type="button" class="side-btn payment-btn-main" style="width:100%;margin-bottom:10px;" id="repayLookupBtn">Look up</button>
+            <div id="repayCustomerResults"></div>
+            <div id="repaySelectedLabel" style="font-size:0.85rem;color:var(--moss);font-weight:700;display:none;margin-bottom:8px;"></div>
+            <input type="text" id="repayAmountInput" placeholder="Amount (Rs.)" inputmode="decimal"
+                   style="width:100%;padding:9px 12px;border:1.5px solid var(--mist);border-radius:8px;font-family:inherit;margin-bottom:12px;display:none;">
+            <div class="item-modal-actions">
+                <button type="button" class="btn-cancel" id="repayCancelBtn">Cancel</button>
+                <button type="button" class="btn-confirm" id="repayConfirmBtn" style="display:none;">Confirm</button>
             </div>
-            <div class="payment-methods" id="paymentMethods">
-                {% for value, label in payment_methods %}
-                <button type="button" class="payment-btn" data-method="{{ value }}">{{ label }}</button>
-                {% endfor %}
-            </div>
-            <button type="button" class="complete-sale-btn" id="completeSaleBtn" disabled>Complete Sale</button>
         </div>
     </div>
 
     <div id="posToast"></div>
 
     <script id="posProductsData" type="application/json">{{ products_json|safe }}</script>
+    <script id="posCategoriesData" type="application/json">{{ categories_json|safe }}</script>
     <script>
         const PRODUCTS = JSON.parse(document.getElementById('posProductsData').textContent);
-        const CATEGORIES = [...new Set(PRODUCTS.map(p => p.category))].sort();
+        const CATEGORIES = JSON.parse(document.getElementById('posCategoriesData').textContent);
+        const IS_VAT_ENABLED = {{ is_vat_enabled|yesno:"true,false" }};
+        const VAT_RATE = {{ vat_rate }};
+
         let activeCategory = CATEGORIES[0] || null;
-        let cart = []; // { product_id, name, pricing_mode, qty, weight, variant_id, detail, line_total }
-        let selectedPayment = null;
+        let cart = []; // { product_id, name, pricing_mode, qty, weight, variant_id, detail, line_total, is_taxable }
+        let currentView = 'receipt'; // 'receipt' | 'shopping'
+        let isUnlocked = false;
+        let currentOperator = null; // { id, name, staff_number, role }
+        let clientSaleId = null;
+        let payments = { cash: '', esewa: '', khalti: '', bank_transfer: '', credit: '' };
+        let selectedCustomer = null;
+        let idleTimer = null;
+        const IDLE_LIMIT_MS = 20 * 60 * 1000;
 
         function getCookie(name) {
             const match = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
             return match ? decodeURIComponent(match[2]) : null;
+        }
+
+        function apiFetch(path, options) {
+            options = options || {};
+            const headers = Object.assign({ 'X-CSRFToken': getCookie('csrftoken') }, options.headers || {});
+            return fetch(path, Object.assign({}, options, { headers }));
         }
 
         function showToast(text) {
@@ -159,19 +376,222 @@
             showToast._t = setTimeout(() => toast.classList.remove('show'), 1800);
         }
 
-        function renderTabs() {
-            const wrap = document.getElementById('catTabs');
-            wrap.innerHTML = CATEGORIES.map(c =>
-                `<button type="button" class="cat-tab${c === activeCategory ? ' active' : ''}" data-cat="${c}">${c}</button>`
+        function newClientSaleId() {
+            clientSaleId = (crypto.randomUUID ? crypto.randomUUID() :
+                'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+                    const r = Math.random() * 16 | 0;
+                    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+                }));
+        }
+        newClientSaleId();
+
+        // ══════════════════════════════════════════════════════════════
+        // Clock — Bikram Sambat (BS) date, ticking every second.
+        // ══════════════════════════════════════════════════════════════
+        // NEPALI_CALENDAR_DATA: month lengths (Baisakh..Chaitra) per BS year.
+        // Best-effort reference table reconstructed for this build — spot-check
+        // today's displayed BS date against a known-good Nepali calendar before
+        // relying on this in production, and extend this table with verified
+        // data before BS 2091 (~2034 AD) arrives, or the date will silently
+        // become wrong past that point.
+        const BS_EPOCH_YEAR = 2075; // 2075/01/01 BS = 2018-04-14 AD
+        const BS_EPOCH_AD = Date.UTC(2018, 3, 14);
+        const NEPALI_CALENDAR_DATA = {
+            2075: [31,32,31,32,31,30,30,30,29,30,29,31],
+            2076: [31,31,32,31,31,31,30,29,30,29,30,31],
+            2077: [31,31,32,32,31,30,30,29,30,29,30,30],
+            2078: [31,32,31,32,31,30,30,30,29,29,30,31],
+            2079: [31,31,32,31,31,31,30,29,30,29,30,31],
+            2080: [31,32,31,32,31,30,30,29,30,29,30,31],
+            2081: [31,31,32,32,31,30,30,30,29,29,30,30],
+            2082: [31,32,31,32,31,30,30,30,29,29,30,31],
+            2083: [31,31,32,31,31,31,30,29,30,29,30,31],
+            2084: [31,32,31,32,31,30,30,29,30,29,30,31],
+            2085: [30,32,31,32,31,31,30,29,30,29,30,30],
+            2086: [31,31,32,31,31,31,30,29,30,29,30,31],
+            2087: [31,32,31,32,31,30,30,29,30,29,30,31],
+            2088: [31,31,32,32,31,30,30,29,30,29,30,30],
+            2089: [31,32,31,32,31,30,30,30,29,29,30,31],
+            2090: [31,31,32,31,31,31,30,29,30,29,30,31],
+        };
+        const BS_MONTH_NAMES = ['बैशाख','जेठ','असार','साउन','भदौ','असोज','कार्तिक','मंसिर','पुष','माघ','फागुन','चैत'];
+        const BS_DAY_NAMES = ['आइत','सोम','मंगल','बुध','बिही','शुक्र','शनि'];
+
+        function adToBs(date) {
+            const utcMidnight = Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
+            let daysSinceEpoch = Math.floor((utcMidnight - BS_EPOCH_AD) / 86400000);
+            let bsYear = BS_EPOCH_YEAR, bsMonth = 0;
+            while (true) {
+                const monthLengths = NEPALI_CALENDAR_DATA[bsYear];
+                if (!monthLengths) break; // ran off the end of our table
+                if (bsMonth >= 12) { bsYear += 1; bsMonth = 0; continue; }
+                const len = monthLengths[bsMonth];
+                if (daysSinceEpoch < len) break;
+                daysSinceEpoch -= len;
+                bsMonth += 1;
+            }
+            return { year: bsYear, month: bsMonth + 1, day: daysSinceEpoch + 1, dayName: BS_DAY_NAMES[date.getDay()] };
+        }
+
+        let lastClockMinute = null;
+        function tickClock() {
+            const now = new Date();
+            document.getElementById('posTime').textContent =
+                String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+            const minuteKey = now.getFullYear() + '-' + now.getMonth() + '-' + now.getDate() + '-' + now.getHours() + '-' + now.getMinutes();
+            if (minuteKey !== lastClockMinute) {
+                lastClockMinute = minuteKey;
+                const bs = adToBs(now);
+                document.getElementById('posDate').textContent =
+                    String(bs.month).padStart(2, '0') + '/' + String(bs.day).padStart(2, '0') + ' (' + bs.dayName + ')';
+            }
+        }
+        tickClock();
+        setInterval(tickClock, 1000);
+
+        // ══════════════════════════════════════════════════════════════
+        // Lock / unlock
+        // ══════════════════════════════════════════════════════════════
+        function renderHeaderStatus() {
+            const el = document.getElementById('headerStatus');
+            if (isUnlocked && currentOperator) {
+                el.innerHTML = `<div class="pos-operator">${currentOperator.name.toUpperCase()} ${currentOperator.staff_number || ''}</div>`;
+            } else {
+                el.innerHTML = `<div class="pos-lock-instruction">टर्मिनल लक छ — PIN हाल्नुहोस्</div>`;
+            }
+        }
+
+        function positionLockBanner() {
+            const banner = document.getElementById('lockBanner');
+            const table = document.querySelector('.receipt-table');
+            const body = document.getElementById('receiptBody');
+            if (!table || !body) return;
+            const tableRect = table.getBoundingClientRect();
+            const bodyRect = body.getBoundingClientRect();
+            const bannerHeight = banner.offsetHeight || 90;
+            banner.style.left = tableRect.left + 'px';
+            banner.style.width = tableRect.width + 'px';
+            const centeredTop = bodyRect.top + bodyRect.height / 2 - bannerHeight / 2;
+            banner.style.top = Math.max(bodyRect.top, centeredTop) + 'px';
+        }
+        window.addEventListener('resize', () => { if (!isUnlocked) positionLockBanner(); });
+
+        function setLocked(locked) {
+            isUnlocked = !locked;
+            document.getElementById('posBody').classList.toggle('locked', locked);
+            document.getElementById('barcodeInput').disabled = locked;
+            renderHeaderStatus();
+            if (locked) {
+                clearTimeout(idleTimer);
+                showReceiptView(); // the lock banner overlays the receipt table, per the mockup
+                document.getElementById('lockPinInput').value = '';
+                document.getElementById('lockMsg').textContent = '';
+                document.getElementById('lockMsg').className = 'lock-msg';
+                document.getElementById('lockBanner').classList.add('active');
+                positionLockBanner();
+                document.getElementById('lockPinInput').focus();
+            } else {
+                document.getElementById('lockBanner').classList.remove('active');
+                resetIdleTimer();
+            }
+        }
+
+        function resetIdleTimer() {
+            if (!isUnlocked) return;
+            clearTimeout(idleTimer);
+            idleTimer = setTimeout(async () => {
+                await apiFetch('/api/v1/pos/lock/', { method: 'POST' });
+                currentOperator = null;
+                setLocked(true);
+            }, IDLE_LIMIT_MS);
+        }
+        ['click', 'keydown', 'input'].forEach(evt => document.addEventListener(evt, resetIdleTimer));
+
+        async function submitPin(pin) {
+            const msgEl = document.getElementById('lockMsg');
+            const response = await apiFetch('/api/v1/pos/unlock/', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pin }),
+            });
+            const data = await response.json().catch(() => ({}));
+            if (response.ok) {
+                currentOperator = data;
+                setLocked(false);
+                return;
+            }
+            document.getElementById('lockPinInput').value = '';
+            msgEl.className = 'lock-msg error';
+            if (data.error === 'locked_out') {
+                let remaining = data.retry_after_seconds || 0;
+                const tick = () => {
+                    msgEl.textContent = `Too many attempts. Try again in ${remaining}s.`;
+                    if (remaining <= 0) { clearInterval(iv); msgEl.textContent = ''; msgEl.className = 'lock-msg'; }
+                    remaining -= 1;
+                };
+                tick();
+                const iv = setInterval(tick, 1000);
+            } else {
+                msgEl.textContent = `Wrong PIN — ${data.attempts_remaining ?? 0} attempt(s) left.`;
+            }
+        }
+
+        const lockPinInput = document.getElementById('lockPinInput');
+        lockPinInput.addEventListener('input', () => {
+            lockPinInput.value = lockPinInput.value.replace(/\D/g, '').slice(0, 4);
+        });
+        lockPinInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && lockPinInput.value) submitPin(lockPinInput.value);
+        });
+        document.getElementById('lockEnterBtn').addEventListener('click', () => {
+            if (lockPinInput.value) submitPin(lockPinInput.value);
+        });
+
+        // ══════════════════════════════════════════════════════════════
+        // Category row (always full list) + product grid
+        // ══════════════════════════════════════════════════════════════
+        const CATEGORY_ICONS = {
+            'Fruits': 'fa-apple-alt', 'Vegetables': 'fa-carrot', 'Honey': 'fa-jar',
+            'Pickles': 'fa-pepper-hot', 'Animals': 'fa-horse', 'Chickens': 'fa-kiwi-bird',
+            'Compost': 'fa-seedling', 'Other': 'fa-box',
+        };
+
+        function renderCategoryRow() {
+            const wrap = document.getElementById('catRow');
+            wrap.innerHTML = CATEGORIES.map(c => `
+                <div class="cat-card${c === activeCategory && currentView === 'shopping' ? ' active' : ''}" data-cat="${c}">
+                    <i class="fas ${CATEGORY_ICONS[c] || 'fa-box'}"></i>
+                    <span>${c}</span>
+                </div>`
             ).join('');
-            wrap.querySelectorAll('.cat-tab').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    activeCategory = btn.dataset.cat;
-                    renderTabs();
+            wrap.querySelectorAll('.cat-card').forEach(card => {
+                card.addEventListener('click', () => {
+                    activeCategory = card.dataset.cat;
+                    showShoppingView();
                     renderGrid();
                 });
             });
         }
+
+        function showReceiptView() {
+            currentView = 'receipt';
+            document.getElementById('receiptView').style.display = '';
+            document.getElementById('shoppingView').style.display = 'none';
+            renderCategoryRow();
+        }
+
+        function showShoppingView() {
+            currentView = 'shopping';
+            document.getElementById('receiptView').style.display = 'none';
+            document.getElementById('shoppingView').style.display = '';
+            renderCategoryRow();
+            updateCartIndicator();
+        }
+
+        function updateCartIndicator() {
+            const count = cart.reduce((s, l) => s + (l.pricing_mode === 'fixed_weight' ? 1 : l.qty), 0);
+            const total = cart.reduce((s, l) => s + l.line_total, 0);
+            document.getElementById('cartIndicator').textContent = `${count} items · Rs. ${Math.round(total)}`;
+        }
+        document.getElementById('cartIndicator').addEventListener('click', showReceiptView);
 
         function renderGrid(filterText) {
             const grid = document.getElementById('productGrid');
@@ -199,63 +619,92 @@
                 </div>`;
             }).join('');
             grid.querySelectorAll('.product-btn').forEach(btn => {
-                btn.addEventListener('click', () => onProductTap(PRODUCTS.find(p => p.id == btn.dataset.id), btn));
+                btn.addEventListener('click', () => onProductTap(PRODUCTS.find(p => p.id == btn.dataset.id)));
             });
         }
 
-        function onProductTap(product, btn) {
+        // ══════════════════════════════════════════════════════════════
+        // Shared item modal: weight stepper (variable_weight) / variant
+        // picker (fixed_weight, 2+ variants)
+        // ══════════════════════════════════════════════════════════════
+        function closeItemModal() {
+            document.getElementById('itemModal').classList.remove('active');
+        }
+
+        function openWeightModal(product) {
+            const step = parseFloat(product.weight_step) || 0.5;
+            let weight = step;
+            const body = document.getElementById('itemModalBody');
+            function render() {
+                body.innerHTML = `
+                    <h3>${product.name}</h3>
+                    <div class="weight-stepper">
+                        <button type="button" id="wStepDown">−</button>
+                        <span class="weight-value">${weight.toFixed(2)} ${product.weight_unit_label}</span>
+                        <button type="button" id="wStepUp">+</button>
+                    </div>
+                    <div class="item-modal-price">Rs. ${Math.round(parseFloat(product.price) * weight)}</div>
+                    <div class="item-modal-actions">
+                        <button type="button" class="btn-cancel" id="wCancel">Cancel</button>
+                        <button type="button" class="btn-confirm" id="wConfirm">Add to Cart</button>
+                    </div>`;
+                document.getElementById('wStepDown').addEventListener('click', () => { weight = Math.max(step, weight - step); render(); });
+                document.getElementById('wStepUp').addEventListener('click', () => { weight = weight + step; render(); });
+                document.getElementById('wCancel').addEventListener('click', closeItemModal);
+                document.getElementById('wConfirm').addEventListener('click', () => {
+                    addToCart(product, { weight: parseFloat(weight.toFixed(2)) });
+                    closeItemModal();
+                });
+            }
+            render();
+            document.getElementById('itemModal').classList.add('active');
+        }
+
+        function openVariantModal(product) {
+            const body = document.getElementById('itemModalBody');
+            body.innerHTML = `<h3>${product.name} — choose one</h3>` +
+                product.variants.map(v => `
+                    <button type="button" class="variant-option" data-vid="${v.id}">
+                        <span>${v.weight} kg${v.label ? ' — ' + v.label : ''}</span><span>Rs. ${v.total_price}</span>
+                    </button>`
+                ).join('') +
+                `<div class="item-modal-actions"><button type="button" class="btn-cancel" id="vCancel">Cancel</button></div>`;
+            body.querySelectorAll('.variant-option').forEach(b => {
+                b.addEventListener('click', () => {
+                    const variant = product.variants.find(v => v.id == b.dataset.vid);
+                    addToCart(product, { variant });
+                    closeItemModal();
+                });
+            });
+            document.getElementById('vCancel').addEventListener('click', closeItemModal);
+            document.getElementById('itemModal').classList.add('active');
+        }
+
+        function onProductTap(product) {
             if (!product) return;
 
             if (product.pricing_mode === 'fixed_weight') {
                 if (!product.variants.length) { showToast('None available right now'); return; }
-                // No positioned button to anchor a menu to (e.g. added via
-                // barcode) — fall back to the first available one rather
-                // than fail; this is also why barcodes on animals aren't
-                // really the intended use (they're for packaged goods).
-                if (product.variants.length === 1 || !btn) {
+                if (product.variants.length === 1) {
                     addToCart(product, { variant: product.variants[0] });
                     return;
                 }
-                openVariantMenu(product, btn);
+                openVariantModal(product);
                 return;
             }
 
             if (product.pricing_mode === 'variable_weight') {
-                const input = prompt(`${product.name} — enter weight in ${product.weight_unit_label}:`);
-                if (input === null) return;
-                const weight = parseFloat(input);
-                if (isNaN(weight) || weight <= 0) { showToast('Enter a valid weight'); return; }
-                addToCart(product, { weight });
+                openWeightModal(product);
                 return;
             }
 
-            // fixed_quantity — add 1, use the × on a repeat tap to build up quantity
+            // fixed_quantity — add 1, repeat taps build up quantity
             addToCart(product, { qty: 1 });
         }
 
-        function openVariantMenu(product, btn) {
-            document.querySelectorAll('.variant-menu').forEach(m => m.remove());
-            const menu = document.createElement('div');
-            menu.className = 'variant-menu';
-            menu.innerHTML = product.variants.map(v =>
-                `<button type="button" data-vid="${v.id}">${v.weight} kg${v.label ? ' — ' + v.label : ''} — Rs. ${v.total_price}</button>`
-            ).join('');
-            btn.appendChild(menu);
-            menu.querySelectorAll('button').forEach(b => {
-                b.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    const variant = product.variants.find(v => v.id == b.dataset.vid);
-                    addToCart(product, { variant });
-                    menu.remove();
-                });
-            });
-            setTimeout(() => {
-                document.addEventListener('click', function closeMenu(ev) {
-                    if (!menu.contains(ev.target)) { menu.remove(); document.removeEventListener('click', closeMenu); }
-                });
-            }, 0);
-        }
-
+        // ══════════════════════════════════════════════════════════════
+        // Cart / receipt table
+        // ══════════════════════════════════════════════════════════════
         function addToCart(product, opts) {
             if (product.pricing_mode === 'fixed_quantity') {
                 const existing = cart.find(l => l.product_id === product.id);
@@ -263,130 +712,349 @@
                     existing.qty += 1;
                     existing.detail = `Qty ${existing.qty}`;
                     existing.line_total = parseFloat(product.price) * existing.qty;
-                    renderCart();
+                    renderReceipt();
+                    updateCartIndicator();
+                    showToast(`${product.name} added`);
                     return;
                 }
             }
-            const line = { product_id: product.id, name: product.name, pricing_mode: product.pricing_mode };
+            const line = { product_id: product.id, name: product.name, pricing_mode: product.pricing_mode, is_taxable: !!product.is_taxable };
             if (opts.variant) {
                 line.variant_id = opts.variant.id;
                 line.detail = `${opts.variant.weight} kg${opts.variant.label ? ' — ' + opts.variant.label : ''}`;
                 line.qty = 1;
+                line.unit_price = parseFloat(opts.variant.total_price);
                 line.line_total = parseFloat(opts.variant.total_price);
             } else if (opts.weight) {
                 line.weight = opts.weight;
                 line.detail = `${opts.weight} ${product.weight_unit_label}`;
                 line.qty = 1;
+                line.unit_price = parseFloat(product.price);
                 line.line_total = parseFloat(product.price) * opts.weight;
             } else {
                 line.qty = opts.qty || 1;
                 line.detail = `Qty ${line.qty}`;
+                line.unit_price = parseFloat(product.price);
                 line.line_total = parseFloat(product.price) * line.qty;
             }
             cart.push(line);
-            renderCart();
+            renderReceipt();
+            updateCartIndicator();
+            showToast(`${product.name} added`);
         }
 
         function removeFromCart(index) {
             cart.splice(index, 1);
-            renderCart();
+            renderReceipt();
+            updateCartIndicator();
         }
 
-        function renderCart() {
-            const list = document.getElementById('cartList');
+        function lineTax(line) {
+            if (!IS_VAT_ENABLED || !line.is_taxable) return 0;
+            return line.line_total * VAT_RATE;
+        }
+
+        function renderReceipt() {
+            const body = document.getElementById('receiptBody');
             if (!cart.length) {
-                list.innerHTML = '<div class="cart-empty">No items yet — tap a product to add it.</div>';
+                body.innerHTML = '<tr class="receipt-empty-row"><td colspan="6">No items yet — tap a category below to start a sale.</td></tr>';
             } else {
-                list.innerHTML = cart.map((line, i) => `
-                    <div class="cart-line">
-                        <div>
-                            <div class="cart-line-name">${line.name}</div>
-                            <div class="cart-line-detail">${line.detail}</div>
-                        </div>
-                        <div style="display:flex;align-items:center;">
-                            <span class="cart-line-amt">Rs. ${line.line_total.toFixed(0)}</span>
-                            <button type="button" class="cart-line-remove" data-i="${i}"><i class="fas fa-times"></i></button>
-                        </div>
-                    </div>`
+                body.innerHTML = cart.map((line, i) => `
+                    <tr>
+                        <td>${i + 1}</td>
+                        <td class="name-cell">${line.name}<br><span style="font-size:0.72rem;color:var(--text-muted);">${line.detail}</span>
+                            <button type="button" class="row-remove" data-i="${i}"><i class="fas fa-times"></i></button>
+                        </td>
+                        <td>Rs. ${Math.round(line.unit_price)}</td>
+                        <td>${line.pricing_mode === 'fixed_weight' ? '1' : (line.weight ? line.weight : line.qty)}</td>
+                        <td>Rs. ${Math.round(line.line_total)}</td>
+                        <td>Rs. ${Math.round(lineTax(line))}</td>
+                    </tr>`
                 ).join('');
-                list.querySelectorAll('.cart-line-remove').forEach(b => {
-                    b.addEventListener('click', () => removeFromCart(parseInt(b.dataset.i)));
+                body.querySelectorAll('.row-remove').forEach(b => {
+                    b.addEventListener('click', (e) => { e.stopPropagation(); removeFromCart(parseInt(b.dataset.i)); });
                 });
             }
+
             const total = cart.reduce((s, l) => s + l.line_total, 0);
-            document.getElementById('cartTotal').textContent = 'Rs. ' + total.toFixed(0);
-            updateCompleteBtn();
+            const vatAmount = cart.reduce((s, l) => s + lineTax(l), 0);
+            const taxableValue = IS_VAT_ENABLED ? cart.filter(l => l.is_taxable).reduce((s, l) => s + l.line_total, 0) : 0;
+            const exemptValue = IS_VAT_ENABLED ? total - taxableValue : total;
+
+            document.getElementById('cartTotal').textContent = 'Rs. ' + Math.round(total + vatAmount);
+            document.getElementById('taxVat').textContent = 'Rs. ' + Math.round(vatAmount);
+            document.getElementById('taxTaxable').textContent = 'Rs. ' + Math.round(taxableValue);
+            document.getElementById('taxExempt').textContent = 'Rs. ' + Math.round(exemptValue);
+            document.getElementById('openPaymentBtn').disabled = cart.length === 0;
         }
 
-        function updateCompleteBtn() {
-            document.getElementById('completeSaleBtn').disabled = !(cart.length && selectedPayment);
-        }
-
-        document.getElementById('paymentMethods').addEventListener('click', (e) => {
-            const btn = e.target.closest('.payment-btn');
-            if (!btn) return;
-            document.querySelectorAll('.payment-btn').forEach(b => b.classList.remove('selected'));
-            btn.classList.add('selected');
-            selectedPayment = btn.dataset.method;
-            updateCompleteBtn();
-        });
-
-        document.getElementById('completeSaleBtn').addEventListener('click', () => {
-            const btn = document.getElementById('completeSaleBtn');
-            btn.disabled = true;
-            const originalText = btn.textContent;
-            btn.textContent = 'Processing…';
-            const payload = {
-                payment_method: selectedPayment,
-                cart: cart.map(l => ({ product_id: l.product_id, qty: l.qty, weight: l.weight || null, variant_id: l.variant_id || null })),
-            };
-            fetch('{% url "pos_create_sale" %}', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
-                body: JSON.stringify(payload),
-            })
-            .then(res => res.json())
-            .then(data => {
-                if (data.status === 'ok') {
-                    showToast(`Sale ${data.sale_number} — Rs. ${data.total} recorded`);
-                    cart = [];
-                    selectedPayment = null;
-                    document.querySelectorAll('.payment-btn').forEach(b => b.classList.remove('selected'));
-                    renderCart();
-                } else {
-                    showToast(data.message || 'Something went wrong');
-                }
-            })
-            .catch(() => showToast('Network error — please try again'))
-            .finally(() => {
-                btn.textContent = originalText;
-                updateCompleteBtn();
-            });
-        });
-
-        // Barcode scanners act like a keyboard — they type the code into
-        // whatever's focused, then send Enter. Same field also works as a
-        // plain text search when no exact barcode matches.
+        // ══════════════════════════════════════════════════════════════
+        // Barcode / search field — also switches into Shopping view
+        // ══════════════════════════════════════════════════════════════
         const barcodeInput = document.getElementById('barcodeInput');
         barcodeInput.addEventListener('keydown', (e) => {
             if (e.key !== 'Enter') return;
             const value = barcodeInput.value.trim();
-            if (!value) { renderGrid(); return; }
+            if (!value) { showReceiptView(); return; }
             const exact = PRODUCTS.find(p => p.barcode && p.barcode === value);
             if (exact) {
-                onProductTap(exact, null);
+                onProductTap(exact);
                 barcodeInput.value = '';
-                renderGrid();
+                showReceiptView();
                 return;
             }
+            showShoppingView();
             renderGrid(value);
         });
         barcodeInput.addEventListener('input', () => {
-            if (!barcodeInput.value) renderGrid();
+            if (!barcodeInput.value) { showReceiptView(); return; }
+            showShoppingView();
+            renderGrid(barcodeInput.value.trim());
         });
 
-        renderTabs();
-        renderGrid();
+        // ══════════════════════════════════════════════════════════════
+        // Payment panel
+        // ══════════════════════════════════════════════════════════════
+        function cartTotalWithVat() {
+            const total = cart.reduce((s, l) => s + l.line_total, 0);
+            const vatAmount = cart.reduce((s, l) => s + lineTax(l), 0);
+            return total + vatAmount;
+        }
+
+        function renderPaymentRows() {
+            const methods = [
+                ['cash', 'Cash'], ['esewa', 'eSewa'], ['khalti', 'Khalti'],
+                ['bank_transfer', 'Bank Transfer'], ['credit', 'Credit (उधारो)'],
+            ];
+            document.getElementById('payMethodRows').innerHTML = methods.map(([key, label]) => `
+                <div class="pay-method-row">
+                    <label>${label}</label>
+                    <input type="text" inputmode="decimal" data-method="${key}" value="${payments[key]}" placeholder="0">
+                </div>`
+            ).join('');
+            document.getElementById('payMethodRows').querySelectorAll('input').forEach(input => {
+                input.addEventListener('input', () => {
+                    payments[input.dataset.method] = input.value;
+                    updatePaymentSummary();
+                });
+            });
+            updatePaymentSummary();
+        }
+
+        function updatePaymentSummary() {
+            const total = cartTotalWithVat();
+            const sum = Object.values(payments).reduce((s, v) => s + (parseFloat(v) || 0), 0);
+            const remaining = Math.round((total - sum) * 100) / 100;
+            const remainingEl = document.getElementById('payRemaining');
+            remainingEl.textContent = remaining === 0 ? 'Settled ✓' : `Remaining: Rs. ${remaining.toFixed(2)}`;
+            remainingEl.classList.toggle('settled', remaining === 0);
+
+            const creditAmount = parseFloat(payments.credit) || 0;
+            document.getElementById('creditSection').style.display = creditAmount > 0 ? '' : 'none';
+            if (creditAmount <= 0) selectedCustomer = null;
+
+            const needsCustomer = creditAmount > 0 && !selectedCustomer;
+            document.getElementById('completeSaleBtn').disabled = remaining !== 0 || needsCustomer;
+        }
+
+        function openPaymentPanel() {
+            payments = { cash: '', esewa: '', khalti: '', bank_transfer: '', credit: '' };
+            selectedCustomer = null;
+            document.getElementById('customerResults').innerHTML = '';
+            document.getElementById('selectedCustomerLabel').style.display = 'none';
+            document.getElementById('newCustomerForm').classList.remove('active');
+            document.getElementById('customerPhoneInput').value = '';
+            renderPaymentRows();
+            document.getElementById('paymentPanel').classList.add('active');
+            document.getElementById('paymentBackdrop').classList.add('active');
+        }
+        function closePaymentPanel() {
+            document.getElementById('paymentPanel').classList.remove('active');
+            document.getElementById('paymentBackdrop').classList.remove('active');
+        }
+        document.getElementById('openPaymentBtn').addEventListener('click', openPaymentPanel);
+        document.getElementById('closePaymentBtn').addEventListener('click', closePaymentPanel);
+        document.getElementById('paymentBackdrop').addEventListener('click', closePaymentPanel);
+
+        document.getElementById('lookupCustomerBtn').addEventListener('click', async () => {
+            const phone = document.getElementById('customerPhoneInput').value.trim();
+            if (!phone) return;
+            const response = await apiFetch(`/api/v1/pos/customers/lookup/?phone=${encodeURIComponent(phone)}`);
+            const results = await response.json().catch(() => []);
+            const resultsEl = document.getElementById('customerResults');
+            document.getElementById('newCustomerForm').classList.toggle('active', results.length === 0);
+            if (results.length === 0) {
+                resultsEl.innerHTML = '';
+                document.getElementById('newCustPhone').value = phone;
+                return;
+            }
+            resultsEl.innerHTML = results.map(c => `
+                <div class="customer-card" data-id="${c.id}">
+                    <span>${c.name}${c.nickname ? ' (' + c.nickname + ')' : ''}</span>
+                    <span>Rs. ${c.outstanding_balance}</span>
+                </div>`
+            ).join('');
+            resultsEl.querySelectorAll('.customer-card').forEach(card => {
+                card.addEventListener('click', () => {
+                    const match = results.find(c => String(c.id) === card.dataset.id);
+                    selectedCustomer = match;
+                    resultsEl.querySelectorAll('.customer-card').forEach(c => c.classList.remove('selected'));
+                    card.classList.add('selected');
+                    const label = document.getElementById('selectedCustomerLabel');
+                    label.textContent = `Selected: ${match.name} (balance Rs. ${match.outstanding_balance})`;
+                    label.style.display = '';
+                    updatePaymentSummary();
+                });
+            });
+        });
+
+        document.getElementById('createCustomerBtn').addEventListener('click', async () => {
+            const payload = {
+                name: document.getElementById('newCustName').value.trim(),
+                nickname: document.getElementById('newCustNickname').value.trim(),
+                phone: document.getElementById('newCustPhone').value.trim(),
+                address: document.getElementById('newCustAddress').value.trim(),
+            };
+            if (!payload.name || !payload.phone) { showToast('Name and phone are required'); return; }
+            const response = await apiFetch('/api/v1/pos/customers/', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) { showToast(data.message || 'Could not create customer'); return; }
+            selectedCustomer = data;
+            document.getElementById('newCustomerForm').classList.remove('active');
+            const label = document.getElementById('selectedCustomerLabel');
+            label.textContent = `Selected: ${data.name} (balance Rs. ${data.outstanding_balance})`;
+            label.style.display = '';
+            updatePaymentSummary();
+        });
+
+        document.getElementById('completeSaleBtn').addEventListener('click', async () => {
+            const btn = document.getElementById('completeSaleBtn');
+            btn.disabled = true;
+            const originalText = btn.textContent;
+            btn.textContent = 'Processing…';
+
+            const paymentsPayload = Object.entries(payments)
+                .filter(([, amount]) => parseFloat(amount) > 0)
+                .map(([method, amount]) => ({ method, amount: parseFloat(amount).toFixed(2) }));
+
+            const payload = {
+                client_sale_id: clientSaleId,
+                cart: cart.map(l => ({ product_id: l.product_id, qty: l.qty, weight: l.weight || null, variant_id: l.variant_id || null })),
+                payments: paymentsPayload,
+            };
+            if (selectedCustomer) payload.customer_id = selectedCustomer.id;
+
+            try {
+                const response = await apiFetch('/pos/sale/', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+                });
+                const data = await response.json().catch(() => ({}));
+                if (response.status === 403) {
+                    // Idle-locked mid-checkout -- cart/payment state stays intact,
+                    // resuming right after a fresh PIN unlock.
+                    closePaymentPanel();
+                    currentOperator = null;
+                    setLocked(true);
+                    showToast('Terminal locked — enter PIN to resume');
+                    return;
+                }
+                if (data.status === 'ok') {
+                    showToast(`Sale ${data.sale_number} — Rs. ${data.total} recorded`);
+                    cart = [];
+                    newClientSaleId();
+                    closePaymentPanel();
+                    renderReceipt();
+                    updateCartIndicator();
+                    showReceiptView();
+                } else {
+                    showToast(data.message || 'Something went wrong');
+                    btn.disabled = false;
+                }
+            } catch (err) {
+                showToast('Network error — please try again');
+                btn.disabled = false;
+            } finally {
+                btn.textContent = originalText;
+            }
+        });
+
+        // ══════════════════════════════════════════════════════════════
+        // Repay credit — standalone flow, no cart involved
+        // ══════════════════════════════════════════════════════════════
+        let repaySelectedCustomer = null;
+        function openRepayModal() {
+            repaySelectedCustomer = null;
+            document.getElementById('repayPhoneInput').value = '';
+            document.getElementById('repayCustomerResults').innerHTML = '';
+            document.getElementById('repaySelectedLabel').style.display = 'none';
+            document.getElementById('repayAmountInput').style.display = 'none';
+            document.getElementById('repayAmountInput').value = '';
+            document.getElementById('repayConfirmBtn').style.display = 'none';
+            document.getElementById('repayBackdrop').style.display = 'flex';
+        }
+        document.getElementById('openRepayBtn').addEventListener('click', openRepayModal);
+        document.getElementById('repayCancelBtn').addEventListener('click', () => {
+            document.getElementById('repayBackdrop').style.display = 'none';
+        });
+
+        document.getElementById('repayLookupBtn').addEventListener('click', async () => {
+            const phone = document.getElementById('repayPhoneInput').value.trim();
+            if (!phone) return;
+            const response = await apiFetch(`/api/v1/pos/customers/lookup/?phone=${encodeURIComponent(phone)}`);
+            const results = await response.json().catch(() => []);
+            const resultsEl = document.getElementById('repayCustomerResults');
+            if (!results.length) { resultsEl.innerHTML = '<p style="font-size:0.82rem;color:var(--text-muted);">No customer found with that phone number.</p>'; return; }
+            resultsEl.innerHTML = results.map(c => `
+                <div class="customer-card" data-id="${c.id}">
+                    <span>${c.name}${c.nickname ? ' (' + c.nickname + ')' : ''}</span>
+                    <span>Rs. ${c.outstanding_balance}</span>
+                </div>`
+            ).join('');
+            resultsEl.querySelectorAll('.customer-card').forEach(card => {
+                card.addEventListener('click', () => {
+                    repaySelectedCustomer = results.find(c => String(c.id) === card.dataset.id);
+                    resultsEl.querySelectorAll('.customer-card').forEach(c => c.classList.remove('selected'));
+                    card.classList.add('selected');
+                    const label = document.getElementById('repaySelectedLabel');
+                    label.textContent = `${repaySelectedCustomer.name} — owes Rs. ${repaySelectedCustomer.outstanding_balance}`;
+                    label.style.display = '';
+                    document.getElementById('repayAmountInput').style.display = '';
+                    document.getElementById('repayConfirmBtn').style.display = '';
+                });
+            });
+        });
+
+        document.getElementById('repayConfirmBtn').addEventListener('click', async () => {
+            const amount = parseFloat(document.getElementById('repayAmountInput').value);
+            if (!repaySelectedCustomer || !(amount > 0)) { showToast('Enter a valid amount'); return; }
+            const response = await apiFetch('/api/v1/pos/credit/repay/', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ customer_id: repaySelectedCustomer.id, amount: amount.toFixed(2) }),
+            });
+            const data = await response.json().catch(() => ({}));
+            if (response.status === 403) {
+                document.getElementById('repayBackdrop').style.display = 'none';
+                currentOperator = null;
+                setLocked(true);
+                showToast('Terminal locked — enter PIN to try again');
+                return;
+            }
+            if (!response.ok) { showToast(data.message || 'Could not record repayment'); return; }
+            showToast(`Repayment recorded — new balance Rs. ${data.outstanding_balance}`);
+            document.getElementById('repayBackdrop').style.display = 'none';
+        });
+
+        // ══════════════════════════════════════════════════════════════
+        // Init — always start locked; there's no way to read prior
+        // session-unlock state without a round trip, so a fresh PIN entry
+        // is required on every page load, even if the session cookie
+        // still technically has an operator set server-side.
+        // ══════════════════════════════════════════════════════════════
+        showReceiptView();
+        renderReceipt();
+        setLocked(true);
     </script>
 </body>
 </html>
