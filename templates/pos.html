@@ -31,7 +31,7 @@
             --pos-enter-orange: #CF7122;
             --pos-reminder-border: #749265;
         }
-        html, body { margin: 0; height: 100%; font-family: 'DM Sans', 'Noto Sans Devanagari', sans-serif; background: var(--pos-bg); color: var(--forest); overflow: hidden; }
+        html, body { margin: 0; height: 100%; font-family: 'DM Sans', 'Noto Sans Devanagari', sans-serif; background: var(--pos-bg); color: var(--pos-text-green); overflow: hidden; }
         body { display: flex; flex-direction: column; }
 
         /* ── Header ── */
@@ -80,29 +80,47 @@
         }
         .cat-card svg { width: 32px; height: 32px; display: block; }
         .cat-card span { font-size: 0.78rem; font-weight: 700; color: var(--pos-text-green); text-align: center; line-height: 1.15; font-family: 'Noto Sans Devanagari', 'DM Sans', sans-serif; }
-        .cat-card.active { background: #dcecd4; border-color: var(--moss); box-shadow: 0 2px 8px rgba(74,124,60,0.25); }
+        .cat-card.active { background: #dcecd4; border-color: var(--pos-header-line); box-shadow: 0 2px 8px rgba(74,124,60,0.25); }
 
         /* ── Receipt view ── */
         #receiptView { display: flex; flex-direction: column; flex: 1; min-height: 0; }
-        .receipt-table-wrap { flex: 1; overflow-y: auto; min-height: 60px; }
+        /* Fixed 7-rows-per-page table -- no internal scroll, ever. Extra
+           items spill onto additional pages, flipped via the pager
+           alongside the table (matches the mockup's "1/1" page indicator). */
+        .receipt-table-row { display: flex; gap: 8px; flex: 1; min-height: 0; }
+        .receipt-table-wrap { flex: 1; min-height: 0; overflow: hidden; }
         .receipt-table { width: 100%; border-collapse: collapse; background: var(--pos-bg); border: 2px solid var(--pos-border-dark); table-layout: fixed; }
-        .receipt-table th, .receipt-table td { border: 1px solid var(--pos-border-dark); padding: 10px 10px; font-size: 0.85rem; text-align: center; color: var(--pos-text-black); }
-        .receipt-table th { background: var(--pos-bg); font-weight: 700; font-family: 'Noto Sans Devanagari', 'DM Sans', sans-serif; position: sticky; top: 0; }
+        .receipt-table th, .receipt-table td { border: 1px solid var(--pos-border-dark); padding: 4px 8px; font-size: 0.78rem; text-align: center; color: var(--pos-text-black); line-height: 1.15; }
+        .receipt-table th { background: var(--pos-bg); font-weight: 700; font-family: 'Noto Sans Devanagari', 'DM Sans', sans-serif; }
         .receipt-table td.name-cell { text-align: left; }
         .receipt-table .row-remove { background: none; border: none; color: #c0392b; cursor: pointer; font-size: 0.85rem; margin-left: 6px; }
-        .receipt-blank-row td { height: 44px; }
+        .receipt-blank-row td { height: 28px; }
+        .table-pager { width: 40px; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; }
+        .pager-btn {
+            background: var(--pos-cat-card-bg); border: 1.5px solid var(--pos-reminder-border); border-radius: 6px;
+            width: 32px; height: 28px; cursor: pointer; color: var(--pos-text-green); font-weight: 700; font-size: 0.75rem;
+        }
+        .pager-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+        .pager-indicator { font-weight: 800; color: var(--pos-text-green); font-size: 1.1rem; text-align: center; line-height: 1.2; font-family: 'Noto Sans Devanagari', 'DM Sans', sans-serif; }
+        .pager-indicator span { display: block; font-size: 0.9rem; }
 
         /* Reminder card | tax box | side buttons, side by side as one row */
         .receipt-combined-row { display: flex; gap: 12px; margin-top: 10px; align-items: stretch; flex-shrink: 0; }
 
         .reminder-card {
-            flex: 1.3; min-width: 0; background: var(--pos-bg); border: 2px solid var(--pos-reminder-border); border-radius: 14px; padding: 10px 14px;
+            flex: 1.3; min-width: 0; background: var(--pos-bg); border: 2px solid var(--pos-reminder-border); border-radius: 12px; padding: 6px 10px;
             box-shadow: 0 3px 10px rgba(26,47,30,0.08); position: relative; overflow: hidden;
         }
-        .reminder-card .reminder-title { font-weight: 700; color: var(--pos-text-green); font-size: 0.82rem; margin-bottom: 4px; font-family: 'Noto Sans Devanagari', 'DM Sans', sans-serif; }
-        .reminder-card ul { margin: 0; padding-left: 0; list-style: none; font-size: 0.76rem; color: var(--pos-text-green); line-height: 1.45; font-family: 'Noto Sans Devanagari', 'DM Sans', sans-serif; }
+        .reminder-card .reminder-title { font-weight: 700; color: var(--pos-text-green); font-size: 0.72rem; margin-bottom: 2px; font-family: 'Noto Sans Devanagari', 'DM Sans', sans-serif; }
+        .reminder-card ul { margin: 0; padding-left: 0; list-style: none; font-size: 0.68rem; color: var(--pos-text-green); line-height: 1.3; font-family: 'Noto Sans Devanagari', 'DM Sans', sans-serif; }
         .reminder-card ul li::before { content: "* "; font-weight: 700; }
-        .reminder-card .reminder-bag { position: absolute; right: 10px; bottom: 4px; width: 42px; height: 42px; opacity: 0.85; pointer-events: none; }
+        .reminder-card .reminder-bag { position: absolute; right: 8px; bottom: 2px; width: 30px; height: 30px; opacity: 0.85; pointer-events: none; }
+
+        /* Repay Credit gets its own column, between the reminder box and the
+           tax box -- pulled out of the Counter/Payment stack so that stack
+           only needs to be two buttons tall, the main lever for shortening
+           this row's overall height. */
+        .repay-col { display: flex; flex-shrink: 0; width: 110px; }
 
         .tax-box { flex: 1; min-width: 0; background: var(--pos-bg); border: 2px solid var(--pos-border-dark); border-radius: 6px; overflow: hidden; height: fit-content; }
         .tax-box .tax-row { display: flex; justify-content: space-between; padding: 7px 14px; font-size: 0.82rem; border-bottom: 1px solid var(--pos-border-dark); font-family: 'Noto Sans Devanagari', 'DM Sans', sans-serif; }
@@ -121,7 +139,7 @@
         .side-btn.counter-btn { background: var(--pos-enter-orange); cursor: default; }
         .side-btn.payment-btn-main { background: var(--pos-text-green); }
         .side-btn.payment-btn-main:disabled { opacity: 0.45; cursor: not-allowed; }
-        .side-btn.repay-btn { background: var(--moss); }
+        .side-btn.repay-btn { background: var(--pos-lock-pill); width: 100%; }
 
         /* ── Shopping view ── */
         #shoppingView { display: none; flex-direction: column; flex: 1; min-height: 0; }
@@ -292,22 +310,29 @@
         <div class="pos-content">
             <!-- Receipt view -->
             <div id="receiptView">
-                <div class="receipt-table-wrap">
-                    <table class="receipt-table">
-                        <thead>
-                            <tr>
-                                <th style="width:6%;">क्र.सं.</th>
-                                <th style="width:34%;">उत्पादनको नाम</th>
-                                <th style="width:15%;">एकाइ मूल्य</th>
-                                <th style="width:13%;">परिमाण</th>
-                                <th style="width:17%;">जम्मा मूल्य</th>
-                                <th style="width:15%;">कर</th>
-                            </tr>
-                        </thead>
-                        <tbody id="receiptBody">
-                            <tr class="receipt-empty-row"><td colspan="6">No items yet — tap a category below to start a sale.</td></tr>
-                        </tbody>
-                    </table>
+                <div class="receipt-table-row">
+                    <div class="receipt-table-wrap">
+                        <table class="receipt-table">
+                            <thead>
+                                <tr>
+                                    <th style="width:6%;">क्र.सं.</th>
+                                    <th style="width:34%;">उत्पादनको नाम</th>
+                                    <th style="width:15%;">एकाइ मूल्य</th>
+                                    <th style="width:13%;">परिमाण</th>
+                                    <th style="width:17%;">जम्मा मूल्य</th>
+                                    <th style="width:15%;">कर</th>
+                                </tr>
+                            </thead>
+                            <tbody id="receiptBody">
+                                <tr class="receipt-empty-row"><td colspan="6">No items yet — tap a category below to start a sale.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="table-pager">
+                        <button type="button" id="pagePrevBtn" class="pager-btn" aria-label="Previous page">▲</button>
+                        <div class="pager-indicator" id="pageIndicator">1<span>/</span>1</div>
+                        <button type="button" id="pageNextBtn" class="pager-btn" aria-label="Next page">▼</button>
+                    </div>
                 </div>
 
                 <div class="receipt-combined-row">
@@ -326,6 +351,10 @@
                         </svg>
                     </div>
 
+                    <div class="repay-col">
+                        <button type="button" class="side-btn repay-btn" id="openRepayBtn">उधारो तिर्नुहोस्<br><span style="font-weight:500;font-size:0.72rem;">Repay Credit</span></button>
+                    </div>
+
                     <div class="tax-box">
                         <div class="tax-row"><span>कुल कर</span><span id="taxVat">Rs. 0</span></div>
                         <div class="tax-row"><span>कर बा. मूल्य</span><span id="taxTaxable">Rs. 0</span></div>
@@ -335,7 +364,6 @@
                     <div class="side-actions">
                         <button type="button" class="side-btn counter-btn"><i class="fas fa-broom"></i><br>Counter<br>सफा राख्नुहोस्।</button>
                         <button type="button" class="side-btn payment-btn-main" id="openPaymentBtn" disabled><i class="fas fa-rupee-sign"></i> payment method&gt;&gt;&gt;</button>
-                        <button type="button" class="side-btn repay-btn" id="openRepayBtn">उधारो तिर्नुहोस्<br><span style="font-weight:500;font-size:0.72rem;">Repay Credit</span></button>
                     </div>
                 </div>
             </div>
@@ -808,6 +836,7 @@
                 line.line_total = parseFloat(product.price) * line.qty;
             }
             cart.push(line);
+            receiptPage = Math.ceil(cart.length / RECEIPT_PAGE_SIZE) - 1; // jump to the page the new item landed on
             renderReceipt();
             updateCartIndicator();
             showToast(`${product.name} added`);
@@ -824,18 +853,26 @@
             return line.line_total * VAT_RATE;
         }
 
-        // Minimum number of ruled rows the table always shows, even empty --
-        // matches the mockup's pre-ruled paper-receipt look instead of a
-        // near-blank box. Real cart rows come first; blanks pad the rest.
-        const RECEIPT_MIN_ROWS = 9;
+        // Fixed rows-per-page, matching the mockup's "1/1" page indicator --
+        // no internal table scroll, ever. Extra items spill onto new pages
+        // instead. Row numbering and remove-buttons use the GLOBAL cart
+        // index (not page-local), so removing an item always hits the right
+        // line regardless of which page it's shown on.
+        const RECEIPT_PAGE_SIZE = 7;
+        let receiptPage = 0;
 
         function renderReceipt() {
             const body = document.getElementById('receiptBody');
-            let rowsHtml = cart.map((line, i) => `
+            const totalPages = Math.max(1, Math.ceil(cart.length / RECEIPT_PAGE_SIZE));
+            receiptPage = Math.min(receiptPage, totalPages - 1);
+            const start = receiptPage * RECEIPT_PAGE_SIZE;
+            const pageLines = cart.slice(start, start + RECEIPT_PAGE_SIZE);
+
+            let rowsHtml = pageLines.map((line, i) => `
                 <tr>
-                    <td>${i + 1}</td>
+                    <td>${start + i + 1}</td>
                     <td class="name-cell">${line.name}<br><span style="font-size:0.72rem;color:var(--text-muted);">${line.detail}</span>
-                        <button type="button" class="row-remove" data-i="${i}"><i class="fas fa-times"></i></button>
+                        <button type="button" class="row-remove" data-i="${start + i}"><i class="fas fa-times"></i></button>
                     </td>
                     <td>Rs. ${Math.round(line.unit_price)}</td>
                     <td>${line.pricing_mode === 'fixed_weight' ? '1' : (line.weight ? line.weight : line.qty)}</td>
@@ -843,13 +880,17 @@
                     <td>Rs. ${Math.round(lineTax(line))}</td>
                 </tr>`
             ).join('');
-            for (let i = cart.length; i < RECEIPT_MIN_ROWS; i++) {
+            for (let i = pageLines.length; i < RECEIPT_PAGE_SIZE; i++) {
                 rowsHtml += '<tr class="receipt-blank-row"><td></td><td></td><td></td><td></td><td></td><td></td></tr>';
             }
             body.innerHTML = rowsHtml;
             body.querySelectorAll('.row-remove').forEach(b => {
                 b.addEventListener('click', (e) => { e.stopPropagation(); removeFromCart(parseInt(b.dataset.i)); });
             });
+
+            document.getElementById('pageIndicator').innerHTML = `${receiptPage + 1}<span>/</span>${totalPages}`;
+            document.getElementById('pagePrevBtn').disabled = receiptPage === 0;
+            document.getElementById('pageNextBtn').disabled = receiptPage >= totalPages - 1;
 
             const total = cart.reduce((s, l) => s + l.line_total, 0);
             const vatAmount = cart.reduce((s, l) => s + lineTax(l), 0);
@@ -862,6 +903,14 @@
             document.getElementById('taxExempt').textContent = 'Rs. ' + Math.round(exemptValue);
             document.getElementById('openPaymentBtn').disabled = cart.length === 0;
         }
+
+        document.getElementById('pagePrevBtn').addEventListener('click', () => {
+            if (receiptPage > 0) { receiptPage -= 1; renderReceipt(); }
+        });
+        document.getElementById('pageNextBtn').addEventListener('click', () => {
+            receiptPage += 1;
+            renderReceipt();
+        });
 
         // ══════════════════════════════════════════════════════════════
         // Barcode / search field — lives inside Shopping view (switching
@@ -949,15 +998,27 @@
         document.getElementById('closePaymentBtn').addEventListener('click', closePaymentPanel);
         document.getElementById('paymentBackdrop').addEventListener('click', closePaymentPanel);
 
+        // Guards against a slow earlier lookup's response overwriting a
+        // faster later one -- without this, searching phone A (slow),
+        // then quickly re-searching phone B (fast) could show A's
+        // customer under B's search if A's response arrives last.
+        let customerLookupSeq = 0;
         document.getElementById('lookupCustomerBtn').addEventListener('click', async () => {
             const phone = document.getElementById('customerPhoneInput').value.trim();
             if (!phone) return;
+            const mySeq = ++customerLookupSeq;
+            const resultsEl = document.getElementById('customerResults');
+            resultsEl.innerHTML = '';
+            document.getElementById('newCustomerForm').classList.remove('active');
+            document.getElementById('selectedCustomerLabel').style.display = 'none';
+            selectedCustomer = null;
+            updatePaymentSummary();
             const response = await apiFetch(`/api/v1/pos/customers/lookup/?phone=${encodeURIComponent(phone)}`);
             const results = await response.json().catch(() => []);
-            const resultsEl = document.getElementById('customerResults');
+            if (mySeq !== customerLookupSeq) return; // a newer search has since started; discard this stale response
             document.getElementById('newCustomerForm').classList.toggle('active', results.length === 0);
             if (results.length === 0) {
-                resultsEl.innerHTML = '';
+                resultsEl.innerHTML = '<p style="font-size:0.82rem;color:var(--text-muted);margin:4px 0;">No existing account found for that number.</p>';
                 document.getElementById('newCustPhone').value = phone;
                 return;
             }
@@ -996,6 +1057,10 @@
             if (!response.ok) { showToast(data.message || 'Could not create customer'); return; }
             selectedCustomer = data;
             document.getElementById('newCustomerForm').classList.remove('active');
+            document.getElementById('newCustName').value = '';
+            document.getElementById('newCustNickname').value = '';
+            document.getElementById('newCustPhone').value = '';
+            document.getElementById('newCustAddress').value = '';
             const label = document.getElementById('selectedCustomerLabel');
             label.textContent = `Selected: ${data.name} (balance Rs. ${data.outstanding_balance})`;
             label.style.display = '';
@@ -1036,6 +1101,7 @@
                 if (data.status === 'ok') {
                     showToast(`Sale ${data.sale_number} — Rs. ${data.total} recorded`);
                     cart = [];
+                    receiptPage = 0;
                     newClientSaleId();
                     closePaymentPanel();
                     renderReceipt();
@@ -1072,13 +1138,21 @@
             document.getElementById('repayBackdrop').style.display = 'none';
         });
 
+        let repayLookupSeq = 0;
         document.getElementById('repayLookupBtn').addEventListener('click', async () => {
             const phone = document.getElementById('repayPhoneInput').value.trim();
             if (!phone) return;
+            const mySeq = ++repayLookupSeq;
+            const resultsEl = document.getElementById('repayCustomerResults');
+            resultsEl.innerHTML = '';
+            repaySelectedCustomer = null;
+            document.getElementById('repaySelectedLabel').style.display = 'none';
+            document.getElementById('repayAmountInput').style.display = 'none';
+            document.getElementById('repayConfirmBtn').style.display = 'none';
             const response = await apiFetch(`/api/v1/pos/customers/lookup/?phone=${encodeURIComponent(phone)}`);
             const results = await response.json().catch(() => []);
-            const resultsEl = document.getElementById('repayCustomerResults');
-            if (!results.length) { resultsEl.innerHTML = '<p style="font-size:0.82rem;color:var(--text-muted);">No customer found with that phone number.</p>'; return; }
+            if (mySeq !== repayLookupSeq) return; // a newer search has since started; discard this stale response
+            if (!results.length) { resultsEl.innerHTML = '<p style="font-size:0.82rem;color:var(--text-muted);">No existing account found for that number.</p>'; return; }
             resultsEl.innerHTML = results.map(c => `
                 <div class="customer-card" data-id="${c.id}">
                     <span>${c.name}${c.nickname ? ' (' + c.nickname + ')' : ''}</span>
