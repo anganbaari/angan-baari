@@ -1,3 +1,6 @@
+import json
+import uuid
+from decimal import Decimal
 from unittest.mock import patch
 
 from django.contrib.auth.models import User
@@ -5,7 +8,10 @@ from django.test import TestCase, Client
 from django.urls import reverse
 
 from .admin import UserProfileInlineForm
-from .models import ContactMessage, NewsletterSubscriber, UserProfile
+from .models import (
+    Category, Customer, InventoryMovement, ContactMessage, NewsletterSubscriber, POSSale,
+    Product, UserProfile,
+)
 
 
 class ContactViewEmailTests(TestCase):
@@ -139,3 +145,101 @@ class UserProfileInlineFormTests(TestCase):
         self.assertTrue(form.is_valid(), form.errors)
         saved = form.save()
         self.assertEqual(saved.pin_hash, '')
+
+
+class PosCreateSaleViewTests(TestCase):
+    """pos_create_sale() — the traditional view templates/pos.html actually
+    calls. Thin parity coverage confirming it's correctly wired to the same
+    create_pos_sale() helper POSSaleApiTests already covers in depth,
+    including that the currently-live "Missing client_sale_id" bug (every
+    real click on Complete Sale used to 400, since pos.html never sent
+    one) is fixed on this exact path."""
+
+    def setUp(self):
+        self.client = Client()
+        self.staff_user = User.objects.create_user('till1', password='pw', is_staff=True)
+        self.operator = UserProfile.objects.create(user=self.staff_user, role='cashier')
+        self.operator_pin = '9182'
+        self.operator.set_pin(self.operator_pin)
+        self.operator.save()
+        self.client.login(username='till1', password='pw')
+
+        self.category = Category.objects.create(name='Honey', order=1)
+        self.jar = Product.objects.create(
+            name='Honey Jar', slug='honey-jar', category=self.category,
+            description='Raw honey', price=Decimal('400.00'), pricing_mode='fixed_quantity',
+        )
+        InventoryMovement.objects.create(
+            product=self.jar, movement_type='harvest', source='admin', quantity=Decimal('10'),
+        )
+
+    def unlock_terminal(self):
+        response = self.client.post(
+            reverse('v1_pos_unlock'), data=json.dumps({'pin': self.operator_pin}), content_type='application/json',
+        )
+        assert response.status_code == 200, response.json()
+
+    def post_sale(self, **overrides):
+        payload = {
+            'client_sale_id': str(uuid.uuid4()),
+            'payments': [{'method': 'cash', 'amount': '400.00'}],
+            'cart': [{'product_id': self.jar.id, 'qty': 1}],
+        }
+        payload.update(overrides)
+        return self.client.post(
+            reverse('pos_create_sale'), data=json.dumps(payload), content_type='application/json',
+        )
+
+    def test_full_cash_sale_works_end_to_end(self):
+        self.unlock_terminal()
+        response = self.post_sale()
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data['status'], 'ok')
+        self.assertEqual(Decimal(data['total']), Decimal('400.00'))
+        self.assertEqual(InventoryMovement.current_stock(self.jar), Decimal('9'))
+
+        sale = POSSale.objects.get(sale_number=data['sale_number'])
+        self.assertEqual(sale.cashier, self.staff_user)
+        self.assertEqual(sale.payment_method, 'cash')
+
+    def test_missing_client_sale_id_is_still_rejected(self):
+        self.unlock_terminal()
+        response = self.post_sale(client_sale_id=None)
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('client_sale_id', response.json()['message'])
+
+    def test_sale_rejected_without_prior_unlock(self):
+        """Logged into the terminal but no PIN entered yet this session."""
+        response = self.post_sale()
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(POSSale.objects.exists())
+
+    def test_credit_sale_requires_customer(self):
+        self.unlock_terminal()
+        response = self.post_sale(payments=[{'method': 'credit', 'amount': '400.00'}])
+        self.assertEqual(response.status_code, 400)
+
+    def test_credit_sale_with_customer_creates_ledger_row(self):
+        from .models import CreditTransaction
+        self.unlock_terminal()
+        credit_customer = Customer.objects.create(name='Bina Karki', phone='9844444444')
+        response = self.post_sale(
+            customer_id=credit_customer.id,
+            payments=[{'method': 'credit', 'amount': '400.00'}],
+        )
+        self.assertEqual(response.status_code, 200, response.json())
+        self.assertEqual(credit_customer.outstanding_balance(), Decimal('400.00'))
+        self.assertTrue(CreditTransaction.objects.filter(customer=credit_customer).exists())
+
+    def test_lock_endpoint_blocks_further_sales_until_unlocked_again(self):
+        self.unlock_terminal()
+        lock_response = self.client.post(reverse('v1_pos_lock'))
+        self.assertEqual(lock_response.status_code, 200)
+
+        blocked = self.post_sale()
+        self.assertEqual(blocked.status_code, 403)
+
+        self.unlock_terminal()
+        allowed = self.post_sale()
+        self.assertEqual(allowed.status_code, 200, allowed.json())

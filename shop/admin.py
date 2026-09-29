@@ -11,7 +11,10 @@ from .models import ContactMessage, ProductOrder, NewsletterSubscriber, Product,
 from .models import Offer, Coupon, BundleItem, ProductVariant
 from .emails import send_newsletter_campaign
 from .models import InventoryMovement
-from .models import Offer, Coupon, BundleItem, ProductVariant, InventoryMovement, POSSale, UserProfile
+from .models import (
+    Offer, Coupon, BundleItem, ProductVariant, InventoryMovement, POSSale, UserProfile,
+    BusinessSettings, CreditTransaction, Customer, POSSalePayment,
+)
 
 
 @admin.register(Category)
@@ -36,8 +39,8 @@ class ProductVariantInline(admin.TabularInline):
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
     list_display = ['name', 'category', 'price', 'price_unit', 'pricing_mode',
-                     'weight_step', 'is_available', 'season', 'current_stock_display', 'origin']
-    list_filter = ['category', 'is_available', 'pricing_mode', 'origin']
+                     'weight_step', 'is_available', 'is_taxable', 'season', 'current_stock_display', 'origin']
+    list_filter = ['category', 'is_available', 'is_taxable', 'pricing_mode', 'origin']
     list_editable = ['is_available', 'price', 'price_unit', 'origin']
     prepopulated_fields = {'slug': ('name',)}
     search_fields = ['name']
@@ -66,6 +69,14 @@ class ProductAdmin(admin.ModelAdmin):
         }),
         ('Availability', {
             'fields': ('is_available', 'origin')
+        }),
+        ('Tax (VAT)', {
+            'fields': ('is_taxable',),
+            'description': (
+                'Dormant until Business Settings\' "VAT enabled" switch is turned on — until then, '
+                'this has no effect on any sale. Most of this catalog (fresh produce, live animals, '
+                'milk, eggs) is VAT-exempt by law; only check this for a processed/packaged item.'
+            ),
         }),
     )
 
@@ -268,14 +279,28 @@ class InventoryMovementAdmin(admin.ModelAdmin):
         return f'{sign}{obj.quantity}'
     change_display.short_description = 'Change'
 
+class POSSalePaymentInline(admin.TabularInline):
+    model = POSSalePayment
+    extra = 0
+    readonly_fields = ['method', 'amount']
+    can_delete = False
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+
 @admin.register(POSSale)
 class POSSaleAdmin(admin.ModelAdmin):
-    list_display = ['sale_number', 'cashier', 'payment_method', 'total_amount', 'created_at']
+    list_display = ['sale_number', 'cashier', 'customer', 'payment_method', 'total_amount', 'created_at']
     list_filter = ['payment_method', 'cashier', 'created_at']
     search_fields = ['sale_number']
     date_hierarchy = 'created_at'
     ordering = ['-created_at']
-    readonly_fields = ['sale_number', 'cashier', 'payment_method', 'cart_snapshot', 'total_amount', 'created_at']
+    inlines = [POSSalePaymentInline]
+    readonly_fields = [
+        'sale_number', 'cashier', 'customer', 'payment_method', 'cart_snapshot', 'total_amount',
+        'client_sale_id', 'taxable_value', 'exempt_value', 'vat_amount', 'created_at',
+    ]
 
     def has_add_permission(self, request):
         # Sales are created by the POS screen itself, never by hand in admin —
@@ -345,3 +370,52 @@ class UserAdmin(BaseUserAdmin):
 
 admin.site.unregister(User)
 admin.site.register(User, UserAdmin)
+
+
+@admin.register(Customer)
+class CustomerAdmin(admin.ModelAdmin):
+    list_display = ['name', 'nickname', 'phone', 'outstanding_balance_display', 'created_at']
+    search_fields = ['name', 'nickname', 'phone']
+    ordering = ['name']
+
+    def outstanding_balance_display(self, obj):
+        return f'Rs. {obj.outstanding_balance():.2f}'
+    outstanding_balance_display.short_description = 'Outstanding balance'
+
+
+@admin.register(CreditTransaction)
+class CreditTransactionAdmin(admin.ModelAdmin):
+    """Viewable for reconciliation only — matches InventoryMovement's own
+    append-only-ledger treatment: no add, no edit, no delete from here."""
+
+    list_display = ['customer', 'transaction_type', 'amount', 'related_pos_sale', 'recorded_by', 'created_at']
+    list_filter = ['transaction_type', 'created_at']
+    search_fields = ['customer__name', 'customer__phone', 'related_pos_sale__sale_number']
+    date_hierarchy = 'created_at'
+    ordering = ['-created_at']
+    readonly_fields = ['customer', 'amount', 'transaction_type', 'related_pos_sale', 'recorded_by', 'created_at']
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(BusinessSettings)
+class BusinessSettingsAdmin(admin.ModelAdmin):
+    """The one editable toggle — everything else about this model is
+    singleton plumbing (see BusinessSettings.save()/get_solo())."""
+
+    list_display = ['is_vat_enabled']
+
+    def has_add_permission(self, request):
+        # Exactly one row should ever exist; get_solo() creates it lazily,
+        # so there's nothing to "add" from here.
+        return not BusinessSettings.objects.exists()
+
+    def has_delete_permission(self, request, obj=None):
+        return False

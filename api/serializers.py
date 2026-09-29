@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
 from django.contrib.auth.password_validation import validate_password
@@ -7,7 +9,7 @@ from rest_framework import serializers
 
 from shop.models import (
     Category, Product, ProductVariant, InventoryMovement, POSSale, ProductOrder,
-    Wishlist, Coupon,
+    Wishlist, Coupon, Customer, CreditTransaction,
 )
 
 
@@ -129,14 +131,27 @@ class POSSaleReadSerializer(serializers.ModelSerializer):
 
 
 class POSSaleCreateSerializer(serializers.Serializer):
-    """Input-shape validation only — the actual total computation, stock
-    check and InventoryMovement writes happen in the view, exactly like
-    pos_create_sale() in shop/views.py, since that's where product/variant
-    lookups and server-side price recomputation have to happen anyway."""
+    """Input-shape validation only — the actual total/VAT computation,
+    payments-sum check, and InventoryMovement writes happen in
+    create_pos_sale() (shop/views.py), shared with pos_create_sale() (the
+    traditional view templates/pos.html actually calls), since that's
+    where product/variant lookups and server-side price recomputation have
+    to happen anyway.
+
+    No operator_id here deliberately: the operator comes from
+    request.session (set only by a verified PIN on POST /pos/unlock/, see
+    get_pos_operator() in shop/views.py), never from client-supplied
+    request data — otherwise any request could just claim to be any staff
+    member without that person actually entering their PIN.
+
+    payments/cart are left as loose dicts (not nested serializers) to
+    match this file's existing cart-shape convention — real validation of
+    each line happens in create_pos_sale() either way."""
 
     client_sale_id = serializers.CharField(max_length=64)
-    payment_method = serializers.CharField()
+    customer_id = serializers.IntegerField(required=False, allow_null=True)
     cart = serializers.ListField(child=serializers.DictField(), allow_empty=False)
+    payments = serializers.ListField(child=serializers.DictField(), allow_empty=False)
 
 
 class PosUnlockSerializer(serializers.Serializer):
@@ -380,3 +395,40 @@ class WishlistSetVariantSerializer(serializers.Serializer):
 class WishlistMoveToCartSerializer(serializers.Serializer):
     product_id = serializers.IntegerField()
     variant_id = serializers.IntegerField(required=False, allow_null=True)
+
+
+# ─── POS Phase A/B: customer + credit (उधारो) ledger ────────────
+
+class CustomerSerializer(serializers.ModelSerializer):
+    """outstanding_balance is always computed (Customer.outstanding_balance()),
+    never a stored field — see that method for why."""
+
+    outstanding_balance = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Customer
+        fields = ['id', 'name', 'nickname', 'phone', 'address', 'outstanding_balance']
+
+    def get_outstanding_balance(self, obj):
+        return str(obj.outstanding_balance())
+
+
+class CustomerCreateSerializer(serializers.Serializer):
+    name = serializers.CharField(max_length=200)
+    nickname = serializers.CharField(max_length=100, required=False, allow_blank=True, default='')
+    phone = serializers.CharField(max_length=20)
+    address = serializers.CharField(required=False, allow_blank=True, default='')
+
+
+class CreditRepaySerializer(serializers.Serializer):
+    """Shape validation only. amount > 0 is enforced here; deliberately NOT
+    capped at the customer's current balance -- a repayment larger than
+    what's owed is a real situation (rounding, the customer overpaying),
+    not a client error, so it's recorded as entered rather than clamped.
+
+    No operator_id: same reasoning as POSSaleCreateSerializer -- the
+    operator comes from request.session (get_pos_operator()), never from
+    client-supplied request data."""
+
+    customer_id = serializers.IntegerField()
+    amount = serializers.DecimalField(max_digits=10, decimal_places=2, min_value=Decimal('0.01'))

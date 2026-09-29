@@ -72,6 +72,13 @@ class Product(models.Model):
     season = models.CharField(max_length=100, blank=True)
     farming_method = models.CharField(max_length=200, blank=True)
     is_available = models.BooleanField(default=True)
+    is_taxable = models.BooleanField(
+        default=False,
+        help_text='VAT scaffolding — dormant until BusinessSettings.is_vat_enabled is '
+                   'switched on. Most of this catalog (fresh produce, live animals, milk, '
+                   'eggs) is VAT-exempt under Nepali law; only check this for a '
+                   'processed/packaged item once VAT registration actually happens.'
+    )
     main_image = models.ImageField(storage=ImageKitStorage(), upload_to='products/', blank=True)
     image2 = models.ImageField(storage=ImageKitStorage(), upload_to='products/', blank=True)
     image3 = models.ImageField(storage=ImageKitStorage(), upload_to='products/', blank=True)
@@ -602,22 +609,97 @@ class InventoryMovement(models.Model):
         qs = cls.objects.filter(product=product, variant=variant)
         return sum((m.signed_quantity() for m in qs), Decimal('0'))
 
+# Shared base for the two payment-method choice lists below: a single
+# POSSalePayment line is always one concrete method (+ 'credit'); a POSSale
+# itself additionally needs 'split' as a derived summary value for when a
+# sale has 2+ payment lines with different methods. Defined once so the two
+# lists can't quietly drift apart.
+_BASE_PAYMENT_METHODS = [
+    ('cash', 'Cash'),
+    ('esewa', 'eSewa'),
+    ('khalti', 'Khalti'),
+    ('bank_transfer', 'Bank Transfer'),
+]
+
+
+class Customer(models.Model):
+    """A credit (उधारो) customer. Phone is the staff lookup key at
+    checkout — deliberately not unique (shared family phones happen), so
+    the lookup endpoint returns every match and lets staff pick."""
+
+    name = models.CharField(max_length=200)
+    nickname = models.CharField(max_length=100, blank=True)
+    phone = models.CharField(max_length=20, db_index=True)
+    address = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['name']
+
+    def __str__(self):
+        return f"{self.name} ({self.phone})"
+
+    def outstanding_balance(self):
+        """Never stored — always credit_sale total minus repayment total,
+        computed fresh so there's exactly one place this math can happen.
+        Quantized to 2dp explicitly: SQLite's Sum() doesn't reliably
+        preserve DecimalField's declared scale (e.g. Decimal('200.00') -
+        Decimal('0') can come back as Decimal('200')), which would
+        otherwise make this value's string formatting inconsistent
+        depending on which rows happen to be summed."""
+        from decimal import Decimal
+        from django.db.models import Q, Sum
+
+        agg = self.credit_transactions.aggregate(
+            credit_sales=Sum('amount', filter=Q(transaction_type='credit_sale')),
+            repayments=Sum('amount', filter=Q(transaction_type='repayment')),
+        )
+        balance = (agg['credit_sales'] or Decimal('0')) - (agg['repayments'] or Decimal('0'))
+        return balance.quantize(Decimal('0.01'))
+
+
 class POSSale(models.Model):
-    PAYMENT_METHOD_CHOICES = [
-        ('cash', 'Cash'),
-        ('esewa', 'eSewa'),
-        ('khalti', 'Khalti'),
-        ('bank_transfer', 'Bank Transfer'),
+    PAYMENT_METHOD_CHOICES = _BASE_PAYMENT_METHODS + [
+        ('credit', 'Credit (उधारो)'),
+        ('split', 'Split Payment'),
     ]
 
     sale_number = models.CharField(max_length=20, unique=True, editable=False)
     cashier = models.ForeignKey('auth.User', on_delete=models.PROTECT, related_name='pos_sales')
-    payment_method = models.CharField(max_length=20, choices=PAYMENT_METHOD_CHOICES)
+    customer = models.ForeignKey(
+        Customer, on_delete=models.PROTECT, null=True, blank=True, related_name='pos_sales',
+        help_text='Only set when at least one payment line on this sale is credit.'
+    )
+    payment_method = models.CharField(
+        max_length=20, choices=PAYMENT_METHOD_CHOICES,
+        help_text="Derived, not user-entered: the sale's one payment method, or "
+                   "'split' when it has more than one payment line. See the "
+                   "payments related set for the actual breakdown."
+    )
     cart_snapshot = models.JSONField(
         help_text='Same shape as ProductOrder.cart_snapshot: '
                    '[{product_id, weight, qty, variant_id}, ...]'
     )
     total_amount = models.DecimalField(max_digits=10, decimal_places=2)
+    client_sale_id = models.CharField(
+        max_length=64, unique=True, null=True, blank=True,
+        help_text='A UUID generated on the POS device itself, before the sale is '
+                   'ever sent to the server. If the same ID arrives twice — a '
+                   'double-tap on Complete Sale, a retried request after a dropped '
+                   'connection, or a queued offline sale being synced — the second '
+                   'attempt returns the original result instead of creating a '
+                   'second sale. Null only for sales that predate this field.'
+    )
+
+    # VAT scaffolding (POS Phase B) — dormant while BusinessSettings.
+    # is_vat_enabled is False: exempt_value == total_amount, the other two
+    # stay zero, regardless of any product's is_taxable flag. Stored (not
+    # recomputed later) so a receipt still shows the correct split even if
+    # a product's is_taxable flag or the VAT toggle itself changes afterward.
+    taxable_value = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    exempt_value = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    vat_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -633,12 +715,84 @@ class POSSale(models.Model):
         return f"{self.sale_number} — Rs. {self.total_amount} ({self.get_payment_method_display()})"
 
 
-    client_sale_id = models.CharField(
-        max_length=64, unique=True, null=True, blank=True,
-        help_text='A UUID generated on the POS device itself, before the sale is '
-                   'ever sent to the server. If the same ID arrives twice — a '
-                   'double-tap on Complete Sale, a retried request after a dropped '
-                   'connection, or a queued offline sale being synced — the second '
-                   'attempt returns the original result instead of creating a '
-                   'second sale. Null only for sales that predate this field.'
-    )    
+class POSSalePayment(models.Model):
+    """One payment line on a sale. A sale has 1+ of these; their amounts
+    must sum to POSSale.total_amount (enforced in the sale-creation view,
+    not here, since that's where the rest of the cart/total validation
+    already happens)."""
+
+    METHOD_CHOICES = _BASE_PAYMENT_METHODS + [('credit', 'Credit (उधारो)')]
+
+    sale = models.ForeignKey(POSSale, on_delete=models.CASCADE, related_name='payments')
+    method = models.CharField(max_length=20, choices=METHOD_CHOICES)
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+
+    class Meta:
+        ordering = ['id']
+
+    def __str__(self):
+        return f"{self.sale.sale_number} — {self.get_method_display()} Rs. {self.amount}"
+
+
+class CreditTransaction(models.Model):
+    """Append-only credit (उधारो) ledger — same philosophy as
+    InventoryMovement: rows are never edited or deleted, and a customer's
+    balance is always derived from this table (Customer.outstanding_balance()),
+    never stored."""
+
+    TRANSACTION_TYPE_CHOICES = [
+        ('credit_sale', 'Credit Sale'),
+        ('repayment', 'Repayment'),
+    ]
+
+    customer = models.ForeignKey(Customer, on_delete=models.PROTECT, related_name='credit_transactions')
+    amount = models.DecimalField(
+        max_digits=10, decimal_places=2,
+        help_text='Always positive — transaction_type decides the direction.'
+    )
+    transaction_type = models.CharField(max_length=20, choices=TRANSACTION_TYPE_CHOICES)
+    related_pos_sale = models.ForeignKey(
+        POSSale, on_delete=models.SET_NULL, null=True, blank=True, related_name='credit_transactions',
+        help_text='Set for credit_sale rows; left blank for a standalone repayment.'
+    )
+    recorded_by = models.ForeignKey(
+        'auth.User', on_delete=models.PROTECT, related_name='recorded_credit_transactions',
+        help_text="The staff member who actually took this payment/recorded this sale — the "
+                  "PIN-unlock 'current operator', not necessarily whoever the terminal is logged in as."
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.customer.name} — {self.get_transaction_type_display()} Rs. {self.amount}"
+
+
+class BusinessSettings(models.Model):
+    """Singleton — exactly one row, always pk=1. is_vat_enabled is the one
+    dormant switch for POS Phase B's VAT scaffolding; flipping it changes
+    how future sales compute their taxable/exempt/VAT split, never
+    retroactively (see POSSale.taxable_value/exempt_value/vat_amount,
+    stored per-sale at creation time)."""
+
+    is_vat_enabled = models.BooleanField(default=False)
+
+    class Meta:
+        verbose_name = 'Business Settings'
+        verbose_name_plural = 'Business Settings'
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        pass
+
+    @classmethod
+    def get_solo(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+    def __str__(self):
+        return 'Business Settings'

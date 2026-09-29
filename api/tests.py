@@ -11,7 +11,10 @@ from rest_framework import status
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
 
-from shop.models import Category, Coupon, InventoryMovement, Product, ProductOrder, ProductVariant, Wishlist
+from shop.models import (
+    BusinessSettings, Category, Coupon, CreditTransaction, Customer, InventoryMovement, POSSale,
+    POSSalePayment, Product, ProductOrder, ProductVariant, UserProfile, Wishlist,
+)
 
 
 class ApiTestBase(TestCase):
@@ -52,7 +55,26 @@ class ApiTestBase(TestCase):
         )
 
         self.staff = User.objects.create_user('cashier', password='pw', is_staff=True)
+        # POS Phase A/B: sale creation and credit repayment now need a real
+        # "operator" identity, established in the SESSION by a correct PIN
+        # on POST /pos/unlock/ -- never a client-supplied operator_id.
+        # self.staff_profile doubles as that operator in every existing
+        # test that doesn't care who specifically it is; self.staff_pin is
+        # its known PIN, used via self.unlock_terminal() below.
+        self.staff_pin = '8256'  # distinct from PINs used in PosUnlockApiTests ('4471', '0000')
+        self.staff_profile = UserProfile.objects.create(user=self.staff, role='cashier')
+        self.staff_profile.set_pin(self.staff_pin)
+        self.staff_profile.save()
         self.customer = User.objects.create_user('shopper', password='pw', is_staff=False)
+
+    def unlock_terminal(self, pin=None):
+        """Logs the session in as the current operator via a real PIN
+        unlock — sale/repay tests call this after self.client.login()
+        (the terminal's own day-long staff login) instead of passing
+        operator_id directly, matching how the frontend will actually work."""
+        response = self.client.post(reverse('v1_pos_unlock'), {'pin': pin or self.staff_pin}, format='json')
+        assert response.status_code == status.HTTP_200_OK, response.data
+        return response
 
 
 class ProductAndCategoryReadTests(ApiTestBase):
@@ -160,17 +182,32 @@ class POSSaleApiTests(ApiTestBase):
     def test_create_sale_requires_staff(self):
         payload = {
             'client_sale_id': str(uuid.uuid4()),
-            'payment_method': 'cash',
+            'payments': [{'method': 'cash', 'amount': '500.00'}],
             'cart': [{'product_id': self.jar.id, 'qty': 2}],
         }
         response = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
         self.assertIn(response.status_code, (status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN))
 
-    def test_create_sale_recomputes_total_and_writes_movements(self):
+    def test_create_sale_rejects_without_prior_unlock(self):
+        """Logged into the terminal (session auth) but no PIN unlock yet in
+        this session -- sale creation must be rejected, not silently
+        attributed to whoever's logged into the terminal."""
         self.client.login(username='cashier', password='pw')
         payload = {
             'client_sale_id': str(uuid.uuid4()),
-            'payment_method': 'cash',
+            'payments': [{'method': 'cash', 'amount': '250.00'}],
+            'cart': [{'product_id': self.jar.id, 'qty': 1}],
+        }
+        response = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertFalse(POSSale.objects.filter(client_sale_id=payload['client_sale_id']).exists())
+
+    def test_create_sale_recomputes_total_and_writes_movements(self):
+        self.client.login(username='cashier', password='pw')
+        self.unlock_terminal()
+        payload = {
+            'client_sale_id': str(uuid.uuid4()),
+            'payments': [{'method': 'cash', 'amount': '1100.00'}],
             'cart': [
                 {'product_id': self.jar.id, 'qty': 2},
                 {'product_id': self.fruit.id, 'qty': 1, 'weight': '2.00'},
@@ -185,26 +222,36 @@ class POSSaleApiTests(ApiTestBase):
         self.assertEqual(InventoryMovement.current_stock(self.jar), Decimal('8'))
         self.assertEqual(InventoryMovement.current_stock(self.fruit), Decimal('18.00'))
 
+        sale = POSSale.objects.get(sale_number=response.data['sale_number'])
+        self.assertEqual(sale.payment_method, 'cash')  # single payment line -> not 'split'
+        self.assertEqual(sale.payments.count(), 1)
+        self.assertEqual(sale.cashier, self.staff)  # attributed from the session-unlocked operator
+
     def test_create_sale_is_idempotent_on_client_sale_id(self):
         self.client.login(username='cashier', password='pw')
+        self.unlock_terminal()
         client_sale_id = str(uuid.uuid4())
         payload = {
             'client_sale_id': client_sale_id,
-            'payment_method': 'cash',
+            'payments': [{'method': 'cash', 'amount': '250.00'}],
             'cart': [{'product_id': self.jar.id, 'qty': 1}],
         }
         first = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
         second = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
 
+        self.assertEqual(first.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(second.status_code, status.HTTP_200_OK)
         self.assertEqual(first.data['sale_number'], second.data['sale_number'])
         # Only ONE sale movement should have been written, despite two requests.
         self.assertEqual(InventoryMovement.current_stock(self.jar), Decimal('9'))
+        self.assertEqual(POSSale.objects.filter(client_sale_id=client_sale_id).count(), 1)
 
     def test_create_sale_rejects_overselling_fixed_weight_animal(self):
         self.client.login(username='cashier', password='pw')
+        self.unlock_terminal()
         payload = {
             'client_sale_id': str(uuid.uuid4()),
-            'payment_method': 'cash',
+            'payments': [{'method': 'cash', 'amount': str(self.goat_variant.total_price())}],
             'cart': [{'product_id': self.goat.id, 'qty': 1, 'variant_id': self.goat_variant.id}],
         }
         first = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
@@ -222,6 +269,273 @@ class POSSaleApiTests(ApiTestBase):
         self.client.login(username='cashier', password='pw')
         response = self.client.get(reverse('v1_sale_list_create'))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_locking_terminal_blocks_further_sales_until_unlocked_again(self):
+        self.client.login(username='cashier', password='pw')
+        self.unlock_terminal()
+
+        lock_response = self.client.post(reverse('v1_pos_lock'))
+        self.assertEqual(lock_response.status_code, status.HTTP_200_OK)
+
+        payload = {
+            'client_sale_id': str(uuid.uuid4()),
+            'payments': [{'method': 'cash', 'amount': '250.00'}],
+            'cart': [{'product_id': self.jar.id, 'qty': 1}],
+        }
+        blocked = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        self.assertEqual(blocked.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertFalse(POSSale.objects.filter(client_sale_id=payload['client_sale_id']).exists())
+
+        # Unlocking again (fresh PIN entry) restores the ability to sell.
+        self.unlock_terminal()
+        allowed = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        self.assertEqual(allowed.status_code, status.HTTP_201_CREATED, allowed.data)
+
+    def test_split_cash_and_credit_sale_creates_payments_and_credit_transaction(self):
+        self.client.login(username='cashier', password='pw')
+        self.unlock_terminal()
+        credit_customer = Customer.objects.create(name='Ram Bahadur', phone='9800000001')
+
+        payload = {
+            'client_sale_id': str(uuid.uuid4()),
+            'customer_id': credit_customer.id,
+            'payments': [
+                {'method': 'cash', 'amount': '350.00'},
+                {'method': 'credit', 'amount': '150.00'},
+            ],
+            'cart': [{'product_id': self.jar.id, 'qty': 2}],  # 2 x 250 = 500
+        }
+        response = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+
+        sale = POSSale.objects.get(sale_number=response.data['sale_number'])
+        self.assertEqual(sale.payment_method, 'split')
+        self.assertEqual(sale.customer, credit_customer)
+        self.assertEqual(sale.payments.count(), 2)
+        self.assertEqual(
+            {(p.method, p.amount) for p in sale.payments.all()},
+            {('cash', Decimal('350.00')), ('credit', Decimal('150.00'))},
+        )
+
+        credit_txn = CreditTransaction.objects.get(related_pos_sale=sale)
+        self.assertEqual(credit_txn.transaction_type, 'credit_sale')
+        self.assertEqual(credit_txn.amount, Decimal('150.00'))
+        self.assertEqual(credit_txn.customer, credit_customer)
+        self.assertEqual(credit_txn.recorded_by, self.staff)
+        self.assertEqual(credit_customer.outstanding_balance(), Decimal('150.00'))
+
+    def test_credit_payment_without_customer_id_is_rejected(self):
+        self.client.login(username='cashier', password='pw')
+        self.unlock_terminal()
+        payload = {
+            'client_sale_id': str(uuid.uuid4()),
+            'payments': [{'method': 'credit', 'amount': '250.00'}],
+            'cart': [{'product_id': self.jar.id, 'qty': 1}],
+        }
+        response = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(POSSale.objects.filter(client_sale_id=payload['client_sale_id']).exists())
+        self.assertFalse(CreditTransaction.objects.exists())
+
+    def test_payments_not_summing_to_total_is_rejected_and_creates_nothing(self):
+        self.client.login(username='cashier', password='pw')
+        self.unlock_terminal()
+        payload = {
+            'client_sale_id': str(uuid.uuid4()),
+            # Jar is 250, qty 1 -> total should be 250.00, not 200.00.
+            'payments': [{'method': 'cash', 'amount': '200.00'}],
+            'cart': [{'product_id': self.jar.id, 'qty': 1}],
+        }
+        response = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(POSSale.objects.filter(client_sale_id=payload['client_sale_id']).exists())
+        # Nothing partially created -- stock untouched either.
+        self.assertEqual(InventoryMovement.current_stock(self.jar), Decimal('10'))
+
+    def test_old_sale_without_payments_still_shows_sensible_payment_method(self):
+        """A sale created before this feature existed has no POSSalePayment
+        rows at all -- payment_method (still a real stored field, just no
+        longer the source of truth for new sales) must keep showing
+        whatever it was already set to."""
+        old_sale = POSSale.objects.create(
+            client_sale_id=str(uuid.uuid4()), cashier=self.staff, payment_method='esewa',
+            cart_snapshot=[], total_amount=Decimal('500.00'),
+        )
+        self.assertEqual(old_sale.payment_method, 'esewa')
+        self.assertEqual(old_sale.get_payment_method_display(), 'eSewa')
+        self.assertEqual(old_sale.payments.count(), 0)
+
+
+class POSVatApiTests(ApiTestBase):
+    """POS Phase B — VAT scaffolding. Dormant by default (BusinessSettings.
+    is_vat_enabled=False), regardless of any product's is_taxable flag."""
+
+    def setUp(self):
+        super().setUp()
+        self.jar.is_taxable = True
+        self.jar.save(update_fields=['is_taxable'])
+        self.client.login(username='cashier', password='pw')
+        self.unlock_terminal()
+
+    def test_vat_disabled_by_default_exempt_equals_total(self):
+        payload = {
+            'client_sale_id': str(uuid.uuid4()),
+            'payments': [{'method': 'cash', 'amount': '500.00'}],
+            'cart': [{'product_id': self.jar.id, 'qty': 2}],  # is_taxable=True, but VAT is off
+        }
+        response = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+
+        sale = POSSale.objects.get(sale_number=response.data['sale_number'])
+        self.assertEqual(sale.exempt_value, Decimal('500.00'))
+        self.assertEqual(sale.taxable_value, Decimal('0.00'))
+        self.assertEqual(sale.vat_amount, Decimal('0.00'))
+
+    def test_vat_enabled_splits_mixed_cart_correctly(self):
+        BusinessSettings.objects.get_or_create(pk=1, defaults={'is_vat_enabled': True})
+        BusinessSettings.get_solo()  # ensure the row exists
+        BusinessSettings.objects.filter(pk=1).update(is_vat_enabled=True)
+
+        # jar (taxable) 2 x 250 = 500; fruit (exempt, default) 2kg x 300 = 600
+        payload = {
+            'client_sale_id': str(uuid.uuid4()),
+            'payments': [{'method': 'cash', 'amount': '1165.00'}],  # 500 + 600 + 13% of 500 (65)
+            'cart': [
+                {'product_id': self.jar.id, 'qty': 2},
+                {'product_id': self.fruit.id, 'qty': 1, 'weight': '2.00'},
+            ],
+        }
+        response = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+
+        sale = POSSale.objects.get(sale_number=response.data['sale_number'])
+        self.assertEqual(sale.taxable_value, Decimal('500.00'))
+        self.assertEqual(sale.exempt_value, Decimal('600.00'))
+        self.assertEqual(sale.vat_amount, Decimal('65.00'))
+        self.assertEqual(sale.total_amount, Decimal('1165.00'))
+
+    def test_toggling_vat_does_not_retroactively_change_completed_sales(self):
+        payload = {
+            'client_sale_id': str(uuid.uuid4()),
+            'payments': [{'method': 'cash', 'amount': '500.00'}],
+            'cart': [{'product_id': self.jar.id, 'qty': 2}],
+        }
+        response = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        sale = POSSale.objects.get(sale_number=response.data['sale_number'])
+        self.assertEqual(sale.exempt_value, Decimal('500.00'))
+        self.assertEqual(sale.taxable_value, Decimal('0.00'))
+
+        # Flip VAT on *after* the sale already exists.
+        BusinessSettings.objects.update_or_create(pk=1, defaults={'is_vat_enabled': True})
+
+        sale.refresh_from_db()
+        self.assertEqual(sale.exempt_value, Decimal('500.00'))
+        self.assertEqual(sale.taxable_value, Decimal('0.00'))
+        self.assertEqual(sale.vat_amount, Decimal('0.00'))
+
+
+class CustomerApiTests(ApiTestBase):
+    def test_lookup_requires_staff(self):
+        response = self.client.get(reverse('v1_pos_customer_lookup'), {'phone': '9800000001'})
+        self.assertIn(response.status_code, (status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN))
+
+    def test_lookup_returns_matches_and_empty_list_for_no_match(self):
+        self.client.login(username='cashier', password='pw')
+        Customer.objects.create(name='Ram Bahadur', phone='9800000001')
+        Customer.objects.create(name='Ram Bahadur Thapa', phone='9800000001')  # shared phone, family account
+        Customer.objects.create(name='Someone Else', phone='9811111111')
+
+        response = self.client.get(reverse('v1_pos_customer_lookup'), {'phone': '9800000001'})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 2)
+        self.assertEqual({c['name'] for c in response.data}, {'Ram Bahadur', 'Ram Bahadur Thapa'})
+
+        empty = self.client.get(reverse('v1_pos_customer_lookup'), {'phone': '9899999999'})
+        self.assertEqual(empty.status_code, status.HTTP_200_OK)
+        self.assertEqual(empty.data, [])
+
+    def test_create_customer(self):
+        self.client.login(username='cashier', password='pw')
+        payload = {'name': 'Sita Devi', 'phone': '9822222222', 'nickname': 'Sita', 'address': 'Bhulka Danda'}
+        response = self.client.post(reverse('v1_pos_customer_create'), payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertEqual(response.data['outstanding_balance'], '0.00')
+        self.assertTrue(Customer.objects.filter(phone='9822222222', name='Sita Devi').exists())
+
+
+class CreditLedgerApiTests(ApiTestBase):
+    def setUp(self):
+        super().setUp()
+        self.credit_customer = Customer.objects.create(name='Hari Prasad', phone='9833333333')
+
+    def test_repay_requires_prior_unlock(self):
+        self.client.login(username='cashier', password='pw')
+        payload = {'customer_id': self.credit_customer.id, 'amount': '50.00'}
+        response = self.client.post(reverse('v1_pos_credit_repay'), payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertFalse(CreditTransaction.objects.filter(customer=self.credit_customer).exists())
+
+    def test_repayment_reduces_outstanding_balance(self):
+        CreditTransaction.objects.create(
+            customer=self.credit_customer, amount=Decimal('300.00'),
+            transaction_type='credit_sale', recorded_by=self.staff,
+        )
+        self.assertEqual(self.credit_customer.outstanding_balance(), Decimal('300.00'))
+
+        self.client.login(username='cashier', password='pw')
+        self.unlock_terminal()
+        payload = {'customer_id': self.credit_customer.id, 'amount': '100.00'}
+        response = self.client.post(reverse('v1_pos_credit_repay'), payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertEqual(response.data['outstanding_balance'], '200.00')
+        self.assertEqual(self.credit_customer.outstanding_balance(), Decimal('200.00'))
+
+        repay_txn = CreditTransaction.objects.get(customer=self.credit_customer, transaction_type='repayment')
+        self.assertEqual(repay_txn.recorded_by, self.staff)
+
+    def test_outstanding_balance_computed_correctly_across_mixed_order(self):
+        # Deliberately not in chronological/sorted order -- the aggregate
+        # must not depend on row insertion order.
+        CreditTransaction.objects.create(
+            customer=self.credit_customer, amount=Decimal('100.00'),
+            transaction_type='repayment', recorded_by=self.staff,
+        )
+        CreditTransaction.objects.create(
+            customer=self.credit_customer, amount=Decimal('500.00'),
+            transaction_type='credit_sale', recorded_by=self.staff,
+        )
+        CreditTransaction.objects.create(
+            customer=self.credit_customer, amount=Decimal('50.00'),
+            transaction_type='repayment', recorded_by=self.staff,
+        )
+        CreditTransaction.objects.create(
+            customer=self.credit_customer, amount=Decimal('200.00'),
+            transaction_type='credit_sale', recorded_by=self.staff,
+        )
+        # 500 + 200 credit_sale - (100 + 50) repayment = 550
+        self.assertEqual(self.credit_customer.outstanding_balance(), Decimal('550.00'))
+
+    def test_repayment_larger_than_balance_is_allowed_not_clamped(self):
+        CreditTransaction.objects.create(
+            customer=self.credit_customer, amount=Decimal('100.00'),
+            transaction_type='credit_sale', recorded_by=self.staff,
+        )
+        self.client.login(username='cashier', password='pw')
+        self.unlock_terminal()
+        payload = {'customer_id': self.credit_customer.id, 'amount': '150.00'}
+        response = self.client.post(reverse('v1_pos_credit_repay'), payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        # Balance genuinely goes negative (customer now owed BY the farm) --
+        # not clamped to zero.
+        self.assertEqual(response.data['outstanding_balance'], '-50.00')
+
+    def test_repayment_rejects_non_positive_amount(self):
+        self.client.login(username='cashier', password='pw')
+        self.unlock_terminal()
+        payload = {'customer_id': self.credit_customer.id, 'amount': '0.00'}
+        response = self.client.post(reverse('v1_pos_credit_repay'), payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(CreditTransaction.objects.filter(customer=self.credit_customer).exists())
 
 
 class PosUnlockApiTests(ApiTestBase):
@@ -469,9 +783,10 @@ class ApiV1CorsMiddlewareTests(ApiTestBase):
         still need to be authenticated regardless; this just confirms
         cross-origin JS still can't read the response."""
         self.client.login(username='cashier', password='pw')
+        self.unlock_terminal()
         payload = {
             'client_sale_id': 'cors-test-sale-1',
-            'payment_method': 'cash',
+            'payments': [{'method': 'cash', 'amount': '250.00'}],
             'cart': [{'product_id': self.jar.id, 'qty': 1}],
         }
         response = self.client.post(

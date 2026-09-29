@@ -19,12 +19,16 @@ from rest_framework.views import APIView
 
 from shop.emails import send_order_cancelled_email, send_order_received_email, send_resend_email
 from shop.models import (
-    Category, InventoryMovement, POSSale, Product, ProductOrder, UserProfile, Wishlist, get_live_coupons,
+    Category, CreditTransaction, Customer, InventoryMovement, POSSale, Product, ProductOrder,
+    UserProfile, Wishlist, get_live_coupons,
 )
 from shop.views import (
     create_inventory_movements_from_snapshot,
     create_order_inventory_movements,
+    create_pos_sale,
     format_weight,
+    get_pos_operator,
+    POSSaleValidationError,
 )
 
 from .permissions import IsStaffUser
@@ -32,6 +36,9 @@ from .serializers import (
     CategorySerializer,
     ChangePasswordSerializer,
     CouponSerializer,
+    CreditRepaySerializer,
+    CustomerCreateSerializer,
+    CustomerSerializer,
     InventoryMovementReadSerializer,
     LoginSerializer,
     OrderCreateSerializer,
@@ -126,11 +133,10 @@ class InventoryMovementListView(generics.ListAPIView):
 
 class POSSaleView(generics.ListAPIView):
     """GET: sale history (staff-only). POST: create a sale via the API —
-    same server-side total recomputation, same
-    create_inventory_movements_from_snapshot(strict=True) call inside
-    transaction.atomic(), and the same client_sale_id idempotency as
-    pos_create_sale() in shop/views.py, which templates/pos.html still
-    calls directly and unchanged."""
+    delegates to create_pos_sale() (shop/views.py), shared with
+    pos_create_sale(), the traditional view templates/pos.html actually
+    calls. Same server-side total/VAT recomputation, same payments-sum
+    validation, same client_sale_id idempotency either way."""
 
     queryset = POSSale.objects.select_related('cashier').order_by('-created_at')
     serializer_class = POSSaleReadSerializer
@@ -142,77 +148,31 @@ class POSSaleView(generics.ListAPIView):
         input_serializer.is_valid(raise_exception=True)
         data = input_serializer.validated_data
 
-        client_sale_id = data['client_sale_id']
-
-        existing = POSSale.objects.filter(client_sale_id=client_sale_id).first()
-        if existing:
-            return Response({
-                'status': 'ok',
-                'sale_number': existing.sale_number,
-                'total': str(existing.total_amount),
-            })
-
-        cart = data['cart']
-        payment_method = data['payment_method']
-        if payment_method not in dict(POSSale.PAYMENT_METHOD_CHOICES):
-            return Response({'status': 'error', 'message': 'Choose a payment method.'}, status=400)
-
-        total = Decimal('0')
-        cart_snapshot = []
-        try:
-            for line in cart:
-                product = Product.objects.get(id=line.get('product_id'), is_available=True)
-                qty = int(line.get('qty', 1) or 1)
-                weight = line.get('weight')
-                variant_id = line.get('variant_id')
-
-                if product.pricing_mode == 'fixed_weight':
-                    variant = (
-                        product.variants.filter(id=variant_id, is_available=True).first()
-                        if variant_id else None
-                    )
-                    if not variant:
-                        return Response(
-                            {'status': 'error', 'message': f'{product.name}: that animal is no longer available.'},
-                            status=400,
-                        )
-                    line_total = variant.total_price()
-                elif product.pricing_mode == 'variable_weight':
-                    line_total = Decimal(str(product.price)) * Decimal(str(weight or 0))
-                else:
-                    line_total = Decimal(str(product.price)) * qty
-
-                total += line_total
-                cart_snapshot.append({
-                    'product_id': product.id, 'weight': weight, 'qty': qty, 'variant_id': variant_id,
-                })
-        except (Product.DoesNotExist, InvalidOperation, TypeError, ValueError):
-            return Response({'status': 'error', 'message': 'One of the items in this cart is no longer valid.'}, status=400)
+        customer = None
+        customer_id = data.get('customer_id')
+        if customer_id:
+            try:
+                customer = Customer.objects.get(id=customer_id)
+            except Customer.DoesNotExist:
+                return Response({'status': 'error', 'message': 'Customer not found.'}, status=400)
 
         try:
-            with transaction.atomic():
-                sale = POSSale.objects.create(
-                    client_sale_id=client_sale_id,
-                    cashier=request.user,
-                    payment_method=payment_method,
-                    cart_snapshot=cart_snapshot,
-                    total_amount=total,
-                )
-                create_inventory_movements_from_snapshot(
-                    cart_snapshot, 'sale', source='pos',
-                    related_pos_sale=sale, note=f"POS sale {sale.sale_number} (API)",
-                    strict=True,
-                )
-        except DjangoValidationError as e:
-            message = '; '.join(e.messages) if hasattr(e, 'messages') else str(e)
-            return Response({'status': 'error', 'message': f'Not enough stock: {message}'}, status=409)
-        except Exception:
-            return Response(
-                {'status': 'error', 'message': 'Could not complete this sale — nothing was charged or recorded. Please try again.'},
-                status=400,
+            operator_user = get_pos_operator(request)
+            sale, created = create_pos_sale(
+                client_sale_id=data['client_sale_id'],
+                cart=data['cart'],
+                payments=data['payments'],
+                operator_user=operator_user,
+                customer=customer,
+                note_prefix='POS sale (API)',
             )
+        except POSSaleValidationError as e:
+            return Response({'status': 'error', 'message': e.message}, status=e.status)
 
-        return Response({'status': 'ok', 'sale_number': sale.sale_number, 'total': str(total)}, status=status.HTTP_201_CREATED)
+        return Response(
+            {'status': 'ok', 'sale_number': sale.sale_number, 'total': str(sale.total_amount)},
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+        )
 
 
 class PosUnlockView(APIView):
@@ -261,6 +221,14 @@ class PosUnlockView(APIView):
         if matched_profile:
             request.session['pos_failed_attempts'] = 0
             user = matched_profile.user
+            # This is the one place operator identity gets established --
+            # sale creation and credit repayment both read it back from the
+            # session rather than trusting a client-supplied operator_id,
+            # so a request can't just claim to be any staff member without
+            # that person actually having entered their PIN on this
+            # terminal/session.
+            request.session['pos_operator_id'] = user.id
+            request.session['pos_operator_unlocked_at'] = timezone.now().isoformat()
             return Response({
                 'id': user.id,
                 'name': user.get_full_name() or user.username,
@@ -279,6 +247,101 @@ class PosUnlockView(APIView):
         return Response(
             {'error': 'invalid_pin', 'attempts_remaining': self.MAX_ATTEMPTS - attempts},
             status=status.HTTP_401_UNAUTHORIZED,
+        )
+
+
+class PosLockView(APIView):
+    """POST /api/v1/pos/lock/ — clears the session's operator identity.
+    What the frontend's idle timer calls to show the lock overlay; after
+    this, sale creation and credit repayment on this session are rejected
+    until someone unlocks again via a correct PIN. Doesn't touch the
+    failed-attempt/lockout counters -- those are a separate concern from
+    "who's currently identified as operating this terminal"."""
+
+    authentication_classes = [SessionAuthentication]
+    permission_classes = [IsStaffUser]
+
+    def post(self, request, *args, **kwargs):
+        request.session.pop('pos_operator_id', None)
+        request.session.pop('pos_operator_unlocked_at', None)
+        return Response({'status': 'ok'})
+
+
+class CustomerLookupView(APIView):
+    """GET /api/v1/pos/customers/lookup/?phone=<number> — the checkout-time
+    lookup staff use to find a credit customer. phone isn't unique (shared
+    family phones happen), so this returns every match as a list, never a
+    single object or a 404 -- an empty list just means "no match," which is
+    the frontend's cue to show its own create-new-customer form next."""
+
+    authentication_classes = [SessionAuthentication]
+    permission_classes = [IsStaffUser]
+
+    def get(self, request, *args, **kwargs):
+        phone = request.query_params.get('phone', '').strip()
+        if not phone:
+            return Response({'status': 'error', 'message': 'phone is required.'}, status=400)
+        customers = Customer.objects.filter(phone=phone)
+        return Response(CustomerSerializer(customers, many=True).data)
+
+
+class CustomerCreateView(APIView):
+    """POST /api/v1/pos/customers/ — creates a new credit customer, used
+    when CustomerLookupView comes back empty. A fresh customer always
+    starts at balance 0 (CreditTransaction rows only ever get created by an
+    actual sale/repayment, never by this view)."""
+
+    authentication_classes = [SessionAuthentication]
+    permission_classes = [IsStaffUser]
+
+    def post(self, request, *args, **kwargs):
+        serializer = CustomerCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        customer = Customer.objects.create(**serializer.validated_data)
+        return Response(CustomerSerializer(customer).data, status=status.HTTP_201_CREATED)
+
+
+class CreditRepayView(APIView):
+    """POST /api/v1/pos/credit/repay/ — records a उधारो repayment. The
+    operator comes from request.session (see get_pos_operator() /
+    PosUnlockView), not necessarily request.user, same reasoning as sale
+    creation — never a client-supplied operator_id. Deliberately does not
+    cap amount at the customer's current balance -- an overpayment is a
+    real business situation (rounding, the customer paying off more than
+    they technically owe), not a client error, so it's recorded exactly
+    as entered rather than silently clamped."""
+
+    authentication_classes = [SessionAuthentication]
+    permission_classes = [IsStaffUser]
+
+    def post(self, request, *args, **kwargs):
+        serializer = CreditRepaySerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        try:
+            customer = Customer.objects.get(id=data['customer_id'])
+        except Customer.DoesNotExist:
+            return Response({'status': 'error', 'message': 'Customer not found.'}, status=400)
+
+        try:
+            operator_user = get_pos_operator(request)
+        except POSSaleValidationError as e:
+            return Response({'status': 'error', 'message': e.message}, status=e.status)
+
+        transaction_row = CreditTransaction.objects.create(
+            customer=customer,
+            amount=data['amount'],
+            transaction_type='repayment',
+            recorded_by=operator_user,
+        )
+        return Response(
+            {
+                'status': 'ok',
+                'id': transaction_row.id,
+                'outstanding_balance': str(customer.outstanding_balance()),
+            },
+            status=status.HTTP_201_CREATED,
         )
 
 

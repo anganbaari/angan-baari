@@ -639,6 +639,199 @@ def create_inventory_movements_from_snapshot(cart_snapshot, movement_type, sourc
             continue
 
 
+class POSSaleValidationError(Exception):
+    """Raised by create_pos_sale() for any business-rule failure (bad cart
+    line, payments not matching the required total, missing customer for a
+    credit line, insufficient stock). Callers translate .message/.status
+    into their own response shape (JsonResponse for the traditional POS
+    view, DRF Response for the API one) rather than each re-implementing
+    the same validation."""
+
+    def __init__(self, message, status=400):
+        self.message = message
+        self.status = status
+        super().__init__(message)
+
+
+VAT_RATE = 0.13  # 13% — Nepal's standard VAT rate. A constant, not a
+                 # literal, so the one place this ever needs to change is
+                 # here, not scattered through every total computation.
+
+
+def get_pos_operator(request):
+    """Resolves the currently-unlocked operator from session state that
+    PosUnlockView sets on a successful PIN match — never from client
+    input (request.data), which would let any request just claim to be
+    any staff member without that person actually entering their PIN on
+    this terminal/session.
+
+    Raises POSSaleValidationError(status=403) if the terminal was never
+    unlocked, has since been locked (PosLockView), or the identified
+    profile's user is no longer active/staff (e.g. deactivated after the
+    unlock). Shared by sale creation and credit repayment — both callers
+    catch POSSaleValidationError the same way regardless of which one
+    raised it.
+    """
+    from .models import UserProfile
+
+    operator_id = request.session.get('pos_operator_id')
+    if not operator_id:
+        raise POSSaleValidationError('Terminal is locked — enter a PIN first.', status=403)
+    try:
+        return UserProfile.objects.select_related('user').get(
+            user_id=operator_id, user__is_staff=True, user__is_active=True,
+        ).user
+    except UserProfile.DoesNotExist:
+        raise POSSaleValidationError('Terminal is locked — enter a PIN first.', status=403)
+
+
+def create_pos_sale(*, client_sale_id, cart, payments, operator_user, customer=None,
+                     source='pos', note_prefix='POS sale'):
+    """Shared by pos_create_sale() (traditional, what templates/pos.html
+    actually calls) and POSSaleView.post() (API) — the two entry points
+    for completing a POS sale. Computes the cart total (and, once
+    BusinessSettings.is_vat_enabled is switched on, the taxable/exempt/VAT
+    split), validates the payment lines against it, and — all inside one
+    atomic transaction — creates the POSSale, one POSSalePayment per
+    payment line, a CreditTransaction for any credit line, and the same
+    InventoryMovement rows website checkout writes.
+
+    cashier is set from operator_user, not necessarily whoever's session
+    is logged into the terminal — same reasoning as the PIN-unlock work:
+    the terminal login can stay active all day while different staff take
+    turns operating the register, and operator_user is whoever the PIN
+    identified as actually running this specific sale.
+
+    Idempotent on client_sale_id: if a sale with this id already exists,
+    it's returned immediately with no re-validation and nothing new
+    created — same behavior this already had before payments/VAT existed.
+
+    Returns (sale, created) — created is False on the idempotent-replay
+    path, so callers that distinguish 200 vs 201 (the API path) still can.
+    """
+    from decimal import Decimal, InvalidOperation
+    from django.core.exceptions import ValidationError
+    from django.db import transaction
+    from .models import BusinessSettings, CreditTransaction, POSSale, POSSalePayment, Product
+
+    existing = POSSale.objects.filter(client_sale_id=client_sale_id).first()
+    if existing:
+        return existing, False
+
+    if not cart:
+        raise POSSaleValidationError('Cart is empty.')
+    if not payments:
+        raise POSSaleValidationError('At least one payment line is required.')
+
+    valid_methods = dict(POSSalePayment.METHOD_CHOICES)
+    for line in payments:
+        if line.get('method') not in valid_methods:
+            raise POSSaleValidationError('Choose a valid payment method for every payment line.')
+        try:
+            if Decimal(str(line.get('amount'))) <= 0:
+                raise POSSaleValidationError('Each payment amount must be greater than zero.')
+        except (InvalidOperation, TypeError, ValueError):
+            raise POSSaleValidationError('Each payment amount must be a valid number.')
+
+    has_credit_line = any(line['method'] == 'credit' for line in payments)
+    if has_credit_line and not customer:
+        raise POSSaleValidationError('A customer is required for a credit payment.')
+
+    settings_row = BusinessSettings.get_solo()
+
+    total = Decimal('0')
+    taxable_value = Decimal('0')
+    exempt_value = Decimal('0')
+    cart_snapshot = []
+    try:
+        for line in cart:
+            product = Product.objects.get(id=line.get('product_id'), is_available=True)
+            qty = int(line.get('qty', 1) or 1)
+            weight = line.get('weight')
+            variant_id = line.get('variant_id')
+
+            if product.pricing_mode == 'fixed_weight':
+                variant = product.variants.filter(id=variant_id, is_available=True).first() if variant_id else None
+                if not variant:
+                    raise POSSaleValidationError(f'{product.name}: that animal is no longer available.')
+                line_total = variant.total_price()
+            elif product.pricing_mode == 'variable_weight':
+                line_total = Decimal(str(product.price)) * Decimal(str(weight or 0))
+            else:
+                line_total = Decimal(str(product.price)) * qty
+
+            total += line_total
+            if settings_row.is_vat_enabled and product.is_taxable:
+                taxable_value += line_total
+            else:
+                exempt_value += line_total
+
+            cart_snapshot.append({'product_id': product.id, 'weight': weight, 'qty': qty, 'variant_id': variant_id})
+    except (Product.DoesNotExist, InvalidOperation, TypeError, ValueError):
+        raise POSSaleValidationError('One of the items in this cart is no longer valid.')
+
+    if settings_row.is_vat_enabled:
+        vat_amount = (taxable_value * Decimal(str(VAT_RATE))).quantize(Decimal('0.01'))
+        required_total = exempt_value + taxable_value + vat_amount
+    else:
+        # Dormant scaffolding: regardless of any product's is_taxable flag,
+        # nothing is taxable while VAT itself is off.
+        taxable_value = Decimal('0')
+        vat_amount = Decimal('0')
+        exempt_value = total
+        required_total = total
+
+    payments_sum = sum((Decimal(str(line['amount'])) for line in payments), Decimal('0'))
+    if payments_sum != required_total:
+        raise POSSaleValidationError(
+            f'Payments (Rs. {payments_sum}) do not match the sale total (Rs. {required_total}).'
+        )
+
+    payment_method = payments[0]['method'] if len(payments) == 1 else 'split'
+
+    try:
+        with transaction.atomic():
+            sale = POSSale.objects.create(
+                client_sale_id=client_sale_id,
+                cashier=operator_user,
+                customer=customer,
+                payment_method=payment_method,
+                cart_snapshot=cart_snapshot,
+                total_amount=required_total,
+                taxable_value=taxable_value,
+                exempt_value=exempt_value,
+                vat_amount=vat_amount,
+            )
+            for line in payments:
+                POSSalePayment.objects.create(
+                    sale=sale, method=line['method'], amount=Decimal(str(line['amount'])),
+                )
+                if line['method'] == 'credit':
+                    CreditTransaction.objects.create(
+                        customer=customer,
+                        amount=Decimal(str(line['amount'])),
+                        transaction_type='credit_sale',
+                        related_pos_sale=sale,
+                        recorded_by=operator_user,
+                    )
+            create_inventory_movements_from_snapshot(
+                cart_snapshot, 'sale', source=source,
+                related_pos_sale=sale, note=f"{note_prefix} {sale.sale_number}",
+                strict=True,
+            )
+    except ValidationError as e:
+        message = '; '.join(e.messages) if hasattr(e, 'messages') else str(e)
+        raise POSSaleValidationError(f'Not enough stock: {message}', status=409)
+    except POSSaleValidationError:
+        raise
+    except Exception:
+        raise POSSaleValidationError(
+            'Could not complete this sale — nothing was charged or recorded. Please try again.'
+        )
+
+    return sale, True
+
+
 @staff_member_required
 def pos_view(request):
     """The shop POS screen. Staff-only (Django's own is_staff flag — same
@@ -684,25 +877,21 @@ def pos_view(request):
 @staff_member_required
 @require_POST
 def pos_create_sale(request):
-    """Complete a POS sale: recompute the total server-side (never trust a
-    client-submitted price), create the POSSale record, and write the same
-    InventoryMovement rows the website checkout writes — same helper, same
-    quantity math, just source='pos', strict=True, and linked via
-    related_pos_sale instead of related_order.
+    """Complete a POS sale — thin request-parsing wrapper around
+    create_pos_sale(), which does all the actual validation/creation work
+    (shared with POSSaleView.post() in api/views.py). This is the endpoint
+    templates/pos.html actually calls.
 
-    Idempotent on client_sale_id: a repeated request with the same ID
-    (double-tap, retried request, a queued offline sale being synced)
-    returns the original result rather than creating a second sale. The
-    actual write is wrapped in one atomic transaction — either the sale
-    and every one of its inventory movements are all saved together, or
-    none of them are; there's no state where a sale exists with only some
-    of its stock movements recorded.
+    client_sale_id is required (idempotency — a repeated request with the
+    same id returns the original sale rather than creating a duplicate).
+    The operator (who's actually running this sale, which may not be
+    request.user — the terminal's own day-long login) comes from
+    request.session, set only by a verified PIN on POST /pos/unlock/ — see
+    get_pos_operator(). customer_id is only required when at least one
+    payment line uses 'credit'.
     """
     import json
-    from decimal import Decimal, InvalidOperation
-    from django.db import transaction
-    from django.core.exceptions import ValidationError
-    from .models import Product, POSSale
+    from .models import Customer
 
     try:
         data = json.loads(request.body)
@@ -713,70 +902,31 @@ def pos_create_sale(request):
     if not client_sale_id:
         return JsonResponse({'status': 'error', 'message': 'Missing client_sale_id.'}, status=400)
 
-    # Idempotency check — if this exact sale was already processed (this is
-    # a retry, not a new sale), return the original result rather than
-    # creating a duplicate.
-    existing = POSSale.objects.filter(client_sale_id=client_sale_id).first()
-    if existing:
-        return JsonResponse({'status': 'ok', 'sale_number': existing.sale_number, 'total': str(existing.total_amount)})
-
-    cart = data.get('cart') or []
-    payment_method = data.get('payment_method')
-
-    if not cart:
-        return JsonResponse({'status': 'error', 'message': 'Cart is empty.'}, status=400)
-    if payment_method not in dict(POSSale.PAYMENT_METHOD_CHOICES):
-        return JsonResponse({'status': 'error', 'message': 'Choose a payment method.'}, status=400)
-
-    total = Decimal('0')
-    cart_snapshot = []
     try:
-        for line in cart:
-            product = Product.objects.get(id=line.get('product_id'), is_available=True)
-            qty = int(line.get('qty', 1) or 1)
-            weight = line.get('weight')
-            variant_id = line.get('variant_id')
+        operator_user = get_pos_operator(request)
+    except POSSaleValidationError as e:
+        return JsonResponse({'status': 'error', 'message': e.message}, status=e.status)
 
-            if product.pricing_mode == 'fixed_weight':
-                variant = product.variants.filter(id=variant_id, is_available=True).first() if variant_id else None
-                if not variant:
-                    return JsonResponse({'status': 'error', 'message': f'{product.name}: that animal is no longer available.'}, status=400)
-                line_total = variant.total_price()
-            elif product.pricing_mode == 'variable_weight':
-                line_total = Decimal(str(product.price)) * Decimal(str(weight or 0))
-            else:
-                line_total = Decimal(str(product.price)) * qty
-
-            total += line_total
-            cart_snapshot.append({'product_id': product.id, 'weight': weight, 'qty': qty, 'variant_id': variant_id})
-    except (Product.DoesNotExist, InvalidOperation, TypeError, ValueError):
-        return JsonResponse({'status': 'error', 'message': 'One of the items in this cart is no longer valid.'}, status=400)
+    customer = None
+    customer_id = data.get('customer_id')
+    if customer_id:
+        try:
+            customer = Customer.objects.get(id=customer_id)
+        except (Customer.DoesNotExist, TypeError, ValueError):
+            return JsonResponse({'status': 'error', 'message': 'Customer not found.'}, status=400)
 
     try:
-        with transaction.atomic():
-            sale = POSSale.objects.create(
-                client_sale_id=client_sale_id,
-                cashier=request.user,
-                payment_method=payment_method,
-                cart_snapshot=cart_snapshot,
-                total_amount=total,
-            )
-            create_inventory_movements_from_snapshot(
-                cart_snapshot, 'sale', source='pos',
-                related_pos_sale=sale, note=f"POS sale {sale.sale_number}",
-                strict=True,
-            )
-    except ValidationError as e:
-        # Almost always the oversell guard firing — someone else (website,
-        # another POS device, ABMS) already sold the stock this cart was
-        # counting on. Nothing was saved; transaction.atomic() rolled the
-        # whole attempt back.
-        message = '; '.join(e.messages) if hasattr(e, 'messages') else str(e)
-        return JsonResponse({'status': 'error', 'message': f'Not enough stock: {message}'}, status=409)
-    except Exception:
-        return JsonResponse({'status': 'error', 'message': 'Could not complete this sale — nothing was charged or recorded. Please try again.'}, status=400)
+        sale, _created = create_pos_sale(
+            client_sale_id=client_sale_id,
+            cart=data.get('cart') or [],
+            payments=data.get('payments') or [],
+            operator_user=operator_user,
+            customer=customer,
+        )
+    except POSSaleValidationError as e:
+        return JsonResponse({'status': 'error', 'message': e.message}, status=e.status)
 
-    return JsonResponse({'status': 'ok', 'sale_number': sale.sale_number, 'total': str(total)})
+    return JsonResponse({'status': 'ok', 'sale_number': sale.sale_number, 'total': str(sale.total_amount)})
 
 def line_subtotal(item):
     try:
