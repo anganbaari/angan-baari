@@ -10,83 +10,122 @@
     <link rel="stylesheet" href="{% static 'style.css' %}">
     <style>
         * { box-sizing: border-box; }
-        html, body { margin: 0; height: 100%; font-family: 'DM Sans', 'Noto Sans Devanagari', sans-serif; background: var(--cream); color: var(--forest); overflow: hidden; }
+        :root {
+            /* Exact colors sampled pixel-by-pixel from the POS mockups
+               (locked.png / grid.png) -- deliberately NOT the site-wide
+               --forest/--moss/--gold, which are visibly different (darker,
+               cooler, more yellow) hues than what these mockups actually use. */
+            --pos-bg: #F9F5E4;
+            --pos-clock-bg: #F6EBCF;
+            --pos-header-line: #4E7438;
+            --pos-border-dark: #000000;
+            --pos-text-black: #000000;
+            --pos-text-green: #285917;
+            --pos-cat-card-bg: #F3F2DD;
+            --pos-footer-green: #3E642F;
+            --pos-lock-stroke: #26561F;
+            --pos-lock-pill: #588144;
+            --pos-lock-bar-bg: #BAD2A8;
+            --pos-lock-input-bg: #F9F5EC;
+            --pos-lock-input-border: #B46C32;
+            --pos-enter-orange: #CF7122;
+            --pos-reminder-border: #749265;
+        }
+        html, body { margin: 0; height: 100%; font-family: 'DM Sans', 'Noto Sans Devanagari', sans-serif; background: var(--pos-bg); color: var(--forest); overflow: hidden; }
+        body { display: flex; flex-direction: column; }
 
         /* ── Header ── */
         .pos-header {
-            display: flex; align-items: center; gap: 18px; background: var(--cream);
-            border-bottom: 3px solid var(--forest); box-shadow: 0 2px 0 #e0c27a; padding: 10px 24px;
+            display: flex; align-items: center; gap: 18px; background: var(--pos-bg);
+            border-bottom: 8px solid var(--pos-header-line); padding: 10px 24px; flex-shrink: 0;
             position: relative; overflow: hidden;
         }
         .pos-header-deco { position: absolute; top: -6px; right: 14px; width: 90px; height: 70px; opacity: 0.9; pointer-events: none; }
-        .pos-clock { background: #fbf2d8; border: 1.5px solid #e6d2a0; border-radius: 10px; padding: 6px 14px; text-align: center; min-width: 90px; box-shadow: 0 2px 6px rgba(26,47,30,0.08); }
-        .pos-clock .pos-date { font-size: 0.78rem; font-weight: 700; color: var(--forest); }
-        .pos-clock .pos-time { font-size: 1.15rem; font-weight: 800; color: var(--forest); }
+        .pos-clock { background: var(--pos-clock-bg); border: 1.5px solid #e6d2a0; border-radius: 10px; padding: 6px 14px; text-align: center; min-width: 90px; box-shadow: 0 2px 6px rgba(26,47,30,0.08); }
+        .pos-clock .pos-date { font-size: 0.78rem; font-weight: 700; color: var(--pos-text-green); }
+        .pos-clock .pos-time { font-size: 1.15rem; font-weight: 800; color: var(--pos-text-green); }
         .pos-brand { display: flex; align-items: center; gap: 10px; }
         .pos-brand img.logo { width: 46px; height: 46px; object-fit: contain; }
-        .pos-brand .brand-text h1 { margin: 0; font-family: 'Noto Sans Devanagari', 'Cormorant Garamond', serif; font-weight: 800; font-size: 2rem; color: var(--forest); line-height: 1.1; }
-        .pos-brand .brand-text span { font-size: 0.72rem; color: var(--moss); font-weight: 600; letter-spacing: 0.03em; }
+        .pos-brand .brand-text h1 { margin: 0; font-family: 'Noto Sans Devanagari', 'Cormorant Garamond', serif; font-weight: 800; font-size: 2rem; color: var(--pos-text-green); line-height: 1.1; }
+        .pos-brand .brand-text span { font-size: 0.72rem; color: var(--pos-text-green); font-weight: 600; letter-spacing: 0.03em; }
         .pos-brand img.flag { width: 34px; height: auto; margin-left: 6px; }
         .pos-header-divider { width: 1.5px; align-self: stretch; background: var(--mist); }
-        .pos-header-right { flex: 1; display: flex; align-items: center; justify-content: flex-end; gap: 14px; text-align: right; z-index: 1; }
-        .pos-lock-instruction { font-size: 0.82rem; color: var(--forest); line-height: 1.4; font-weight: 600; }
-        .pos-operator { font-size: 1.15rem; font-weight: 800; color: var(--forest); letter-spacing: 0.03em; }
+        .pos-header-right { flex: 1; display: flex; align-items: center; justify-content: flex-end; gap: 14px; text-align: right; padding-right: 90px; z-index: 1; }
+        .pos-lock-instruction { font-size: 0.82rem; color: var(--pos-text-green); line-height: 1.4; font-weight: 700; }
+        .pos-operator { font-size: 1.15rem; font-weight: 800; color: var(--pos-text-green); letter-spacing: 0.03em; min-width: 220px; text-align: center; }
 
-        /* ── Main layout: everything below header, category row pinned to bottom ── */
-        .pos-body { height: calc(100vh - 74px); display: flex; flex-direction: column; position: relative; }
-        .pos-content { flex: 1; overflow-y: auto; padding: 16px 20px; position: relative; }
+        /* ── Main layout: everything below header, category row pinned to bottom.
+           No page scroll -- .pos-content is a flex column and the table wrap is
+           the only scrollable region, so header/combined-row/category-row always
+           stay fully visible and the table absorbs whatever space is left.
+           .pos-body gets flex:1 from the <body> flex column above (not a
+           hardcoded "100vh - Npx"), so it always exactly fills whatever space
+           the header doesn't use, regardless of the header's actual height. ── */
+        .pos-body { flex: 1; min-height: 0; display: flex; flex-direction: column; position: relative; overflow: hidden; }
+        .pos-content { flex: 1; display: flex; flex-direction: column; padding: 10px 20px; position: relative; min-height: 0; overflow: hidden; }
 
         /* ── Sticky category row (always full list, always visible) ── */
-        .cat-row { display: flex; gap: 12px; padding: 12px 20px; background: var(--cream); border-top: 1px solid var(--mist); overflow-x: auto; flex-shrink: 0; }
+        .cat-row {
+            display: flex; gap: 12px; padding: 8px 20px 10px; background: var(--pos-bg);
+            border-top: 1px solid var(--mist);
+            overflow-x: auto; flex-shrink: 0;
+        }
+        /* Distinct full-width footer strip below the category row, per the
+           mockup -- separate element, not a border on the row itself. */
+        .pos-footer-bar { background: var(--pos-footer-green); height: 16px; flex-shrink: 0; width: 100%; }
         .cat-card {
             flex: 1; min-width: 110px; display: flex; flex-direction: column; align-items: center; justify-content: center;
-            gap: 6px; padding: 12px 8px; border-radius: 14px; border: 1.5px solid #cfe0c8;
-            background: #eef5ea; cursor: pointer; font-family: inherit; box-shadow: 0 2px 6px rgba(26,47,30,0.08);
+            gap: 6px; padding: 12px 8px; border-radius: 14px; border: 1.5px solid #d9d4b8;
+            background: var(--pos-cat-card-bg); cursor: pointer; font-family: inherit; box-shadow: 0 2px 6px rgba(26,47,30,0.08);
         }
         .cat-card svg { width: 32px; height: 32px; display: block; }
-        .cat-card span { font-size: 0.78rem; font-weight: 700; color: var(--forest); text-align: center; line-height: 1.15; font-family: 'Noto Sans Devanagari', 'DM Sans', sans-serif; }
+        .cat-card span { font-size: 0.78rem; font-weight: 700; color: var(--pos-text-green); text-align: center; line-height: 1.15; font-family: 'Noto Sans Devanagari', 'DM Sans', sans-serif; }
         .cat-card.active { background: #dcecd4; border-color: var(--moss); box-shadow: 0 2px 8px rgba(74,124,60,0.25); }
 
         /* ── Receipt view ── */
-        .receipt-table { width: 100%; border-collapse: collapse; background: var(--white); border: 2px solid #1a1a1a; }
-        .receipt-table th, .receipt-table td { border: 1px solid #1a1a1a; padding: 13px 10px; font-size: 0.85rem; text-align: center; }
-        .receipt-table th { background: #eef3ea; color: var(--forest); font-weight: 700; font-family: 'Noto Sans Devanagari', 'DM Sans', sans-serif; }
+        #receiptView { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+        .receipt-table-wrap { flex: 1; overflow-y: auto; min-height: 60px; }
+        .receipt-table { width: 100%; border-collapse: collapse; background: var(--pos-bg); border: 2px solid var(--pos-border-dark); table-layout: fixed; }
+        .receipt-table th, .receipt-table td { border: 1px solid var(--pos-border-dark); padding: 10px 10px; font-size: 0.85rem; text-align: center; color: var(--pos-text-black); }
+        .receipt-table th { background: var(--pos-bg); font-weight: 700; font-family: 'Noto Sans Devanagari', 'DM Sans', sans-serif; position: sticky; top: 0; }
         .receipt-table td.name-cell { text-align: left; }
         .receipt-table .row-remove { background: none; border: none; color: #c0392b; cursor: pointer; font-size: 0.85rem; margin-left: 6px; }
-        .receipt-empty-row td { color: var(--text-muted); padding: 18px 10px; }
+        .receipt-blank-row td { height: 44px; }
+
+        /* Reminder card | tax box | side buttons, side by side as one row */
+        .receipt-combined-row { display: flex; gap: 12px; margin-top: 10px; align-items: stretch; flex-shrink: 0; }
 
         .reminder-card {
-            margin-top: 14px; background: #fdf6e3; border: 2px dashed #e0c27a; border-radius: 14px; padding: 14px 18px;
+            flex: 1.3; min-width: 0; background: var(--pos-bg); border: 2px solid var(--pos-reminder-border); border-radius: 14px; padding: 10px 14px;
             box-shadow: 0 3px 10px rgba(26,47,30,0.08); position: relative; overflow: hidden;
         }
-        .reminder-card .reminder-title { font-weight: 700; color: var(--forest); font-size: 0.88rem; margin-bottom: 6px; font-family: 'Noto Sans Devanagari', 'DM Sans', sans-serif; }
-        .reminder-card ul { margin: 0; padding-left: 0; list-style: none; font-size: 0.82rem; color: var(--forest); line-height: 1.6; font-family: 'Noto Sans Devanagari', 'DM Sans', sans-serif; }
+        .reminder-card .reminder-title { font-weight: 700; color: var(--pos-text-green); font-size: 0.82rem; margin-bottom: 4px; font-family: 'Noto Sans Devanagari', 'DM Sans', sans-serif; }
+        .reminder-card ul { margin: 0; padding-left: 0; list-style: none; font-size: 0.76rem; color: var(--pos-text-green); line-height: 1.45; font-family: 'Noto Sans Devanagari', 'DM Sans', sans-serif; }
         .reminder-card ul li::before { content: "* "; font-weight: 700; }
-        .reminder-card .reminder-bag { position: absolute; right: 14px; bottom: 6px; width: 56px; height: 56px; opacity: 0.85; pointer-events: none; }
+        .reminder-card .reminder-bag { position: absolute; right: 10px; bottom: 4px; width: 42px; height: 42px; opacity: 0.85; pointer-events: none; }
 
-        .receipt-bottom-row { display: flex; gap: 14px; margin-top: 14px; align-items: stretch; flex-wrap: wrap; }
-        .tax-box { flex: 1; min-width: 260px; background: var(--white); border: 2px solid #1a1a1a; border-radius: 6px; overflow: hidden; }
-        .tax-box .tax-row { display: flex; justify-content: space-between; padding: 9px 14px; font-size: 0.85rem; border-bottom: 1px solid #1a1a1a; font-family: 'Noto Sans Devanagari', 'DM Sans', sans-serif; }
+        .tax-box { flex: 1; min-width: 0; background: var(--pos-bg); border: 2px solid var(--pos-border-dark); border-radius: 6px; overflow: hidden; height: fit-content; }
+        .tax-box .tax-row { display: flex; justify-content: space-between; padding: 7px 14px; font-size: 0.82rem; border-bottom: 1px solid var(--pos-border-dark); font-family: 'Noto Sans Devanagari', 'DM Sans', sans-serif; }
         .tax-box .tax-row:last-child { border-bottom: none; }
-        .tax-box .tax-row span:first-child { font-weight: 600; color: var(--forest); }
-        .tax-box .tax-row span:last-child { font-weight: 700; color: var(--forest); }
+        .tax-box .tax-row span:first-child { font-weight: 600; color: var(--pos-text-black); }
+        .tax-box .tax-row span:last-child { font-weight: 700; color: var(--pos-text-black); }
         .tax-box .tax-row.grand-total { background: #f3f8f0; }
-        .tax-box .tax-row.grand-total span { font-size: 0.98rem; }
+        .tax-box .tax-row.grand-total span { font-size: 0.94rem; }
 
-        .side-actions { display: flex; flex-direction: column; gap: 10px; width: 170px; flex-shrink: 0; }
+        .side-actions { display: flex; flex-direction: column; gap: 8px; width: 160px; flex-shrink: 0; justify-content: space-between; }
         .side-btn {
-            border: none; border-radius: 12px; padding: 12px 10px; font-family: 'Noto Sans Devanagari', 'DM Sans', sans-serif; font-weight: 700;
-            font-size: 0.85rem; cursor: pointer; color: #fff; text-align: center; line-height: 1.3;
-            box-shadow: 0 4px 10px rgba(26,47,30,0.22);
+            border: none; border-radius: 12px; padding: 10px; font-family: 'Noto Sans Devanagari', 'DM Sans', sans-serif; font-weight: 700;
+            font-size: 0.82rem; cursor: pointer; color: #fff; text-align: center; line-height: 1.3;
+            box-shadow: 0 4px 10px rgba(26,47,30,0.22); flex: 1;
         }
-        .side-btn.counter-btn { background: #c17a3d; cursor: default; }
-        .side-btn.payment-btn-main { background: var(--forest); }
+        .side-btn.counter-btn { background: var(--pos-enter-orange); cursor: default; }
+        .side-btn.payment-btn-main { background: var(--pos-text-green); }
         .side-btn.payment-btn-main:disabled { opacity: 0.45; cursor: not-allowed; }
         .side-btn.repay-btn { background: var(--moss); }
 
         /* ── Shopping view ── */
-        #shoppingView { display: none; }
-        .shopping-topbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 10px; }
+        #shoppingView { display: none; flex-direction: column; flex: 1; min-height: 0; }
+        .shopping-topbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 10px; flex-shrink: 0; }
         .shop-search-wrap { flex: 1; max-width: 320px; }
         .shop-search-wrap input {
             width: 100%; padding: 9px 14px; border: 1.5px solid var(--mist); border-radius: 8px;
@@ -97,7 +136,7 @@
             background: var(--forest); color: var(--gold); border: none; border-radius: 50px;
             padding: 9px 18px; font-family: inherit; font-weight: 700; font-size: 0.85rem; cursor: pointer;
         }
-        .product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; }
+        .product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; flex: 1; overflow-y: auto; min-height: 0; align-content: start; }
         .product-btn {
             background: var(--white); border: 1px solid var(--mist); border-radius: 12px;
             padding: 12px; cursor: pointer; text-align: left; transition: box-shadow 0.15s;
@@ -108,34 +147,45 @@
         .product-btn .pprice { font-size: 0.76rem; color: var(--moss); font-weight: 700; }
         .product-btn.unavailable { opacity: 0.5; cursor: default; }
 
-        /* ── Lock banner (overlaid across the receipt table, per mockup — not a modal popup) ── */
+        /* ── Lock banner: a true centered modal overlay, dimming everything
+           behind it -- NOT positioned relative to the table, so it can never
+           collide with the table or reminder card underneath. ── */
         #lockBanner {
-            display: none; position: fixed; z-index: 500; flex-direction: column; gap: 6px;
+            display: none; position: fixed; inset: 0; z-index: 500; flex-direction: column;
+            align-items: center; justify-content: center; gap: 10px; background: rgba(20,30,15,0.55);
         }
         #lockBanner.active { display: flex; }
         .lock-bar {
-            display: flex; align-items: stretch; border-radius: 8px; overflow: hidden;
-            box-shadow: 0 6px 20px rgba(26,47,30,0.25); border: 2px solid var(--forest);
+            display: flex; align-items: center; gap: 10px; border-radius: 14px;
+            box-shadow: 0 10px 34px rgba(0,0,0,0.35); border: 2px solid var(--pos-lock-stroke);
+            background: var(--pos-lock-bar-bg); padding: 14px 16px; width: min(46vw, 560px);
         }
         .lock-bar-label {
-            display: flex; align-items: center; gap: 10px; background: var(--moss); color: #fff;
-            padding: 10px 16px; font-size: 0.82rem; font-weight: 700; line-height: 1.3; flex-shrink: 0;
+            display: flex; align-items: center; gap: 7px; background: var(--pos-lock-pill); color: #fff;
+            padding: 12px 16px; font-size: 0.72rem; font-weight: 700; line-height: 1.35; flex-shrink: 0;
+            border-radius: 50px;
         }
-        .lock-bar-label i { font-size: 1.4rem; }
+        .lock-bar-label i { font-size: 1.2rem; }
         .lock-bar input {
-            flex: 1; border: none; outline: none; font: inherit; font-size: 1.1rem; text-align: center;
-            letter-spacing: 0.3em; color: var(--forest); font-weight: 700; background: var(--white); min-width: 0;
+            flex: 1; border: 2px solid var(--pos-lock-input-border); outline: none; font: inherit; font-size: 0.9rem; text-align: center;
+            letter-spacing: 0.3em; color: var(--forest); font-weight: 700; background: var(--pos-lock-input-bg); min-width: 0;
+            border-radius: 8px; padding: 12px 6px;
         }
         .lock-bar-enter {
-            border: none; background: #c17a3d; color: #1a1a1a; font-family: inherit; font-weight: 800;
-            font-size: 1rem; letter-spacing: 0.05em; padding: 0 28px; cursor: pointer; flex-shrink: 0;
+            border: none; background: var(--pos-enter-orange); color: #1a1a1a; font-family: inherit; font-weight: 800;
+            font-size: 0.9rem; letter-spacing: 0.05em; padding: 14px 22px; cursor: pointer; flex-shrink: 0;
+            border-radius: 8px;
         }
-        .lock-bar-enter:active { background: #a8672f; }
-        .lock-msg { min-height: 20px; font-size: 0.8rem; font-weight: 700; text-align: center; background: rgba(255,255,255,0.9); border-radius: 6px; padding: 2px 0; }
+        .lock-bar-enter:active { filter: brightness(0.9); }
+        .lock-msg { font-size: 0.75rem; font-weight: 700; text-align: center; background: rgba(255,255,255,0.95); border-radius: 6px; padding: 4px 12px; }
+        .lock-msg:empty { display: none; }
         .lock-msg.error { color: #c0392b; }
 
-        /* Disables the rest of the screen while locked -- still visible, not interactive. */
-        .pos-body.locked, .pos-header-right.locked-disabled { pointer-events: none; opacity: 0.55; }
+        /* Disables the rest of the screen while locked -- still visible, not
+           interactive. The dimming itself comes from #lockBanner's own
+           full-viewport backdrop (consistent across header + body); doubling
+           it with opacity here too just made everything look muddy. */
+        .pos-body.locked, .pos-header-right.locked-disabled { pointer-events: none; }
 
         /* ── Shared modal (weight stepper / variant picker) ── */
         #itemModal { display: none; position: fixed; inset: 0; z-index: 400; background: rgba(26,47,30,0.45); align-items: center; justify-content: center; }
@@ -218,7 +268,7 @@
         <div class="pos-header-divider"></div>
         <div class="pos-header-right" id="headerRight">
             <div id="headerStatus">
-                <div class="pos-lock-instruction">टर्मिनल लक छ — PIN हाल्नुहोस्</div>
+                <div class="pos-lock-instruction">कृपया बारकोड स्क्यान गर्नुहोस् वा staff को नम्बर हालेर Enter बटन थिच्छुहोस् ।</div>
             </div>
         </div>
         <svg class="pos-header-deco" viewBox="0 0 90 70" aria-hidden="true">
@@ -242,38 +292,40 @@
         <div class="pos-content">
             <!-- Receipt view -->
             <div id="receiptView">
-                <table class="receipt-table">
-                    <thead>
-                        <tr>
-                            <th style="width:6%;">क्र.सं.</th>
-                            <th style="width:34%;">उत्पादनको नाम</th>
-                            <th style="width:15%;">एकाइ मूल्य</th>
-                            <th style="width:13%;">परिमाण</th>
-                            <th style="width:17%;">जम्मा मूल्य</th>
-                            <th style="width:15%;">कर</th>
-                        </tr>
-                    </thead>
-                    <tbody id="receiptBody">
-                        <tr class="receipt-empty-row"><td colspan="6">No items yet — tap a category below to start a sale.</td></tr>
-                    </tbody>
-                </table>
-
-                <div class="reminder-card">
-                    <div class="reminder-title">📢 पैसा तिर्नु अघि ग्राहकलाई सोध्नुपर्नो कुरा</div>
-                    <ul>
-                        <li>नमस्ते 🙏</li>
-                        <li>झोला ल्याउनु भष ?</li>
-                        <li>तपाईंलाई झोला चाहिन्छ ?</li>
-                        <li>झोलामा सामान हालिदिऊ ?</li>
-                    </ul>
-                    <svg class="reminder-bag" viewBox="0 0 48 48" aria-hidden="true">
-                        <path d="M14 18h20l2 24a3 3 0 0 1-3 3H15a3 3 0 0 1-3-3z" fill="#e8dcc0" stroke="#8a7a52" stroke-width="1.2"/>
-                        <path d="M18 18v-4a6 6 0 0 1 12 0v4" fill="none" stroke="#8a7a52" stroke-width="2"/>
-                        <path d="M20 30c1 3 6 3 7 0" fill="none" stroke="#5a8f3c" stroke-width="1.5"/>
-                    </svg>
+                <div class="receipt-table-wrap">
+                    <table class="receipt-table">
+                        <thead>
+                            <tr>
+                                <th style="width:6%;">क्र.सं.</th>
+                                <th style="width:34%;">उत्पादनको नाम</th>
+                                <th style="width:15%;">एकाइ मूल्य</th>
+                                <th style="width:13%;">परिमाण</th>
+                                <th style="width:17%;">जम्मा मूल्य</th>
+                                <th style="width:15%;">कर</th>
+                            </tr>
+                        </thead>
+                        <tbody id="receiptBody">
+                            <tr class="receipt-empty-row"><td colspan="6">No items yet — tap a category below to start a sale.</td></tr>
+                        </tbody>
+                    </table>
                 </div>
 
-                <div class="receipt-bottom-row">
+                <div class="receipt-combined-row">
+                    <div class="reminder-card">
+                        <div class="reminder-title">📢 पैसा तिर्नु अघि ग्राहकलाई सोध्नुपर्नो कुरा</div>
+                        <ul>
+                            <li>नमस्ते 🙏</li>
+                            <li>झोला ल्याउनु भष ?</li>
+                            <li>तपाईंलाई झोला चाहिन्छ ?</li>
+                            <li>झोलामा सामान हालिदिऊ ?</li>
+                        </ul>
+                        <svg class="reminder-bag" viewBox="0 0 48 48" aria-hidden="true">
+                            <path d="M14 18h20l2 24a3 3 0 0 1-3 3H15a3 3 0 0 1-3-3z" fill="#e8dcc0" stroke="#8a7a52" stroke-width="1.2"/>
+                            <path d="M18 18v-4a6 6 0 0 1 12 0v4" fill="none" stroke="#8a7a52" stroke-width="2"/>
+                            <path d="M20 30c1 3 6 3 7 0" fill="none" stroke="#5a8f3c" stroke-width="1.5"/>
+                        </svg>
+                    </div>
+
                     <div class="tax-box">
                         <div class="tax-row"><span>कुल कर</span><span id="taxVat">Rs. 0</span></div>
                         <div class="tax-row"><span>कर बा. मूल्य</span><span id="taxTaxable">Rs. 0</span></div>
@@ -301,6 +353,7 @@
         </div>
 
         <div class="cat-row" id="catRow"></div>
+        <div class="pos-footer-bar"></div>
     </div>
 
     <!-- Lock banner — overlaid across the receipt table, per mockup (not a modal popup) -->
@@ -483,24 +536,9 @@
             if (isUnlocked && currentOperator) {
                 el.innerHTML = `<div class="pos-operator">${currentOperator.name.toUpperCase()} ${currentOperator.staff_number || ''}</div>`;
             } else {
-                el.innerHTML = `<div class="pos-lock-instruction">टर्मिनल लक छ — PIN हाल्नुहोस्</div>`;
+                el.innerHTML = `<div class="pos-lock-instruction">कृपया बारकोड स्क्यान गर्नुहोस् वा staff को नम्बर हालेर Enter बटन थिच्छुहोस् ।</div>`;
             }
         }
-
-        function positionLockBanner() {
-            const banner = document.getElementById('lockBanner');
-            const table = document.querySelector('.receipt-table');
-            const body = document.getElementById('receiptBody');
-            if (!table || !body) return;
-            const tableRect = table.getBoundingClientRect();
-            const bodyRect = body.getBoundingClientRect();
-            const bannerHeight = banner.offsetHeight || 90;
-            banner.style.left = tableRect.left + 'px';
-            banner.style.width = tableRect.width + 'px';
-            const centeredTop = bodyRect.top + bodyRect.height / 2 - bannerHeight / 2;
-            banner.style.top = Math.max(bodyRect.top, centeredTop) + 'px';
-        }
-        window.addEventListener('resize', () => { if (!isUnlocked) positionLockBanner(); });
 
         function setLocked(locked) {
             isUnlocked = !locked;
@@ -513,7 +551,6 @@
                 document.getElementById('lockMsg').textContent = '';
                 document.getElementById('lockMsg').className = 'lock-msg';
                 document.getElementById('lockBanner').classList.add('active');
-                positionLockBanner();
                 document.getElementById('lockPinInput').focus();
             } else {
                 document.getElementById('lockBanner').classList.remove('active');
@@ -614,7 +651,7 @@
         function showShoppingView() {
             currentView = 'shopping';
             document.getElementById('receiptView').style.display = 'none';
-            document.getElementById('shoppingView').style.display = 'block';
+            document.getElementById('shoppingView').style.display = 'flex';
             renderCategoryRow();
             updateCartIndicator();
         }
@@ -787,27 +824,32 @@
             return line.line_total * VAT_RATE;
         }
 
+        // Minimum number of ruled rows the table always shows, even empty --
+        // matches the mockup's pre-ruled paper-receipt look instead of a
+        // near-blank box. Real cart rows come first; blanks pad the rest.
+        const RECEIPT_MIN_ROWS = 9;
+
         function renderReceipt() {
             const body = document.getElementById('receiptBody');
-            if (!cart.length) {
-                body.innerHTML = '<tr class="receipt-empty-row"><td colspan="6">No items yet — tap a category below to start a sale.</td></tr>';
-            } else {
-                body.innerHTML = cart.map((line, i) => `
-                    <tr>
-                        <td>${i + 1}</td>
-                        <td class="name-cell">${line.name}<br><span style="font-size:0.72rem;color:var(--text-muted);">${line.detail}</span>
-                            <button type="button" class="row-remove" data-i="${i}"><i class="fas fa-times"></i></button>
-                        </td>
-                        <td>Rs. ${Math.round(line.unit_price)}</td>
-                        <td>${line.pricing_mode === 'fixed_weight' ? '1' : (line.weight ? line.weight : line.qty)}</td>
-                        <td>Rs. ${Math.round(line.line_total)}</td>
-                        <td>Rs. ${Math.round(lineTax(line))}</td>
-                    </tr>`
-                ).join('');
-                body.querySelectorAll('.row-remove').forEach(b => {
-                    b.addEventListener('click', (e) => { e.stopPropagation(); removeFromCart(parseInt(b.dataset.i)); });
-                });
+            let rowsHtml = cart.map((line, i) => `
+                <tr>
+                    <td>${i + 1}</td>
+                    <td class="name-cell">${line.name}<br><span style="font-size:0.72rem;color:var(--text-muted);">${line.detail}</span>
+                        <button type="button" class="row-remove" data-i="${i}"><i class="fas fa-times"></i></button>
+                    </td>
+                    <td>Rs. ${Math.round(line.unit_price)}</td>
+                    <td>${line.pricing_mode === 'fixed_weight' ? '1' : (line.weight ? line.weight : line.qty)}</td>
+                    <td>Rs. ${Math.round(line.line_total)}</td>
+                    <td>Rs. ${Math.round(lineTax(line))}</td>
+                </tr>`
+            ).join('');
+            for (let i = cart.length; i < RECEIPT_MIN_ROWS; i++) {
+                rowsHtml += '<tr class="receipt-blank-row"><td></td><td></td><td></td><td></td><td></td><td></td></tr>';
             }
+            body.innerHTML = rowsHtml;
+            body.querySelectorAll('.row-remove').forEach(b => {
+                b.addEventListener('click', (e) => { e.stopPropagation(); removeFromCart(parseInt(b.dataset.i)); });
+            });
 
             const total = cart.reduce((s, l) => s + l.line_total, 0);
             const vatAmount = cart.reduce((s, l) => s + lineTax(l), 0);
