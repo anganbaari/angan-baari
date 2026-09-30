@@ -137,11 +137,11 @@
         .reminder-card {
             flex: 1.3; min-width: 0; background: var(--pos-bg); border: 2px solid var(--pos-reminder-border); border-radius: 12px; padding: 6px 10px;
             box-shadow: 0 3px 10px rgba(26,47,30,0.08); position: relative; overflow: hidden;
+            display: flex; flex-direction: column; align-items: center; text-align: center;
         }
-        .reminder-card .reminder-title { font-weight: 800; color: var(--pos-text-green); font-size: 0.92rem; margin-bottom: 4px; font-family: 'Noto Sans Devanagari', 'DM Sans', sans-serif; }
-        .reminder-card ul { margin: 0; padding-left: 0; list-style: none; font-size: 0.86rem; font-weight: 700; color: var(--pos-text-green); line-height: 1.4; font-family: 'Noto Sans Devanagari', 'DM Sans', sans-serif; }
+        .reminder-card .reminder-title { font-weight: 800; color: var(--pos-text-green); font-size: 1.15rem; margin-bottom: 4px; font-family: 'Noto Sans Devanagari', 'DM Sans', sans-serif; }
+        .reminder-card ul { margin: 0; padding-left: 0; list-style: none; font-size: 1.05rem; font-weight: 700; color: var(--pos-text-green); line-height: 1.4; font-family: 'Noto Sans Devanagari', 'DM Sans', sans-serif; }
         .reminder-card ul li::before { content: "* "; font-weight: 700; }
-        .reminder-card .reminder-bag { position: absolute; right: 8px; bottom: 2px; width: 30px; height: 30px; opacity: 0.85; pointer-events: none; }
 
         /* Five standalone columns: reminder | Repay Credit | Counter | tax
            box | payment method -- each button gets its own column instead
@@ -253,6 +253,35 @@
         .item-modal-actions button { flex: 1; padding: 12px; border-radius: 10px; border: none; font-family: inherit; font-weight: 700; cursor: pointer; }
         .item-modal-actions .btn-confirm { background: var(--forest); color: var(--gold); }
         .item-modal-actions .btn-cancel { background: var(--mist); color: var(--forest); }
+        .item-modal-actions .btn-confirm:disabled { opacity: 0.45; cursor: not-allowed; }
+
+        /* Keypad + unit-picker modal (replaces the old +/- stepper for
+           fixed_quantity products) -- wider than the other item-modal
+           variants since it's two columns side by side. */
+        .item-modal-card.keypad-mode { max-width: 480px; }
+        .keypad-layout { display: flex; gap: 14px; margin-bottom: 10px; }
+        .keypad-left { flex: 1.2; display: flex; flex-direction: column; gap: 10px; }
+        .keypad-layout.single-col .keypad-left { flex: none; width: 100%; max-width: 260px; margin: 0 auto; }
+        .keypad-display {
+            text-align: center; font-size: 1.5rem; font-weight: 800; color: var(--forest);
+            background: var(--mist); border-radius: 10px; padding: 10px 8px; min-height: 1.6em;
+        }
+        .keypad-unit-tag { font-size: 0.82rem; font-weight: 700; color: var(--moss); margin-left: 6px; }
+        .keypad-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+        .keypad-key {
+            padding: 14px 0; border-radius: 10px; border: none; background: var(--mist);
+            color: var(--forest); font-size: 1.15rem; font-weight: 700; cursor: pointer; font-family: inherit;
+        }
+        .keypad-key:active { background: #dfe8df; }
+        .keypad-key.keypad-fn { background: #e8e0c8; font-size: 1rem; }
+        .keypad-units { flex: 1; display: flex; flex-direction: column; gap: 6px; overflow-y: auto; max-height: 232px; }
+        .unit-option {
+            display: flex; justify-content: space-between; align-items: center; width: 100%;
+            padding: 10px 12px; border-radius: 10px; border: 1.5px solid var(--mist);
+            background: var(--white); font-family: inherit; font-weight: 700; color: var(--forest);
+            cursor: pointer; font-size: 0.92rem;
+        }
+        .unit-option.selected { border-color: var(--moss); background: #f3f8f3; }
 
         /* ── Payment panel (slide-in) ── */
         #paymentBackdrop { display: none; position: fixed; inset: 0; background: rgba(26,47,30,0.35); z-index: 300; }
@@ -309,9 +338,8 @@
             .cat-card span { font-size: 0.82rem; }
             .receipt-table th, .receipt-table td { padding: 3px 8px; font-size: 0.82rem; }
             .reminder-card { padding: 4px 8px; }
-            .reminder-card .reminder-title { font-size: 0.78rem; margin-bottom: 2px; }
-            .reminder-card ul { font-size: 0.72rem; line-height: 1.25; }
-            .reminder-card .reminder-bag { width: 22px; height: 22px; }
+            .reminder-card .reminder-title { font-size: 0.95rem; margin-bottom: 2px; }
+            .reminder-card ul { font-size: 0.88rem; line-height: 1.25; }
             .tax-box .tax-row { padding: 2px 10px; font-size: 0.82rem; }
             .tax-box .tax-row.grand-total span { font-size: 0.95rem; }
             .side-btn { font-size: 0.82rem; padding: 4px; }
@@ -391,11 +419,6 @@
                             <li>तपाईंलाई झोला चाहिन्छ ?</li>
                             <li>झोलामा सामान हालिदिऊ ?</li>
                         </ul>
-                        <svg class="reminder-bag" viewBox="0 0 48 48" aria-hidden="true">
-                            <path d="M14 18h20l2 24a3 3 0 0 1-3 3H15a3 3 0 0 1-3-3z" fill="#e8dcc0" stroke="#8a7a52" stroke-width="1.2"/>
-                            <path d="M18 18v-4a6 6 0 0 1 12 0v4" fill="none" stroke="#8a7a52" stroke-width="2"/>
-                            <path d="M20 30c1 3 6 3 7 0" fill="none" stroke="#5a8f3c" stroke-width="1.5"/>
-                        </svg>
                     </div>
 
                     <div class="repay-col">
@@ -505,7 +528,7 @@
         const VAT_RATE = {{ vat_rate }};
 
         let activeCategory = CATEGORIES[0] || null;
-        let cart = []; // { product_id, name, pricing_mode, qty, weight, variant_id, detail, line_total, is_taxable }
+        let cart = []; // { product_id, name, pricing_mode, qty, weight, variant_id, unit_id, unit_name, detail, line_total, is_taxable }
         let currentView = 'receipt'; // 'receipt' | 'shopping'
         let isUnlocked = false;
         let currentOperator = null; // { id, name, staff_number, role }
@@ -558,30 +581,60 @@
         // Clock — Bikram Sambat (BS) date, ticking every second.
         // ══════════════════════════════════════════════════════════════
         // NEPALI_CALENDAR_DATA: month lengths (Baisakh..Chaitra) per BS year.
-        // Best-effort reference table reconstructed for this build — spot-check
-        // today's displayed BS date against a known-good Nepali calendar before
-        // relying on this in production, and extend this table with verified
-        // data before BS 2091 (~2034 AD) arrives, or the date will silently
-        // become wrong past that point.
+        // SOURCE: extracted from remotemerge/nepali-date-converter (MIT license,
+        // https://github.com/remotemerge/nepali-date-converter, file
+        // html/src/years.ts, fetched 2026-09-30), which covers BS 1975-2099 and
+        // documents its data as sourced from official Nepali calendar
+        // specifications. Only the 2075-2099 slice is kept here (this table is
+        // only ever queried for "today", never historical dates, and the shared
+        // epoch below already anchors at 2075) — trim was done by literal
+        // year-by-year copy, not retyping, so no new transcription errors were
+        // introduced.
+        // VERIFIED 2026-09-30 against https://www.hamropatro.com/ and an
+        // independent web search, cross-checking multiple points, not just
+        // today:
+        //   - today (2026-09-30 AD) -> BS 2083 Ashoj 14 — matches hamropatro.com
+        //     exactly (the OLD table gave Ashoj 10, a 4-day drift — this was the
+        //     bug being fixed).
+        //   - BS 2083-01-01 (Baisakh 1, Nepali New Year) -> 2026-04-14 AD —
+        //     matches independently-sourced New Year date for 2083 BS.
+        //   - BS 2082-12-30 (Chaitra, last day of the previous BS year) ->
+        //     2026-04-13 AD, i.e. exactly one day before the above New Year —
+        //     internal consistency check across a year boundary.
+        //   - BS 2083-06-01 (Ashoj 1) -> 2026-09-17 AD and BS 2083-07-01
+        //     (Kartik 1) -> 2026-10-18 AD — first/last-day-of-month boundaries
+        //     around today both land where the month-length table says they
+        //     should.
+        // If this table is ever extended past 2099 or re-verified, re-fetch
+        // years.ts from the same repo rather than hand-typing new rows.
         const BS_EPOCH_YEAR = 2075; // 2075/01/01 BS = 2018-04-14 AD
         const BS_EPOCH_AD = Date.UTC(2018, 3, 14);
         const NEPALI_CALENDAR_DATA = {
-            2075: [31,32,31,32,31,30,30,30,29,30,29,31],
-            2076: [31,31,32,31,31,31,30,29,30,29,30,31],
-            2077: [31,31,32,32,31,30,30,29,30,29,30,30],
-            2078: [31,32,31,32,31,30,30,30,29,29,30,31],
-            2079: [31,31,32,31,31,31,30,29,30,29,30,31],
-            2080: [31,32,31,32,31,30,30,29,30,29,30,31],
-            2081: [31,31,32,32,31,30,30,30,29,29,30,30],
-            2082: [31,32,31,32,31,30,30,30,29,29,30,31],
-            2083: [31,31,32,31,31,31,30,29,30,29,30,31],
-            2084: [31,32,31,32,31,30,30,29,30,29,30,31],
-            2085: [30,32,31,32,31,31,30,29,30,29,30,30],
-            2086: [31,31,32,31,31,31,30,29,30,29,30,31],
-            2087: [31,32,31,32,31,30,30,29,30,29,30,31],
-            2088: [31,31,32,32,31,30,30,29,30,29,30,30],
-            2089: [31,32,31,32,31,30,30,30,29,29,30,31],
-            2090: [31,31,32,31,31,31,30,29,30,29,30,31],
+            2075: [31,31,32,31,31,31,30,29,30,29,30,30],
+            2076: [31,32,31,32,31,30,30,30,29,29,30,30],
+            2077: [31,32,31,32,31,30,30,30,29,30,29,31],
+            2078: [31,31,31,32,31,31,30,29,30,29,30,30],
+            2079: [31,31,32,31,31,31,30,29,30,29,30,30],
+            2080: [31,32,31,32,31,30,30,30,29,29,30,30],
+            2081: [31,32,31,32,31,30,30,30,29,30,29,31],
+            2082: [31,31,32,31,31,31,30,29,30,29,30,30],
+            2083: [31,31,32,31,31,31,30,29,30,29,30,30],
+            2084: [31,32,31,32,31,30,30,30,29,29,30,31],
+            2085: [30,32,31,32,31,30,30,30,29,30,29,31],
+            2086: [31,31,32,31,31,31,30,29,30,29,30,30],
+            2087: [31,31,32,32,31,30,30,29,30,29,30,30],
+            2088: [31,32,31,32,31,30,30,30,29,29,30,31],
+            2089: [30,32,31,32,31,30,30,30,29,30,29,31],
+            2090: [31,31,32,31,31,31,30,29,30,29,30,30],
+            2091: [31,31,32,32,31,30,30,29,30,29,30,30],
+            2092: [31,32,31,32,31,30,30,30,29,29,30,31],
+            2093: [31,31,31,32,31,31,29,30,30,29,29,31],
+            2094: [31,31,32,31,31,31,30,29,30,29,30,30],
+            2095: [31,31,32,32,31,30,30,29,30,29,30,30],
+            2096: [31,32,31,32,31,30,30,30,29,29,30,31],
+            2097: [31,31,31,32,31,31,29,30,30,29,30,30],
+            2098: [31,31,32,31,31,31,30,29,30,29,30,30],
+            2099: [31,31,32,32,31,30,30,29,30,29,30,30],
         };
         const BS_MONTH_NAMES = ['बैशाख','जेठ','असार','साउन','भदौ','असोज','कार्तिक','मंसिर','पुष','माघ','फागुन','चैत'];
         const BS_DAY_NAMES = ['आइत','सोम','मंगल','बुध','बिही','शुक्र','शनि'];
@@ -772,8 +825,13 @@
         // Shared item modal: weight stepper (variable_weight) / variant
         // picker (fixed_weight, 2+ variants)
         // ══════════════════════════════════════════════════════════════
+        let keypadKeyHandler = null;
         function closeItemModal() {
             document.getElementById('itemModal').classList.remove('active');
+            if (keypadKeyHandler) {
+                document.removeEventListener('keydown', keypadKeyHandler);
+                keypadKeyHandler = null;
+            }
         }
 
         // editIndex is null when adding a new line, or a cart index when
@@ -806,6 +864,7 @@
 
         function openWeightModal(product, editIndex) {
             const body = document.getElementById('itemModalBody');
+            body.classList.remove('keypad-mode');
 
             if (product.weight_entry_mode === 'exact') {
                 // Free-typed scale reading in grams, not a fixed-step stepper --
@@ -875,46 +934,122 @@
             document.getElementById('itemModal').classList.add('active');
         }
 
+        // Keypad + unit-picker modal for fixed_quantity products -- replaces
+        // the old +/- stepper. LEFT is a calculator-style numeric keypad the
+        // cashier types a quantity into directly (with backspace/clear,
+        // reachable both by tapping the on-screen keys and the physical
+        // keyboard); RIGHT is a vertical list of this product's named
+        // selling units (ProductSellingUnit rows -- "Piece"/"Crate"/etc,
+        // each with its own independently-set price), shown only when the
+        // product actually has any configured. Confirm reuses the same
+        // add-vs-update-via-editIndex pattern as confirmWeightLine.
+        function confirmQtyLine(product, editIndex, qty, unit) {
+            const rate = unit ? parseFloat(unit.price) : parseFloat(product.price);
+            const detail = unit ? `${qty} ${unit.label}` : `Qty ${qty}`;
+            if (editIndex != null) {
+                const line = cart[editIndex];
+                line.qty = qty;
+                line.unit_id = unit ? unit.id : null;
+                line.unit_name = unit ? unit.label : null;
+                line.detail = detail;
+                line.unit_price = rate;
+                line.line_total = rate * qty;
+                renderReceipt();
+                updateCartIndicator();
+            } else {
+                addToCart(product, { qty, unit });
+            }
+            closeItemModal();
+        }
+
         function openQtyModal(product, editIndex) {
-            let qty = editIndex != null ? cart[editIndex].qty : 1;
             const body = document.getElementById('itemModalBody');
+            body.classList.add('keypad-mode');
+
+            const units = product.units || [];
+            const hasUnits = units.length > 0;
+
+            let typed = editIndex != null ? String(cart[editIndex].qty) : '1';
+            let selectedUnitId = null;
+            if (hasUnits) {
+                const existingUnitId = editIndex != null ? cart[editIndex].unit_id : null;
+                const stillValid = existingUnitId && units.find(u => u.id === existingUnitId);
+                selectedUnitId = stillValid ? existingUnitId : (units.find(u => u.is_default) || units[0]).id;
+            }
+
+            function currentUnit() { return hasUnits ? units.find(u => u.id === selectedUnitId) : null; }
+            function unitRate() { const u = currentUnit(); return u ? parseFloat(u.price) : parseFloat(product.price); }
+
+            function applyKey(k) {
+                if (k === 'back') typed = typed.slice(0, -1);
+                else if (k === 'clear') typed = '';
+                else if (typed.length < 5) typed = (typed === '0' ? '' : typed) + k;
+                render();
+            }
+
+            function doConfirm() {
+                const qty = parseInt(typed, 10) || 0;
+                if (qty <= 0) return;
+                confirmQtyLine(product, editIndex, qty, currentUnit());
+            }
+
             function render() {
+                const qty = parseInt(typed, 10) || 0;
+                const total = unitRate() * qty;
+                const u = currentUnit();
+                const keys = ['7','8','9','4','5','6','1','2','3'];
                 body.innerHTML = `
                     <h3>${product.name}</h3>
-                    <div class="weight-stepper">
-                        <button type="button" id="qStepDown">−</button>
-                        <span class="weight-value">${qty}</span>
-                        <button type="button" id="qStepUp">+</button>
+                    <div class="keypad-layout${hasUnits ? '' : ' single-col'}">
+                        <div class="keypad-left">
+                            <div class="keypad-display">${typed || '0'}${u ? `<span class="keypad-unit-tag">${u.label}</span>` : ''}</div>
+                            <div class="keypad-grid">
+                                ${keys.map(d => `<button type="button" class="keypad-key" data-k="${d}">${d}</button>`).join('')}
+                                <button type="button" class="keypad-key keypad-fn" data-k="clear">C</button>
+                                <button type="button" class="keypad-key" data-k="0">0</button>
+                                <button type="button" class="keypad-key keypad-fn" data-k="back">&#9003;</button>
+                            </div>
+                        </div>
+                        ${hasUnits ? `<div class="keypad-units">${units.map(uu => `
+                            <button type="button" class="unit-option${uu.id === selectedUnitId ? ' selected' : ''}" data-uid="${uu.id}">
+                                <span>${uu.label}</span><span>Rs. ${formatMoney(uu.price)}</span>
+                            </button>`).join('')}</div>` : ''}
                     </div>
-                    <div class="item-modal-price">Rs. ${Math.round(parseFloat(product.price) * qty)}</div>
+                    <div class="item-modal-price">Rs. ${formatMoney(total)}</div>
                     <div class="item-modal-actions">
                         <button type="button" class="btn-cancel" id="qCancel">Cancel</button>
-                        <button type="button" class="btn-confirm" id="qConfirm">${editIndex != null ? 'Update' : 'Add to Cart'}</button>
+                        <button type="button" class="btn-confirm" id="qConfirm" ${qty > 0 ? '' : 'disabled'}>Enter &#8629;</button>
                     </div>`;
-                document.getElementById('qStepDown').addEventListener('click', () => { qty = Math.max(1, qty - 1); render(); });
-                document.getElementById('qStepUp').addEventListener('click', () => { qty = qty + 1; render(); });
-                document.getElementById('qCancel').addEventListener('click', closeItemModal);
-                document.getElementById('qConfirm').addEventListener('click', () => {
-                    if (editIndex != null) {
-                        const line = cart[editIndex];
-                        line.qty = qty;
-                        line.detail = `Qty ${qty}`;
-                        line.unit_price = parseFloat(product.price);
-                        line.line_total = parseFloat(product.price) * qty;
-                        renderReceipt();
-                        updateCartIndicator();
-                    } else {
-                        addToCart(product, { qty });
-                    }
-                    closeItemModal();
+
+                body.querySelectorAll('.keypad-key').forEach(btn => {
+                    btn.addEventListener('click', () => applyKey(btn.dataset.k));
                 });
+                if (hasUnits) {
+                    body.querySelectorAll('.unit-option').forEach(b => {
+                        b.addEventListener('click', () => { selectedUnitId = parseInt(b.dataset.uid, 10); render(); });
+                    });
+                }
+                document.getElementById('qCancel').addEventListener('click', closeItemModal);
+                if (qty > 0) {
+                    document.getElementById('qConfirm').addEventListener('click', doConfirm);
+                }
             }
+
+            keypadKeyHandler = (e) => {
+                if (e.key >= '0' && e.key <= '9') applyKey(e.key);
+                else if (e.key === 'Backspace') { e.preventDefault(); applyKey('back'); }
+                else if (e.key === 'Enter') doConfirm();
+                else if (e.key === 'Escape') closeItemModal();
+            };
+            document.addEventListener('keydown', keypadKeyHandler);
+
             render();
             document.getElementById('itemModal').classList.add('active');
         }
 
         function openVariantModal(product, editIndex) {
             const body = document.getElementById('itemModalBody');
+            body.classList.remove('keypad-mode');
             body.innerHTML = `<h3>${product.name} — choose one</h3>` +
                 product.variants.map(v => `
                     <button type="button" class="variant-option" data-vid="${v.id}">
@@ -978,26 +1113,17 @@
                 return;
             }
 
-            // fixed_quantity — add 1, repeat taps build up quantity
-            addToCart(product, { qty: 1 });
+            // fixed_quantity — keypad + unit-picker modal. If this product
+            // is already in the cart, reopen that line for editing instead
+            // of pushing a duplicate row for the same product.
+            const existingIndex = cart.findIndex(l => l.product_id === product.id && l.pricing_mode === 'fixed_quantity');
+            openQtyModal(product, existingIndex >= 0 ? existingIndex : null);
         }
 
         // ══════════════════════════════════════════════════════════════
         // Cart / receipt table
         // ══════════════════════════════════════════════════════════════
         function addToCart(product, opts) {
-            if (product.pricing_mode === 'fixed_quantity') {
-                const existing = cart.find(l => l.product_id === product.id);
-                if (existing) {
-                    existing.qty += 1;
-                    existing.detail = `Qty ${existing.qty}`;
-                    existing.line_total = parseFloat(product.price) * existing.qty;
-                    renderReceipt();
-                    updateCartIndicator();
-                    showToast(`${product.name} added`);
-                    return;
-                }
-            }
             const line = { product_id: product.id, name: product.name, pricing_mode: product.pricing_mode, is_taxable: !!product.is_taxable };
             if (opts.variant) {
                 line.variant_id = opts.variant.id;
@@ -1013,9 +1139,17 @@
                 line.line_total = parseFloat(product.price) * opts.weight;
             } else {
                 line.qty = opts.qty || 1;
-                line.detail = `Qty ${line.qty}`;
-                line.unit_price = parseFloat(product.price);
-                line.line_total = parseFloat(product.price) * line.qty;
+                if (opts.unit) {
+                    line.unit_id = opts.unit.id;
+                    line.unit_name = opts.unit.label;
+                    line.detail = `${line.qty} ${opts.unit.label}`;
+                    line.unit_price = parseFloat(opts.unit.price);
+                    line.line_total = parseFloat(opts.unit.price) * line.qty;
+                } else {
+                    line.detail = `Qty ${line.qty}`;
+                    line.unit_price = parseFloat(product.price);
+                    line.line_total = parseFloat(product.price) * line.qty;
+                }
             }
             cart.push(line);
             receiptPage = Math.ceil(cart.length / RECEIPT_PAGE_SIZE) - 1; // jump to the page the new item landed on
@@ -1050,6 +1184,7 @@
         function qtyCellDisplay(line) {
             if (line.pricing_mode === 'fixed_weight') return '1';
             if (line.weight) return line.detail;
+            if (line.unit_name) return `${line.qty} ${line.unit_name}`;
             return line.qty;
         }
 
@@ -1277,7 +1412,7 @@
 
             const payload = {
                 client_sale_id: clientSaleId,
-                cart: cart.map(l => ({ product_id: l.product_id, qty: l.qty, weight: l.weight || null, variant_id: l.variant_id || null })),
+                cart: cart.map(l => ({ product_id: l.product_id, qty: l.qty, weight: l.weight || null, variant_id: l.variant_id || null, unit_id: l.unit_id || null })),
                 payments: paymentsPayload,
             };
             if (selectedCustomer) payload.customer_id = selectedCustomer.id;

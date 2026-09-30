@@ -173,6 +173,9 @@ class Product(models.Model):
     def available_variant_count(self):
         return len(self.available_variants())
 
+    def available_selling_units(self):
+        return [u for u in self.selling_units.all() if u.is_available]
+
     def locked_total_price(self):
         """For fixed-weight products with NO variant rows added (fallback only):
         the locked total price (rate x product.fixed_weight)."""
@@ -232,6 +235,64 @@ class ProductVariant(models.Model):
         if self.price_override is not None:
             return self.price_override
         return round(Decimal(str(self.product.price)) * Decimal(str(self.weight)), 2)
+
+
+class ProductSellingUnit(models.Model):
+    """A named way ONE 'Fixed quantity' product can be sold, each with its
+    own independently-set price -- e.g. eggs sold both by the Piece and by
+    the Crate (~30 eggs), where the crate price is a bulk discount, NOT
+    simply 30x the piece price. Each unit's price is entered directly here,
+    never derived from another unit. Analogous to ProductVariant for
+    fixed_weight products: lets one Product record carry several selling
+    units instead of needing a separate Product per unit.
+
+    Only meaningful for pricing_mode='fixed_quantity'. A fixed_quantity
+    product with NO rows here behaves exactly as it did before this model
+    existed (its own price/price_unit fields, plain quantity stepper) --
+    this is additive, the same fallback relationship product.fixed_weight
+    already has with ProductVariant."""
+
+    UNIT_NAME_CHOICES = [
+        ('piece', 'Piece'),
+        ('kg', 'Kg'),
+        ('gram', 'Gram'),
+        ('dozen', 'Dozen'),
+        ('liter', 'Liter'),
+        ('milliliter', 'Milliliter'),
+        ('crate', 'Crate'),
+    ]
+
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='selling_units')
+    name = models.CharField(max_length=20, choices=UNIT_NAME_CHOICES)
+    price = models.DecimalField(
+        max_digits=10, decimal_places=2,
+        help_text="This unit's own price, e.g. Rs. 20 for Piece, Rs. 550 for Crate. "
+                   "Entered directly, never calculated by multiplying another unit's "
+                   "price -- bulk units are usually discounted, not a flat multiple."
+    )
+    quantity_in_base_units = models.DecimalField(
+        max_digits=8, decimal_places=2, default=1,
+        help_text="How many of this product's own stock-counting unit ONE of this "
+                   "selling unit equals -- e.g. 1 for Piece, 30 for a Crate of eggs. "
+                   "Only used to deduct the correct amount from inventory when this "
+                   "unit is sold; never used to calculate price."
+    )
+    is_default = models.BooleanField(
+        default=False,
+        help_text='Pre-selected in the POS keypad modal when this product has more than one unit.'
+    )
+    is_available = models.BooleanField(
+        default=True,
+        help_text='Uncheck to stop offering this unit at POS without deleting its price history.'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['id']
+        unique_together = [('product', 'name')]
+
+    def __str__(self):
+        return f"{self.product.name} — {self.get_name_display()} (Rs. {self.price})"
 
 
 class NewsletterSubscriber(models.Model):

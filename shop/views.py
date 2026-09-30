@@ -616,6 +616,14 @@ def create_inventory_movements_from_snapshot(cart_snapshot, movement_type, sourc
                 quantity = Decimal(str(qty)) * Decimal(str(weight or 0))
             else:  # fixed_quantity
                 quantity = Decimal(str(qty))
+                unit_id = line.get('unit_id')
+                if unit_id:
+                    unit = product.selling_units.filter(id=unit_id).first()
+                    if unit:
+                        # e.g. 1 Crate of eggs removes 30 pieces from stock —
+                        # inventory is always tracked in the product's own
+                        # base counting unit, never in whatever unit was sold.
+                        quantity *= Decimal(str(unit.quantity_in_base_units))
 
             if quantity <= 0:
                 continue
@@ -749,6 +757,8 @@ def create_pos_sale(*, client_sale_id, cart, payments, operator_user, customer=N
             qty = int(line.get('qty', 1) or 1)
             weight = line.get('weight')
             variant_id = line.get('variant_id')
+            unit_id = line.get('unit_id')
+            unit = None
 
             if product.pricing_mode == 'fixed_weight':
                 variant = product.variants.filter(id=variant_id, is_available=True).first() if variant_id else None
@@ -758,7 +768,13 @@ def create_pos_sale(*, client_sale_id, cart, payments, operator_user, customer=N
             elif product.pricing_mode == 'variable_weight':
                 line_total = Decimal(str(product.price)) * Decimal(str(weight or 0))
             else:
-                line_total = Decimal(str(product.price)) * qty
+                if unit_id:
+                    unit = product.selling_units.filter(id=unit_id, is_available=True).first()
+                    if not unit:
+                        raise POSSaleValidationError(f'{product.name}: that selling unit is no longer available.')
+                    line_total = unit.price * qty
+                else:
+                    line_total = Decimal(str(product.price)) * qty
 
             total += line_total
             if settings_row.is_vat_enabled and product.is_taxable:
@@ -766,7 +782,11 @@ def create_pos_sale(*, client_sale_id, cart, payments, operator_user, customer=N
             else:
                 exempt_value += line_total
 
-            cart_snapshot.append({'product_id': product.id, 'weight': weight, 'qty': qty, 'variant_id': variant_id})
+            cart_snapshot.append({
+                'product_id': product.id, 'weight': weight, 'qty': qty, 'variant_id': variant_id,
+                'unit_id': unit.id if unit else None,
+                'unit_name': unit.get_name_display() if unit else None,
+            })
     except (Product.DoesNotExist, InvalidOperation, TypeError, ValueError):
         raise POSSaleValidationError('One of the items in this cart is no longer valid.')
 
@@ -877,6 +897,19 @@ def pos_view(request):
                 }
                 for v in p.available_variants()
             ]
+        if p.pricing_mode == 'fixed_quantity':
+            units = p.available_selling_units()
+            if units:
+                entry['units'] = [
+                    {
+                        'id': u.id,
+                        'name': u.name,
+                        'label': u.get_name_display(),
+                        'price': str(u.price),
+                        'is_default': u.is_default,
+                    }
+                    for u in units
+                ]
         products_data.append(entry)
 
     # Every top-level category a product could belong to (via itself or any

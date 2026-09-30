@@ -12,7 +12,7 @@ from .models import Offer, Coupon, BundleItem, ProductVariant
 from .emails import send_newsletter_campaign
 from .models import InventoryMovement
 from .models import (
-    Offer, Coupon, BundleItem, ProductVariant, InventoryMovement, POSSale, UserProfile,
+    Offer, Coupon, BundleItem, ProductVariant, ProductSellingUnit, InventoryMovement, POSSale, UserProfile,
     BusinessSettings, CreditTransaction, Customer, POSSalePayment,
 )
 from .utils import format_money
@@ -48,6 +48,12 @@ class ProductVariantInline(admin.TabularInline):
     fields = ['weight', 'price_override', 'label', 'is_available']
 
 
+class ProductSellingUnitInline(admin.TabularInline):
+    model = ProductSellingUnit
+    extra = 1
+    fields = ['name', 'price', 'quantity_in_base_units', 'is_default', 'is_available']
+
+
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
     list_display = ['name', 'category', 'price', 'price_unit', 'pricing_mode',
@@ -56,7 +62,7 @@ class ProductAdmin(admin.ModelAdmin):
     list_editable = ['is_available', 'price', 'price_unit', 'origin']
     prepopulated_fields = {'slug': ('name',)}
     search_fields = ['name']
-    inlines = [ProductVariantInline]
+    inlines = [ProductVariantInline, ProductSellingUnitInline]
 
     def formfield_for_dbfield(self, db_field, request, **kwargs):
         formfield = super().formfield_for_dbfield(db_field, request, **kwargs)
@@ -76,6 +82,9 @@ class ProductAdmin(admin.ModelAdmin):
                 'with "weight_unit_label" (e.g. 0.50 "kg" for fruit, 0.25 "kg" for pickle jars, 0.5 "dozen" for banana). '
                 '<b>Fixed quantity</b> — plain quantity stepper, no weight (jars, eggs by piece). '
                 'weight_step/weight_unit_label/fixed_weight are all ignored for this mode. '
+                'Optionally add rows in "Selling units" below to sell this product in more than '
+                'one named unit at independent prices (e.g. eggs by the Piece AND by the Crate) — '
+                'leave empty for the plain single-price behaviour above; most products need none. '
                 '<b>Fixed weight</b> — one specific animal (goat/chicken): scroll down to '
                 '"Weight variants" below and add a row for each size/animal currently available '
                 '(e.g. 15kg, 20kg) — no need to create a new product for each one. The old '
