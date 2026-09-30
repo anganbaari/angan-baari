@@ -84,14 +84,33 @@
         #receiptView { display: flex; flex-direction: column; flex: 1; min-height: 0; }
         /* Fixed 7-rows-per-page table -- no internal scroll, ever. Extra
            items spill onto additional pages, flipped via the pager
-           alongside the table (matches the mockup's "1/1" page indicator). */
+           alongside the table (matches the mockup's "1/1" page indicator).
+           This is a real <table> for markup/semantics, but laid out as a
+           CSS Grid: native table row-height is only ever a *minimum* (a
+           2-line product name silently grows the row and overflow:hidden
+           on a <td> does nothing to stop that), whereas grid's `1fr` row
+           tracks are authoritative -- the header takes its natural height
+           and the remaining space splits into exactly 7 equal, truly fixed
+           rows that clip rather than grow. thead/tbody/tr get
+           display:contents so th/td become direct grid items in DOM order. */
         .receipt-table-row { display: flex; gap: 8px; flex: 1; min-height: 0; }
         .receipt-table-wrap { flex: 1; min-height: 0; overflow: hidden; }
-        .receipt-table { width: 100%; border-collapse: collapse; background: var(--pos-bg); border: 2px solid var(--pos-border-dark); table-layout: fixed; }
-        .receipt-table th, .receipt-table td { border: 1px solid var(--pos-border-dark); padding: 6px 10px; font-size: 0.95rem; font-weight: 700; text-align: center; color: var(--pos-text-black); line-height: 1.15; }
+        .receipt-table {
+            display: grid; grid-template-columns: 6% 34% 15% 13% 17% 15%;
+            grid-template-rows: auto repeat(7, 1fr);
+            width: 100%; height: 100%; background: var(--pos-bg); border: 2px solid var(--pos-border-dark);
+        }
+        .receipt-table thead, .receipt-table tbody, .receipt-table tr { display: contents; }
+        .receipt-table th, .receipt-table td {
+            display: flex; align-items: center; justify-content: center;
+            border: 1px solid var(--pos-border-dark); padding: 6px 10px; font-size: 0.95rem; font-weight: 700;
+            text-align: center; color: var(--pos-text-black); line-height: 1.15; box-sizing: border-box; overflow: hidden;
+        }
         .receipt-table th { background: var(--pos-bg); font-weight: 800; font-family: 'Noto Sans Devanagari', 'DM Sans', sans-serif; }
-        .receipt-table td.name-cell { text-align: left; }
-        .name-cell-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+        .receipt-table td.name-cell { justify-content: flex-start; text-align: left; }
+        .name-cell-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; width: 100%; height: 100%; overflow: hidden; }
+        .name-cell-row > div { overflow: hidden; min-width: 0; }
+        .name-cell-row > div > *, .receipt-table td.name-cell { overflow: hidden; }
         .receipt-table .row-remove {
             background: #fdecea; border: 1.5px solid #c0392b; color: #c0392b; cursor: pointer;
             width: 20px; height: 20px; border-radius: 50%; font-size: 0.62rem; line-height: 1;
@@ -100,7 +119,9 @@
         .receipt-table .qty-cell { cursor: pointer; }
         .receipt-table .qty-cell:hover { background: #f3f8f0; }
         .qty-edit-icon { font-size: 0.6rem; opacity: 0.5; margin-left: 2px; }
-        .receipt-blank-row td { height: 28px; }
+        /* No explicit height here -- grid's 1fr row tracks size every row
+           (blank or populated) identically; the old fixed px height was
+           a table-layout-era leftover that would now just leave a gap. */
         .table-pager { width: 40px; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; }
         .pager-btn {
             background: var(--pos-cat-card-bg); border: 1.5px solid var(--pos-reminder-border); border-radius: 6px;
@@ -122,11 +143,14 @@
         .reminder-card ul li::before { content: "* "; font-weight: 700; }
         .reminder-card .reminder-bag { position: absolute; right: 8px; bottom: 2px; width: 30px; height: 30px; opacity: 0.85; pointer-events: none; }
 
-        /* Repay Credit gets its own column, between the reminder box and the
-           tax box -- pulled out of the Counter/Payment stack so that stack
-           only needs to be two buttons tall, the main lever for shortening
-           this row's overall height. */
-        .repay-col { display: flex; flex-shrink: 0; width: 110px; }
+        /* Five standalone columns: reminder | Repay Credit | Counter | tax
+           box | payment method -- each button gets its own column instead
+           of Counter/Payment stacking, which is the main lever for keeping
+           this row's height down now that it's five columns wide. */
+        .repay-col, .counter-col, .payment-col { display: flex; flex-shrink: 0; }
+        .repay-col { width: 110px; }
+        .counter-col { width: 100px; }
+        .payment-col { width: 130px; }
 
         .tax-box { flex: 1; min-width: 0; background: var(--pos-bg); border: 2px solid var(--pos-border-dark); border-radius: 6px; overflow: hidden; height: fit-content; }
         .tax-box .tax-row { display: flex; justify-content: space-between; padding: 4px 14px; font-size: 0.95rem; border-bottom: 1px solid var(--pos-border-dark); font-family: 'Noto Sans Devanagari', 'DM Sans', sans-serif; }
@@ -136,7 +160,6 @@
         .tax-box .tax-row.grand-total { background: #f3f8f0; }
         .tax-box .tax-row.grand-total span { font-size: 1.12rem; }
 
-        .side-actions { display: flex; flex-direction: column; gap: 8px; width: 160px; flex-shrink: 0; justify-content: space-between; }
         .side-btn {
             border: none; border-radius: 12px; padding: 7px; font-family: 'Noto Sans Devanagari', 'DM Sans', sans-serif; font-weight: 800;
             font-size: 1rem; cursor: pointer; color: #fff; text-align: center; line-height: 1.25;
@@ -271,6 +294,39 @@
             opacity: 0; pointer-events: none; transition: opacity 0.25s, transform 0.25s; z-index: 900;
         }
         #posToast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+        /* ── Tablet landscape: shorter viewport heights need every row of
+           chrome (header, category row, combined row, table rows) to give
+           up some of its padding/font-size so the fixed 7-row table still
+           has enough room to show 2-line content without clipping. Applies
+           by viewport HEIGHT, not width, since a 10-11" Android tablet in
+           landscape at a high device-pixel-ratio can report a CSS height
+           as short as ~600px even though it's plenty wide (900-1280px). ── */
+        @media (max-height: 700px) {
+            .pos-clock { padding: 4px 10px; }
+            .pos-brand .brand-text h1 { font-size: 1.6rem; }
+            .cat-card { padding: 15px 6px; gap: 4px; }
+            .cat-card span { font-size: 0.82rem; }
+            .receipt-table th, .receipt-table td { padding: 3px 8px; font-size: 0.82rem; }
+            .reminder-card { padding: 4px 8px; }
+            .reminder-card .reminder-title { font-size: 0.78rem; margin-bottom: 2px; }
+            .reminder-card ul { font-size: 0.72rem; line-height: 1.25; }
+            .reminder-card .reminder-bag { width: 22px; height: 22px; }
+            .tax-box .tax-row { padding: 2px 10px; font-size: 0.82rem; }
+            .tax-box .tax-row.grand-total span { font-size: 0.95rem; }
+            .side-btn { font-size: 0.82rem; padding: 4px; }
+        }
+
+        /* ── Comfortable tap targets on touch devices -- every button and
+           tappable cell gets a real minimum footprint regardless of how
+           compact the surrounding text gets above. ── */
+        @media (hover: none) and (pointer: coarse) {
+            .side-btn, .cat-card, .row-remove, .qty-cell, .pager-btn,
+            #lockEnterBtn, #completeSaleBtn, #openPaymentBtn, #openRepayBtn {
+                min-height: 44px;
+            }
+            .row-remove { min-width: 32px; min-height: 32px; }
+        }
     </style>
 </head>
 <body>
@@ -306,12 +362,12 @@
                         <table class="receipt-table">
                             <thead>
                                 <tr>
-                                    <th style="width:6%;">क्र.सं.</th>
-                                    <th style="width:34%;">उत्पादनको नाम</th>
-                                    <th style="width:15%;">एकाइ मूल्य</th>
-                                    <th style="width:13%;">परिमाण</th>
-                                    <th style="width:17%;">जम्मा मूल्य</th>
-                                    <th style="width:15%;">कर</th>
+                                    <th>क्र.सं.</th>
+                                    <th>उत्पादनको नाम</th>
+                                    <th>एकाइ मूल्य</th>
+                                    <th>परिमाण</th>
+                                    <th>जम्मा मूल्य</th>
+                                    <th>कर</th>
                                 </tr>
                             </thead>
                             <tbody id="receiptBody">
@@ -346,14 +402,18 @@
                         <button type="button" class="side-btn repay-btn" id="openRepayBtn">उधारो तिर्नुहोस्<br><span style="font-weight:700;font-size:0.85rem;">Repay Credit</span></button>
                     </div>
 
+                    <div class="counter-col">
+                        <button type="button" class="side-btn counter-btn"><i class="fas fa-broom"></i><br>Counter<br>सफा राख्नुहोस्।</button>
+                    </div>
+
                     <div class="tax-box">
                         <div class="tax-row"><span>कुल कर</span><span id="taxVat">Rs. 0</span></div>
                         <div class="tax-row"><span>कर बा. मूल्य</span><span id="taxTaxable">Rs. 0</span></div>
                         <div class="tax-row"><span>कर स. मूल्य</span><span id="taxExempt">Rs. 0</span></div>
                         <div class="tax-row grand-total"><span>जम्मा</span><span id="cartTotal">Rs. 0</span></div>
                     </div>
-                    <div class="side-actions">
-                        <button type="button" class="side-btn counter-btn"><i class="fas fa-broom"></i><br>Counter<br>सफा राख्नुहोस्।</button>
+
+                    <div class="payment-col">
                         <button type="button" class="side-btn payment-btn-main" id="openPaymentBtn" disabled><i class="fas fa-rupee-sign"></i> payment method&gt;&gt;&gt;</button>
                     </div>
                 </div>
@@ -458,6 +518,17 @@
         function getCookie(name) {
             const match = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
             return match ? decodeURIComponent(match[2]) : null;
+        }
+
+        // Whole-number prices drop the trailing ".00" ("80.00" -> "80"), but
+        // a real decimal keeps its full 2-place form ("80.50" stays
+        // "80.50", not "80.5"). Mirrors shop/utils.py's format_money() on
+        // the Python side so admin and POS agree on the same rule.
+        function formatMoney(amount) {
+            const n = parseFloat(amount);
+            if (isNaN(n)) return String(amount);
+            const rounded = Math.round(n * 100) / 100;
+            return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(2);
         }
 
         function apiFetch(path, options) {
@@ -682,9 +753,9 @@
                 if (p.pricing_mode === 'fixed_weight') {
                     priceLabel = p.variants.length ? `${p.variants.length} available` : 'Unavailable';
                 } else if (p.pricing_mode === 'variable_weight') {
-                    priceLabel = `Rs. ${p.price} / ${p.weight_unit_label}`;
+                    priceLabel = `Rs. ${formatMoney(p.price)} / ${p.weight_unit_label}`;
                 } else {
-                    priceLabel = `Rs. ${p.price}${p.price_unit ? ' ' + p.price_unit : ''}`;
+                    priceLabel = `Rs. ${formatMoney(p.price)}${p.price_unit ? ' ' + p.price_unit : ''}`;
                 }
                 return `<div class="product-btn" data-id="${p.id}">
                     ${imgHtml}
@@ -998,10 +1069,10 @@
                             <button type="button" class="row-remove" data-i="${start + i}" title="Remove"><i class="fas fa-times"></i></button>
                         </div>
                     </td>
-                    <td>Rs. ${Math.round(line.unit_price)}</td>
+                    <td>Rs. ${formatMoney(line.unit_price)}</td>
                     <td class="qty-cell" data-i="${start + i}" title="Tap to change">${qtyCellDisplay(line)} <i class="fas fa-pen qty-edit-icon"></i></td>
-                    <td>Rs. ${Math.round(line.line_total)}</td>
-                    <td>Rs. ${Math.round(lineTax(line))}</td>
+                    <td>Rs. ${formatMoney(line.line_total)}</td>
+                    <td>Rs. ${formatMoney(lineTax(line))}</td>
                 </tr>`
             ).join('');
             for (let i = pageLines.length; i < RECEIPT_PAGE_SIZE; i++) {
@@ -1024,10 +1095,10 @@
             const taxableValue = IS_VAT_ENABLED ? cart.filter(l => l.is_taxable).reduce((s, l) => s + l.line_total, 0) : 0;
             const exemptValue = IS_VAT_ENABLED ? total - taxableValue : total;
 
-            document.getElementById('cartTotal').textContent = 'Rs. ' + Math.round(total + vatAmount);
-            document.getElementById('taxVat').textContent = 'Rs. ' + Math.round(vatAmount);
-            document.getElementById('taxTaxable').textContent = 'Rs. ' + Math.round(taxableValue);
-            document.getElementById('taxExempt').textContent = 'Rs. ' + Math.round(exemptValue);
+            document.getElementById('cartTotal').textContent = 'Rs. ' + formatMoney(total + vatAmount);
+            document.getElementById('taxVat').textContent = 'Rs. ' + formatMoney(vatAmount);
+            document.getElementById('taxTaxable').textContent = 'Rs. ' + formatMoney(taxableValue);
+            document.getElementById('taxExempt').textContent = 'Rs. ' + formatMoney(exemptValue);
             document.getElementById('openPaymentBtn').disabled = cart.length === 0;
         }
 

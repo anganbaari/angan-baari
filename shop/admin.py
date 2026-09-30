@@ -15,6 +15,18 @@ from .models import (
     Offer, Coupon, BundleItem, ProductVariant, InventoryMovement, POSSale, UserProfile,
     BusinessSettings, CreditTransaction, Customer, POSSalePayment,
 )
+from .utils import format_money
+
+
+class MoneyDisplayWidget(forms.TextInput):
+    """Shows the same value it's editing, minus a trailing '.00' -- '80.00'
+    displays as '80' in the box. Submitting it back unchanged still
+    round-trips correctly since Decimal('80') == Decimal('80.00') once
+    Django re-quantizes on save (decimal_places=2 on the model field)."""
+    def format_value(self, value):
+        if value in (None, ''):
+            return ''
+        return format_money(value)
 
 
 @admin.register(Category)
@@ -45,6 +57,12 @@ class ProductAdmin(admin.ModelAdmin):
     prepopulated_fields = {'slug': ('name',)}
     search_fields = ['name']
     inlines = [ProductVariantInline]
+
+    def formfield_for_dbfield(self, db_field, request, **kwargs):
+        formfield = super().formfield_for_dbfield(db_field, request, **kwargs)
+        if db_field.name == 'price':
+            formfield.widget = MoneyDisplayWidget()
+        return formfield
 
     fieldsets = (
         (None, {
