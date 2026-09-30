@@ -434,6 +434,159 @@ class POSVatApiTests(ApiTestBase):
         self.assertEqual(sale.vat_amount, Decimal('0.00'))
 
 
+class POSCouponApiTests(ApiTestBase):
+    """POS Phase C — coupon discounts at checkout. Reuses the website's
+    Coupon model (resolve_pos_coupon() in shop/views.py) rather than a
+    parallel POS-only discount system."""
+
+    def setUp(self):
+        super().setUp()
+        self.client.login(username='cashier', password='pw')
+        self.unlock_terminal()
+        now = timezone.now()
+        self.percent_coupon = Coupon.objects.create(
+            code='dashain25', discount_type='percent', discount_value=Decimal('25'),
+            start_date=now - timedelta(days=1), end_date=now + timedelta(days=1),
+        )
+        self.fixed_coupon = Coupon.objects.create(
+            code='FLAT50', discount_type='fixed', discount_value=Decimal('50'),
+            start_date=now - timedelta(days=1), end_date=now + timedelta(days=1),
+        )
+
+    def test_validate_endpoint_requires_staff(self):
+        self.client.logout()
+        response = self.client.post(
+            reverse('v1_pos_coupon_validate'), {'code': 'DASHAIN25', 'subtotal': '500.00'}, format='json',
+        )
+        self.assertIn(response.status_code, (status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN))
+
+    def test_validate_endpoint_returns_discount_without_side_effects(self):
+        response = self.client.post(
+            reverse('v1_pos_coupon_validate'), {'code': 'dashain25', 'subtotal': '500.00'}, format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.data['code'], 'DASHAIN25')  # normalized uppercase, same as website checkout
+        self.assertEqual(Decimal(response.data['discount_amount']), Decimal('125.00'))  # 25% of 500
+
+        self.percent_coupon.refresh_from_db()
+        self.assertEqual(self.percent_coupon.used_count, 0)  # preview only -- never consumes a use
+
+    def test_validate_endpoint_rejects_unknown_code(self):
+        response = self.client.post(
+            reverse('v1_pos_coupon_validate'), {'code': 'NOPE', 'subtotal': '500.00'}, format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_validate_endpoint_enforces_min_order_amount(self):
+        self.fixed_coupon.min_order_amount = Decimal('1000.00')
+        self.fixed_coupon.save(update_fields=['min_order_amount'])
+        response = self.client.post(
+            reverse('v1_pos_coupon_validate'), {'code': 'FLAT50', 'subtotal': '500.00'}, format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_sale_with_percent_coupon_reduces_total_and_increments_used_count(self):
+        payload = {
+            'client_sale_id': str(uuid.uuid4()),
+            'coupon_code': 'dashain25',
+            # 2 jars @ 250 = 500, minus 25% (125) = 375
+            'payments': [{'method': 'cash', 'amount': '375.00'}],
+            'cart': [{'product_id': self.jar.id, 'qty': 2}],
+        }
+        response = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertEqual(Decimal(response.data['total']), Decimal('375.00'))
+        self.assertEqual(Decimal(response.data['discount_amount']), Decimal('125.00'))
+
+        sale = POSSale.objects.get(sale_number=response.data['sale_number'])
+        self.assertEqual(sale.coupon, self.percent_coupon)
+        self.assertEqual(sale.discount_amount, Decimal('125.00'))
+        self.assertEqual(sale.total_amount, Decimal('375.00'))
+
+        self.percent_coupon.refresh_from_db()
+        self.assertEqual(self.percent_coupon.used_count, 1)
+
+    def test_sale_with_fixed_coupon_and_payments_matching_pre_discount_total_is_rejected(self):
+        payload = {
+            'client_sale_id': str(uuid.uuid4()),
+            'coupon_code': 'FLAT50',
+            # Jar is 250; staff forgot to apply the 50 discount to the payment amount.
+            'payments': [{'method': 'cash', 'amount': '250.00'}],
+            'cart': [{'product_id': self.jar.id, 'qty': 1}],
+        }
+        response = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(POSSale.objects.filter(client_sale_id=payload['client_sale_id']).exists())
+
+    def test_sale_with_expired_coupon_is_rejected_and_creates_nothing(self):
+        now = timezone.now()
+        self.percent_coupon.end_date = now - timedelta(hours=1)
+        self.percent_coupon.save(update_fields=['end_date'])
+        payload = {
+            'client_sale_id': str(uuid.uuid4()),
+            'coupon_code': 'dashain25',
+            'payments': [{'method': 'cash', 'amount': '187.50'}],
+            'cart': [{'product_id': self.jar.id, 'qty': 1}],
+        }
+        response = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(POSSale.objects.filter(client_sale_id=payload['client_sale_id']).exists())
+        self.assertEqual(InventoryMovement.current_stock(self.jar), Decimal('10'))  # untouched
+
+    def test_sale_with_unknown_coupon_code_is_rejected(self):
+        payload = {
+            'client_sale_id': str(uuid.uuid4()),
+            'coupon_code': 'MADEUP',
+            'payments': [{'method': 'cash', 'amount': '250.00'}],
+            'cart': [{'product_id': self.jar.id, 'qty': 1}],
+        }
+        response = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_idempotent_replay_does_not_double_increment_used_count(self):
+        client_sale_id = str(uuid.uuid4())
+        payload = {
+            'client_sale_id': client_sale_id,
+            'coupon_code': 'dashain25',
+            'payments': [{'method': 'cash', 'amount': '187.50'}],  # 250 - 25% = 187.50
+            'cart': [{'product_id': self.jar.id, 'qty': 1}],
+        }
+        first = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        second = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        self.assertEqual(first.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(second.status_code, status.HTTP_200_OK)
+
+        self.percent_coupon.refresh_from_db()
+        self.assertEqual(self.percent_coupon.used_count, 1)
+
+    def test_coupon_discount_reduces_taxable_value_proportionally_under_vat(self):
+        BusinessSettings.objects.update_or_create(pk=1, defaults={'is_vat_enabled': True})
+        self.jar.is_taxable = True
+        self.jar.save(update_fields=['is_taxable'])
+
+        # jar (taxable) 2 x 250 = 500; fruit (exempt) 2kg x 300 = 600. Subtotal 1100.
+        # FLAT50 knocks 50 off the subtotal -> discounted 1050, split proportionally:
+        # taxable share = 500/1100 * 1050 = 477.27, exempt = 572.73, VAT = 13% of 477.27 = 62.05
+        payload = {
+            'client_sale_id': str(uuid.uuid4()),
+            'coupon_code': 'FLAT50',
+            'payments': [{'method': 'cash', 'amount': '1112.05'}],
+            'cart': [
+                {'product_id': self.jar.id, 'qty': 2},
+                {'product_id': self.fruit.id, 'qty': 1, 'weight': '2.00'},
+            ],
+        }
+        response = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+
+        sale = POSSale.objects.get(sale_number=response.data['sale_number'])
+        self.assertEqual(sale.discount_amount, Decimal('50.00'))
+        self.assertEqual(sale.taxable_value, Decimal('477.27'))
+        self.assertEqual(sale.exempt_value, Decimal('572.73'))
+        self.assertEqual(sale.vat_amount, Decimal('62.05'))
+        self.assertEqual(sale.total_amount, Decimal('1112.05'))
+
+
 class CustomerApiTests(ApiTestBase):
     def test_lookup_requires_staff(self):
         response = self.client.get(reverse('v1_pos_customer_lookup'), {'phone': '9800000001'})

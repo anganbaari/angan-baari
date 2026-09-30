@@ -1,12 +1,13 @@
 # Current State
 
-*Living document — update as work lands. Last checked: 2026-09-27.*
+*Living document — update as work lands. Last checked: 2026-10-01.*
 
-## In-flight (uncommitted, as of 2026-09-27)
+## Recently landed (as of 2026-10-01, commit 76865d4 + POS Phase C)
 
-- **`shop/models.py`** — the `django.ce.exceptions` → `django.core.exceptions` typo fix (see [[Known-Bugs]]) is applied locally but **not yet committed, migrated, or deployed**. Confirm it's landed before assuming POS sales work in production.
-- **`farmsite/settings.py`** — `ALLOWED_HOSTS` extended to include `127.0.0.1`/`localhost` for local dev testing. Uncommitted.
-- **`shop/migrations/0021_possale_client_sale_id.py`** — new migration, untracked. Adds `POSSale.client_sale_id` (see [[POS]]).
+- The `django.ce.exceptions` typo (see [[Known-Bugs]]) is fixed and committed — no longer an open item.
+- POS Phase A (staff roles + PIN unlock) and Phase B (Customer/credit ledger, split payments, dormant VAT scaffolding) are built, tested, committed, and confirmed on `main`.
+- POS Phase C (coupon discounts) added this session: `resolve_pos_coupon()` + coupon fields on `POSSale` + `/api/v1/pos/coupon/validate/` preview endpoint + pos.html coupon UI. 10 new tests, 122/122 passing locally. **Not yet migrated/deployed to PythonAnywhere as of this writing** — migration `shop/0030_possale_coupon_possale_discount_amount.py` needs `migrate` there after the next `git pull`.
+- `ProductSellingUnit` (fixed_quantity selling units, e.g. jar sizes) and a shared weight/qty keypad modal with Kg/Gram switching also landed since the doc below was last accurate — check `shop/models.py` directly for the current full model list rather than trusting an older summary.
 
 ## Recently set up (2026-09-27)
 

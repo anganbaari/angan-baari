@@ -777,9 +777,28 @@ class POSSale(models.Model):
     # stay zero, regardless of any product's is_taxable flag. Stored (not
     # recomputed later) so a receipt still shows the correct split even if
     # a product's is_taxable flag or the VAT toggle itself changes afterward.
+    # NOTE: taxable_value/exempt_value are recorded AFTER any coupon discount
+    # below is applied (see create_pos_sale()) — they reflect the sale's
+    # actual tax basis, not the pre-discount cart total.
     taxable_value = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     exempt_value = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     vat_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+
+    # POS Phase C: coupon discounts. Reuses the same Coupon model the
+    # website checkout uses (festival codes like DASHAIN25) rather than a
+    # parallel POS-only discount system — one place discount rules live,
+    # one used_count counter, one "My Coupons" list. Offer-style automatic
+    # per-product/category discounts are a website-only concept for now
+    # (they'd need per-line price overrides in the product grid) and are
+    # deliberately not part of this.
+    coupon = models.ForeignKey(
+        Coupon, on_delete=models.SET_NULL, null=True, blank=True, related_name='pos_sales',
+        help_text='The coupon code applied to this sale, if any.',
+    )
+    discount_amount = models.DecimalField(
+        max_digits=10, decimal_places=2, default=0,
+        help_text='Amount knocked off the pre-tax subtotal by the coupon above. Zero when no coupon was used.',
+    )
 
     created_at = models.DateTimeField(auto_now_add=True)
 

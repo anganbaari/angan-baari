@@ -318,15 +318,15 @@ class POSSalePaymentInline(admin.TabularInline):
 
 @admin.register(POSSale)
 class POSSaleAdmin(admin.ModelAdmin):
-    list_display = ['sale_number', 'cashier', 'customer', 'payment_method', 'total_amount', 'created_at']
-    list_filter = ['payment_method', 'cashier', 'created_at']
+    list_display = ['sale_number', 'cashier', 'customer', 'payment_method', 'coupon', 'discount_amount', 'total_amount', 'created_at']
+    list_filter = ['payment_method', 'cashier', 'coupon', 'created_at']
     search_fields = ['sale_number']
     date_hierarchy = 'created_at'
     ordering = ['-created_at']
     inlines = [POSSalePaymentInline]
     readonly_fields = [
         'sale_number', 'cashier', 'customer', 'payment_method', 'cart_snapshot', 'total_amount',
-        'client_sale_id', 'taxable_value', 'exempt_value', 'vat_amount', 'created_at',
+        'client_sale_id', 'taxable_value', 'exempt_value', 'vat_amount', 'coupon', 'discount_amount', 'created_at',
     ]
 
     def has_add_permission(self, request):

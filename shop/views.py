@@ -693,8 +693,43 @@ def get_pos_operator(request):
         raise POSSaleValidationError('Terminal is locked — enter a PIN first.', status=403)
 
 
+def resolve_pos_coupon(code, subtotal):
+    """Validate a coupon code against a cart subtotal — same rules as the
+    website checkout's coupon handling (Coupon.is_live(), min_order_amount,
+    Coupon.calculate_discount()), factored out here so both the live
+    /pos/coupon/validate/ preview and create_pos_sale()'s own server-side
+    recheck use exactly one implementation.
+
+    Returns (coupon_obj_or_None, discount_amount, error_message_or_None).
+    A blank/whitespace code returns (None, Decimal('0'), None) — "no coupon"
+    is not an error. discount_amount is always quantized to 2dp so it lines
+    up exactly with the 2dp totals the rest of the sale math uses.
+    """
+    from decimal import Decimal, ROUND_HALF_UP
+    from .models import Coupon
+
+    code = (code or '').strip().upper()
+    if not code:
+        return None, Decimal('0'), None
+
+    try:
+        coupon_obj = Coupon.objects.get(code=code)
+    except Coupon.DoesNotExist:
+        return None, Decimal('0'), 'Invalid coupon code.'
+
+    if not coupon_obj.is_live():
+        return None, Decimal('0'), 'This coupon has expired or is no longer active.'
+
+    subtotal = Decimal(str(subtotal))
+    if subtotal < coupon_obj.min_order_amount:
+        return None, Decimal('0'), f'Minimum order of Rs. {coupon_obj.min_order_amount:.0f} required for this coupon.'
+
+    discount_amount = coupon_obj.calculate_discount(subtotal).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+    return coupon_obj, discount_amount, None
+
+
 def create_pos_sale(*, client_sale_id, cart, payments, operator_user, customer=None,
-                     source='pos', note_prefix='POS sale'):
+                     source='pos', note_prefix='POS sale', coupon_code=None):
     """Shared by pos_create_sale() (traditional, what templates/pos.html
     actually calls) and POSSaleView.post() (API) — the two entry points
     for completing a POS sale. Computes the cart total (and, once
@@ -714,10 +749,17 @@ def create_pos_sale(*, client_sale_id, cart, payments, operator_user, customer=N
     it's returned immediately with no re-validation and nothing new
     created — same behavior this already had before payments/VAT existed.
 
+    coupon_code (POS Phase C) is resolved fresh here via resolve_pos_coupon(),
+    never trusted from a client-supplied discount_amount — same reasoning
+    as the rest of this function's server-side recomputation. See
+    resolve_pos_coupon() for the coupon rules themselves and
+    pos_validate_coupon() for the pre-checkout preview that uses the same
+    function.
+
     Returns (sale, created) — created is False on the idempotent-replay
     path, so callers that distinguish 200 vs 201 (the API path) still can.
     """
-    from decimal import Decimal, InvalidOperation
+    from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
     from django.core.exceptions import ValidationError
     from django.db import transaction
     from .models import BusinessSettings, CreditTransaction, POSSale, POSSalePayment, Product
@@ -790,16 +832,34 @@ def create_pos_sale(*, client_sale_id, cart, payments, operator_user, customer=N
     except (Product.DoesNotExist, InvalidOperation, TypeError, ValueError):
         raise POSSaleValidationError('One of the items in this cart is no longer valid.')
 
+    # POS Phase C: coupon discount. Resolved against the pre-tax subtotal,
+    # same as website checkout — an invalid/expired/no-longer-qualifying
+    # code is a hard error here (unlike checkout(), which just shows an
+    # error banner and proceeds at full price): the POS operator already
+    # told the customer a discount applies, so silently dropping it would
+    # complete a sale for more than what was rung up on the screen.
+    coupon_obj, discount_amount, coupon_error = resolve_pos_coupon(coupon_code, total)
+    if coupon_error:
+        raise POSSaleValidationError(coupon_error)
+    discounted_subtotal = total - discount_amount
+
     if settings_row.is_vat_enabled:
-        vat_amount = (taxable_value * Decimal(str(VAT_RATE))).quantize(Decimal('0.01'))
+        # Spread the discount across taxable/exempt in the same proportion
+        # the undiscounted cart had, then compute VAT on the now-smaller
+        # taxable amount — a coupon reduces the tax bill too, not just the
+        # sticker price.
+        ratio = (taxable_value / total) if total > 0 else Decimal('0')
+        taxable_value = (discounted_subtotal * ratio).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        exempt_value = discounted_subtotal - taxable_value
+        vat_amount = (taxable_value * Decimal(str(VAT_RATE))).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
         required_total = exempt_value + taxable_value + vat_amount
     else:
         # Dormant scaffolding: regardless of any product's is_taxable flag,
         # nothing is taxable while VAT itself is off.
         taxable_value = Decimal('0')
         vat_amount = Decimal('0')
-        exempt_value = total
-        required_total = total
+        exempt_value = discounted_subtotal
+        required_total = discounted_subtotal
 
     payments_sum = sum((Decimal(str(line['amount'])) for line in payments), Decimal('0'))
     if payments_sum != required_total:
@@ -821,7 +881,12 @@ def create_pos_sale(*, client_sale_id, cart, payments, operator_user, customer=N
                 taxable_value=taxable_value,
                 exempt_value=exempt_value,
                 vat_amount=vat_amount,
+                coupon=coupon_obj,
+                discount_amount=discount_amount,
             )
+            if coupon_obj:
+                coupon_obj.used_count += 1
+                coupon_obj.save(update_fields=['used_count'])
             for line in payments:
                 POSSalePayment.objects.create(
                     sale=sale, method=line['method'], amount=Decimal(str(line['amount'])),
@@ -990,11 +1055,15 @@ def pos_create_sale(request):
             payments=data.get('payments') or [],
             operator_user=operator_user,
             customer=customer,
+            coupon_code=data.get('coupon_code'),
         )
     except POSSaleValidationError as e:
         return JsonResponse({'status': 'error', 'message': e.message}, status=e.status)
 
-    return JsonResponse({'status': 'ok', 'sale_number': sale.sale_number, 'total': str(sale.total_amount)})
+    return JsonResponse({
+        'status': 'ok', 'sale_number': sale.sale_number, 'total': str(sale.total_amount),
+        'discount_amount': str(sale.discount_amount),
+    })
 
 def line_subtotal(item):
     try:

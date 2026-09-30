@@ -28,6 +28,7 @@ from shop.views import (
     create_pos_sale,
     format_weight,
     get_pos_operator,
+    resolve_pos_coupon,
     POSSaleValidationError,
 )
 
@@ -36,6 +37,7 @@ from .serializers import (
     CategorySerializer,
     ChangePasswordSerializer,
     CouponSerializer,
+    CouponValidateSerializer,
     CreditRepaySerializer,
     CustomerCreateSerializer,
     CustomerSerializer,
@@ -165,14 +167,48 @@ class POSSaleView(generics.ListAPIView):
                 operator_user=operator_user,
                 customer=customer,
                 note_prefix='POS sale (API)',
+                coupon_code=data.get('coupon_code'),
             )
         except POSSaleValidationError as e:
             return Response({'status': 'error', 'message': e.message}, status=e.status)
 
         return Response(
-            {'status': 'ok', 'sale_number': sale.sale_number, 'total': str(sale.total_amount)},
+            {
+                'status': 'ok', 'sale_number': sale.sale_number, 'total': str(sale.total_amount),
+                'discount_amount': str(sale.discount_amount),
+            },
             status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
         )
+
+
+class CouponValidateView(APIView):
+    """POST /api/v1/pos/coupon/validate/ — live coupon preview for the POS
+    screen: checks a code against the current cart subtotal and returns the
+    discount without creating or changing anything (no used_count
+    increment, no sale). The actual sale still re-validates the same
+    coupon from scratch in create_pos_sale() via resolve_pos_coupon(),
+    which is the only place a coupon is ever actually consumed — this view
+    exists purely so staff see the discount before tapping Complete Sale."""
+
+    authentication_classes = [SessionAuthentication]
+    permission_classes = [IsStaffUser]
+
+    def post(self, request, *args, **kwargs):
+        serializer = CouponValidateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        coupon_obj, discount_amount, error = resolve_pos_coupon(data['code'], data['subtotal'])
+        if error:
+            return Response({'status': 'error', 'message': error}, status=400)
+        if not coupon_obj:
+            return Response({'status': 'error', 'message': 'Enter a coupon code.'}, status=400)
+
+        return Response({
+            'status': 'ok',
+            'code': coupon_obj.code,
+            'discount_amount': str(discount_amount),
+        })
 
 
 class PosUnlockView(APIView):

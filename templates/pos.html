@@ -159,6 +159,19 @@
         .tax-box .tax-row span:last-child { font-weight: 800; color: var(--pos-text-black); }
         .tax-box .tax-row.grand-total { background: #f3f8f0; }
         .tax-box .tax-row.grand-total span { font-size: 1.12rem; }
+        .tax-box .tax-row.discount-row span:last-child { color: #b23b3b; }
+
+        .tax-box .coupon-row { display: flex; gap: 6px; padding: 5px 8px; }
+        .tax-box .coupon-row input {
+            flex: 1; min-width: 0; border: 1.5px solid var(--pos-border-dark); border-radius: 6px;
+            padding: 4px 8px; font-size: 0.9rem; font-family: 'DM Sans', sans-serif;
+        }
+        .tax-box .coupon-row input:disabled { background: #f3f8f0; color: var(--pos-text-green); font-weight: 700; }
+        .tax-box .coupon-row button {
+            flex-shrink: 0; border: none; border-radius: 6px; padding: 4px 12px; font-weight: 800;
+            font-size: 0.85rem; cursor: pointer; background: var(--pos-text-green); color: #fff;
+        }
+        .tax-box .coupon-row button:disabled { opacity: 0.6; cursor: not-allowed; }
 
         .side-btn {
             border: none; border-radius: 12px; padding: 7px; font-family: 'Noto Sans Devanagari', 'DM Sans', sans-serif; font-weight: 800;
@@ -434,6 +447,11 @@
                     </div>
 
                     <div class="tax-box">
+                        <div class="tax-row coupon-row">
+                            <input type="text" id="couponInput" placeholder="Coupon code" autocomplete="off">
+                            <button type="button" id="applyCouponBtn">Apply</button>
+                        </div>
+                        <div class="tax-row discount-row" id="discountRow" style="display:none;"><span>छुट</span><span id="taxDiscount">Rs. 0</span></div>
                         <div class="tax-row"><span>कुल कर</span><span id="taxVat">Rs. 0</span></div>
                         <div class="tax-row"><span>कर बा. मूल्य</span><span id="taxTaxable">Rs. 0</span></div>
                         <div class="tax-row"><span>कर स. मूल्य</span><span id="taxExempt">Rs. 0</span></div>
@@ -539,6 +557,7 @@
         let clientSaleId = null;
         let payments = { cash: '', esewa: '', khalti: '', bank_transfer: '', credit: '' };
         let selectedCustomer = null;
+        let appliedCoupon = null; // { code, discount_amount, subtotalAtApply } — see renderReceipt()
         let idleTimer = null;
         const IDLE_LIMIT_MS = 20 * 60 * 1000;
 
@@ -1218,6 +1237,54 @@
             return line.line_total * VAT_RATE;
         }
 
+        function round2(n) {
+            return Math.round(n * 100) / 100;
+        }
+
+        function cartSubtotal() {
+            return cart.reduce((s, l) => s + l.line_total, 0);
+        }
+
+        // Mirrors create_pos_sale()'s server-side math exactly (see
+        // resolve_pos_coupon() / create_pos_sale() in shop/views.py): the
+        // discount comes off the pre-tax subtotal, then VAT is recomputed
+        // on the now-smaller taxable share. Kept in one place so the live
+        // total shown here always matches what the server will actually
+        // charge -- the server re-validates the coupon from scratch at
+        // checkout either way, this is purely a live preview.
+        function computeTotals() {
+            const subtotal = cartSubtotal();
+            const discount = appliedCoupon ? appliedCoupon.discount_amount : 0;
+            const discountedSubtotal = subtotal - discount;
+            const taxableBefore = IS_VAT_ENABLED ? cart.filter(l => l.is_taxable).reduce((s, l) => s + l.line_total, 0) : 0;
+            const ratio = subtotal > 0 ? taxableBefore / subtotal : 0;
+            const taxableValue = IS_VAT_ENABLED ? round2(discountedSubtotal * ratio) : 0;
+            const exemptValue = IS_VAT_ENABLED ? discountedSubtotal - taxableValue : discountedSubtotal;
+            const vatAmount = IS_VAT_ENABLED ? round2(taxableValue * VAT_RATE) : 0;
+            return { subtotal, discount, taxableValue, exemptValue, vatAmount, grandTotal: exemptValue + taxableValue + vatAmount };
+        }
+
+        function updateCouponUI(discount) {
+            const row = document.getElementById('discountRow');
+            const btn = document.getElementById('applyCouponBtn');
+            if (appliedCoupon) {
+                row.style.display = '';
+                document.getElementById('taxDiscount').textContent = '- Rs. ' + formatMoney(discount);
+                btn.textContent = 'Remove';
+            } else {
+                row.style.display = 'none';
+                btn.textContent = 'Apply';
+            }
+        }
+
+        function clearCoupon(silent) {
+            if (!appliedCoupon) return;
+            appliedCoupon = null;
+            document.getElementById('couponInput').value = '';
+            document.getElementById('couponInput').disabled = false;
+            if (!silent) showToast('Coupon removed');
+        }
+
         // Fixed rows-per-page, matching the mockup's "1/1" page indicator --
         // no internal table scroll, ever. Extra items spill onto new pages
         // instead. Row numbering and remove-buttons use the GLOBAL cart
@@ -1274,15 +1341,20 @@
             document.getElementById('pagePrevBtn').disabled = receiptPage === 0;
             document.getElementById('pageNextBtn').disabled = receiptPage >= totalPages - 1;
 
-            const total = cart.reduce((s, l) => s + l.line_total, 0);
-            const vatAmount = cart.reduce((s, l) => s + lineTax(l), 0);
-            const taxableValue = IS_VAT_ENABLED ? cart.filter(l => l.is_taxable).reduce((s, l) => s + l.line_total, 0) : 0;
-            const exemptValue = IS_VAT_ENABLED ? total - taxableValue : total;
+            // A coupon was validated against a specific subtotal -- if the
+            // cart has since changed (item added/removed/qty edited), that
+            // discount may no longer be valid (e.g. min_order_amount), so
+            // drop it rather than show a total the server would reject.
+            if (appliedCoupon && Math.round(appliedCoupon.subtotalAtApply * 100) !== Math.round(cartSubtotal() * 100)) {
+                clearCoupon();
+            }
 
-            document.getElementById('cartTotal').textContent = 'Rs. ' + formatMoney(total + vatAmount);
-            document.getElementById('taxVat').textContent = 'Rs. ' + formatMoney(vatAmount);
-            document.getElementById('taxTaxable').textContent = 'Rs. ' + formatMoney(taxableValue);
-            document.getElementById('taxExempt').textContent = 'Rs. ' + formatMoney(exemptValue);
+            const totals = computeTotals();
+            document.getElementById('cartTotal').textContent = 'Rs. ' + formatMoney(totals.grandTotal);
+            document.getElementById('taxVat').textContent = 'Rs. ' + formatMoney(totals.vatAmount);
+            document.getElementById('taxTaxable').textContent = 'Rs. ' + formatMoney(totals.taxableValue);
+            document.getElementById('taxExempt').textContent = 'Rs. ' + formatMoney(totals.exemptValue);
+            updateCouponUI(totals.discount);
             document.getElementById('openPaymentBtn').disabled = cart.length === 0;
         }
 
@@ -1320,9 +1392,7 @@
         // Payment panel
         // ══════════════════════════════════════════════════════════════
         function cartTotalWithVat() {
-            const total = cart.reduce((s, l) => s + l.line_total, 0);
-            const vatAmount = cart.reduce((s, l) => s + lineTax(l), 0);
-            return total + vatAmount;
+            return computeTotals().grandTotal;
         }
 
         function renderPaymentRows() {
@@ -1376,6 +1446,48 @@
             document.getElementById('paymentPanel').classList.remove('active');
             document.getElementById('paymentBackdrop').classList.remove('active');
         }
+        // ══════════════════════════════════════════════════════════════
+        // Coupon (POS Phase C) — validated live against /api/v1/pos/coupon/
+        // validate/ (resolve_pos_coupon() in shop/views.py) so staff sees
+        // the discount before checkout, but create_pos_sale() re-validates
+        // the same code from scratch at Complete Sale -- this is a preview,
+        // never the source of truth.
+        // ══════════════════════════════════════════════════════════════
+        document.getElementById('applyCouponBtn').addEventListener('click', async () => {
+            if (appliedCoupon) {
+                clearCoupon();
+                renderReceipt();
+                return;
+            }
+            const input = document.getElementById('couponInput');
+            const code = input.value.trim();
+            if (!code) { showToast('Enter a coupon code'); return; }
+
+            const btn = document.getElementById('applyCouponBtn');
+            btn.disabled = true;
+            const subtotal = cartSubtotal();
+            try {
+                const response = await apiFetch('/api/v1/pos/coupon/validate/', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ code, subtotal: subtotal.toFixed(2) }),
+                });
+                const data = await response.json().catch(() => ({}));
+                if (data.status === 'ok') {
+                    appliedCoupon = { code: data.code, discount_amount: parseFloat(data.discount_amount), subtotalAtApply: subtotal };
+                    input.value = data.code;
+                    input.disabled = true;
+                    showToast(`Coupon ${data.code} applied — Rs. ${data.discount_amount} off`);
+                    renderReceipt();
+                } else {
+                    showToast(data.message || 'Invalid coupon');
+                }
+            } catch (err) {
+                showToast('Network error — please try again');
+            } finally {
+                btn.disabled = false;
+            }
+        });
+
         document.getElementById('openPaymentBtn').addEventListener('click', openPaymentPanel);
         document.getElementById('closePaymentBtn').addEventListener('click', closePaymentPanel);
         document.getElementById('paymentBackdrop').addEventListener('click', closePaymentPanel);
@@ -1465,6 +1577,7 @@
                 payments: paymentsPayload,
             };
             if (selectedCustomer) payload.customer_id = selectedCustomer.id;
+            if (appliedCoupon) payload.coupon_code = appliedCoupon.code;
 
             try {
                 const response = await apiFetch('/pos/sale/', {
@@ -1484,6 +1597,7 @@
                     showToast(`Sale ${data.sale_number} — Rs. ${data.total} recorded`);
                     cart = [];
                     receiptPage = 0;
+                    clearCoupon(true);
                     newClientSaleId();
                     closePaymentPanel();
                     renderReceipt();

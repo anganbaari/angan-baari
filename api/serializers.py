@@ -121,12 +121,14 @@ class POSSaleReadSerializer(serializers.ModelSerializer):
     cashier_username = serializers.CharField(source='cashier.username', read_only=True)
     payment_method_display = serializers.CharField(source='get_payment_method_display', read_only=True)
 
+    coupon_code = serializers.CharField(source='coupon.code', read_only=True, default=None)
+
     class Meta:
         model = POSSale
         fields = [
             'id', 'sale_number', 'cashier', 'cashier_username', 'payment_method',
             'payment_method_display', 'cart_snapshot', 'total_amount',
-            'client_sale_id', 'created_at',
+            'client_sale_id', 'created_at', 'coupon_code', 'discount_amount',
         ]
 
 
@@ -152,6 +154,7 @@ class POSSaleCreateSerializer(serializers.Serializer):
     customer_id = serializers.IntegerField(required=False, allow_null=True)
     cart = serializers.ListField(child=serializers.DictField(), allow_empty=False)
     payments = serializers.ListField(child=serializers.DictField(), allow_empty=False)
+    coupon_code = serializers.CharField(max_length=30, required=False, allow_null=True, allow_blank=True)
 
 
 class PosUnlockSerializer(serializers.Serializer):
@@ -418,6 +421,16 @@ class CustomerCreateSerializer(serializers.Serializer):
     nickname = serializers.CharField(max_length=100, required=False, allow_blank=True, default='')
     phone = serializers.CharField(max_length=20)
     address = serializers.CharField(required=False, allow_blank=True, default='')
+
+
+class CouponValidateSerializer(serializers.Serializer):
+    """Input-shape validation for the POS coupon-preview endpoint. The
+    actual coupon rules (is_live, min_order_amount, discount calculation)
+    live in shop.views.resolve_pos_coupon() — same function create_pos_sale()
+    uses to re-validate at checkout — not here."""
+
+    code = serializers.CharField(max_length=30)
+    subtotal = serializers.DecimalField(max_digits=10, decimal_places=2, min_value=Decimal('0'))
 
 
 class CreditRepaySerializer(serializers.Serializer):

@@ -2,6 +2,18 @@
 
 Known, intentional, not yet built. None of these should be assumed complete without checking the code.
 
+## POS enhancement phases (see [[POS]])
+
+Built: Phase A (staff roles + PIN unlock), Phase B (Customer/credit ledger,
+split payments, dormant VAT scaffolding), Phase C (coupon discounts —
+reuses the website's `Coupon` model via `resolve_pos_coupon()`, staff
+preview at `/api/v1/pos/coupon/validate/`, actual application in
+`create_pos_sale()`; `Offer`-style automatic per-product/category
+discounts are NOT part of this, website-only for now).
+
+Not yet built: receipts & printing, receipt printer/cash drawer hardware
+integration, returns & refunds, sales reports & dashboard.
+
 - **Local Egg / Vermicompost inventory bridge from ABMS** — hook into ABMS's `productionLog` / `vermiOut`, same pattern as the harvest bridge (see [[ABMS-Integration]]).
 - **Goat/Chicken sales bridge** — needs a live variant-picker in ABMS; the operator must pick which specific animal was sold, never auto-pick "cheapest available" (see [[Inventory-Rules]] on `ProductVariant`).
 - **React POS screen** — not planned. See [[Architecture-Decisions]] — POS staying vanilla JS is deliberate, not a gap.

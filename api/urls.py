@@ -14,6 +14,7 @@ urlpatterns = [
     path('pos/customers/lookup/', views.CustomerLookupView.as_view(), name='v1_pos_customer_lookup'),
     path('pos/customers/', views.CustomerCreateView.as_view(), name='v1_pos_customer_create'),
     path('pos/credit/repay/', views.CreditRepayView.as_view(), name='v1_pos_credit_repay'),
+    path('pos/coupon/validate/', views.CouponValidateView.as_view(), name='v1_pos_coupon_validate'),
     path('orders/', views.OrderCreateView.as_view(), name='v1_order_create'),
     path('orders/<int:pk>/', views.OrderDetailView.as_view(), name='v1_order_detail'),
     path('orders/<int:pk>/cancel/', views.OrderCancelView.as_view(), name='v1_order_cancel'),
