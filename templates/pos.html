@@ -239,13 +239,6 @@
         #itemModal.active { display: flex; }
         .item-modal-card { background: var(--white); border-radius: 16px; padding: 24px; width: 100%; max-width: 360px; }
         .item-modal-card h3 { margin: 0 0 16px; font-family: 'Cormorant Garamond', serif; color: var(--forest); font-size: 1.25rem; text-align: center; }
-        .weight-stepper { display: flex; align-items: center; justify-content: center; gap: 16px; margin-bottom: 12px; }
-        .weight-stepper button { width: 44px; height: 44px; border-radius: 50%; border: none; background: var(--mist); color: var(--forest); font-size: 1.3rem; cursor: pointer; }
-        .weight-stepper .weight-value { font-size: 1.3rem; font-weight: 800; color: var(--forest); min-width: 90px; text-align: center; cursor: pointer; border-bottom: 1.5px dashed var(--mist); }
-        .weight-value-input {
-            font-size: 1.3rem; font-weight: 800; color: var(--forest); min-width: 90px; max-width: 130px;
-            text-align: center; border: 1.5px solid var(--moss); border-radius: 8px; padding: 4px 6px; font-family: inherit;
-        }
         .item-modal-price { text-align: center; font-size: 1rem; font-weight: 700; color: var(--moss); margin-bottom: 16px; }
         .variant-option {
             display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 12px 14px;
@@ -292,6 +285,7 @@
             cursor: pointer; font-size: 0.92rem;
         }
         .unit-option.selected { border-color: var(--moss); background: #f3f8f3; }
+        .unit-option.unit-option-single { justify-content: center; font-size: 1rem; }
 
         /* ── Payment panel (slide-in) ── */
         #paymentBackdrop { display: none; position: fixed; inset: 0; background: rgba(26,47,30,0.35); z-index: 300; }
@@ -872,6 +866,127 @@
             closeItemModal();
         }
 
+        // Shared keypad + optional-unit-list engine behind both openWeightModal
+        // (variable_weight, step-based entry) and openQtyModal (fixed_quantity
+        // + unit-enabled products). LEFT is always the calculator-style digit
+        // keypad + a +/- nudge pair flanking the big display; RIGHT is an
+        // optional vertical unit list. Everything unit-specific (what units
+        // exist, how a typed number converts between them, the nudge step
+        // size, the Rs rate, and what happens on confirm) is supplied by the
+        // caller via cfg so this one render/interaction loop can't drift
+        // between the two call sites.
+        //
+        // cfg:
+        //   units: [{id, label, sublabel?}]  -- [] means no unit list (single column)
+        //   initialUnitId, initialValue      -- initialValue is expressed in initialUnitId's own domain
+        //   convertValue(value, fromUnitId, toUnitId) -> value expressed in toUnitId's domain
+        //   stepFor(unitId) -> nudge increment, in unitId's domain
+        //   rateFor(unitId) -> Rs per one of unitId's domain
+        //   formatTyped(value, unitId) -> display string ('' for zero/invalid)
+        //   onConfirm(value, unitObj|null) -- value is in the currently-selected unit's domain
+        //   maxDigits (default 5)
+        function openKeypadModal(product, editIndex, cfg) {
+            const body = document.getElementById('itemModalBody');
+            body.classList.add('keypad-mode');
+
+            const units = cfg.units || [];
+            const hasUnits = units.length > 0;
+            let unitId = cfg.initialUnitId;
+            let typed = cfg.formatTyped(cfg.initialValue, unitId);
+
+            function currentUnit() { return hasUnits ? units.find(u => u.id === unitId) : null; }
+            function currentValue() { return parseFloat(typed) || 0; }
+
+            function applyKey(k) {
+                if (k === 'back') typed = typed.slice(0, -1);
+                else if (k === 'clear') typed = '';
+                else if (typed.length < (cfg.maxDigits || 5)) typed = (typed === '0' ? '' : typed) + k;
+                render();
+            }
+
+            function nudge(delta) {
+                const step = cfg.stepFor(unitId);
+                const next = Math.max(0, currentValue() + step * delta);
+                typed = cfg.formatTyped(next, unitId);
+                render();
+            }
+
+            function switchUnit(newUnitId) {
+                if (newUnitId === unitId) return;
+                const converted = cfg.convertValue(currentValue(), unitId, newUnitId);
+                unitId = newUnitId;
+                typed = cfg.formatTyped(converted, unitId);
+                render();
+            }
+
+            function doConfirm() {
+                const value = currentValue();
+                if (value <= 0) return;
+                cfg.onConfirm(value, currentUnit());
+            }
+
+            function render() {
+                const value = currentValue();
+                const total = cfg.rateFor(unitId) * value;
+                const u = currentUnit();
+                const keys = ['7', '8', '9', '4', '5', '6', '1', '2', '3'];
+                body.innerHTML = `
+                    <h3>${product.name}</h3>
+                    <div class="keypad-layout${hasUnits ? '' : ' single-col'}">
+                        <div class="keypad-left">
+                            <div class="keypad-display-row">
+                                <button type="button" class="keypad-nudge" id="kNudgeDown" aria-label="Decrease">−</button>
+                                <div class="keypad-display">${typed || '0'}${u ? `<span class="keypad-unit-tag">${u.label}</span>` : ''}</div>
+                                <button type="button" class="keypad-nudge" id="kNudgeUp" aria-label="Increase">+</button>
+                            </div>
+                            <div class="keypad-grid">
+                                ${keys.map(d => `<button type="button" class="keypad-key" data-k="${d}">${d}</button>`).join('')}
+                                <button type="button" class="keypad-key keypad-fn" data-k="clear">C</button>
+                                <button type="button" class="keypad-key" data-k="0">0</button>
+                                <button type="button" class="keypad-key keypad-fn" data-k="back">&#9003;</button>
+                            </div>
+                        </div>
+                        ${hasUnits ? `<div class="keypad-units">${units.map(uu => `
+                            <button type="button" class="unit-option${uu.id === unitId ? ' selected' : ''}${uu.sublabel ? '' : ' unit-option-single'}" data-uid="${uu.id}">
+                                <span>${uu.label}</span>${uu.sublabel ? `<span>${uu.sublabel}</span>` : ''}
+                            </button>`).join('')}</div>` : ''}
+                    </div>
+                    <div class="item-modal-price">Rs. ${formatMoney(total)}</div>
+                    <div class="item-modal-actions">
+                        <button type="button" class="btn-cancel" id="kCancel">Cancel</button>
+                        <button type="button" class="btn-confirm" id="kConfirm" ${value > 0 ? '' : 'disabled'}>Enter &#8629;</button>
+                    </div>`;
+
+                body.querySelectorAll('.keypad-key').forEach(btn => {
+                    btn.addEventListener('click', () => applyKey(btn.dataset.k));
+                });
+                document.getElementById('kNudgeDown').addEventListener('click', () => nudge(-1));
+                document.getElementById('kNudgeUp').addEventListener('click', () => nudge(1));
+                if (hasUnits) {
+                    // Wired by closing over cfg.units directly (not re-parsing
+                    // data-uid) so a unit id can be a string ('kg'/'gram') or
+                    // a number (a ProductSellingUnit id) without coercion bugs.
+                    const unitButtons = body.querySelectorAll('.unit-option');
+                    units.forEach((uu, i) => unitButtons[i].addEventListener('click', () => switchUnit(uu.id)));
+                }
+                document.getElementById('kCancel').addEventListener('click', closeItemModal);
+                if (value > 0) {
+                    document.getElementById('kConfirm').addEventListener('click', doConfirm);
+                }
+            }
+
+            keypadKeyHandler = (e) => {
+                if (e.key >= '0' && e.key <= '9') applyKey(e.key);
+                else if (e.key === 'Backspace') { e.preventDefault(); applyKey('back'); }
+                else if (e.key === 'Enter') doConfirm();
+                else if (e.key === 'Escape') closeItemModal();
+            };
+            document.addEventListener('keydown', keypadKeyHandler);
+
+            render();
+            document.getElementById('itemModal').classList.add('active');
+        }
+
         function openWeightModal(product, editIndex) {
             const body = document.getElementById('itemModalBody');
             body.classList.remove('keypad-mode');
@@ -917,79 +1032,41 @@
                 return;
             }
 
-            const step = parseFloat(product.weight_step) || 0.5;
-            let weight = editIndex != null ? cart[editIndex].weight : step;
-            // Tapping the number itself swaps it for a focused text input --
-            // for a big amount (5kg in 0.25kg steps) typing it directly beats
-            // stepping through the +/- button 20 times. The +/- buttons stay
-            // for quick fine adjustments either way.
-            let editingValue = false;
-            function render() {
-                const valueHtml = editingValue
-                    ? `<input type="text" id="wValueInput" inputmode="decimal" class="weight-value-input" value="${weight.toFixed(2)}">`
-                    : `<span class="weight-value" id="wValueDisplay" title="Tap to type a value">${weight.toFixed(2)} ${product.weight_unit_label}</span>`;
-                body.innerHTML = `
-                    <h3>${product.name}</h3>
-                    <div class="weight-stepper">
-                        <button type="button" id="wStepDown">−</button>
-                        ${valueHtml}
-                        <button type="button" id="wStepUp">+</button>
-                    </div>
-                    <div class="item-modal-price">Rs. ${Math.round(parseFloat(product.price) * weight)}</div>
-                    <div class="item-modal-actions">
-                        <button type="button" class="btn-cancel" id="wCancel">Cancel</button>
-                        <button type="button" class="btn-confirm" id="wConfirm">${editIndex != null ? 'Update' : 'Add to Cart'}</button>
-                    </div>`;
-                document.getElementById('wStepDown').addEventListener('click', () => {
-                    weight = parseFloat(Math.max(step, weight - step).toFixed(2));
-                    editingValue = false;
-                    render();
-                });
-                document.getElementById('wStepUp').addEventListener('click', () => {
-                    weight = parseFloat((weight + step).toFixed(2));
-                    editingValue = false;
-                    render();
-                });
-                document.getElementById('wCancel').addEventListener('click', closeItemModal);
-                document.getElementById('wConfirm').addEventListener('click', () => {
-                    const finalWeight = parseFloat(weight.toFixed(2));
-                    confirmWeightLine(product, editIndex, finalWeight, `${finalWeight} ${product.weight_unit_label}`);
-                });
+            // Kg and Gram aren't ProductSellingUnit rows -- there's no separate
+            // price to set for either, they're just two typing scales for the
+            // same per-kg price, so switching converts the typed number
+            // (grams / 1000 <-> kg) instead of relabeling it.
+            const step = parseFloat(product.weight_step) || 0.5; // kg-mode nudge
+            const gramStep = 50; // gram-mode nudge -- fixed, not weight_step-derived, so it's never a silly 0.25g
+            const initialWeightKg = editIndex != null ? cart[editIndex].weight : step;
 
-                if (editingValue) {
-                    const input = document.getElementById('wValueInput');
-                    input.focus();
-                    input.select();
-                    let committed = false;
-                    const commit = () => {
-                        if (committed) return;
-                        committed = true;
-                        const raw = input.value.trim();
-                        const parsed = parseFloat(raw);
-                        // Only accept a plain positive decimal -- a blank or
-                        // invalid entry (letters, negative, garbage) just
-                        // reverts to whatever the weight already was rather
-                        // than committing a 0/NaN line.
-                        if (/^\d+(\.\d+)?$/.test(raw) && parsed > 0) {
-                            weight = parsed;
-                        }
-                        editingValue = false;
-                        render();
-                    };
-                    input.addEventListener('keydown', (e) => {
-                        if (e.key === 'Enter') { e.preventDefault(); commit(); }
-                        else if (e.key === 'Escape') { committed = true; editingValue = false; render(); }
-                    });
-                    input.addEventListener('blur', commit);
-                } else {
-                    document.getElementById('wValueDisplay').addEventListener('click', () => {
-                        editingValue = true;
-                        render();
-                    });
-                }
-            }
-            render();
-            document.getElementById('itemModal').classList.add('active');
+            openKeypadModal(product, editIndex, {
+                units: [
+                    { id: 'kg', label: 'Kg' },
+                    { id: 'gram', label: 'Gram' },
+                ],
+                initialUnitId: 'kg',
+                initialValue: initialWeightKg,
+                convertValue: (value, fromUnitId, toUnitId) => {
+                    const kg = fromUnitId === 'gram' ? value / 1000 : value;
+                    return toUnitId === 'gram' ? kg * 1000 : kg;
+                },
+                stepFor: (unitId) => unitId === 'gram' ? gramStep : step,
+                rateFor: (unitId) => {
+                    const perKg = parseFloat(product.price);
+                    return unitId === 'gram' ? perKg / 1000 : perKg;
+                },
+                formatTyped: (value, unitId) => {
+                    if (!(value > 0)) return '';
+                    if (unitId === 'gram') return String(Math.round(value));
+                    return String(parseFloat(value.toFixed(3)));
+                },
+                onConfirm: (value, unitObj) => {
+                    const kg = unitObj.id === 'gram' ? value / 1000 : value;
+                    const finalWeight = parseFloat(kg.toFixed(3));
+                    confirmWeightLine(product, editIndex, finalWeight, `${finalWeight} ${product.weight_unit_label}`);
+                },
+            });
         }
 
         // Keypad + unit-picker modal for fixed_quantity products -- replaces
@@ -1021,103 +1098,37 @@
         }
 
         function openQtyModal(product, editIndex) {
-            const body = document.getElementById('itemModalBody');
-            body.classList.add('keypad-mode');
+            const rawUnits = product.units || [];
+            const hasUnits = rawUnits.length > 0;
 
-            const units = product.units || [];
-            const hasUnits = units.length > 0;
-
-            let typed = editIndex != null ? String(cart[editIndex].qty) : '1';
-            let selectedUnitId = null;
+            let initialUnitId = null;
             if (hasUnits) {
+                const defaultUnit = rawUnits.find(u => u.is_default) || rawUnits[0];
                 const existingUnitId = editIndex != null ? cart[editIndex].unit_id : null;
-                const stillValid = existingUnitId && units.find(u => u.id === existingUnitId);
-                selectedUnitId = stillValid ? existingUnitId : (units.find(u => u.is_default) || units[0]).id;
+                const stillValid = existingUnitId != null && rawUnits.some(u => u.id === existingUnitId);
+                initialUnitId = stillValid ? existingUnitId : defaultUnit.id;
             }
 
-            function currentUnit() { return hasUnits ? units.find(u => u.id === selectedUnitId) : null; }
-            function unitRate() { const u = currentUnit(); return u ? parseFloat(u.price) : parseFloat(product.price); }
-
-            function applyKey(k) {
-                if (k === 'back') typed = typed.slice(0, -1);
-                else if (k === 'clear') typed = '';
-                else if (typed.length < 5) typed = (typed === '0' ? '' : typed) + k;
-                render();
-            }
-
-            // Small +/- nudges next to the display, for a quick +-1 without
-            // retyping the whole number -- the keypad stays the fast path
-            // for typing a value directly.
-            function nudge(delta) {
-                const next = (parseInt(typed, 10) || 0) + delta;
-                typed = next > 0 ? String(next) : '';
-                render();
-            }
-
-            function doConfirm() {
-                const qty = parseInt(typed, 10) || 0;
-                if (qty <= 0) return;
-                confirmQtyLine(product, editIndex, qty, currentUnit());
-            }
-
-            function render() {
-                const qty = parseInt(typed, 10) || 0;
-                const total = unitRate() * qty;
-                const u = currentUnit();
-                const keys = ['7','8','9','4','5','6','1','2','3'];
-                body.innerHTML = `
-                    <h3>${product.name}</h3>
-                    <div class="keypad-layout${hasUnits ? '' : ' single-col'}">
-                        <div class="keypad-left">
-                            <div class="keypad-display-row">
-                                <button type="button" class="keypad-nudge" id="qNudgeDown" aria-label="Decrease by 1">−</button>
-                                <div class="keypad-display">${typed || '0'}${u ? `<span class="keypad-unit-tag">${u.label}</span>` : ''}</div>
-                                <button type="button" class="keypad-nudge" id="qNudgeUp" aria-label="Increase by 1">+</button>
-                            </div>
-                            <div class="keypad-grid">
-                                ${keys.map(d => `<button type="button" class="keypad-key" data-k="${d}">${d}</button>`).join('')}
-                                <button type="button" class="keypad-key keypad-fn" data-k="clear">C</button>
-                                <button type="button" class="keypad-key" data-k="0">0</button>
-                                <button type="button" class="keypad-key keypad-fn" data-k="back">&#9003;</button>
-                            </div>
-                        </div>
-                        ${hasUnits ? `<div class="keypad-units">${units.map(uu => `
-                            <button type="button" class="unit-option${uu.id === selectedUnitId ? ' selected' : ''}" data-uid="${uu.id}">
-                                <span>${uu.label}</span><span>Rs. ${formatMoney(uu.price)}</span>
-                            </button>`).join('')}</div>` : ''}
-                    </div>
-                    <div class="item-modal-price">Rs. ${formatMoney(total)}</div>
-                    <div class="item-modal-actions">
-                        <button type="button" class="btn-cancel" id="qCancel">Cancel</button>
-                        <button type="button" class="btn-confirm" id="qConfirm" ${qty > 0 ? '' : 'disabled'}>Enter &#8629;</button>
-                    </div>`;
-
-                body.querySelectorAll('.keypad-key').forEach(btn => {
-                    btn.addEventListener('click', () => applyKey(btn.dataset.k));
-                });
-                document.getElementById('qNudgeDown').addEventListener('click', () => nudge(-1));
-                document.getElementById('qNudgeUp').addEventListener('click', () => nudge(1));
-                if (hasUnits) {
-                    body.querySelectorAll('.unit-option').forEach(b => {
-                        b.addEventListener('click', () => { selectedUnitId = parseInt(b.dataset.uid, 10); render(); });
-                    });
-                }
-                document.getElementById('qCancel').addEventListener('click', closeItemModal);
-                if (qty > 0) {
-                    document.getElementById('qConfirm').addEventListener('click', doConfirm);
-                }
-            }
-
-            keypadKeyHandler = (e) => {
-                if (e.key >= '0' && e.key <= '9') applyKey(e.key);
-                else if (e.key === 'Backspace') { e.preventDefault(); applyKey('back'); }
-                else if (e.key === 'Enter') doConfirm();
-                else if (e.key === 'Escape') closeItemModal();
-            };
-            document.addEventListener('keydown', keypadKeyHandler);
-
-            render();
-            document.getElementById('itemModal').classList.add('active');
+            openKeypadModal(product, editIndex, {
+                units: rawUnits.map(u => ({ id: u.id, label: u.label, sublabel: `Rs. ${formatMoney(u.price)}` })),
+                initialUnitId,
+                initialValue: editIndex != null ? cart[editIndex].qty : 1,
+                // Piece <-> Crate aren't a continuous quantity -- switching
+                // units keeps the count as typed, it doesn't try to convert
+                // "4" pieces into a fraction of a crate.
+                convertValue: (value) => value,
+                stepFor: () => 1,
+                rateFor: (unitId) => {
+                    if (!unitId) return parseFloat(product.price);
+                    const u = rawUnits.find(uu => uu.id === unitId);
+                    return u ? parseFloat(u.price) : parseFloat(product.price);
+                },
+                formatTyped: (value) => value > 0 ? String(Math.round(value)) : '',
+                onConfirm: (value, unitObj) => {
+                    const unit = unitObj ? rawUnits.find(u => u.id === unitObj.id) : null;
+                    confirmQtyLine(product, editIndex, Math.round(value), unit);
+                },
+            });
         }
 
         function openVariantModal(product, editIndex) {
