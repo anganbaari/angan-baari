@@ -46,7 +46,7 @@
         .pos-brand { display: flex; align-items: center; gap: 10px; }
         .pos-brand img.logo { width: 46px; height: 46px; object-fit: contain; }
         .pos-brand .brand-text h1 { margin: 0; font-family: 'Noto Sans Devanagari', 'Cormorant Garamond', serif; font-weight: 800; font-size: 2rem; color: var(--pos-text-green); line-height: 1.1; }
-        .pos-brand .brand-text span { font-size: 0.72rem; color: var(--pos-text-green); font-weight: 600; letter-spacing: 0.03em; }
+        .pos-brand .brand-text span { display: block; margin-left: 4px; font-size: 0.72rem; color: var(--pos-text-green); font-weight: 600; letter-spacing: 0.03em; }
         .pos-brand img.flag { width: 34px; height: auto; margin-left: 6px; }
         .pos-header-divider { width: 1.5px; align-self: stretch; background: var(--mist); }
         .pos-header-right { flex: 1; display: flex; align-items: center; justify-content: flex-end; gap: 14px; text-align: right; z-index: 1; }
@@ -61,11 +61,11 @@
            hardcoded "100vh - Npx"), so it always exactly fills whatever space
            the header doesn't use, regardless of the header's actual height. ── */
         .pos-body { flex: 1; min-height: 0; display: flex; flex-direction: column; position: relative; overflow: hidden; }
-        .pos-content { flex: 1; display: flex; flex-direction: column; padding: 10px 20px; position: relative; min-height: 0; overflow: hidden; }
+        .pos-content { flex: 1; display: flex; flex-direction: column; padding: 6px 20px; position: relative; min-height: 0; overflow: hidden; }
 
         /* ── Sticky category row (always full list, always visible) ── */
         .cat-row {
-            display: flex; gap: 12px; padding: 8px 20px 10px; background: var(--pos-bg);
+            display: flex; gap: 12px; padding: 6px 20px 8px; background: var(--pos-bg);
             border-top: 1px solid var(--mist);
             overflow-x: auto; flex-shrink: 0;
         }
@@ -74,11 +74,11 @@
         .pos-footer-bar { background: var(--pos-footer-green); height: 16px; flex-shrink: 0; width: 100%; }
         .cat-card {
             flex: 1; min-width: 110px; display: flex; flex-direction: column; align-items: center; justify-content: center;
-            gap: 6px; padding: 12px 8px; border-radius: 14px; border: 1.5px solid #d9d4b8;
+            gap: 8px; padding: 22px 8px; border-radius: 14px; border: 1.5px solid #d9d4b8;
             background: var(--pos-cat-card-bg); cursor: pointer; font-family: inherit; box-shadow: 0 2px 6px rgba(26,47,30,0.08);
         }
-        .cat-card svg { width: 32px; height: 32px; display: block; }
-        .cat-card span { font-size: 0.78rem; font-weight: 700; color: var(--pos-text-green); text-align: center; line-height: 1.15; font-family: 'Noto Sans Devanagari', 'DM Sans', sans-serif; }
+        .cat-card svg { width: 34px; height: 34px; display: block; }
+        .cat-card span { font-size: 0.95rem; font-weight: 800; color: var(--pos-text-green); text-align: center; line-height: 1.2; font-family: 'Noto Sans Devanagari', 'DM Sans', sans-serif; }
         .cat-card.active { background: #dcecd4; border-color: var(--pos-header-line); box-shadow: 0 2px 8px rgba(74,124,60,0.25); }
 
         /* ── Receipt view ── */
@@ -89,8 +89,8 @@
         .receipt-table-row { display: flex; gap: 8px; flex: 1; min-height: 0; }
         .receipt-table-wrap { flex: 1; min-height: 0; overflow: hidden; }
         .receipt-table { width: 100%; border-collapse: collapse; background: var(--pos-bg); border: 2px solid var(--pos-border-dark); table-layout: fixed; }
-        .receipt-table th, .receipt-table td { border: 1px solid var(--pos-border-dark); padding: 4px 8px; font-size: 0.78rem; text-align: center; color: var(--pos-text-black); line-height: 1.15; }
-        .receipt-table th { background: var(--pos-bg); font-weight: 700; font-family: 'Noto Sans Devanagari', 'DM Sans', sans-serif; }
+        .receipt-table th, .receipt-table td { border: 1px solid var(--pos-border-dark); padding: 6px 10px; font-size: 0.95rem; font-weight: 700; text-align: center; color: var(--pos-text-black); line-height: 1.15; }
+        .receipt-table th { background: var(--pos-bg); font-weight: 800; font-family: 'Noto Sans Devanagari', 'DM Sans', sans-serif; }
         .receipt-table td.name-cell { text-align: left; }
         .name-cell-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
         .receipt-table .row-remove {
@@ -112,14 +112,14 @@
         .pager-indicator span { display: block; font-size: 0.9rem; }
 
         /* Reminder card | tax box | side buttons, side by side as one row */
-        .receipt-combined-row { display: flex; gap: 12px; margin-top: 10px; align-items: stretch; flex-shrink: 0; }
+        .receipt-combined-row { display: flex; gap: 12px; margin-top: 2px; align-items: stretch; flex-shrink: 0; }
 
         .reminder-card {
             flex: 1.3; min-width: 0; background: var(--pos-bg); border: 2px solid var(--pos-reminder-border); border-radius: 12px; padding: 6px 10px;
             box-shadow: 0 3px 10px rgba(26,47,30,0.08); position: relative; overflow: hidden;
         }
-        .reminder-card .reminder-title { font-weight: 700; color: var(--pos-text-green); font-size: 0.72rem; margin-bottom: 2px; font-family: 'Noto Sans Devanagari', 'DM Sans', sans-serif; }
-        .reminder-card ul { margin: 0; padding-left: 0; list-style: none; font-size: 0.68rem; color: var(--pos-text-green); line-height: 1.3; font-family: 'Noto Sans Devanagari', 'DM Sans', sans-serif; }
+        .reminder-card .reminder-title { font-weight: 800; color: var(--pos-text-green); font-size: 0.92rem; margin-bottom: 4px; font-family: 'Noto Sans Devanagari', 'DM Sans', sans-serif; }
+        .reminder-card ul { margin: 0; padding-left: 0; list-style: none; font-size: 0.86rem; font-weight: 700; color: var(--pos-text-green); line-height: 1.4; font-family: 'Noto Sans Devanagari', 'DM Sans', sans-serif; }
         .reminder-card ul li::before { content: "* "; font-weight: 700; }
         .reminder-card .reminder-bag { position: absolute; right: 8px; bottom: 2px; width: 30px; height: 30px; opacity: 0.85; pointer-events: none; }
 
@@ -130,17 +130,17 @@
         .repay-col { display: flex; flex-shrink: 0; width: 110px; }
 
         .tax-box { flex: 1; min-width: 0; background: var(--pos-bg); border: 2px solid var(--pos-border-dark); border-radius: 6px; overflow: hidden; height: fit-content; }
-        .tax-box .tax-row { display: flex; justify-content: space-between; padding: 7px 14px; font-size: 0.82rem; border-bottom: 1px solid var(--pos-border-dark); font-family: 'Noto Sans Devanagari', 'DM Sans', sans-serif; }
+        .tax-box .tax-row { display: flex; justify-content: space-between; padding: 4px 14px; font-size: 0.95rem; border-bottom: 1px solid var(--pos-border-dark); font-family: 'Noto Sans Devanagari', 'DM Sans', sans-serif; }
         .tax-box .tax-row:last-child { border-bottom: none; }
-        .tax-box .tax-row span:first-child { font-weight: 600; color: var(--pos-text-black); }
-        .tax-box .tax-row span:last-child { font-weight: 700; color: var(--pos-text-black); }
+        .tax-box .tax-row span:first-child { font-weight: 700; color: var(--pos-text-black); }
+        .tax-box .tax-row span:last-child { font-weight: 800; color: var(--pos-text-black); }
         .tax-box .tax-row.grand-total { background: #f3f8f0; }
-        .tax-box .tax-row.grand-total span { font-size: 0.94rem; }
+        .tax-box .tax-row.grand-total span { font-size: 1.12rem; }
 
         .side-actions { display: flex; flex-direction: column; gap: 8px; width: 160px; flex-shrink: 0; justify-content: space-between; }
         .side-btn {
-            border: none; border-radius: 12px; padding: 10px; font-family: 'Noto Sans Devanagari', 'DM Sans', sans-serif; font-weight: 700;
-            font-size: 0.82rem; cursor: pointer; color: #fff; text-align: center; line-height: 1.3;
+            border: none; border-radius: 12px; padding: 7px; font-family: 'Noto Sans Devanagari', 'DM Sans', sans-serif; font-weight: 800;
+            font-size: 1rem; cursor: pointer; color: #fff; text-align: center; line-height: 1.25;
             box-shadow: 0 4px 10px rgba(26,47,30,0.22); flex: 1;
         }
         .side-btn.counter-btn { background: var(--pos-enter-orange); cursor: default; }
@@ -344,7 +344,7 @@
                     </div>
 
                     <div class="repay-col">
-                        <button type="button" class="side-btn repay-btn" id="openRepayBtn">उधारो तिर्नुहोस्<br><span style="font-weight:500;font-size:0.72rem;">Repay Credit</span></button>
+                        <button type="button" class="side-btn repay-btn" id="openRepayBtn">उधारो तिर्नुहोस्<br><span style="font-weight:700;font-size:0.85rem;">Repay Credit</span></button>
                     </div>
 
                     <div class="tax-box">
@@ -633,13 +633,13 @@
         // Flat-color inline SVGs matching the mockup's illustrated category
         // icons (Font Awesome's monochrome glyphs didn't match at all).
         const CATEGORY_ICONS = {
-            'Fruits': `<svg viewBox="0 0 40 40"><path d="M8 27c-3-1-5-5-4-9 1-4 5-6 8-5 1-4 5-6 9-5 4 1 6 5 5 9-1 5-6 9-11 9-2 0-5-1-7 1z" fill="#eec13a"/><circle cx="26" cy="21" r="8" fill="#d8483a"/><path d="M26 13c0-2 1-3 2-4" stroke="#6b4a2b" stroke-width="1.6" fill="none" stroke-linecap="round"/><path d="M27 10c2-1.5 4-1 4 1-1.5 1.5-4 1-4-1z" fill="#5a8f3c"/></svg>`,
-            'Vegetables': `<svg viewBox="0 0 40 40"><path d="M20 34c-4 0-6-4-6-10 0-5 2-9 6-9s6 4 6 9c0 6-2 10-6 10z" fill="#e8862c"/><path d="M20 15c-1-4 0-7 2-9M20 15c1-4 3-6 6-7M20 15c-2-3-5-4-8-4" stroke="#5a8f3c" stroke-width="2.2" fill="none" stroke-linecap="round"/></svg>`,
-            'Honey': `<svg viewBox="0 0 40 40"><rect x="10" y="14" width="16" height="18" rx="3" fill="#e8b93c" stroke="#a9791f" stroke-width="1.2"/><rect x="13" y="9" width="10" height="6" rx="2" fill="#c98f1f"/><path d="M10 20h16M10 26h16" stroke="#c98f1f" stroke-width="1" opacity="0.6"/><g transform="translate(29,24) rotate(-15)"><ellipse cx="0" cy="0" rx="5" ry="3.4" fill="#2b2b2b"/><path d="M-5 0h10" stroke="#f0c419" stroke-width="1.8"/><ellipse cx="-1.5" cy="-3.2" rx="2.6" ry="1.7" fill="#dfefe8" opacity="0.9"/><ellipse cx="1.5" cy="-3.2" rx="2.6" ry="1.7" fill="#dfefe8" opacity="0.9"/></g></svg>`,
-            'Pickles': `<svg viewBox="0 0 40 40"><rect x="11" y="13" width="18" height="20" rx="4" fill="#dcefd6" stroke="#5a8f3c" stroke-width="1.2"/><rect x="14" y="9" width="12" height="5" rx="2" fill="#8a7a52"/><path d="M16 26c3-6 5-10 4-14 3 3 3 8 1 14-2 3-3 5-1 7-3-1-5-4-4-7z" fill="#c0392b"/></svg>`,
-            'Animals': `<svg viewBox="0 0 40 40"><ellipse cx="20" cy="24" rx="10" ry="9" fill="#c9a36a"/><path d="M13 16c-2-5-1-9 2-9 2 4 1 7 0 9M27 16c2-5 1-9-2-9-2 4-1 7 0 9" fill="#8a6a3c" stroke="#8a6a3c" stroke-width="1.5" stroke-linecap="round"/><path d="M14 15l3 4M26 15l-3 4" stroke="#c9a36a" stroke-width="3" stroke-linecap="round"/><circle cx="16" cy="23" r="1.4" fill="#3a2c1a"/><circle cx="24" cy="23" r="1.4" fill="#3a2c1a"/><path d="M18 28c1 1.5 3 1.5 4 0" stroke="#3a2c1a" stroke-width="1.3" fill="none" stroke-linecap="round"/></svg>`,
-            'Chickens': `<svg viewBox="0 0 40 40"><ellipse cx="19" cy="24" rx="10" ry="9" fill="#fdfaf2" stroke="#c9bd98" stroke-width="1.6"/><path d="M14 15c1-3 0-5-2-5s0 4 2 5zM18 13c0-3-1-5-3-4s1 4 3 4zM22 14c1-3 3-4 4-3s-2 4-4 3z" fill="#d8483a"/><path d="M27 22l6-2-4 4z" fill="#e8862c"/><circle cx="17" cy="21" r="1.3" fill="#2b2b2b"/><path d="M17 30l-2 4M22 30l2 4" stroke="#e8862c" stroke-width="2" stroke-linecap="round"/></svg>`,
-            'Compost': `<svg viewBox="0 0 40 40"><path d="M9 30c0-6 5-10 11-10s11 4 11 10z" fill="#8a6a3c"/><path d="M20 20c-1-5 1-9 4-11-1 5-2 8-4 11zM20 20c1-4 4-6 7-6-2 3-4 5-7 6z" fill="#5a8f3c"/><circle cx="14" cy="27" r="1" fill="#5c4324"/><circle cx="26" cy="26" r="1" fill="#5c4324"/><circle cx="20" cy="29" r="1" fill="#5c4324"/></svg>`,
+            'फलफूल': `<svg viewBox="0 0 40 40"><path d="M8 27c-3-1-5-5-4-9 1-4 5-6 8-5 1-4 5-6 9-5 4 1 6 5 5 9-1 5-6 9-11 9-2 0-5-1-7 1z" fill="#eec13a"/><circle cx="26" cy="21" r="8" fill="#d8483a"/><path d="M26 13c0-2 1-3 2-4" stroke="#6b4a2b" stroke-width="1.6" fill="none" stroke-linecap="round"/><path d="M27 10c2-1.5 4-1 4 1-1.5 1.5-4 1-4-1z" fill="#5a8f3c"/></svg>`,
+            'तरकारी': `<svg viewBox="0 0 40 40"><path d="M20 34c-4 0-6-4-6-10 0-5 2-9 6-9s6 4 6 9c0 6-2 10-6 10z" fill="#e8862c"/><path d="M20 15c-1-4 0-7 2-9M20 15c1-4 3-6 6-7M20 15c-2-3-5-4-8-4" stroke="#5a8f3c" stroke-width="2.2" fill="none" stroke-linecap="round"/></svg>`,
+            'अचार': `<svg viewBox="0 0 40 40"><rect x="11" y="13" width="18" height="20" rx="4" fill="#dcefd6" stroke="#5a8f3c" stroke-width="1.2"/><rect x="14" y="9" width="12" height="5" rx="2" fill="#8a7a52"/><path d="M16 26c3-6 5-10 4-14 3 3 3 8 1 14-2 3-3 5-1 7-3-1-5-4-4-7z" fill="#c0392b"/></svg>`,
+            'मह': `<svg viewBox="0 0 40 40"><rect x="10" y="14" width="16" height="18" rx="3" fill="#e8b93c" stroke="#a9791f" stroke-width="1.2"/><rect x="13" y="9" width="10" height="6" rx="2" fill="#c98f1f"/><path d="M10 20h16M10 26h16" stroke="#c98f1f" stroke-width="1" opacity="0.6"/><g transform="translate(29,24) rotate(-15)"><ellipse cx="0" cy="0" rx="5" ry="3.4" fill="#2b2b2b"/><path d="M-5 0h10" stroke="#f0c419" stroke-width="1.8"/><ellipse cx="-1.5" cy="-3.2" rx="2.6" ry="1.7" fill="#dfefe8" opacity="0.9"/><ellipse cx="1.5" cy="-3.2" rx="2.6" ry="1.7" fill="#dfefe8" opacity="0.9"/></g></svg>`,
+            'Dairy Product': `<svg viewBox="0 0 40 40"><path d="M16 8h8v5l3 3v16a2 2 0 0 1-2 2H15a2 2 0 0 1-2-2V16l3-3z" fill="#f4f7fb" stroke="#9db3c9" stroke-width="1.4"/><rect x="16" y="8" width="8" height="3" fill="#7fa8cc"/><path d="M13 22h14" stroke="#9db3c9" stroke-width="1.2"/><circle cx="20" cy="27" r="2.2" fill="#e8b93c"/></svg>`,
+            'मसला र Dry Fruits': `<svg viewBox="0 0 40 40"><path d="M9 20c0-2 5-3 11-3s11 1 11 3-4 10-11 10-11-8-11-10z" fill="#c9793d" stroke="#8a5a2b" stroke-width="1.2"/><circle cx="15" cy="19" r="2" fill="#d8483a"/><circle cx="20" cy="17" r="2" fill="#e8862c"/><circle cx="25" cy="19" r="2" fill="#8a6a3c"/><circle cx="18" cy="22" r="1.6" fill="#5a8f3c"/><circle cx="23" cy="22" r="1.6" fill="#e8b93c"/></svg>`,
+            'मल र दाना': `<svg viewBox="0 0 40 40"><path d="M9 30c0-6 5-10 11-10s11 4 11 10z" fill="#8a6a3c"/><path d="M20 20c-1-5 1-9 4-11-1 5-2 8-4 11zM20 20c1-4 4-6 7-6-2 3-4 5-7 6z" fill="#5a8f3c"/><circle cx="14" cy="27" r="1" fill="#5c4324"/><circle cx="26" cy="26" r="1" fill="#5c4324"/><circle cx="20" cy="29" r="1" fill="#5c4324"/></svg>`,
             'Other': `<svg viewBox="0 0 40 40"><rect x="9" y="12" width="22" height="18" rx="3" fill="#cfd8c8" stroke="#8a9a7c" stroke-width="1.2"/><path d="M9 17h22" stroke="#8a9a7c" stroke-width="1.2"/></svg>`,
         };
 
@@ -1009,7 +1009,7 @@
                     <td>${start + i + 1}</td>
                     <td class="name-cell">
                         <div class="name-cell-row">
-                            <div>${line.name}<br><span style="font-size:0.72rem;color:var(--text-muted);">${line.detail}</span></div>
+                            <div>${line.name}<br><span style="font-size:0.88rem;color:var(--text-muted);">${line.detail}</span></div>
                             <button type="button" class="row-remove" data-i="${start + i}" title="Remove"><i class="fas fa-times"></i></button>
                         </div>
                     </td>
