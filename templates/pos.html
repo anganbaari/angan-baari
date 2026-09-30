@@ -40,7 +40,6 @@
             border-bottom: 8px solid var(--pos-header-line); padding: 10px 24px; flex-shrink: 0;
             position: relative; overflow: hidden;
         }
-        .pos-header-deco { position: absolute; top: -6px; right: 14px; width: 90px; height: 70px; opacity: 0.9; pointer-events: none; }
         .pos-clock { background: var(--pos-clock-bg); border: 1.5px solid #e6d2a0; border-radius: 10px; padding: 6px 14px; text-align: center; min-width: 90px; box-shadow: 0 2px 6px rgba(26,47,30,0.08); }
         .pos-clock .pos-date { font-size: 0.78rem; font-weight: 700; color: var(--pos-text-green); }
         .pos-clock .pos-time { font-size: 1.15rem; font-weight: 800; color: var(--pos-text-green); }
@@ -50,7 +49,7 @@
         .pos-brand .brand-text span { font-size: 0.72rem; color: var(--pos-text-green); font-weight: 600; letter-spacing: 0.03em; }
         .pos-brand img.flag { width: 34px; height: auto; margin-left: 6px; }
         .pos-header-divider { width: 1.5px; align-self: stretch; background: var(--mist); }
-        .pos-header-right { flex: 1; display: flex; align-items: center; justify-content: flex-end; gap: 14px; text-align: right; padding-right: 90px; z-index: 1; }
+        .pos-header-right { flex: 1; display: flex; align-items: center; justify-content: flex-end; gap: 14px; text-align: right; z-index: 1; }
         .pos-lock-instruction { font-size: 0.82rem; color: var(--pos-text-green); line-height: 1.4; font-weight: 700; }
         .pos-operator { font-size: 1.15rem; font-weight: 800; color: var(--pos-text-green); letter-spacing: 0.03em; min-width: 220px; text-align: center; }
 
@@ -297,21 +296,6 @@
                 <div class="pos-lock-instruction">कृपया बारकोड स्क्यान गर्नुहोस् वा staff को नम्बर हालेर Enter बटन थिच्छुहोस् ।</div>
             </div>
         </div>
-        <svg class="pos-header-deco" viewBox="0 0 90 70" aria-hidden="true">
-            <ellipse cx="30" cy="52" rx="16" ry="12" fill="#f4d78c" opacity="0.6"/>
-            <circle cx="60" cy="18" r="7" fill="#fff" stroke="#e8b84b" stroke-width="1.5"/>
-            <circle cx="72" cy="14" r="6" fill="#fff" stroke="#e8b84b" stroke-width="1.5"/>
-            <circle cx="78" cy="26" r="6" fill="#fff" stroke="#e8b84b" stroke-width="1.5"/>
-            <circle cx="66" cy="30" r="3" fill="#f0c419"/>
-            <path d="M50 40c4-6 10-8 14-4" stroke="#5a8f3c" stroke-width="3" fill="none" stroke-linecap="round"/>
-            <path d="M45 48c3-5 8-7 12-4" stroke="#5a8f3c" stroke-width="3" fill="none" stroke-linecap="round"/>
-            <g transform="translate(38,44) rotate(-20)">
-                <ellipse cx="0" cy="0" rx="6" ry="4" fill="#2b2b2b"/>
-                <path d="M-6 0h12" stroke="#f0c419" stroke-width="2"/>
-                <ellipse cx="-2" cy="-4" rx="3" ry="2" fill="#dfefe8" opacity="0.85"/>
-                <ellipse cx="2" cy="-4" rx="3" ry="2" fill="#dfefe8" opacity="0.85"/>
-            </g>
-        </svg>
     </div>
 
     <div class="pos-body" id="posBody">
@@ -663,7 +647,6 @@
             const wrap = document.getElementById('catRow');
             wrap.innerHTML = CATEGORIES.map(c => `
                 <div class="cat-card${c === activeCategory && currentView === 'shopping' ? ' active' : ''}" data-cat="${c}">
-                    ${CATEGORY_ICONS[c] || CATEGORY_ICONS['Other']}
                     <span>${c}</span>
                 </div>`
             ).join('');
@@ -777,7 +760,7 @@
                     body.innerHTML = `
                         <h3>${product.name}</h3>
                         <div style="text-align:center;margin-bottom:10px;">
-                            <input type="number" id="gramsInput" inputmode="numeric" placeholder="Weight in grams"
+                            <input type="text" id="gramsInput" inputmode="numeric" placeholder="Weight in grams"
                                    value="${grams}" style="width:70%;padding:12px;font-size:1.2rem;text-align:center;
                                    border:1.5px solid var(--mist);border-radius:8px;font-family:inherit;">
                             <div style="font-size:0.82rem;color:var(--text-muted);margin-top:6px;">${kg > 0 ? formatWeightDisplay(kg) : 'Enter the scale reading'}</div>
@@ -788,7 +771,13 @@
                             <button type="button" class="btn-confirm" id="wConfirm" ${kg > 0 ? '' : 'disabled'}>${editIndex != null ? 'Update' : 'Add to Cart'}</button>
                         </div>`;
                     const input = document.getElementById('gramsInput');
-                    input.addEventListener('input', () => { grams = input.value; render(); input.focus(); input.selectionStart = input.selectionEnd = input.value.length; });
+                    input.addEventListener('input', () => {
+                        grams = input.value.replace(/[^0-9]/g, '');
+                        render();
+                        const newInput = document.getElementById('gramsInput');
+                        newInput.focus();
+                        newInput.selectionStart = newInput.selectionEnd = newInput.value.length;
+                    });
                     document.getElementById('wCancel').addEventListener('click', closeItemModal);
                     const confirmBtn = document.getElementById('wConfirm');
                     if (kg > 0) {
