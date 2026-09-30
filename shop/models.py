@@ -125,20 +125,22 @@ class Product(models.Model):
     )
     weight_step = models.DecimalField(
         max_digits=4, decimal_places=2, default=0.50,
-        help_text='Only used for "Variable weight" products in "Stepper" entry mode. The '
-                   'increment customers can adjust the weight by, e.g. 0.50 for fruit '
-                   '(500g steps), 0.25 for pickle jars.'
+        help_text='Only used for "Variable weight" products. The POS keypad\'s +/- nudge '
+                   'increment while "Kg" is selected, e.g. 0.50 for fruit (500g steps), '
+                   '0.25 for pickle jars.'
     )
     WEIGHT_ENTRY_MODE_CHOICES = [
-        ('stepper', 'Stepper — tap +/- in weight_step increments'),
-        ('exact', 'Exact — type the scale reading in grams (e.g. 230g, or 1.150kg once over 1kg)'),
+        ('stepper', 'Stepper — POS keypad starts on Kg'),
+        ('exact', 'Exact — POS keypad starts on Gram'),
     ]
     weight_entry_mode = models.CharField(
         max_length=10, choices=WEIGHT_ENTRY_MODE_CHOICES, default='stepper',
-        help_text='Only used for "Variable weight" products. "Stepper" is the +/- button UI '
-                   '(weight_step controls the increment). "Exact" is a free-typed gram entry '
-                   'for produce weighed on a scale at checkout (coriander, dragon fruit, '
-                   'watermelon, papaya, cauliflower) — weight_step is ignored in this mode.'
+        help_text='Only used for "Variable weight" products. Both modes use the same POS '
+                   'keypad (a Kg/Gram unit switcher with +/- nudges) -- this only picks '
+                   'which unit starts selected when the modal opens. "Exact" starts on '
+                   'Gram, for produce typically weighed on a scale rather than bought in '
+                   'round step sizes (coriander, dragon fruit, watermelon, papaya, '
+                   'cauliflower). "Stepper" starts on Kg.'
     )
     fixed_weight = models.DecimalField(
         max_digits=6, decimal_places=2, null=True, blank=True,

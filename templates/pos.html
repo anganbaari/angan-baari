@@ -842,9 +842,10 @@
         // re-opened from tapping an existing row's qty/weight cell -- same
         // modal either way, just "Add to Cart" becomes "Update" and confirm
         // rewrites the existing line instead of pushing a new one.
-        // Display convention for "exact" gram-entry products: under 1000g
-        // shows as whole grams ("230g"), 1000g and up shows as kg with 3
-        // decimal places ("1.150kg", "2.785kg").
+        // Receipt display convention for any variable_weight line: under
+        // 1000g shows as whole grams ("230g"), 1000g and up shows as kg with
+        // 3 decimal places ("1.150kg", "2.785kg") -- regardless of which
+        // unit (Kg or Gram) the cashier actually typed it in.
         function formatWeightDisplay(weightKg) {
             const grams = Math.round(weightKg * 1000);
             if (grams < 1000) return `${grams}g`;
@@ -988,65 +989,29 @@
         }
 
         function openWeightModal(product, editIndex) {
-            const body = document.getElementById('itemModalBody');
-            body.classList.remove('keypad-mode');
-
-            if (product.weight_entry_mode === 'exact') {
-                // Free-typed scale reading in grams, not a fixed-step stepper --
-                // real produce weight doesn't land on round 0.25/0.50kg values.
-                let grams = editIndex != null ? Math.round(cart[editIndex].weight * 1000) : '';
-                function render() {
-                    const kg = parseFloat(grams) > 0 ? parseFloat(grams) / 1000 : 0;
-                    body.innerHTML = `
-                        <h3>${product.name}</h3>
-                        <div style="text-align:center;margin-bottom:10px;">
-                            <input type="text" id="gramsInput" inputmode="numeric" placeholder="Weight in grams"
-                                   value="${grams}" style="width:70%;padding:12px;font-size:1.2rem;text-align:center;
-                                   border:1.5px solid var(--mist);border-radius:8px;font-family:inherit;">
-                            <div style="font-size:0.82rem;color:var(--text-muted);margin-top:6px;">${kg > 0 ? formatWeightDisplay(kg) : 'Enter the scale reading'}</div>
-                        </div>
-                        <div class="item-modal-price">Rs. ${Math.round(parseFloat(product.price) * kg)}</div>
-                        <div class="item-modal-actions">
-                            <button type="button" class="btn-cancel" id="wCancel">Cancel</button>
-                            <button type="button" class="btn-confirm" id="wConfirm" ${kg > 0 ? '' : 'disabled'}>${editIndex != null ? 'Update' : 'Add to Cart'}</button>
-                        </div>`;
-                    const input = document.getElementById('gramsInput');
-                    input.addEventListener('input', () => {
-                        grams = input.value.replace(/[^0-9]/g, '');
-                        render();
-                        const newInput = document.getElementById('gramsInput');
-                        newInput.focus();
-                        newInput.selectionStart = newInput.selectionEnd = newInput.value.length;
-                    });
-                    document.getElementById('wCancel').addEventListener('click', closeItemModal);
-                    const confirmBtn = document.getElementById('wConfirm');
-                    if (kg > 0) {
-                        confirmBtn.addEventListener('click', () => {
-                            confirmWeightLine(product, editIndex, kg, formatWeightDisplay(kg));
-                        });
-                    }
-                }
-                render();
-                document.getElementById('itemModal').classList.add('active');
-                document.getElementById('gramsInput').focus();
-                return;
-            }
-
             // Kg and Gram aren't ProductSellingUnit rows -- there's no separate
             // price to set for either, they're just two typing scales for the
             // same per-kg price, so switching converts the typed number
-            // (grams / 1000 <-> kg) instead of relabeling it.
+            // (grams / 1000 <-> kg) instead of relabeling it. Every
+            // variable_weight product goes through this same keypad now --
+            // weight_entry_mode no longer picks a different UI, it only picks
+            // which unit starts selected: 'exact' products (produce that used
+            // to get a free-typed-grams box, since it doesn't land on round
+            // step values -- cauliflower, coriander, papaya, dragon fruit,
+            // watermelon) default to Gram, matching how they were entered
+            // before; step-mode products default to Kg as they always have.
             const step = parseFloat(product.weight_step) || 0.5; // kg-mode nudge
             const gramStep = 50; // gram-mode nudge -- fixed, not weight_step-derived, so it's never a silly 0.25g
             const initialWeightKg = editIndex != null ? cart[editIndex].weight : step;
+            const initialUnitId = product.weight_entry_mode === 'exact' ? 'gram' : 'kg';
 
             openKeypadModal(product, editIndex, {
                 units: [
                     { id: 'kg', label: 'Kg' },
                     { id: 'gram', label: 'Gram' },
                 ],
-                initialUnitId: 'kg',
-                initialValue: initialWeightKg,
+                initialUnitId,
+                initialValue: initialUnitId === 'gram' ? initialWeightKg * 1000 : initialWeightKg,
                 convertValue: (value, fromUnitId, toUnitId) => {
                     const kg = fromUnitId === 'gram' ? value / 1000 : value;
                     return toUnitId === 'gram' ? kg * 1000 : kg;
@@ -1064,7 +1029,7 @@
                 onConfirm: (value, unitObj) => {
                     const kg = unitObj.id === 'gram' ? value / 1000 : value;
                     const finalWeight = parseFloat(kg.toFixed(3));
-                    confirmWeightLine(product, editIndex, finalWeight, `${finalWeight} ${product.weight_unit_label}`);
+                    confirmWeightLine(product, editIndex, finalWeight, formatWeightDisplay(finalWeight));
                 },
             });
         }
@@ -1217,7 +1182,7 @@
                 line.line_total = parseFloat(opts.variant.total_price);
             } else if (opts.weight) {
                 line.weight = opts.weight;
-                line.detail = opts.detailOverride || `${opts.weight} ${product.weight_unit_label}`;
+                line.detail = opts.detailOverride;
                 line.qty = 1;
                 line.unit_price = parseFloat(product.price);
                 line.line_total = parseFloat(product.price) * opts.weight;
