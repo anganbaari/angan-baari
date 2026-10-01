@@ -433,6 +433,18 @@ class CouponValidateSerializer(serializers.Serializer):
     subtotal = serializers.DecimalField(max_digits=10, decimal_places=2, min_value=Decimal('0'))
 
 
+class PosRestockSerializer(serializers.Serializer):
+    """Input-shape validation for the POS restock endpoint. quantity gets
+    the model's own 3-decimal-place precision (InventoryMovement.quantity)
+    so a scale-weighed restock isn't forced to the nearest 10g. The actual
+    business rules (which movement_type, full_clean()'s own checks) live in
+    PosRestockView/InventoryMovement.clean() -- not here."""
+
+    product_id = serializers.IntegerField()
+    quantity = serializers.DecimalField(max_digits=8, decimal_places=3, min_value=Decimal('0.001'))
+    note = serializers.CharField(max_length=300, required=False, allow_blank=True, default='')
+
+
 class CreditRepaySerializer(serializers.Serializer):
     """Shape validation only. amount > 0 is enforced here; deliberately NOT
     capped at the customer's current balance -- a repayment larger than

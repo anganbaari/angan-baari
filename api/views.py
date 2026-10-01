@@ -49,6 +49,7 @@ from .serializers import (
     OrderStatusSerializer,
     PasswordResetConfirmSerializer,
     PasswordResetRequestSerializer,
+    PosRestockSerializer,
     PosUnlockSerializer,
     POSSaleCreateSerializer,
     POSSaleReadSerializer,
@@ -293,6 +294,108 @@ class PosOffersListView(APIView):
                     })
 
         return Response({'discount_offers': discount_offers, 'combo_offers': combo_offers})
+
+
+class PosStockListView(APIView):
+    """GET /api/v1/pos/stock/ — the POS stock screen's data: every non-
+    fixed_weight product's current stock, low-stock threshold/flag, restock
+    method, and last-restocked date, including disabled (is_available=False)
+    products — unlike pos_view()'s embedded PRODUCTS blob, which is filtered
+    to is_available=True only (see shop/views.py's pos_view()), this screen
+    needs disabled products too so staff can see (and restock) something
+    that's run all the way out.
+
+    Reuses get_stock_table_rows() in shop/stock.py — the exact same function
+    ProductAdmin's stock column uses — so the two can never show different
+    numbers for the same product. Read-only, makes no changes."""
+
+    authentication_classes = [SessionAuthentication]
+    permission_classes = [IsStaffUser]
+
+    def get(self, request, *args, **kwargs):
+        from shop.stock import get_stock_table_rows
+
+        return Response([
+            {
+                'product_id': row['product_id'],
+                'name': row['name'],
+                'current_stock': str(row['current_stock']),
+                'low_stock_threshold': row['low_stock_threshold'],
+                'is_low': row['is_low'],
+                'restock_method': row['restock_method'],
+                'last_restocked_at': row['last_restocked_at'].isoformat() if row['last_restocked_at'] else None,
+                'is_available': row['is_available'],
+            }
+            for row in get_stock_table_rows()
+        ])
+
+
+class PosRestockView(APIView):
+    """POST /api/v1/pos/restock/ — a direct operator-entered restock from
+    the POS stock screen. Picks movement_type='harvest' if the product is
+    farm-origin, 'purchase' otherwise (a separate concept from both
+    'harvest' and 'adjustment_add' — see InventoryMovement.
+    MOVEMENT_TYPE_CHOICES). source='pos'. full_clean() is called explicitly
+    inside transaction.atomic() — DRF's serializer validation does NOT call
+    Model.clean() on its own, and this is a direct operator-entered
+    movement (not a best-effort website write), so it gets the same strict
+    treatment create_pos_sale()/create_inventory_movements_from_snapshot()
+    already use for POS-originated movements.
+
+    Fixed-weight products (goats/chickens) are rejected here — they're
+    restocked by adding a new ProductVariant row (a new animal), not by a
+    plain quantity movement, same exclusion as the stock table itself."""
+
+    authentication_classes = [SessionAuthentication]
+    permission_classes = [IsStaffUser]
+
+    def post(self, request, *args, **kwargs):
+        from shop.models import Product
+
+        serializer = PosRestockSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        try:
+            product = Product.objects.get(id=data['product_id'])
+        except Product.DoesNotExist:
+            return Response({'status': 'error', 'message': 'Product not found.'}, status=404)
+
+        if product.pricing_mode == 'fixed_weight':
+            return Response(
+                {'status': 'error', 'message': 'Fixed-weight products are restocked by adding a new animal, not here.'},
+                status=400,
+            )
+
+        movement_type = 'harvest' if product.origin == 'farm' else 'purchase'
+
+        try:
+            with transaction.atomic():
+                movement = InventoryMovement(
+                    product=product, movement_type=movement_type, source='pos',
+                    quantity=data['quantity'], note=data.get('note') or '',
+                )
+                movement.full_clean()
+                movement.save()
+        except DjangoValidationError as e:
+            message = '; '.join(e.messages) if hasattr(e, 'messages') else str(e)
+            return Response({'status': 'error', 'message': message}, status=400)
+
+        # A restock crossing stock from <=0 back to positive may have just
+        # flipped product.is_available via the existing sync_availability_
+        # from_stock signal (shop/signals.py) -- refresh so the response
+        # reflects that instead of the pre-save value still held in memory.
+        product.refresh_from_db()
+        current_stock = InventoryMovement.current_stock(product)
+        return Response({
+            'status': 'ok',
+            'product_id': product.id,
+            'current_stock': str(current_stock),
+            'is_low': current_stock <= product.low_stock_threshold,
+            'is_available': product.is_available,
+            'last_restocked_at': movement.created_at.isoformat(),
+            'movement_type': movement_type,
+        }, status=status.HTTP_201_CREATED)
 
 
 class PosUnlockView(APIView):

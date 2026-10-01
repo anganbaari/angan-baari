@@ -938,6 +938,105 @@ class POSOfferApiTests(ApiTestBase):
         self.assertFalse(combo_entry['fully_available'])
 
 
+class PosStockApiTests(ApiTestBase):
+    """GET /api/v1/pos/stock/ and POST /api/v1/pos/restock/ -- the list
+    reuses get_stock_table_rows() (shop/stock.py), the exact same function
+    ProductAdmin's stock column uses; restock picks movement_type by
+    product.origin and goes through the same strict full_clean()-inside-
+    transaction.atomic() pattern create_pos_sale() uses for POS-originated
+    movements (not a best-effort write)."""
+
+    def setUp(self):
+        super().setUp()
+        self.client.login(username='cashier', password='pw')
+
+    def test_stock_list_requires_staff(self):
+        self.client.logout()
+        response = self.client.get(reverse('v1_pos_stock_list'))
+        self.assertIn(response.status_code, (status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN))
+
+    def test_stock_list_excludes_fixed_weight_and_returns_shared_rows(self):
+        response = self.client.get(reverse('v1_pos_stock_list'))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        ids = [row['product_id'] for row in response.data]
+        self.assertIn(self.jar.id, ids)
+        self.assertIn(self.fruit.id, ids)
+        self.assertNotIn(self.goat.id, ids)  # fixed_weight -- tracked per-animal, excluded
+
+    def test_restock_requires_staff(self):
+        self.client.logout()
+        response = self.client.post(
+            reverse('v1_pos_restock'), {'product_id': self.jar.id, 'quantity': '5'}, format='json',
+        )
+        self.assertIn(response.status_code, (status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN))
+
+    def test_restock_farm_origin_product_creates_harvest_movement(self):
+        self.jar.origin = 'farm'
+        self.jar.save(update_fields=['origin'])
+        before = InventoryMovement.current_stock(self.jar)
+        response = self.client.post(
+            reverse('v1_pos_restock'), {'product_id': self.jar.id, 'quantity': '5', 'note': 'supplier drop-off'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertEqual(response.data['movement_type'], 'harvest')
+        self.assertEqual(InventoryMovement.current_stock(self.jar), before + Decimal('5'))
+        movement = InventoryMovement.objects.get(product=self.jar, movement_type='harvest', note='supplier drop-off')
+        self.assertEqual(movement.source, 'pos')
+
+    def test_restock_sourced_origin_product_creates_purchase_movement(self):
+        self.jar.origin = 'sourced'
+        self.jar.save(update_fields=['origin'])
+        response = self.client.post(
+            reverse('v1_pos_restock'), {'product_id': self.jar.id, 'quantity': '5'}, format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertEqual(response.data['movement_type'], 'purchase')
+        self.assertTrue(
+            InventoryMovement.objects.filter(product=self.jar, movement_type='purchase', source='pos').exists()
+        )
+
+    def test_restock_rejects_fixed_weight_products_and_creates_nothing(self):
+        before_count = InventoryMovement.objects.filter(product=self.goat).count()
+        response = self.client.post(
+            reverse('v1_pos_restock'), {'product_id': self.goat.id, 'quantity': '1'}, format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(InventoryMovement.objects.filter(product=self.goat).count(), before_count)
+
+    def test_restock_rejects_invalid_quantity_and_creates_nothing(self):
+        before_count = InventoryMovement.objects.filter(product=self.jar).count()
+        response = self.client.post(
+            reverse('v1_pos_restock'), {'product_id': self.jar.id, 'quantity': '0'}, format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(InventoryMovement.objects.filter(product=self.jar).count(), before_count)
+
+    def test_restock_response_reflects_availability_flipped_by_existing_signal(self):
+        """A restock that crosses stock from <=0 back to positive flips
+        Product.is_available via the pre-existing sync_availability_from_
+        stock signal -- the restock response must reflect that fresh value,
+        not whatever is_available was before this movement saved."""
+        self.jar.is_available = False
+        self.jar.save(update_fields=['is_available'])
+        InventoryMovement.objects.filter(product=self.jar).delete()  # zero out stock from ApiTestBase's own harvest
+        response = self.client.post(
+            reverse('v1_pos_restock'), {'product_id': self.jar.id, 'quantity': '3'}, format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertTrue(response.data['is_available'])
+        self.jar.refresh_from_db()
+        self.assertTrue(self.jar.is_available)
+
+    def test_restock_updates_stock_list_row_without_a_second_product(self):
+        before = InventoryMovement.current_stock(self.fruit)
+        self.client.post(reverse('v1_pos_restock'), {'product_id': self.fruit.id, 'quantity': '2.500'}, format='json')
+        response = self.client.get(reverse('v1_pos_stock_list'))
+        row = next(r for r in response.data if r['product_id'] == self.fruit.id)
+        self.assertEqual(Decimal(row['current_stock']), before + Decimal('2.500'))
+        self.assertIsNotNone(row['last_restocked_at'])
+
+
 class CustomerApiTests(ApiTestBase):
     def test_lookup_requires_staff(self):
         response = self.client.get(reverse('v1_pos_customer_lookup'), {'phone': '9800000001'})

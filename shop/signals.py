@@ -3,6 +3,38 @@ from django.dispatch import receiver
 from .models import InventoryMovement
 
 
+@receiver(post_save, sender=InventoryMovement)
+def notify_on_low_stock_crossing(sender, instance, created, **kwargs):
+    """A one-time Telegram alert the moment stock crosses DOWN past a
+    product's low_stock_threshold -- not a ping on every subsequent sale
+    while it stays below that line, and it naturally re-arms once a restock
+    pushes stock back above threshold and it later crosses down again.
+
+    Fixed-weight products (goats/chickens) are skipped entirely -- they're
+    tracked per-animal via ProductVariant, not by a single stock count, so
+    "low stock threshold" doesn't apply to them (same exclusion as the POS
+    stock table in shop/stock.py).
+
+    Only fires on a newly-created row: InventoryMovement is an append-only
+    ledger (rows are never edited after the fact), but this guard costs
+    nothing and makes that assumption explicit rather than silent.
+    """
+    if not created or instance.product.pricing_mode == 'fixed_weight':
+        return
+
+    product = instance.product
+    stock_after = InventoryMovement.current_stock(product)
+    stock_before = stock_after - instance.signed_quantity()
+    threshold = product.low_stock_threshold
+
+    if stock_before > threshold and stock_after <= threshold:
+        from .emails import send_telegram
+        send_telegram(
+            f"⚠️ <b>Low stock</b>\n{product.name} is down to "
+            f"{stock_after} (threshold {threshold})."
+        )
+
+
 @receiver([post_save, post_delete], sender=InventoryMovement)
 def sync_availability_from_stock(sender, instance, **kwargs):
     """Fires on every InventoryMovement change — from the POS, website

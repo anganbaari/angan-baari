@@ -111,6 +111,14 @@ class Product(models.Model):
                    'eggs) is VAT-exempt under Nepali law; only check this for a '
                    'processed/packaged item once VAT registration actually happens.'
     )
+    low_stock_threshold = models.PositiveIntegerField(
+        default=5,
+        help_text='When current stock drops to this level or below, the product is flagged '
+                   'on the POS stock-alert table and triggers a one-time Telegram notification '
+                   'the moment stock crosses down past this line (see shop/signals.py). Not '
+                   'used for "Fixed weight" products (goats/chickens) -- those are tracked '
+                   'per-animal, not by a stock count.'
+    )
     main_image = models.ImageField(storage=ImageKitStorage(), upload_to='products/', blank=True)
     image2 = models.ImageField(storage=ImageKitStorage(), upload_to='products/', blank=True)
     image3 = models.ImageField(storage=ImageKitStorage(), upload_to='products/', blank=True)
@@ -613,6 +621,7 @@ class InventoryMovement(models.Model):
 
     MOVEMENT_TYPE_CHOICES = [
         ('harvest', 'Harvest — new stock in from the farm'),
+        ('purchase', 'Purchase — new stock bought in from an outside supplier'),
         ('sale', 'Sale — stock out, sold (website order or shop POS)'),
         ('waste', 'Waste — spoiled/bad stock, not sellable'),
         ('return', 'Return — stock back in, e.g. a cancelled order'),
@@ -628,7 +637,7 @@ class InventoryMovement(models.Model):
     ]
 
     # Movement types that ADD to stock; every other type subtracts.
-    INCREASE_TYPES = {'harvest', 'return', 'adjustment_add'}
+    INCREASE_TYPES = {'harvest', 'purchase', 'return', 'adjustment_add'}
 
     product = models.ForeignKey(
         'Product', on_delete=models.CASCADE, related_name='inventory_movements'

@@ -143,14 +143,28 @@
         .reminder-card ul { margin: 0; padding-left: 0; list-style: none; font-size: 1.05rem; font-weight: 700; color: var(--pos-text-green); line-height: 1.4; font-family: 'Noto Sans Devanagari', 'DM Sans', sans-serif; }
         .reminder-card ul li::before { content: "* "; font-weight: 700; }
 
-        /* Five standalone columns: reminder | Repay Credit | Offers | tax
-           box | payment method -- each button gets its own column instead
-           of Offers/Payment stacking, which is the main lever for keeping
-           this row's height down now that it's five columns wide. */
-        .repay-col, .offers-col, .payment-col { display: flex; flex-shrink: 0; }
+        /* Six standalone columns: reminder | Stock | Repay Credit | Offers |
+           tax box | payment method -- each button gets its own column
+           instead of stacking, which is the main lever for keeping this
+           row's height down now that it's six columns wide. */
+        .repay-col, .offers-col, .payment-col, .stock-col { display: flex; flex-shrink: 0; }
         .repay-col { width: 110px; }
         .offers-col { width: 100px; }
         .payment-col { width: 130px; }
+
+        .stock-col {
+            width: 130px; flex-direction: column; background: var(--pos-bg); border: 2px solid var(--pos-border-dark);
+            border-radius: 6px; overflow: hidden; padding: 4px 6px;
+        }
+        .stock-box-title { font-weight: 800; font-size: 0.82rem; color: #b23b3b; margin-bottom: 2px; }
+        .stock-box-list { flex: 1; overflow-y: auto; min-height: 0; font-size: 0.78rem; }
+        .stock-box-item { display: flex; justify-content: space-between; gap: 4px; padding: 1px 0; color: var(--pos-text-black); }
+        .stock-box-item span:last-child { font-weight: 800; color: #b23b3b; flex-shrink: 0; }
+        .stock-box-empty { color: var(--text-muted); font-size: 0.78rem; }
+        .stock-view-all-btn {
+            border: none; background: none; color: var(--pos-text-green); font-weight: 800; font-size: 0.78rem;
+            cursor: pointer; padding: 2px 0 0; text-align: left; font-family: inherit;
+        }
 
         .tax-box { flex: 1; min-width: 0; background: var(--pos-bg); border: 2px solid var(--pos-border-dark); border-radius: 6px; overflow: hidden; height: fit-content; }
         .tax-box .tax-row { display: flex; justify-content: space-between; padding: 4px 14px; font-size: 0.95rem; border-bottom: 1px solid var(--pos-border-dark); font-family: 'Noto Sans Devanagari', 'DM Sans', sans-serif; }
@@ -206,6 +220,37 @@
         .product-btn .pname { font-size: 0.83rem; font-weight: 600; color: var(--forest); margin-bottom: 2px; line-height: 1.25; }
         .product-btn .pprice { font-size: 0.76rem; color: var(--moss); font-weight: 700; }
         .product-btn.unavailable { opacity: 0.5; cursor: default; }
+
+        /* ── Stock view ── */
+        #stockView { display: none; flex-direction: column; flex: 1; min-height: 0; }
+        .stock-view-topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-shrink: 0; }
+        .stock-view-topbar h2 { margin: 0; font-family: 'Cormorant Garamond', serif; color: var(--forest); font-size: 1.6rem; }
+        .stock-view-topbar .payment-btn-main { flex: none; padding: 8px 18px; }
+        /* Vertical scroll only -- the wrapper clips/scrolls, the table
+           itself never exceeds its container's width. Header row and name
+           column are both position:sticky so they stay put while scrolling
+           in either direction; the th/td that's sticky in BOTH directions
+           (the name column's own header cell) needs the highest z-index so
+           it stays above both the plain sticky header row and the plain
+           sticky name cells it overlaps. */
+        .stock-table-wrap { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; border: 2px solid var(--pos-border-dark); border-radius: 6px; }
+        .stock-table { width: 100%; border-collapse: collapse; background: var(--pos-bg); }
+        .stock-table th, .stock-table td {
+            padding: 8px 12px; font-size: 0.9rem; text-align: center; border-bottom: 1px solid var(--pos-border-dark);
+            color: var(--pos-text-black);
+        }
+        .stock-table th { background: var(--pos-bg); font-weight: 800; position: sticky; top: 0; z-index: 2; }
+        .stock-table td.stock-col-name, .stock-table th.stock-col-name {
+            text-align: left; position: sticky; left: 0; background: var(--pos-bg); z-index: 1;
+        }
+        .stock-table th.stock-col-name { z-index: 3; }
+        .stock-table tbody tr.stock-row-low td { background: #fdecea; }
+        .stock-table tbody tr.stock-row-low td.stock-col-name { background: #fdecea; }
+        .stock-table .stock-restock-btn {
+            border: none; border-radius: 8px; padding: 5px 12px; font-weight: 800; font-size: 0.8rem;
+            cursor: pointer; background: var(--pos-text-green); color: #fff; font-family: inherit;
+        }
+        .stock-table .stock-unavailable-tag { font-size: 0.72rem; color: var(--text-muted); font-weight: 700; }
 
         /* ── Lock banner: a true centered modal overlay, dimming everything
            behind it -- NOT positioned relative to the table, so it can never
@@ -456,6 +501,12 @@
                         </ul>
                     </div>
 
+                    <div class="stock-col" id="stockBox">
+                        <div class="stock-box-title">&#9888; Low Stock</div>
+                        <div class="stock-box-list" id="stockBoxList"></div>
+                        <button type="button" class="stock-view-all-btn" id="viewAllStockBtn">View all »</button>
+                    </div>
+
                     <div class="repay-col">
                         <button type="button" class="side-btn repay-btn" id="openRepayBtn">उधारो तिर्नुहोस्<br><span style="font-weight:700;font-size:0.85rem;">Repay Credit</span></button>
                     </div>
@@ -492,6 +543,29 @@
                     <button type="button" class="cart-indicator" id="cartIndicator">0 items · Rs. 0</button>
                 </div>
                 <div class="product-grid" id="productGrid"></div>
+            </div>
+
+            <!-- Stock view -->
+            <div id="stockView">
+                <div class="stock-view-topbar">
+                    <h2>Stock</h2>
+                    <button type="button" class="side-btn payment-btn-main" id="backFromStockBtn">&laquo; Back</button>
+                </div>
+                <div class="stock-table-wrap">
+                    <table class="stock-table">
+                        <thead>
+                            <tr>
+                                <th class="stock-col-name">Name</th>
+                                <th>Current Stock</th>
+                                <th>Minimum Stock</th>
+                                <th>Restock Method</th>
+                                <th>Last Restocked</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="stockTableBody"></tbody>
+                    </table>
+                </div>
             </div>
         </div>
 
@@ -558,6 +632,21 @@
         </div>
     </div>
 
+    <!-- Restock modal (same visual style as the Repay Credit modal above) -->
+    <div id="restockBackdrop" style="display:none;position:fixed;inset:0;background:rgba(26,47,30,0.45);z-index:320;align-items:center;justify-content:center;">
+        <div class="item-modal-card" style="max-width:380px;">
+            <h3 id="restockTitle">Restock</h3>
+            <input type="text" id="restockQtyInput" placeholder="Quantity" inputmode="decimal"
+                   style="width:100%;padding:9px 12px;border:1.5px solid var(--mist);border-radius:8px;font-family:inherit;margin-bottom:8px;">
+            <input type="text" id="restockNoteInput" placeholder="Note (optional)"
+                   style="width:100%;padding:9px 12px;border:1.5px solid var(--mist);border-radius:8px;font-family:inherit;margin-bottom:12px;">
+            <div class="item-modal-actions">
+                <button type="button" class="btn-cancel" id="restockCancelBtn">Cancel</button>
+                <button type="button" class="btn-confirm" id="restockConfirmBtn">Confirm</button>
+            </div>
+        </div>
+    </div>
+
     <div id="posToast"></div>
 
     <script id="posProductsData" type="application/json">{{ products_json|safe }}</script>
@@ -570,7 +659,8 @@
 
         let activeCategory = CATEGORIES[0] || null;
         let cart = []; // { product_id, name, pricing_mode, qty, weight, variant_id, unit_id, unit_name, offer_id, combo_instance_id, detail, unit_price, line_total, is_taxable }
-        let currentView = 'receipt'; // 'receipt' | 'shopping'
+        let currentView = 'receipt'; // 'receipt' | 'shopping' | 'stock'
+        let stockData = []; // [{product_id, name, current_stock, low_stock_threshold, is_low, restock_method, last_restocked_at, is_available}] — see loadStockData()
         let isUnlocked = false;
         let currentOperator = null; // { id, name, staff_number, role }
         let clientSaleId = null;
@@ -819,6 +909,7 @@
             currentView = 'receipt';
             document.getElementById('receiptView').style.display = '';
             document.getElementById('shoppingView').style.display = 'none';
+            document.getElementById('stockView').style.display = 'none';
             renderCategoryRow();
         }
 
@@ -826,8 +917,18 @@
             currentView = 'shopping';
             document.getElementById('receiptView').style.display = 'none';
             document.getElementById('shoppingView').style.display = 'flex';
+            document.getElementById('stockView').style.display = 'none';
             renderCategoryRow();
             updateCartIndicator();
+        }
+
+        function showStockView() {
+            currentView = 'stock';
+            document.getElementById('receiptView').style.display = 'none';
+            document.getElementById('shoppingView').style.display = 'none';
+            document.getElementById('stockView').style.display = 'flex';
+            renderCategoryRow();
+            renderStockTable();
         }
 
         function updateCartIndicator() {
@@ -836,6 +937,121 @@
             document.getElementById('cartIndicator').textContent = `${count} items · Rs. ${Math.round(total)}`;
         }
         document.getElementById('cartIndicator').addEventListener('click', showReceiptView);
+
+        // ══════════════════════════════════════════════════════════════
+        // Stock -- low-stock alert box, full stock screen, restock modal.
+        // GET /api/v1/pos/stock/ reuses get_stock_table_rows() in
+        // shop/stock.py, the exact same function ProductAdmin's stock
+        // column uses, so the two can never show different numbers.
+        // ══════════════════════════════════════════════════════════════
+        async function loadStockData() {
+            try {
+                const response = await apiFetch('/api/v1/pos/stock/');
+                if (!response.ok) return;
+                stockData = await response.json();
+            } catch (err) {
+                return; // transient network error -- keep whatever stockData already had rather than wiping it
+            }
+            renderStockBox();
+            if (currentView === 'stock') renderStockTable();
+        }
+
+        function renderStockBox() {
+            const list = document.getElementById('stockBoxList');
+            const lowItems = stockData.filter(r => r.is_low);
+            if (!lowItems.length) {
+                list.innerHTML = '<div class="stock-box-empty">All good</div>';
+                return;
+            }
+            list.innerHTML = lowItems.map(r => `
+                <div class="stock-box-item"><span>${r.name}</span><span>${formatStockQty(r.current_stock)}</span></div>`
+            ).join('');
+        }
+        document.getElementById('stockBox').addEventListener('click', showStockView);
+        document.getElementById('viewAllStockBtn').addEventListener('click', (e) => {
+            e.stopPropagation(); // stockBox itself also opens the stock view on click
+            showStockView();
+        });
+        document.getElementById('backFromStockBtn').addEventListener('click', showReceiptView);
+
+        // Stock can be a plain integer count (jars, pieces) or a 3-decimal
+        // weight (0.335kg) -- trims trailing zeros like formatMoney() does
+        // for prices, but without assuming money's fixed 2 decimal places.
+        function formatStockQty(value) {
+            const n = parseFloat(value);
+            if (isNaN(n)) return String(value);
+            return Number.isInteger(n) ? String(n) : String(parseFloat(n.toFixed(3)));
+        }
+
+        function formatLastRestocked(iso) {
+            if (!iso) return 'Never restocked';
+            return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+        }
+
+        function renderStockTable() {
+            const body = document.getElementById('stockTableBody');
+            body.innerHTML = stockData.map(r => `
+                <tr class="${r.is_low ? 'stock-row-low' : ''}">
+                    <td class="stock-col-name">${r.name}${r.is_available ? '' : ' <span class="stock-unavailable-tag">(disabled)</span>'}</td>
+                    <td>${formatStockQty(r.current_stock)}</td>
+                    <td>${r.low_stock_threshold}</td>
+                    <td>${r.restock_method}</td>
+                    <td>${formatLastRestocked(r.last_restocked_at)}</td>
+                    <td><button type="button" class="stock-restock-btn" data-pid="${r.product_id}">Restock</button></td>
+                </tr>`
+            ).join('');
+            body.querySelectorAll('.stock-restock-btn').forEach(btn => {
+                btn.addEventListener('click', () => openRestockModal(parseInt(btn.dataset.pid, 10)));
+            });
+        }
+
+        let restockTargetId = null;
+        function openRestockModal(productId) {
+            const row = stockData.find(r => r.product_id === productId);
+            if (!row) return;
+            restockTargetId = productId;
+            document.getElementById('restockTitle').textContent = `Restock — ${row.name}`;
+            document.getElementById('restockQtyInput').value = '';
+            document.getElementById('restockNoteInput').value = '';
+            document.getElementById('restockBackdrop').style.display = 'flex';
+        }
+        document.getElementById('restockCancelBtn').addEventListener('click', () => {
+            document.getElementById('restockBackdrop').style.display = 'none';
+        });
+
+        document.getElementById('restockConfirmBtn').addEventListener('click', async () => {
+            const qty = parseFloat(document.getElementById('restockQtyInput').value);
+            if (!restockTargetId || !(qty > 0)) { showToast('Enter a valid quantity'); return; }
+            const note = document.getElementById('restockNoteInput').value.trim();
+
+            const response = await apiFetch('/api/v1/pos/restock/', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ product_id: restockTargetId, quantity: qty.toFixed(3), note }),
+            });
+            const data = await response.json().catch(() => ({}));
+            if (response.status === 403) {
+                document.getElementById('restockBackdrop').style.display = 'none';
+                currentOperator = null;
+                setLocked(true);
+                showToast('Terminal locked — enter PIN to try again');
+                return;
+            }
+            if (!response.ok) { showToast(data.message || 'Could not record restock'); return; }
+
+            // Update just this row's stock/last-restocked values client-side
+            // rather than refetching the whole table.
+            const row = stockData.find(r => r.product_id === restockTargetId);
+            if (row) {
+                row.current_stock = data.current_stock;
+                row.is_low = data.is_low;
+                row.last_restocked_at = data.last_restocked_at;
+                row.is_available = data.is_available;
+            }
+            renderStockBox();
+            if (currentView === 'stock') renderStockTable();
+            showToast(`Restocked — new stock ${formatStockQty(data.current_stock)}`);
+            document.getElementById('restockBackdrop').style.display = 'none';
+        });
 
         function renderGrid(filterText) {
             const grid = document.getElementById('productGrid');
@@ -2003,6 +2219,7 @@
         showReceiptView();
         renderReceipt();
         setLocked(true);
+        loadStockData();
     </script>
 </body>
 </html>

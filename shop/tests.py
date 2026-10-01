@@ -10,8 +10,9 @@ from django.urls import reverse
 from .admin import UserProfileInlineForm
 from .models import (
     Category, Customer, InventoryMovement, ContactMessage, NewsletterSubscriber, POSSale,
-    Product, UserProfile,
+    Product, ProductVariant, UserProfile,
 )
+from .stock import get_stock_table_rows
 
 
 class ContactViewEmailTests(TestCase):
@@ -292,3 +293,227 @@ class PosCreateSaleViewTests(TestCase):
         self.unlock_terminal()
         allowed = self.post_sale()
         self.assertEqual(allowed.status_code, 200, allowed.json())
+
+
+class PurchaseMovementTypeTests(TestCase):
+    """'purchase' (outside-supplier restock) is a distinct movement_type
+    from both 'harvest' (farm-origin) and 'adjustment_add' (a stock-count
+    correction, not a real incoming purchase) -- it must behave exactly
+    like any other INCREASE_TYPES member for signed_quantity()/
+    current_stock() purposes."""
+
+    def setUp(self):
+        self.category = Category.objects.create(name='Pantry', order=1)
+        self.product = Product.objects.create(
+            name='Honey Jar', slug='honey-jar', category=self.category, description='test',
+            price=Decimal('500.00'), pricing_mode='fixed_quantity', origin='sourced',
+        )
+
+    def test_purchase_is_a_valid_movement_type_choice(self):
+        self.assertIn('purchase', dict(InventoryMovement.MOVEMENT_TYPE_CHOICES))
+
+    def test_purchase_increases_stock_like_harvest_and_adjustment_add(self):
+        self.assertIn('purchase', InventoryMovement.INCREASE_TYPES)
+        movement = InventoryMovement.objects.create(
+            product=self.product, movement_type='purchase', source='pos', quantity=Decimal('10'),
+        )
+        self.assertEqual(movement.signed_quantity(), Decimal('10'))
+        self.assertEqual(InventoryMovement.current_stock(self.product), Decimal('10'))
+
+    def test_purchase_harvest_and_adjustment_add_are_kept_distinct(self):
+        """They must never be merged into one concept -- each movement
+        remembers which of the three it actually was, even though all three
+        increase stock identically."""
+        InventoryMovement.objects.create(product=self.product, movement_type='harvest', source='admin', quantity=Decimal('5'))
+        InventoryMovement.objects.create(product=self.product, movement_type='purchase', source='pos', quantity=Decimal('3'))
+        InventoryMovement.objects.create(product=self.product, movement_type='adjustment_add', source='admin', quantity=Decimal('2'))
+        self.assertEqual(InventoryMovement.current_stock(self.product), Decimal('10'))
+        self.assertEqual(
+            sorted(InventoryMovement.objects.filter(product=self.product).values_list('movement_type', flat=True)),
+            ['adjustment_add', 'harvest', 'purchase'],
+        )
+
+
+class StockTableTests(TestCase):
+    """get_stock_table_rows() in shop/stock.py -- the single shared source
+    of truth reused by both ProductAdmin's stock column and the POS stock
+    screen (GET /api/v1/pos/stock/)."""
+
+    def setUp(self):
+        self.category = Category.objects.create(name='Produce', order=1)
+
+    def test_fixed_weight_products_are_excluded_entirely(self):
+        goat = Product.objects.create(
+            name='Goat', slug='stock-test-goat', category=self.category, description='test',
+            price=Decimal('1200.00'), pricing_mode='fixed_weight',
+        )
+        ProductVariant.objects.create(product=goat, weight=Decimal('20.00'))
+        rows = get_stock_table_rows()
+        self.assertNotIn(goat.id, [r['product_id'] for r in rows])
+
+    def test_eggs_fixed_quantity_not_fixed_weight_stay_in_the_table(self):
+        """Explicitly named in the spec: eggs are fixed_quantity (sold per
+        piece), not fixed_weight (per-animal) -- they must NOT be swept up
+        by the fixed_weight exclusion just because they're also a farm
+        product with per-unit stock tracking."""
+        eggs = Product.objects.create(
+            name='Local Egg', slug='stock-test-eggs', category=self.category, description='test',
+            price=Decimal('20.00'), pricing_mode='fixed_quantity', origin='farm',
+        )
+        rows = get_stock_table_rows()
+        self.assertIn(eggs.id, [r['product_id'] for r in rows])
+
+    def test_disabled_products_are_included(self):
+        disabled = Product.objects.create(
+            name='Disabled Product', slug='stock-test-disabled', category=self.category, description='test',
+            price=Decimal('100.00'), pricing_mode='fixed_quantity', is_available=False,
+        )
+        rows = get_stock_table_rows()
+        row = next(r for r in rows if r['product_id'] == disabled.id)
+        self.assertFalse(row['is_available'])
+
+    def test_is_low_and_restock_method_and_last_restocked(self):
+        farm_product = Product.objects.create(
+            name='Farm Product', slug='stock-test-farm', category=self.category,
+            description='test', price=Decimal('50.00'), pricing_mode='fixed_quantity',
+            origin='farm', low_stock_threshold=5,
+        )
+        InventoryMovement.objects.create(product=farm_product, movement_type='harvest', source='admin', quantity=Decimal('3'))
+
+        sourced_product = Product.objects.create(
+            name='Sourced Product', slug='stock-test-sourced', category=self.category,
+            description='test', price=Decimal('80.00'), pricing_mode='variable_weight',
+            origin='sourced', low_stock_threshold=10,
+        )
+        InventoryMovement.objects.create(product=sourced_product, movement_type='purchase', source='admin', quantity=Decimal('20'))
+        InventoryMovement.objects.create(product=sourced_product, movement_type='sale', source='pos', quantity=Decimal('1'))
+        InventoryMovement.objects.create(product=sourced_product, movement_type='waste', source='admin', quantity=Decimal('1'))
+
+        rows_by_id = {r['product_id']: r for r in get_stock_table_rows()}
+
+        farm_row = rows_by_id[farm_product.id]
+        self.assertTrue(farm_row['is_low'])  # 3 <= 5
+        self.assertEqual(farm_row['restock_method'], 'Own farm')
+        self.assertIsNotNone(farm_row['last_restocked_at'])  # harvest counts
+
+        sourced_row = rows_by_id[sourced_product.id]
+        self.assertFalse(sourced_row['is_low'])  # 18 > 10
+        self.assertEqual(sourced_row['restock_method'], 'Outsourced')
+        self.assertIsNotNone(sourced_row['last_restocked_at'])  # purchase counts, sale/waste don't
+
+    def test_last_restocked_only_counts_harvest_purchase_adjustment_add(self):
+        """A sale/waste/return/adjustment_remove is never a restock, even
+        though return technically adds stock back."""
+        product = Product.objects.create(
+            name='Return Test Product', slug='stock-test-return', category=self.category,
+            description='test', price=Decimal('100.00'), pricing_mode='fixed_quantity',
+        )
+        InventoryMovement.objects.create(product=product, movement_type='harvest', source='admin', quantity=Decimal('10'))
+        InventoryMovement.objects.create(product=product, movement_type='sale', source='pos', quantity=Decimal('2'))
+        InventoryMovement.objects.create(product=product, movement_type='return', source='website', quantity=Decimal('1'))
+
+        row = next(r for r in get_stock_table_rows() if r['product_id'] == product.id)
+        # last_restocked_at should be the harvest, not the later return.
+        harvest = InventoryMovement.objects.get(product=product, movement_type='harvest')
+        self.assertEqual(row['last_restocked_at'], harvest.created_at)
+
+    def test_never_restocked_product_has_none(self):
+        product = Product.objects.create(
+            name='Never Restocked Product', slug='stock-test-never', category=self.category,
+            description='test', price=Decimal('100.00'), pricing_mode='fixed_quantity',
+        )
+        row = next(r for r in get_stock_table_rows() if r['product_id'] == product.id)
+        self.assertIsNone(row['last_restocked_at'])
+
+    def test_sort_order_low_stock_first_ascending_then_alphabetical(self):
+        # Two low-stock products, stock 2 and 1 (1 should sort before 2).
+        low_b = Product.objects.create(
+            name='Zed Low Stock', slug='stock-test-low-b', category=self.category, description='test',
+            price=Decimal('10.00'), pricing_mode='fixed_quantity', low_stock_threshold=5,
+        )
+        InventoryMovement.objects.create(product=low_b, movement_type='harvest', source='admin', quantity=Decimal('2'))
+        low_a = Product.objects.create(
+            name='Apple Low Stock', slug='stock-test-low-a', category=self.category, description='test',
+            price=Decimal('10.00'), pricing_mode='fixed_quantity', low_stock_threshold=5,
+        )
+        InventoryMovement.objects.create(product=low_a, movement_type='harvest', source='admin', quantity=Decimal('1'))
+        # Two normal-stock products, named so alphabetical order is obvious
+        # and distinguishable from insertion order.
+        normal_z = Product.objects.create(
+            name='Zed Normal Stock', slug='stock-test-normal-z', category=self.category, description='test',
+            price=Decimal('10.00'), pricing_mode='fixed_quantity', low_stock_threshold=5,
+        )
+        InventoryMovement.objects.create(product=normal_z, movement_type='harvest', source='admin', quantity=Decimal('50'))
+        normal_a = Product.objects.create(
+            name='Apple Normal Stock', slug='stock-test-normal-a', category=self.category, description='test',
+            price=Decimal('10.00'), pricing_mode='fixed_quantity', low_stock_threshold=5,
+        )
+        InventoryMovement.objects.create(product=normal_a, movement_type='harvest', source='admin', quantity=Decimal('50'))
+
+        ids_in_order = [r['product_id'] for r in get_stock_table_rows()]
+        relevant_order = [pid for pid in ids_in_order if pid in {low_a.id, low_b.id, normal_a.id, normal_z.id}]
+        self.assertEqual(relevant_order, [low_a.id, low_b.id, normal_a.id, normal_z.id])
+
+
+class LowStockSignalTests(TestCase):
+    """notify_on_low_stock_crossing() in shop/signals.py -- a one-time
+    Telegram alert the moment stock crosses DOWN past low_stock_threshold,
+    not a repeat ping on every subsequent sale while it stays below."""
+
+    def setUp(self):
+        self.category = Category.objects.create(name='Signal Test', order=1)
+        self.product = Product.objects.create(
+            name='Signal Product', slug='signal-product', category=self.category, description='test',
+            price=Decimal('10.00'), pricing_mode='fixed_quantity', low_stock_threshold=5,
+        )
+
+    def test_fires_once_on_crossing_down_past_threshold(self):
+        with patch('shop.emails.send_telegram') as mock_send:
+            InventoryMovement.objects.create(product=self.product, movement_type='harvest', source='admin', quantity=Decimal('20'))
+            self.assertEqual(mock_send.call_count, 0)  # 20 > 5, no crossing
+
+            InventoryMovement.objects.create(product=self.product, movement_type='sale', source='pos', quantity=Decimal('14'))
+            self.assertEqual(mock_send.call_count, 0)  # 6 > 5, still no crossing
+
+            InventoryMovement.objects.create(product=self.product, movement_type='sale', source='pos', quantity=Decimal('3'))
+            self.assertEqual(mock_send.call_count, 1)  # 6 -> 3, crossed down past 5
+            self.assertIn('Signal Product', mock_send.call_args[0][0])
+            self.assertIn('3', mock_send.call_args[0][0])
+
+    def test_does_not_refire_on_repeat_sales_while_still_below_threshold(self):
+        InventoryMovement.objects.create(product=self.product, movement_type='harvest', source='admin', quantity=Decimal('6'))
+        with patch('shop.emails.send_telegram') as mock_send:
+            InventoryMovement.objects.create(product=self.product, movement_type='sale', source='pos', quantity=Decimal('2'))
+            self.assertEqual(mock_send.call_count, 1)  # 6 -> 4, crossed
+
+            InventoryMovement.objects.create(product=self.product, movement_type='sale', source='pos', quantity=Decimal('1'))
+            self.assertEqual(mock_send.call_count, 1)  # 4 -> 3, still below, no re-fire
+
+    def test_rearms_after_restock_pushes_stock_back_above_threshold(self):
+        InventoryMovement.objects.create(product=self.product, movement_type='harvest', source='admin', quantity=Decimal('6'))
+        with patch('shop.emails.send_telegram') as mock_send:
+            InventoryMovement.objects.create(product=self.product, movement_type='sale', source='pos', quantity=Decimal('2'))
+            self.assertEqual(mock_send.call_count, 1)  # 6 -> 4, crossed
+
+            InventoryMovement.objects.create(product=self.product, movement_type='purchase', source='pos', quantity=Decimal('10'))
+            self.assertEqual(mock_send.call_count, 1)  # 4 -> 14, back above, no fire on the way up
+
+            InventoryMovement.objects.create(product=self.product, movement_type='sale', source='pos', quantity=Decimal('10'))
+            self.assertEqual(mock_send.call_count, 2)  # 14 -> 4, crossed down again -- re-armed
+
+    def test_skips_fixed_weight_products_entirely(self):
+        goat = Product.objects.create(
+            name='Signal Goat', slug='signal-goat', category=self.category, description='test',
+            price=Decimal('1200.00'), pricing_mode='fixed_weight', low_stock_threshold=1,
+        )
+        variant = ProductVariant.objects.create(product=goat, weight=Decimal('20.00'))
+        with patch('shop.emails.send_telegram') as mock_send:
+            InventoryMovement.objects.create(
+                product=goat, variant=variant, movement_type='harvest', source='admin', quantity=Decimal('1'),
+            )
+            InventoryMovement.objects.create(
+                product=goat, variant=variant, movement_type='sale', source='pos', quantity=Decimal('1'),
+            )
+            # 1 -> 0 would cross a threshold of 1 for a normal product, but
+            # fixed_weight is skipped entirely -- never even evaluated.
+            self.assertEqual(mock_send.call_count, 0)

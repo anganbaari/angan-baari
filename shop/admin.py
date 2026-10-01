@@ -2,11 +2,12 @@ from django import forms
 from django.contrib import admin, messages
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import User
+from django.db.models import Case, DecimalField, F, Sum, When
 from django.urls import path
 from django.http import HttpResponse
 from django.shortcuts import redirect
 from django.middleware.csrf import get_token
-from django.utils.html import escape
+from django.utils.html import escape, format_html
 from .models import ContactMessage, ProductOrder, NewsletterSubscriber, Product, Review, Category
 from .models import Offer, Coupon, BundleItem, ProductVariant
 from .emails import send_newsletter_campaign
@@ -15,6 +16,7 @@ from .models import (
     Offer, Coupon, BundleItem, ProductVariant, ProductSellingUnit, InventoryMovement, POSSale, UserProfile,
     BusinessSettings, CreditTransaction, Customer, POSSalePayment,
 )
+from .stock import get_stock_table_rows
 from .utils import format_money
 
 
@@ -57,12 +59,34 @@ class ProductSellingUnitInline(admin.TabularInline):
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
     list_display = ['name', 'category', 'price', 'price_unit', 'pricing_mode',
-                     'weight_step', 'is_available', 'is_taxable', 'season', 'current_stock_display', 'origin']
+                     'weight_step', 'is_available', 'is_taxable', 'season', 'current_stock_display',
+                     'stock_alert_display', 'origin']
     list_filter = ['category', 'is_available', 'is_taxable', 'pricing_mode', 'origin']
     list_editable = ['is_available', 'price', 'price_unit', 'origin']
     prepopulated_fields = {'slug': ('name',)}
     search_fields = ['name']
     inlines = [ProductVariantInline, ProductSellingUnitInline]
+
+    def get_queryset(self, request):
+        # Annotates a sortable stock figure so clicking the column header
+        # actually works -- the DISPLAYED number/highlight in
+        # stock_alert_display() still comes from get_stock_table_rows(),
+        # the single shared source of truth the POS stock screen also uses,
+        # so this annotation only ever drives sort order, never the values
+        # shown. Meaningless for fixed_weight products (it sums across every
+        # variant instead of per-animal) -- harmless since those rows always
+        # display '—' in this column regardless of where they sort to.
+        qs = super().get_queryset(request)
+        return qs.annotate(
+            _stock_sort=Sum(
+                Case(
+                    When(inventory_movements__movement_type__in=InventoryMovement.INCREASE_TYPES,
+                         then=F('inventory_movements__quantity')),
+                    default=-F('inventory_movements__quantity'),
+                    output_field=DecimalField(max_digits=8, decimal_places=3),
+                )
+            )
+        )
 
     def formfield_for_dbfield(self, db_field, request, **kwargs):
         formfield = super().formfield_for_dbfield(db_field, request, **kwargs)
@@ -118,6 +142,32 @@ class ProductAdmin(admin.ModelAdmin):
         unit = obj.weight_unit_label if obj.pricing_mode == 'variable_weight' else 'pcs'
         return f'{stock} {unit}'
     current_stock_display.short_description = 'Current stock'
+
+    def changelist_view(self, request, extra_context=None):
+        # Computed once per page load (not once per row -- get_stock_table_
+        # rows() itself already queries every non-fixed_weight product, so
+        # calling it from stock_alert_display() directly would be quadratic)
+        # and stashed on self rather than threaded through per-row via
+        # list_display's (obj)-only call signature. Staff-only, low-traffic
+        # admin page for a two-person team -- the Django-admin-common
+        # tradeoff of caching read-only display data on self for the
+        # duration of one changelist render is an acceptable one here.
+        self._stock_by_product_id = {row['product_id']: row for row in get_stock_table_rows()}
+        return super().changelist_view(request, extra_context)
+
+    def stock_alert_display(self, obj):
+        row = getattr(self, '_stock_by_product_id', {}).get(obj.id)
+        if not row:  # fixed_weight products are excluded from get_stock_table_rows()
+            return '\u2014'
+        text = f"{row['current_stock']} (min {row['low_stock_threshold']})"
+        if row['is_low']:
+            return format_html(
+                '<span style="background:#f8d7da;color:#842029;padding:2px 7px;'
+                'border-radius:4px;font-weight:700;">{}</span>', text,
+            )
+        return text
+    stock_alert_display.short_description = 'Stock alert'
+    stock_alert_display.admin_order_field = '_stock_sort'
 
 
 @admin.register(ContactMessage)
