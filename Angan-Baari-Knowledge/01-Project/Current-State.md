@@ -2,7 +2,59 @@
 
 *Living document — update as work lands. Last checked: 2026-10-01.*
 
-## Recently landed (as of 2026-10-01, commit 7eca669 + uncommitted stock work)
+## Recently landed (as of 2026-10-01, uncommitted — stock follow-up fixes + Repay Credit rework)
+
+Same session as the commit `d61daff` work below, done as a later, separate pass
+— **none of this is committed yet**, see "Deploy status" below.
+
+- **Low-stock/restock follow-up fixes**, after the first production test of
+  the `d61daff` stock screen surfaced several rough edges:
+  - The compact Stock box is now actually colored — blue "Stock OK" via
+    `.stock-col.stock-all-ok`, red "⚠ Low Stock" via `.stock-col.stock-has-low`
+    (previously had no background color at all).
+  - `is_low` corrected from `<=` to strict `<` everywhere it's checked
+    (`shop/stock.py::get_stock_table_rows()` and the Telegram-crossing check
+    in `shop/signals.py`) — a product sitting exactly at its minimum no
+    longer flags as low.
+  - Stock numbers are now genuinely live: `loadStockData()` refetches
+    `GET /api/v1/pos/stock/` fresh every time the Stock box/view is about to
+    display, and again right after every completed sale — no stale cached
+    JS variable.
+  - The Restock modal now lets staff explicitly pick the movement's origin
+    (farm / outsourced) per restock, defaulting to the product's current
+    `origin` but overridable — for a normally-farm-grown item occasionally
+    bought in (e.g. Chilly) without changing the product's actual default.
+    `POST /api/v1/pos/restock/` takes this as an explicit `origin` field
+    instead of inferring it from `product.origin`.
+  - A separate inline pencil-edit control on the Stock table's "Restock
+    Method" column changes `Product.origin` itself going forward, via a new
+    `PATCH /api/v1/pos/products/<id>/origin/` — distinct from the per-restock
+    override above, which never touches the product's own default.
+  - **Bug found and fixed during CDP verification**: `PosStockListView`'s
+    `GET /api/v1/pos/stock/` built its own response dict and never included
+    `origin`, even though `get_stock_table_rows()` already returned it —
+    silently broke both the Restock modal's default-origin preselection and
+    the inline-edit's preselection (neither origin button showed "selected"
+    on open). Fixed by adding the field; regression test
+    `test_stock_list_includes_origin` added to `api/tests.py`.
+- **Repay Credit rework.** Replaced the old phone-search-first lookup with a
+  full customer table (No./Name/Nickname/Phone/Address/Current Credit/Last
+  Repaid Amount/Last Repaid Date), styled like the Stock table (sticky
+  header, vertical scroll), with a live phone-substring search box (phone
+  isn't unique — shared family phones) and click-to-select feeding into the
+  unchanged repay-amount flow. Backed by a new `GET /api/v1/pos/customers/`
+  (same URL as the existing create-customer `POST`, now a combined
+  list/create view).
+- **`Customer.address` is now required** (migration `0035`, generated and
+  applied to the local dev DB only — not committed). The Payment Panel's
+  create-customer form shows an inline error under the Address field instead
+  of a generic toast when it's left blank, both client-side (before the
+  API call) and when the server rejects it.
+- Verified with a full CDP browser pass (real clicks, real fetches, real
+  page reloads, real DB state checked afterward — not mocked), including
+  the origin-bug fix above. **181/181 tests passing** (`api shop`).
+
+## Recently landed (as of 2026-10-01, commit `d61daff` — pushed to GitHub `main`)
 
 Additive to the POS Phase C entry below — that one is left as-is.
 
@@ -45,8 +97,10 @@ Additive to the POS Phase C entry below — that one is left as-is.
   widened from 2 to 3 decimal places (migration `0033`) so an exact-gram
   scale reading (Papaya, Dragon Fruit, Cauliflower, Coriander, Watermelon)
   that isn't a multiple of 10g actually saves.
-- **Low-stock tracking + POS restocking** (uncommitted as of this writing —
-  see "Deploy status" below). `Product.low_stock_threshold`; a new
+- **Low-stock tracking + POS restocking** (committed and pushed to GitHub
+  `main` — see "Deploy status" below; the follow-up fixes and Repay Credit
+  rework in the section above are a later, still-uncommitted pass on top of
+  this). `Product.low_stock_threshold`; a new
   `purchase` `InventoryMovement` type (stock bought from an outside
   supplier) kept deliberately distinct from both `harvest` (farm-origin)
   and `adjustment_add` (a stock-count correction, not a real incoming
@@ -69,17 +123,24 @@ Additive to the POS Phase C entry below — that one is left as-is.
 
 ### Deploy status — check this before assuming any of the above is live
 
-- **Offers/round-off/PIN-hashing/quantity-precision** (commit `7eca669`):
-  committed and pushed to GitHub `main`. **Not confirmed deployed to
+- **Offers/round-off/PIN-hashing/quantity-precision** (commit `7eca669`)
+  **and low-stock tracking + restocking** (commit `3748afa`, plus the stock-
+  box simplification in `d61daff`): all committed and pushed to GitHub
+  `main` — confirmed via `git rev-list --left-right --count
+  origin/main...HEAD` returning `0  0` (local `main` and `origin/main` point
+  at the same commit, `d61daff`). **Not confirmed deployed to
   PythonAnywhere as of this writing** — needs `git pull`, then `migrate`
-  (applies `0030` through `0033`), `collectstatic`, and a Web tab reload
+  (applies `0030` through `0034`), `collectstatic`, and a Web tab reload
   there. Until that actually happens on the live PythonAnywhere instance:
   real staff PINs are still on the old PBKDF2 hashes and still work as
-  before, and round-off/offers/combo pricing aren't touching real sales.
-- **Low-stock tracking + restocking**: **not committed at all yet** — still
-  local working-tree changes as of this writing, doesn't exist on `main`,
-  let alone on PythonAnywhere. Needs its own commit + push before any
-  deploy step is even possible; migration `0034` once it does land.
+  before, round-off/offers/combo pricing aren't touching real sales, and the
+  low-stock/restock screen doesn't exist there at all yet.
+- **This round's stock follow-up fixes + Repay Credit rework** (see the
+  section above): **not committed at all** — still local working-tree
+  changes as of this writing, doesn't exist on `main`, let alone on
+  PythonAnywhere. Migration `0035` (`Customer.address` required) has only
+  been generated and applied to the local dev database — not committed.
+  Needs its own commit + push before any deploy step is even possible.
 
 ## Recently landed (as of 2026-10-01, commit 76865d4 + POS Phase C)
 
