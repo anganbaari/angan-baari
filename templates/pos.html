@@ -1842,11 +1842,22 @@
                 const body = document.getElementById('itemModalBody');
                 body.classList.remove('keypad-mode', 'offers-mode');
                 body.innerHTML = `<h3>Choose a ${productName}</h3>` +
-                    variants.map(v => `
+                    variants.map(v => {
+                        // Shows what this specific pick actually costs within
+                        // the combo -- "(included)" at/below the reference
+                        // weight, "(+Rs. X)" above it -- so the upcharge is
+                        // visible before confirming, not a surprise on the
+                        // final total. resolve_pos_combo_lines() recomputes
+                        // this same upcharge authoritatively at sale time.
+                        const upcharge = parseFloat(v.upcharge || 0);
+                        const priceLabel = upcharge > 0
+                            ? `Rs. ${v.total_price} (+Rs. ${formatMoney(upcharge)})`
+                            : `Rs. ${v.total_price} (included)`;
+                        return `
                         <button type="button" class="variant-option" data-vid="${v.id}">
-                            <span>${v.weight} kg${v.label ? ' — ' + v.label : ''}</span><span>Rs. ${v.total_price}</span>
-                        </button>`
-                    ).join('') +
+                            <span>${v.weight} kg${v.label ? ' — ' + v.label : ''}</span><span>${priceLabel}</span>
+                        </button>`;
+                    }).join('') +
                     `<div class="item-modal-actions"><button type="button" class="btn-cancel" id="comboVariantCancel">Cancel combo</button></div>`;
                 body.querySelectorAll('.variant-option').forEach(b => {
                     b.addEventListener('click', () => resolve(variants.find(v => v.id == b.dataset.vid)));
@@ -1871,6 +1882,7 @@
             const comboPrice = parseFloat(combo.combo_price);
             const newLines = [];
             let runningTotal = 0;
+            let totalUpcharge = 0; // sum of any fixed_weight reference-weight upcharges, for the toast below
 
             for (let i = 0; i < combo.items.length; i++) {
                 const item = combo.items[i];
@@ -1895,6 +1907,17 @@
                 } else {
                     price = round2((naturalLineValue / naturalTotal) * comboPrice);
                     runningTotal += price;
+                }
+
+                // A fixed_weight slot's reference-weight upcharge is a pure
+                // add-on, never folded into the proportional-share math above
+                // -- mirrors resolve_pos_combo_lines()'s server-side
+                // separation exactly, so this preview total matches what
+                // Complete Sale will actually charge.
+                if (item.pricing_mode === 'fixed_weight') {
+                    const upcharge = parseFloat(variant.upcharge || 0);
+                    price = round2(price + upcharge);
+                    totalUpcharge += upcharge;
                 }
 
                 const line = {
@@ -1926,7 +1949,12 @@
             closeItemModal();
             renderReceipt();
             updateCartIndicator();
-            showToast(`${combo.title} added — Rs. ${formatMoney(comboPrice)}`);
+            const chargedTotal = comboPrice + totalUpcharge;
+            showToast(
+                totalUpcharge > 0
+                    ? `${combo.title} added — Rs. ${formatMoney(chargedTotal)} (includes +Rs. ${formatMoney(totalUpcharge)} for a bigger pick)`
+                    : `${combo.title} added — Rs. ${formatMoney(chargedTotal)}`
+            );
         }
 
         document.getElementById('openOffersBtn').addEventListener('click', openOffersModal);

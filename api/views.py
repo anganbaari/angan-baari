@@ -28,6 +28,7 @@ from shop.views import (
     create_pos_sale,
     format_weight,
     get_pos_operator,
+    resolve_combo_reference_price,
     resolve_pos_coupon,
     POSSaleValidationError,
 )
@@ -269,9 +270,20 @@ class PosOffersListView(APIView):
                         'available': bi.product.is_available,
                     }
                     if bi.product.pricing_mode == 'fixed_weight':
+                        available_variants = list(bi.product.available_variants())
+                        reference_price = resolve_combo_reference_price(bi, available_variants)
                         item['available_variants'] = [
-                            {'id': v.id, 'weight': str(v.weight), 'label': v.label, 'total_price': str(v.total_price())}
-                            for v in bi.product.available_variants()
+                            {
+                                'id': v.id, 'weight': str(v.weight), 'label': v.label,
+                                'total_price': str(v.total_price()),
+                                # So the variant picker can show "(included)" vs
+                                # "(+Rs. X)" before the cashier commits to one --
+                                # resolve_pos_combo_lines() recomputes this same
+                                # upcharge authoritatively at sale time regardless.
+                                'upcharge': str(max(Decimal('0'), v.total_price() - reference_price))
+                                if reference_price is not None else '0',
+                            }
+                            for v in available_variants
                         ]
                         item['available'] = bi.product.is_available and bool(item['available_variants'])
                     items.append(item)

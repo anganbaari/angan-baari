@@ -1,16 +1,18 @@
 import json
 import uuid
+from datetime import timedelta
 from decimal import Decimal
 from unittest.mock import patch
 
 from django.contrib.auth.models import User
 from django.test import TestCase, Client
 from django.urls import reverse
+from django.utils import timezone
 
 from .admin import UserProfileInlineForm
 from .models import (
-    Category, Customer, InventoryMovement, ContactMessage, NewsletterSubscriber, POSSale,
-    Product, ProductVariant, UserProfile,
+    BundleItem, Category, Customer, InventoryMovement, ContactMessage, NewsletterSubscriber, Offer,
+    POSSale, Product, ProductVariant, UserProfile,
 )
 from .stock import get_stock_table_rows
 
@@ -556,3 +558,80 @@ class LowStockSignalTests(TestCase):
             # 1 -> 0 would cross a threshold of 1 for a normal product, but
             # fixed_weight is skipped entirely -- never even evaluated.
             self.assertEqual(mock_send.call_count, 0)
+
+
+class BundleItemReferenceWeightTests(TestCase):
+    """BundleItem.reference_weight -- the animal weight a combo's advertised
+    price assumes, for fixed_weight (goat/chicken) bundle slots. Auto-fills
+    once from whichever variant is cheapest at save time, then stays fixed
+    -- never recomputed as stock changes (see save() in shop/models.py)."""
+
+    def setUp(self):
+        self.category = Category.objects.create(name='Combo Weight Test', order=1)
+        self.goat = Product.objects.create(
+            name='Weight Test Goat', slug='weight-test-goat', category=self.category, description='test',
+            price=Decimal('1200.00'), pricing_mode='fixed_weight',
+        )
+        self.offer = Offer.objects.create(
+            title='Weight Test Combo', discount_type='combo', discount_value=Decimal('0'),
+            combo_price=Decimal('20000.00'),
+            start_date=timezone.now() - timedelta(days=1), end_date=timezone.now() + timedelta(days=1),
+        )
+
+    def test_autofills_with_cheapest_available_variant_at_creation(self):
+        ProductVariant.objects.create(product=self.goat, weight=Decimal('20.00'))  # 24000
+        cheaper = ProductVariant.objects.create(product=self.goat, weight=Decimal('10.00'))  # 12000, cheapest
+
+        bundle_item = BundleItem.objects.create(offer=self.offer, product=self.goat, quantity=Decimal('10.00'))
+
+        self.assertEqual(bundle_item.reference_weight, cheaper.weight)
+
+    def test_does_not_drift_when_a_cheaper_variant_appears_later(self):
+        ProductVariant.objects.create(product=self.goat, weight=Decimal('10.00'))  # 12000, cheapest at creation
+        bundle_item = BundleItem.objects.create(offer=self.offer, product=self.goat, quantity=Decimal('10.00'))
+        self.assertEqual(bundle_item.reference_weight, Decimal('10.00'))
+
+        # A cheaper animal shows up afterward -- already-locked reference_weight
+        # must not follow it, even across a later unrelated re-save.
+        ProductVariant.objects.create(product=self.goat, weight=Decimal('5.00'))  # 6000, now the cheapest
+        bundle_item.quantity = Decimal('11.00')
+        bundle_item.save()
+        bundle_item.refresh_from_db()
+        self.assertEqual(bundle_item.reference_weight, Decimal('10.00'))
+
+    def test_left_blank_when_no_variants_available_at_creation(self):
+        # Nothing to auto-fill from yet -- stays None rather than erroring.
+        bundle_item = BundleItem.objects.create(offer=self.offer, product=self.goat, quantity=Decimal('10.00'))
+        self.assertIsNone(bundle_item.reference_weight)
+
+        # The first save after a variant actually exists is still "blank at
+        # save time", so it fills in then -- same no-extra-admin-work rule
+        # as filling in at creation, just a save later than usual.
+        ProductVariant.objects.create(product=self.goat, weight=Decimal('10.00'))
+        bundle_item.quantity = Decimal('12.00')
+        bundle_item.save()
+        bundle_item.refresh_from_db()
+        self.assertEqual(bundle_item.reference_weight, Decimal('10.00'))
+
+        # From here on it's locked exactly like the normal case -- a cheaper
+        # animal showing up afterward must not make it drift.
+        ProductVariant.objects.create(product=self.goat, weight=Decimal('5.00'))
+        bundle_item.quantity = Decimal('13.00')
+        bundle_item.save()
+        bundle_item.refresh_from_db()
+        self.assertEqual(bundle_item.reference_weight, Decimal('10.00'))
+
+    def test_explicit_value_is_never_overridden(self):
+        ProductVariant.objects.create(product=self.goat, weight=Decimal('10.00'))  # cheapest would be 10
+        bundle_item = BundleItem.objects.create(
+            offer=self.offer, product=self.goat, quantity=Decimal('10.00'), reference_weight=Decimal('20.00'),
+        )
+        self.assertEqual(bundle_item.reference_weight, Decimal('20.00'))  # admin's explicit choice, not auto-filled
+
+    def test_not_autofilled_for_non_fixed_weight_products(self):
+        jar = Product.objects.create(
+            name='Weight Test Jar', slug='weight-test-jar', category=self.category, description='test',
+            price=Decimal('250.00'), pricing_mode='fixed_quantity',
+        )
+        bundle_item = BundleItem.objects.create(offer=self.offer, product=jar, quantity=Decimal('1'))
+        self.assertIsNone(bundle_item.reference_weight)

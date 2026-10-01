@@ -1021,6 +1021,152 @@ class POSOfferApiTests(ApiTestBase):
         combo_entry = next(o for o in response.data['combo_offers'] if o['offer_id'] == combo.id)
         self.assertFalse(combo_entry['fully_available'])
 
+    def _create_combo_with_goat_variants(self, combo_price, reference_weight):
+        """Same shape as _create_combo(), but the goat slot gets two extra
+        variants (a cheaper 10kg and a pricier 30kg, alongside the existing
+        20kg self.goat_variant) so upcharge math actually has something to
+        bite on, and an explicit reference_weight instead of whatever
+        auto-fills."""
+        light = ProductVariant.objects.create(product=self.goat, weight=Decimal('10.00'))  # 10 x 1200 = 12000
+        InventoryMovement.objects.create(
+            product=self.goat, variant=light, movement_type='harvest', source='admin', quantity=Decimal('1'),
+        )
+        heavy = ProductVariant.objects.create(product=self.goat, weight=Decimal('30.00'))  # 30 x 1200 = 36000
+        InventoryMovement.objects.create(
+            product=self.goat, variant=heavy, movement_type='harvest', source='admin', quantity=Decimal('1'),
+        )
+        combo = Offer.objects.create(
+            title='Goat Combo', discount_type='combo', discount_value=Decimal('0'),
+            combo_price=Decimal(combo_price),
+            start_date=timezone.now() - timedelta(days=1), end_date=timezone.now() + timedelta(days=1),
+        )
+        BundleItem.objects.create(offer=combo, product=self.fruit, quantity=Decimal('2.00'))
+        BundleItem.objects.create(offer=combo, product=self.jar, quantity=Decimal('3'))
+        goat_item = BundleItem.objects.create(
+            offer=combo, product=self.goat, quantity=Decimal('10.00'), reference_weight=reference_weight,
+        )
+        return combo, goat_item, light, heavy
+
+    def _combo_payload(self, combo, variant):
+        combo_instance_id = str(uuid.uuid4())
+        return combo_instance_id, {
+            'client_sale_id': str(uuid.uuid4()),
+            'cart': [
+                {'product_id': self.fruit.id, 'qty': 1, 'weight': '2.00', 'offer_id': combo.id, 'combo_instance_id': combo_instance_id},
+                {'product_id': self.jar.id, 'qty': 3, 'offer_id': combo.id, 'combo_instance_id': combo_instance_id},
+                {'product_id': self.goat.id, 'qty': 1, 'variant_id': variant.id, 'offer_id': combo.id, 'combo_instance_id': combo_instance_id},
+            ],
+        }
+
+    def test_combo_fixed_weight_zero_upcharge_at_reference_weight(self):
+        # self.goat_variant is exactly 20kg -- picking it when reference_weight
+        # is also 20kg costs exactly the plain combo price, no add-on.
+        combo, goat_item, light, heavy = self._create_combo_with_goat_variants('20000.00', Decimal('20.00'))
+        combo_instance_id, payload = self._combo_payload(combo, self.goat_variant)
+        payload['payments'] = [{'method': 'cash', 'amount': '20000.00'}]
+        response = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertEqual(Decimal(response.data['total']), Decimal('20000.00'))
+
+    def test_combo_fixed_weight_upcharge_for_heavier_variant(self):
+        # 30kg (36000) vs the 20kg (24000) reference -- +12000 on top of the
+        # plain combo price.
+        combo, goat_item, light, heavy = self._create_combo_with_goat_variants('20000.00', Decimal('20.00'))
+        combo_instance_id, payload = self._combo_payload(combo, heavy)
+        payload['payments'] = [{'method': 'cash', 'amount': '32000.00'}]  # 20000 + 12000
+        response = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertEqual(Decimal(response.data['total']), Decimal('32000.00'))
+
+    def test_combo_fixed_weight_lighter_variant_is_never_a_discount(self):
+        # 10kg (12000) is CHEAPER than the 20kg (24000) reference -- still
+        # costs the full plain combo price, never a discount for picking
+        # smaller.
+        combo, goat_item, light, heavy = self._create_combo_with_goat_variants('20000.00', Decimal('20.00'))
+        combo_instance_id, payload = self._combo_payload(combo, light)
+        payload['payments'] = [{'method': 'cash', 'amount': '20000.00'}]
+        response = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertEqual(Decimal(response.data['total']), Decimal('20000.00'))
+
+    def test_combo_fixed_weight_falls_back_to_cheapest_when_reference_variant_gone(self):
+        # reference_weight points at 20kg, but that exact animal has since
+        # sold -- falls back to the cheapest currently-available variant
+        # (10kg/12000) as the reference instead of erroring out, so picking
+        # the 30kg/36000 one now upcharges +24000 (against 12000, not 24000).
+        combo, goat_item, light, heavy = self._create_combo_with_goat_variants('20000.00', Decimal('20.00'))
+        self.goat_variant.is_available = False
+        self.goat_variant.save(update_fields=['is_available'])
+        combo_instance_id, payload = self._combo_payload(combo, heavy)
+        payload['payments'] = [{'method': 'cash', 'amount': '44000.00'}]  # 20000 + (36000 - 12000)
+        response = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertEqual(Decimal(response.data['total']), Decimal('44000.00'))
+
+    def test_combo_fixed_weight_upcharge_cannot_be_bypassed_by_underpaying(self):
+        # Picking the heavier animal but only paying the plain combo price
+        # (as if the upcharge didn't apply) must be rejected -- proves the
+        # upcharge is actually enforced server-side, not a client-optional
+        # extra.
+        combo, goat_item, light, heavy = self._create_combo_with_goat_variants('20000.00', Decimal('20.00'))
+        combo_instance_id, payload = self._combo_payload(combo, heavy)
+        payload['payments'] = [{'method': 'cash', 'amount': '20000.00'}]  # missing the +12000 upcharge
+        response = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(POSSale.objects.filter(client_sale_id=payload['client_sale_id']).exists())
+
+    def test_pos_offers_list_includes_per_variant_upcharge(self):
+        combo, goat_item, light, heavy = self._create_combo_with_goat_variants('20000.00', Decimal('20.00'))
+        response = self.client.get(reverse('v1_pos_offers_list'))
+        combo_entry = next(o for o in response.data['combo_offers'] if o['offer_id'] == combo.id)
+        goat_item_entry = next(i for i in combo_entry['items'] if i['product_id'] == self.goat.id)
+        by_id = {v['id']: v for v in goat_item_entry['available_variants']}
+        self.assertEqual(Decimal(by_id[self.goat_variant.id]['upcharge']), Decimal('0'))
+        self.assertEqual(Decimal(by_id[light.id]['upcharge']), Decimal('0'))  # cheaper -- never negative
+        self.assertEqual(Decimal(by_id[heavy.id]['upcharge']), Decimal('12000'))
+
+    def test_combo_with_zero_variant_fixed_weight_item_is_rejected_cleanly(self):
+        # Product.fixed_weight/locked_total_price() is a WEBSITE-only display
+        # fallback for a fixed_weight product that has no ProductVariant rows
+        # yet (see resolve_cart_line() in this same file) -- the POS, combo
+        # or not, has always required a real variant row to actually sell
+        # one. This must stay a clean rejection, never a silent price off
+        # the base rate and never a crash.
+        bare_goat = Product.objects.create(
+            name='Bare Goat', slug='bare-goat', category=self.category,
+            description='no variants yet', price=Decimal('1200.00'),
+            pricing_mode='fixed_weight', fixed_weight=Decimal('20.00'),
+        )
+        combo = Offer.objects.create(
+            title='Bare Goat Combo', discount_type='combo', discount_value=Decimal('0'),
+            combo_price=Decimal('10000.00'),
+            start_date=timezone.now() - timedelta(days=1), end_date=timezone.now() + timedelta(days=1),
+        )
+        BundleItem.objects.create(offer=combo, product=self.jar, quantity=Decimal('3'))
+        bundle_item = BundleItem.objects.create(offer=combo, product=bare_goat, quantity=Decimal('20.00'))
+        self.assertIsNone(bundle_item.reference_weight)  # nothing to auto-fill from -- confirmed, not assumed
+
+        combo_instance_id = str(uuid.uuid4())
+        payload = {
+            'client_sale_id': str(uuid.uuid4()),
+            'payments': [{'method': 'cash', 'amount': '10000.00'}],
+            'cart': [
+                {'product_id': self.jar.id, 'qty': 3, 'offer_id': combo.id, 'combo_instance_id': combo_instance_id},
+                # No variant_id -- none exist to pick. This is the only
+                # payload shape a real client could even send here, since
+                # GET /api/v1/pos/offers/ would list zero available_variants
+                # for this slot and mark the combo not fully_available
+                # (same as the no-stock case already covered above), so the
+                # POS UI itself never lets a cashier reach Complete Sale
+                # with this combo in the cart.
+                {'product_id': bare_goat.id, 'qty': 1, 'offer_id': combo.id, 'combo_instance_id': combo_instance_id},
+            ],
+        }
+        response = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('no longer available', response.data['message'])
+        self.assertFalse(POSSale.objects.filter(client_sale_id=payload['client_sale_id']).exists())
+
 
 class PosStockApiTests(ApiTestBase):
     """GET /api/v1/pos/stock/ and POST /api/v1/pos/restock/ -- the list

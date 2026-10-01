@@ -301,7 +301,7 @@ class BundleItemInline(admin.TabularInline):
     model = BundleItem
     extra = 1
     autocomplete_fields = ['product']
-    fields = ['product', 'quantity']
+    fields = ['product', 'quantity', 'reference_weight']
 
 
 @admin.register(Offer)

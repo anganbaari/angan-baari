@@ -764,6 +764,27 @@ def resolve_pos_offer_discount(offer_id, product, base_price):
     return offer.discounted_price(base_price)
 
 
+def resolve_combo_reference_price(bundle_item, available_variants):
+    """For a fixed_weight BundleItem, the price a chosen animal is compared
+    against to work out the combo upcharge (see BundleItem.reference_weight).
+
+    Looks for the variant matching reference_weight among `available_variants`
+    (today's actually-available animals for this product) and uses its price.
+    If none currently matches that exact weight -- animals come and go, the
+    one originally priced at the reference weight may be long sold -- falls
+    back to the cheapest currently-available variant's price instead of
+    erroring out. Returns None if there are no available variants at all
+    (caller's problem: nothing can be priced or sold either way).
+    """
+    if not available_variants:
+        return None
+    if bundle_item.reference_weight is not None:
+        match = next((v for v in available_variants if v.weight == bundle_item.reference_weight), None)
+        if match is not None:
+            return match.total_price()
+    return min(v.total_price() for v in available_variants)
+
+
 def resolve_pos_combo_lines(cart):
     """Validates every combo-offer group in a cart and returns the
     authoritative, server-computed price for each of their lines — a
@@ -786,6 +807,15 @@ def resolve_pos_combo_lines(cart):
          deterministic regardless of which particular animal was in stock
          that day. The last line in each group absorbs the rounding
          remainder so the group's lines sum to combo_price exactly.
+      5. For a fixed_weight slot (goat/chicken), adds an upcharge on top of
+         that share when the cashier picked a heavier/pricier animal than
+         BundleItem.reference_weight assumes — see
+         resolve_combo_reference_price(). Never a discount: picking at or
+         below the reference weight costs exactly the plain share, picking
+         above it adds the real price difference. This upcharge is a pure
+         add-on, computed after and independent of the remainder-absorption
+         above, so the group's *plain* shares still sum to combo_price
+         exactly regardless of which line(s) carry an upcharge.
 
     Returns {cart_index: Decimal(authoritative_price), ...} covering every
     line that belongs to a combo. Raises POSSaleValidationError if any
@@ -839,12 +869,37 @@ def resolve_pos_combo_lines(cart):
         combo_price = offer.combo_price or natural_total
         running_total = Decimal('0')
         for position, (index, bundle_item) in enumerate(allocations):
+            # running_total only ever tracks these plain proportional shares
+            # (pre-upcharge) -- a fixed_weight upcharge below is layered on
+            # top afterward, never folded into the remainder math, so the
+            # last line's share still correctly sums the GROUP to combo_price
+            # regardless of which line(s) carry an upcharge.
             if position == len(allocations) - 1:
                 price = combo_price - running_total  # last line absorbs the rounding remainder
             else:
                 share = (bundle_item.line_total() / natural_total) * combo_price
                 price = share.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
                 running_total += price
+
+            if bundle_item.product.pricing_mode == 'fixed_weight':
+                line = cart[index]
+                variant_id = line.get('variant_id')
+                variant = (
+                    bundle_item.product.variants.filter(id=variant_id, is_available=True).first()
+                    if variant_id else None
+                )
+                if not variant:
+                    raise POSSaleValidationError(f'{bundle_item.product.name}: that animal is no longer available.')
+                available = list(bundle_item.product.available_variants())
+                reference_price = resolve_combo_reference_price(bundle_item, available)
+                if reference_price is None:
+                    raise POSSaleValidationError(
+                        f'{bundle_item.product.name}: no animals currently available for this combo.'
+                    )
+                upcharge = variant.total_price() - reference_price
+                if upcharge > 0:
+                    price += upcharge
+
             line_prices[index] = price
 
     return line_prices

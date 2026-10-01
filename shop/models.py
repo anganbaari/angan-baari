@@ -518,9 +518,31 @@ class BundleItem(models.Model):
         max_digits=6, decimal_places=2, default=1,
         help_text='Amount of this product in the bundle. E.g. 1.9 for 1.9 kg chicken, 3 for 3 pieces of lemon.'
     )
+    reference_weight = models.DecimalField(
+        max_digits=6, decimal_places=2, null=True, blank=True,
+        help_text='For a fixed-weight bundle item: the animal weight this combo\'s '
+                   'advertised price assumes. Picking a variant at or below this weight '
+                   'costs exactly the combo price; picking a heavier one adds the real '
+                   'price difference. Only meaningful when the bundled product is '
+                   '"Fixed weight". Leave blank to auto-fill with the cheapest currently '
+                   'available animal\'s weight when this row is first saved -- once set '
+                   '(auto-filled or typed in), it stays fixed and is never recomputed as '
+                   'stock changes.'
+    )
 
     class Meta:
         ordering = ['id']
+
+    def save(self, *args, **kwargs):
+        # Auto-fill once, on whichever save first leaves this blank with a
+        # fixed_weight product attached -- never re-derived afterward, which
+        # is the whole point of a reference weight: it's what the owner's
+        # advertised combo price assumes, not a floating "today's cheapest".
+        if self.reference_weight is None and self.product_id and self.product.pricing_mode == 'fixed_weight':
+            available = self.product.available_variants()
+            if available:
+                self.reference_weight = min(available, key=lambda v: v.total_price()).weight
+        super().save(*args, **kwargs)
 
     def line_total(self):
         from decimal import Decimal
