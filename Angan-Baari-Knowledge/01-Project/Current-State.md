@@ -2,10 +2,68 @@
 
 *Living document — update as work lands. Last checked: 2026-10-01.*
 
-## Recently landed (as of 2026-10-01, uncommitted — stock follow-up fixes + Repay Credit rework)
+## Recently landed (as of 2026-10-01, uncommitted — Repay Credit full view, Logout, offer/coupon fixes)
 
-Same session as the commit `d61daff` work below, done as a later, separate pass
-— **none of this is committed yet**, see "Deploy status" below.
+Same session as everything below, done as a later, separate pass on top of
+commits `2ebe357`/`38390bb` — **none of this is committed yet**, see
+"Deploy status" below.
+
+- **Repay Credit converted from a modal to a full `repayView` screen**,
+  matching the `stockView` pattern exactly (same `currentView` toggle, same
+  sticky-header table styling, a "« Back" button instead of a backdrop
+  close). The search/row-click-select/repay-amount flow underneath is
+  functionally unchanged. Cancel now just clears the in-progress selection
+  (Back is the "leave the screen" action); a successful repayment stays on
+  the screen and refreshes the table rather than bouncing back to the
+  receipt, so staff can process several customers' repayments back to back
+  without re-navigating each time.
+- **Logout button** added next to the reminder card (which shrank slightly
+  to make room), styled slate gray (`#54606b`) — deliberately not
+  red/green/orange/blue, since those already mean Low Stock/Repay
+  Credit/Offers/Stock OK. Does a full Django logout (`{% url 'logout' %}`),
+  not a re-lock to the PIN screen — confirmed correct rather than assumed:
+  the PIN-unlock layer (`PosUnlockView`) only tracks who's currently
+  operating an already-logged-in terminal, it was never the terminal's own
+  access control, so end-of-shift needs the real session to end. Verified
+  directly (not just read) that `/account/logout/` ends the session and a
+  follow-up `/pos/` request redirects to login.
+- **Fixed-weight offer pricing bug in the edit flow.** Diagnosed with CDP
+  tracing before changing anything — the *add-to-cart* path
+  (`cloneProductWithOffer()`) already discounted every variant correctly.
+  The actual bug was in *editing* an offer-priced line: switching to a
+  different animal/variant via `editCartLine()` used
+  `productWithFixedRate()`, which only patched whichever variant was
+  originally picked, leaving every other variant at full undiscounted
+  price if you switched to it. Fixed by having `editCartLine()` re-fetch
+  the live offer and recompute every variant fresh (same as the initial
+  add), with a graceful fallback (plain prices + a toast) if the offer has
+  since expired. Also fixed a related bug where switching variants during
+  an edit could leave a stale `offer_id` on the line. Combo pricing
+  (`resolve_pos_combo_lines()`) was untouched — confirmed working as
+  designed, not part of this bug. Server-side `resolve_pos_offer_discount()`
+  needed no change — it already validates against the actual selected
+  variant's real price, not a flat number; added a regression test
+  (`test_fixed_weight_offer_discounts_each_variant_from_its_own_price`)
+  to lock that in.
+- **Coupons now exclude offer/combo-discounted lines.** `create_pos_sale()`
+  computes a separate `coupon_eligible_subtotal` (only lines with no
+  `offer_id`/`combo_instance_id`) and validates the coupon against that,
+  not the full cart total — an offer/combo line keeps its already-
+  discounted price untouched by a coupon. An all-offer cart with a coupon
+  code no longer blocks the sale (this can't happen via the normal UI
+  anyway, since `couponEligibleSubtotal()` on the Apply button already
+  catches it first) — it just completes at full price. The live
+  `/api/v1/pos/coupon/validate/` preview matches this same restricted-
+  subtotal rule via what the client sends it. The Apply button shows a
+  clear toast ("doesn't apply — every item is already discounted by an
+  offer") instead of silently doing nothing when nothing in the cart is
+  coupon-eligible.
+- Verified via a full CDP browser pass (real clicks, real session/logout
+  checks against the live server, not mocked) — found the fixed-weight
+  edit-flow bug this way before touching code, then confirmed the fix.
+  **184/184 tests passing** (`api shop`). No new migration this round.
+
+## Recently landed (as of 2026-10-01, commits `2ebe357`/`38390bb` — pushed to GitHub `main`)
 
 - **Low-stock/restock follow-up fixes**, after the first production test of
   the `d61daff` stock screen surfaced several rough edges:
@@ -45,11 +103,11 @@ Same session as the commit `d61daff` work below, done as a later, separate pass
   unchanged repay-amount flow. Backed by a new `GET /api/v1/pos/customers/`
   (same URL as the existing create-customer `POST`, now a combined
   list/create view).
-- **`Customer.address` is now required** (migration `0035`, generated and
-  applied to the local dev DB only — not committed). The Payment Panel's
-  create-customer form shows an inline error under the Address field instead
-  of a generic toast when it's left blank, both client-side (before the
-  API call) and when the server rejects it.
+- **`Customer.address` is now required** (migration `0035`, committed and
+  pushed — see "Deploy status" below). The Payment Panel's create-customer
+  form shows an inline error under the Address field instead of a generic
+  toast when it's left blank, both client-side (before the API call) and
+  when the server rejects it.
 - Verified with a full CDP browser pass (real clicks, real fetches, real
   page reloads, real DB state checked afterward — not mocked), including
   the origin-bug fix above. **181/181 tests passing** (`api shop`).
@@ -123,24 +181,29 @@ Additive to the POS Phase C entry below — that one is left as-is.
 
 ### Deploy status — check this before assuming any of the above is live
 
-- **Offers/round-off/PIN-hashing/quantity-precision** (commit `7eca669`)
-  **and low-stock tracking + restocking** (commit `3748afa`, plus the stock-
-  box simplification in `d61daff`): all committed and pushed to GitHub
+- **Offers/round-off/PIN-hashing/quantity-precision** (commit `7eca669`),
+  **low-stock tracking + restocking** (commit `3748afa`, plus the stock-box
+  simplification in `d61daff`), **and the stock follow-up fixes + Repay
+  Credit table rework** (commits `2ebe357`/`38390bb`, including migration
+  `0035` — `Customer.address` required): all committed and pushed to GitHub
   `main` — confirmed via `git rev-list --left-right --count
   origin/main...HEAD` returning `0  0` (local `main` and `origin/main` point
-  at the same commit, `d61daff`). **Not confirmed deployed to
+  at the same commit, `38390bb`). **Not confirmed deployed to
   PythonAnywhere as of this writing** — needs `git pull`, then `migrate`
-  (applies `0030` through `0034`), `collectstatic`, and a Web tab reload
+  (applies `0030` through `0035`), `collectstatic`, and a Web tab reload
   there. Until that actually happens on the live PythonAnywhere instance:
   real staff PINs are still on the old PBKDF2 hashes and still work as
-  before, round-off/offers/combo pricing aren't touching real sales, and the
-  low-stock/restock screen doesn't exist there at all yet.
-- **This round's stock follow-up fixes + Repay Credit rework** (see the
-  section above): **not committed at all** — still local working-tree
-  changes as of this writing, doesn't exist on `main`, let alone on
-  PythonAnywhere. Migration `0035` (`Customer.address` required) has only
-  been generated and applied to the local dev database — not committed.
-  Needs its own commit + push before any deploy step is even possible.
+  before, round-off/offers/combo pricing aren't touching real sales, the
+  low-stock/restock screen doesn't exist there at all yet, and Repay Credit
+  is still whatever it was before this rework.
+- **This round's Repay Credit full-view conversion, Logout button, and the
+  offer/coupon fixes** (see the top section above): **not committed at
+  all** — still local working-tree changes as of this writing, doesn't
+  exist on `main`, let alone on PythonAnywhere. No new migration this round
+  (no model changes), so once committed this is a pure code deploy —
+  `git pull`, `collectstatic`, Web tab reload, no `migrate` step needed for
+  this part specifically (though check whether migration `0035` above has
+  landed yet first).
 
 ## Recently landed (as of 2026-10-01, commit 76865d4 + POS Phase C)
 
