@@ -1069,14 +1069,18 @@
         document.getElementById('stockBox').addEventListener('click', showStockView);
         document.getElementById('backFromStockBtn').addEventListener('click', showReceiptView);
 
-        // Full Django staff logout (session ends, next use needs staff login
-        // again) -- deliberately NOT just re-locking to the PIN screen
-        // (setLocked(true)), since this is for end-of-shift: the PIN-unlock
-        // layer (PosUnlockView) only tracks who's currently operating an
-        // already-logged-in terminal, it was never meant to be the terminal's
-        // own access control.
-        document.getElementById('logoutBtn').addEventListener('click', () => {
-            window.location.href = "{% url 'logout' %}";
+        // Clears the current operator's PIN-unlock session (same
+        // /api/v1/pos/lock/ call the idle-timeout auto-lock above uses --
+        // PosLockView just pops pos_operator_id/pos_operator_unlocked_at
+        // from the session), then reloads /pos/ itself, re-running the
+        // exact same init sequence that shows the locked PIN screen on
+        // first page load. Deliberately NOT a full Django logout -- the
+        // PIN-unlock layer only tracks who's currently operating an
+        // already-logged-in terminal, it was never the terminal's own
+        // access control, so the underlying staff session stays active.
+        document.getElementById('logoutBtn').addEventListener('click', async () => {
+            await apiFetch('/api/v1/pos/lock/', { method: 'POST' });
+            window.location.href = "{% url 'pos' %}";
         });
 
         // Stock can be a plain integer count (jars, pieces) or a 3-decimal
