@@ -190,7 +190,14 @@ class CouponValidateView(APIView):
     increment, no sale). The actual sale still re-validates the same
     coupon from scratch in create_pos_sale() via resolve_pos_coupon(),
     which is the only place a coupon is ever actually consumed — this view
-    exists purely so staff see the discount before tapping Complete Sale."""
+    exists purely so staff see the discount before tapping Complete Sale.
+
+    `subtotal` is trusted as-is here (this is a preview only, never
+    authoritative) but pos.html is responsible for sending only the
+    coupon-eligible portion of the cart -- excluding any offer/combo-
+    discounted lines -- via its own couponEligibleSubtotal(), the same
+    restricted-subtotal rule create_pos_sale() enforces for real. This view
+    has no visibility into individual cart lines to enforce that itself."""
 
     authentication_classes = [SessionAuthentication]
     permission_classes = [IsStaffUser]

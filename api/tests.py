@@ -592,6 +592,54 @@ class POSCouponApiTests(ApiTestBase):
         self.percent_coupon.refresh_from_db()
         self.assertEqual(self.percent_coupon.used_count, 1)
 
+    def test_coupon_only_discounts_non_offer_lines(self):
+        # Fruit (300/kg * 0.5kg = 150) is under a 10%-off offer -> 135,
+        # untouched by the coupon. Jar (250, plain) is the only line the
+        # 25%-off coupon can see -- eligible subtotal is 250, not 400.
+        offer = Offer.objects.create(
+            title='Mango Sale', discount_type='percent', discount_value=Decimal('10'),
+            start_date=timezone.now() - timedelta(days=1), end_date=timezone.now() + timedelta(days=1),
+        )
+        offer.products.add(self.fruit)
+        payload = {
+            'client_sale_id': str(uuid.uuid4()),
+            'coupon_code': 'dashain25',
+            # 135 (offer line, untouched) + 187.50 (250 jar - 25%) = 322.50 -> rounds to 323
+            'payments': [{'method': 'cash', 'amount': '323.00'}],
+            'cart': [
+                {'product_id': self.fruit.id, 'weight': '0.50', 'offer_id': offer.id},
+                {'product_id': self.jar.id, 'qty': 1},
+            ],
+        }
+        response = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertEqual(Decimal(response.data['total']), Decimal('323.00'))
+        # 25% of the jar's 250 alone, not 25% of (135 + 250) = 385
+        self.assertEqual(Decimal(response.data['discount_amount']), Decimal('62.50'))
+
+    def test_coupon_on_an_all_offer_cart_is_not_blocked_and_applies_no_discount(self):
+        # Every line is already offer-discounted -- nothing left for the
+        # coupon to discount. In the real UI the Apply button refuses this
+        # before ever sending the coupon_code (couponEligibleSubtotal() is
+        # 0), so reaching create_pos_sale() this way is a direct-API edge
+        # case; it must still complete the sale rather than reject it.
+        offer = Offer.objects.create(
+            title='Mango Sale', discount_type='percent', discount_value=Decimal('10'),
+            start_date=timezone.now() - timedelta(days=1), end_date=timezone.now() + timedelta(days=1),
+        )
+        offer.products.add(self.fruit)
+        payload = {
+            'client_sale_id': str(uuid.uuid4()),
+            'coupon_code': 'dashain25',
+            'payments': [{'method': 'cash', 'amount': '135.00'}],  # 150 - 10% offer, no coupon discount
+            'cart': [{'product_id': self.fruit.id, 'weight': '0.50', 'offer_id': offer.id}],
+        }
+        response = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertEqual(Decimal(response.data['total']), Decimal('135.00'))
+        self.assertEqual(Decimal(response.data['discount_amount']), Decimal('0'))
+        self.assertIsNone(POSSale.objects.get(sale_number=response.data['sale_number']).coupon)
+
     def test_coupon_discount_reduces_taxable_value_proportionally_under_vat(self):
         BusinessSettings.objects.update_or_create(pk=1, defaults={'is_vat_enabled': True})
         self.jar.is_taxable = True
@@ -817,6 +865,42 @@ class POSOfferApiTests(ApiTestBase):
         }
         response = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_fixed_weight_offer_discounts_each_variant_from_its_own_price(self):
+        # Two animals of the same product at very different prices -- the
+        # discount must be recomputed against whichever one was actually
+        # picked, not a single flat number shared across every variant
+        # (the bug this test guards against: discounting once from
+        # product.price or from only the first variant checked).
+        light_goat = ProductVariant.objects.create(product=self.goat, weight=Decimal('10.00'))  # 10kg * 1200 = 12000
+        heavy_goat = ProductVariant.objects.create(product=self.goat, weight=Decimal('30.00'))  # 30kg * 1200 = 36000
+        for variant in (light_goat, heavy_goat):
+            InventoryMovement.objects.create(
+                product=self.goat, variant=variant, movement_type='harvest', source='admin', quantity=Decimal('1'),
+            )
+        offer = Offer.objects.create(
+            title='Goat Sale', discount_type='percent', discount_value=Decimal('10'),
+            start_date=timezone.now() - timedelta(days=1), end_date=timezone.now() + timedelta(days=1),
+        )
+        offer.products.add(self.goat)
+
+        light_payload = {
+            'client_sale_id': str(uuid.uuid4()),
+            'payments': [{'method': 'cash', 'amount': '10800.00'}],  # 12000 - 10%
+            'cart': [{'product_id': self.goat.id, 'variant_id': light_goat.id, 'offer_id': offer.id}],
+        }
+        response = self.client.post(reverse('v1_sale_list_create'), light_payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertEqual(Decimal(response.data['total']), Decimal('10800.00'))
+
+        heavy_payload = {
+            'client_sale_id': str(uuid.uuid4()),
+            'payments': [{'method': 'cash', 'amount': '32400.00'}],  # 36000 - 10%
+            'cart': [{'product_id': self.goat.id, 'variant_id': heavy_goat.id, 'offer_id': offer.id}],
+        }
+        response = self.client.post(reverse('v1_sale_list_create'), heavy_payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertEqual(Decimal(response.data['total']), Decimal('32400.00'))
 
     def _create_combo(self, combo_price):
         combo = Offer.objects.create(

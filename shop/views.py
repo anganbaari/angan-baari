@@ -700,6 +700,12 @@ def resolve_pos_coupon(code, subtotal):
     /pos/coupon/validate/ preview and create_pos_sale()'s own server-side
     recheck use exactly one implementation.
 
+    `subtotal` must already exclude any offer/combo-discounted lines (see
+    the coupon_eligible_subtotal callers compute in create_pos_sale() and
+    pos.html's couponEligibleSubtotal()) — a coupon never discounts a line
+    that's already discounted by an Offer, so this function never sees
+    those lines' value at all, not even to apply min_order_amount against.
+
     Returns (coupon_obj_or_None, discount_amount, error_message_or_None).
     A blank/whitespace code returns (None, Decimal('0'), None) — "no coupon"
     is not an error. discount_amount is always quantized to 2dp so it lines
@@ -925,6 +931,10 @@ def create_pos_sale(*, client_sale_id, cart, payments, operator_user, customer=N
     combo_line_prices = resolve_pos_combo_lines(cart)
 
     total = Decimal('0')
+    # Separate from `total` -- a coupon only ever discounts lines that
+    # AREN'T already offer/combo-discounted (see resolve_pos_coupon() call
+    # below), so this only accumulates plain, undiscounted lines.
+    coupon_eligible_subtotal = Decimal('0')
     taxable_value = Decimal('0')
     exempt_value = Decimal('0')
     cart_snapshot = []
@@ -971,6 +981,8 @@ def create_pos_sale(*, client_sale_id, cart, payments, operator_user, customer=N
                 line_total = combo_line_prices[index]
 
             total += line_total
+            if not offer_id and not combo_instance_id:
+                coupon_eligible_subtotal += line_total
             if settings_row.is_vat_enabled and product.is_taxable:
                 taxable_value += line_total
             else:
@@ -985,13 +997,28 @@ def create_pos_sale(*, client_sale_id, cart, payments, operator_user, customer=N
     except (Product.DoesNotExist, InvalidOperation, TypeError, ValueError):
         raise POSSaleValidationError('One of the items in this cart is no longer valid.')
 
-    # POS Phase C: coupon discount. Resolved against the pre-tax subtotal,
-    # same as website checkout — an invalid/expired/no-longer-qualifying
-    # code is a hard error here (unlike checkout(), which just shows an
-    # error banner and proceeds at full price): the POS operator already
-    # told the customer a discount applies, so silently dropping it would
-    # complete a sale for more than what was rung up on the screen.
-    coupon_obj, discount_amount, coupon_error = resolve_pos_coupon(coupon_code, total)
+    # POS Phase C: coupon discount. Resolved against the pre-tax subtotal of
+    # only the non-offer, non-combo lines (coupon_eligible_subtotal) -- a
+    # coupon never discounts a line that's already offer/combo-discounted,
+    # same reasoning as a combo's fixed bundle price never being touched
+    # by anything else. An invalid/expired/no-longer-qualifying code is a
+    # hard error here (unlike checkout(), which just shows an error banner
+    # and proceeds at full price): the POS operator already told the
+    # customer a discount applies, so silently dropping it would complete a
+    # sale for more than what was rung up on the screen. The one exception
+    # is a cart with nothing left for the coupon to discount at all (every
+    # line is offer/combo priced) -- that's not an invalid code, there's
+    # just nothing eligible, so the sale completes at full (undiscounted)
+    # price instead of being blocked. In the normal UI flow this can't
+    # actually happen (pos.html's Apply button already refuses to apply a
+    # coupon to an all-offer cart with its own clear toast, the same
+    # restricted-subtotal rule mirrored client-side), so reaching this
+    # branch server-side means a stale or direct API request, not a
+    # cashier action to explain.
+    if coupon_code and coupon_code.strip() and coupon_eligible_subtotal <= 0:
+        coupon_obj, discount_amount, coupon_error = None, Decimal('0'), None
+    else:
+        coupon_obj, discount_amount, coupon_error = resolve_pos_coupon(coupon_code, coupon_eligible_subtotal)
     if coupon_error:
         raise POSSaleValidationError(coupon_error)
     discounted_subtotal = total - discount_amount
