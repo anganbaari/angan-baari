@@ -392,14 +392,36 @@ class StockTableTests(TestCase):
         rows_by_id = {r['product_id']: r for r in get_stock_table_rows()}
 
         farm_row = rows_by_id[farm_product.id]
-        self.assertTrue(farm_row['is_low'])  # 3 <= 5
+        self.assertTrue(farm_row['is_low'])  # 3 < 5
+        self.assertEqual(farm_row['origin'], 'farm')
         self.assertEqual(farm_row['restock_method'], 'Own farm')
         self.assertIsNotNone(farm_row['last_restocked_at'])  # harvest counts
 
         sourced_row = rows_by_id[sourced_product.id]
         self.assertFalse(sourced_row['is_low'])  # 18 > 10
+        self.assertEqual(sourced_row['origin'], 'sourced')
         self.assertEqual(sourced_row['restock_method'], 'Outsourced')
         self.assertIsNotNone(sourced_row['last_restocked_at'])  # purchase counts, sale/waste don't
+
+    def test_is_low_is_strictly_less_than_not_less_than_or_equal(self):
+        """A product sitting exactly AT its threshold is not low yet -- only
+        strictly below it is. This is the exact boundary the feature
+        originally got wrong (<=  instead of <)."""
+        at_threshold = Product.objects.create(
+            name='At Threshold Product', slug='stock-test-at-threshold', category=self.category,
+            description='test', price=Decimal('10.00'), pricing_mode='fixed_quantity', low_stock_threshold=5,
+        )
+        InventoryMovement.objects.create(product=at_threshold, movement_type='harvest', source='admin', quantity=Decimal('5'))
+
+        just_below = Product.objects.create(
+            name='Just Below Threshold Product', slug='stock-test-below-threshold', category=self.category,
+            description='test', price=Decimal('10.00'), pricing_mode='fixed_quantity', low_stock_threshold=5,
+        )
+        InventoryMovement.objects.create(product=just_below, movement_type='harvest', source='admin', quantity=Decimal('4'))
+
+        rows_by_id = {r['product_id']: r for r in get_stock_table_rows()}
+        self.assertFalse(rows_by_id[at_threshold.id]['is_low'])  # 5 == 5, not low
+        self.assertTrue(rows_by_id[just_below.id]['is_low'])     # 4 < 5, low
 
     def test_last_restocked_only_counts_harvest_purchase_adjustment_add(self):
         """A sale/waste/return/adjustment_remove is never a restock, even
@@ -479,6 +501,23 @@ class LowStockSignalTests(TestCase):
             self.assertEqual(mock_send.call_count, 1)  # 6 -> 3, crossed down past 5
             self.assertIn('Signal Product', mock_send.call_args[0][0])
             self.assertIn('3', mock_send.call_args[0][0])
+
+    def test_does_not_fire_when_stock_lands_exactly_on_threshold(self):
+        """Landing exactly AT threshold is not a crossing -- is_low (and
+        this signal) only trigger strictly below it."""
+        InventoryMovement.objects.create(product=self.product, movement_type='harvest', source='admin', quantity=Decimal('20'))
+        with patch('shop.emails.send_telegram') as mock_send:
+            InventoryMovement.objects.create(product=self.product, movement_type='sale', source='pos', quantity=Decimal('15'))
+            self.assertEqual(mock_send.call_count, 0)  # 20 -> 5, lands exactly on threshold, not below it
+
+    def test_fires_when_crossing_from_exactly_at_threshold_to_below(self):
+        """stock_before >= threshold is deliberately inclusive of equality --
+        a product sitting exactly AT threshold is still eligible to cross
+        down on the very next sale."""
+        InventoryMovement.objects.create(product=self.product, movement_type='harvest', source='admin', quantity=Decimal('5'))
+        with patch('shop.emails.send_telegram') as mock_send:
+            InventoryMovement.objects.create(product=self.product, movement_type='sale', source='pos', quantity=Decimal('1'))
+            self.assertEqual(mock_send.call_count, 1)  # 5 -> 4, crossed
 
     def test_does_not_refire_on_repeat_sales_while_still_below_threshold(self):
         InventoryMovement.objects.create(product=self.product, movement_type='harvest', source='admin', quantity=Decimal('6'))

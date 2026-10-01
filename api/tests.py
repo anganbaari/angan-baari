@@ -941,10 +941,12 @@ class POSOfferApiTests(ApiTestBase):
 class PosStockApiTests(ApiTestBase):
     """GET /api/v1/pos/stock/ and POST /api/v1/pos/restock/ -- the list
     reuses get_stock_table_rows() (shop/stock.py), the exact same function
-    ProductAdmin's stock column uses; restock picks movement_type by
-    product.origin and goes through the same strict full_clean()-inside-
-    transaction.atomic() pattern create_pos_sale() uses for POS-originated
-    movements (not a best-effort write)."""
+    ProductAdmin's stock column uses; restock picks movement_type by the
+    request's explicit origin field (NOT product.origin -- a normally
+    farm-grown product can occasionally be bought in, and the ledger needs
+    to record what actually happened that day) and goes through the same
+    strict full_clean()-inside-transaction.atomic() pattern create_pos_
+    sale() uses for POS-originated movements (not a best-effort write)."""
 
     def setUp(self):
         super().setUp()
@@ -963,19 +965,26 @@ class PosStockApiTests(ApiTestBase):
         self.assertIn(self.fruit.id, ids)
         self.assertNotIn(self.goat.id, ids)  # fixed_weight -- tracked per-animal, excluded
 
+    def test_stock_list_includes_origin(self):
+        # The Restock modal's default-origin selector and the inline
+        # origin-edit control both read row.origin from this endpoint --
+        # without it they silently fall back to nothing being pre-selected.
+        response = self.client.get(reverse('v1_pos_stock_list'))
+        row = next(r for r in response.data if r['product_id'] == self.jar.id)
+        self.assertEqual(row['origin'], self.jar.origin)
+
     def test_restock_requires_staff(self):
         self.client.logout()
         response = self.client.post(
-            reverse('v1_pos_restock'), {'product_id': self.jar.id, 'quantity': '5'}, format='json',
+            reverse('v1_pos_restock'), {'product_id': self.jar.id, 'quantity': '5', 'origin': 'farm'}, format='json',
         )
         self.assertIn(response.status_code, (status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN))
 
-    def test_restock_farm_origin_product_creates_harvest_movement(self):
-        self.jar.origin = 'farm'
-        self.jar.save(update_fields=['origin'])
+    def test_restock_with_farm_origin_creates_harvest_movement(self):
         before = InventoryMovement.current_stock(self.jar)
         response = self.client.post(
-            reverse('v1_pos_restock'), {'product_id': self.jar.id, 'quantity': '5', 'note': 'supplier drop-off'},
+            reverse('v1_pos_restock'),
+            {'product_id': self.jar.id, 'quantity': '5', 'origin': 'farm', 'note': 'supplier drop-off'},
             format='json',
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
@@ -984,11 +993,9 @@ class PosStockApiTests(ApiTestBase):
         movement = InventoryMovement.objects.get(product=self.jar, movement_type='harvest', note='supplier drop-off')
         self.assertEqual(movement.source, 'pos')
 
-    def test_restock_sourced_origin_product_creates_purchase_movement(self):
-        self.jar.origin = 'sourced'
-        self.jar.save(update_fields=['origin'])
+    def test_restock_with_sourced_origin_creates_purchase_movement(self):
         response = self.client.post(
-            reverse('v1_pos_restock'), {'product_id': self.jar.id, 'quantity': '5'}, format='json',
+            reverse('v1_pos_restock'), {'product_id': self.jar.id, 'quantity': '5', 'origin': 'sourced'}, format='json',
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
         self.assertEqual(response.data['movement_type'], 'purchase')
@@ -996,10 +1003,32 @@ class PosStockApiTests(ApiTestBase):
             InventoryMovement.objects.filter(product=self.jar, movement_type='purchase', source='pos').exists()
         )
 
+    def test_restock_origin_is_independent_of_product_origin(self):
+        """The Chilly case: a normally farm-grown product occasionally
+        bought in from local farmers when the farm has none that day --
+        the explicit per-restock origin must win over product.origin,
+        which stays unchanged (see PosProductOriginUpdateView for actually
+        changing the product's own default)."""
+        self.jar.origin = 'farm'
+        self.jar.save(update_fields=['origin'])
+        response = self.client.post(
+            reverse('v1_pos_restock'), {'product_id': self.jar.id, 'quantity': '5', 'origin': 'sourced'}, format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertEqual(response.data['movement_type'], 'purchase')
+        self.jar.refresh_from_db()
+        self.assertEqual(self.jar.origin, 'farm')  # product's own default is untouched
+
+    def test_restock_rejects_missing_origin(self):
+        response = self.client.post(
+            reverse('v1_pos_restock'), {'product_id': self.jar.id, 'quantity': '5'}, format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
     def test_restock_rejects_fixed_weight_products_and_creates_nothing(self):
         before_count = InventoryMovement.objects.filter(product=self.goat).count()
         response = self.client.post(
-            reverse('v1_pos_restock'), {'product_id': self.goat.id, 'quantity': '1'}, format='json',
+            reverse('v1_pos_restock'), {'product_id': self.goat.id, 'quantity': '1', 'origin': 'farm'}, format='json',
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(InventoryMovement.objects.filter(product=self.goat).count(), before_count)
@@ -1007,7 +1036,7 @@ class PosStockApiTests(ApiTestBase):
     def test_restock_rejects_invalid_quantity_and_creates_nothing(self):
         before_count = InventoryMovement.objects.filter(product=self.jar).count()
         response = self.client.post(
-            reverse('v1_pos_restock'), {'product_id': self.jar.id, 'quantity': '0'}, format='json',
+            reverse('v1_pos_restock'), {'product_id': self.jar.id, 'quantity': '0', 'origin': 'farm'}, format='json',
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(InventoryMovement.objects.filter(product=self.jar).count(), before_count)
@@ -1021,7 +1050,7 @@ class PosStockApiTests(ApiTestBase):
         self.jar.save(update_fields=['is_available'])
         InventoryMovement.objects.filter(product=self.jar).delete()  # zero out stock from ApiTestBase's own harvest
         response = self.client.post(
-            reverse('v1_pos_restock'), {'product_id': self.jar.id, 'quantity': '3'}, format='json',
+            reverse('v1_pos_restock'), {'product_id': self.jar.id, 'quantity': '3', 'origin': 'farm'}, format='json',
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
         self.assertTrue(response.data['is_available'])
@@ -1030,11 +1059,54 @@ class PosStockApiTests(ApiTestBase):
 
     def test_restock_updates_stock_list_row_without_a_second_product(self):
         before = InventoryMovement.current_stock(self.fruit)
-        self.client.post(reverse('v1_pos_restock'), {'product_id': self.fruit.id, 'quantity': '2.500'}, format='json')
+        self.client.post(
+            reverse('v1_pos_restock'), {'product_id': self.fruit.id, 'quantity': '2.500', 'origin': 'farm'}, format='json',
+        )
         response = self.client.get(reverse('v1_pos_stock_list'))
         row = next(r for r in response.data if r['product_id'] == self.fruit.id)
         self.assertEqual(Decimal(row['current_stock']), before + Decimal('2.500'))
         self.assertIsNotNone(row['last_restocked_at'])
+
+
+class PosProductOriginUpdateApiTests(ApiTestBase):
+    """PATCH /api/v1/pos/products/<id>/origin/ -- changes a product's own
+    default origin going forward, separate from PosRestockView's per-
+    restock override above."""
+
+    def setUp(self):
+        super().setUp()
+        self.client.login(username='cashier', password='pw')
+
+    def test_requires_staff(self):
+        self.client.logout()
+        response = self.client.patch(
+            reverse('v1_pos_product_origin_update', args=[self.jar.id]), {'origin': 'sourced'}, format='json',
+        )
+        self.assertIn(response.status_code, (status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN))
+
+    def test_updates_product_origin(self):
+        self.jar.origin = 'farm'
+        self.jar.save(update_fields=['origin'])
+        response = self.client.patch(
+            reverse('v1_pos_product_origin_update', args=[self.jar.id]), {'origin': 'sourced'}, format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.data['origin'], 'sourced')
+        self.assertEqual(response.data['restock_method'], 'Outsourced')
+        self.jar.refresh_from_db()
+        self.assertEqual(self.jar.origin, 'sourced')
+
+    def test_rejects_invalid_origin_value(self):
+        response = self.client.patch(
+            reverse('v1_pos_product_origin_update', args=[self.jar.id]), {'origin': 'not-a-real-choice'}, format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_404_for_unknown_product(self):
+        response = self.client.patch(
+            reverse('v1_pos_product_origin_update', args=[999999]), {'origin': 'farm'}, format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
 
 class CustomerApiTests(ApiTestBase):
@@ -1064,6 +1136,59 @@ class CustomerApiTests(ApiTestBase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
         self.assertEqual(response.data['outstanding_balance'], '0.00')
         self.assertTrue(Customer.objects.filter(phone='9822222222', name='Sita Devi').exists())
+
+    def test_create_customer_without_address_is_rejected(self):
+        """Customer.address is required (not just a model-level change --
+        the create-customer API itself must reject a missing/blank address,
+        not just rely on the admin form)."""
+        self.client.login(username='cashier', password='pw')
+        payload = {'name': 'No Address Person', 'phone': '9855555555'}
+        response = self.client.post(reverse('v1_pos_customer_create'), payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('address', response.data)
+        self.assertFalse(Customer.objects.filter(phone='9855555555').exists())
+
+        blank_payload = {'name': 'Blank Address Person', 'phone': '9855555556', 'address': ''}
+        blank_response = self.client.post(reverse('v1_pos_customer_create'), blank_payload, format='json')
+        self.assertEqual(blank_response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_customer_list_requires_staff(self):
+        self.client.logout()
+        response = self.client.get(reverse('v1_pos_customer_create'))
+        self.assertIn(response.status_code, (status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN))
+
+    def test_customer_list_returns_every_customer_with_last_repayment(self):
+        """GET on the same /pos/customers/ URL POST creates on -- powers
+        the Repay Credit table: every customer (not phone-filtered, unlike
+        CustomerLookupView), each with their most recent repayment amount/
+        date, or null if they've never repaid."""
+        self.client.login(username='cashier', password='pw')
+        never_repaid = Customer.objects.create(name='Never Repaid', phone='9866666666', address='Farm Road')
+        repaid_twice = Customer.objects.create(name='Repaid Twice', phone='9877777777', address='Farm Road')
+        CreditTransaction.objects.create(
+            customer=repaid_twice, amount=Decimal('100.00'), transaction_type='repayment', recorded_by=self.staff,
+        )
+        later_repayment = CreditTransaction.objects.create(
+            customer=repaid_twice, amount=Decimal('250.00'), transaction_type='repayment', recorded_by=self.staff,
+        )
+        # A credit_sale transaction must never be mistaken for a repayment.
+        CreditTransaction.objects.create(
+            customer=repaid_twice, amount=Decimal('500.00'), transaction_type='credit_sale', recorded_by=self.staff,
+        )
+
+        response = self.client.get(reverse('v1_pos_customer_create'))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        rows_by_id = {row['id']: row for row in response.data}
+
+        never_row = rows_by_id[never_repaid.id]
+        self.assertIsNone(never_row['last_repaid_amount'])
+        self.assertIsNone(never_row['last_repaid_at'])
+        self.assertEqual(never_row['address'], 'Farm Road')
+
+        repaid_row = rows_by_id[repaid_twice.id]
+        self.assertEqual(Decimal(repaid_row['last_repaid_amount']), Decimal('250.00'))  # the LATER of the two
+        self.assertEqual(repaid_row['last_repaid_at'], later_repayment.created_at.isoformat())
+        self.assertEqual(Decimal(repaid_row['outstanding_balance']), Decimal('150.00'))  # 500 - 100 - 250
 
 
 class CreditLedgerApiTests(ApiTestBase):

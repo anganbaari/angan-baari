@@ -10,6 +10,12 @@ def notify_on_low_stock_crossing(sender, instance, created, **kwargs):
     while it stays below that line, and it naturally re-arms once a restock
     pushes stock back above threshold and it later crosses down again.
 
+    is_low is a strict less-than (see shop/stock.py::get_stock_table_rows())
+    -- a product sitting exactly AT threshold isn't low yet, so the crossing
+    itself is "was at or above threshold, is now strictly below it" ( >=
+    before, < after), not the old off-by-one ( > before, <= after) that
+    flagged a product the moment it merely touched threshold.
+
     Fixed-weight products (goats/chickens) are skipped entirely -- they're
     tracked per-animal via ProductVariant, not by a single stock count, so
     "low stock threshold" doesn't apply to them (same exclusion as the POS
@@ -27,7 +33,7 @@ def notify_on_low_stock_crossing(sender, instance, created, **kwargs):
     stock_before = stock_after - instance.signed_quantity()
     threshold = product.low_stock_threshold
 
-    if stock_before > threshold and stock_after <= threshold:
+    if stock_before >= threshold and stock_after < threshold:
         from .emails import send_telegram
         send_telegram(
             f"⚠️ <b>Low stock</b>\n{product.name} is down to "

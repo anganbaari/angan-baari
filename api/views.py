@@ -53,6 +53,7 @@ from .serializers import (
     PosUnlockSerializer,
     POSSaleCreateSerializer,
     POSSaleReadSerializer,
+    ProductOriginUpdateSerializer,
     ProductSerializer,
     ProductVariantSerializer,
     ProfileUpdateSerializer,
@@ -322,6 +323,7 @@ class PosStockListView(APIView):
                 'current_stock': str(row['current_stock']),
                 'low_stock_threshold': row['low_stock_threshold'],
                 'is_low': row['is_low'],
+                'origin': row['origin'],
                 'restock_method': row['restock_method'],
                 'last_restocked_at': row['last_restocked_at'].isoformat() if row['last_restocked_at'] else None,
                 'is_available': row['is_available'],
@@ -332,15 +334,23 @@ class PosStockListView(APIView):
 
 class PosRestockView(APIView):
     """POST /api/v1/pos/restock/ — a direct operator-entered restock from
-    the POS stock screen. Picks movement_type='harvest' if the product is
-    farm-origin, 'purchase' otherwise (a separate concept from both
-    'harvest' and 'adjustment_add' — see InventoryMovement.
+    the POS stock screen. Picks movement_type='harvest' if this restock's
+    explicit origin is 'farm', 'purchase' otherwise (a separate concept
+    from both 'harvest' and 'adjustment_add' — see InventoryMovement.
     MOVEMENT_TYPE_CHOICES). source='pos'. full_clean() is called explicitly
     inside transaction.atomic() — DRF's serializer validation does NOT call
     Model.clean() on its own, and this is a direct operator-entered
     movement (not a best-effort website write), so it gets the same strict
     treatment create_pos_sale()/create_inventory_movements_from_snapshot()
     already use for POS-originated movements.
+
+    origin is a per-restock field on the request (PosRestockSerializer),
+    deliberately NOT derived from product.origin: a normally farm-grown
+    product is occasionally bought in when the farm has none that day, and
+    the ledger needs to record what actually happened, not the product's
+    usual default. The POS restock modal pre-selects product.origin so the
+    common case is still one click. Changing the product's own default
+    going forward is a separate action — see PosProductOriginUpdateView.
 
     Fixed-weight products (goats/chickens) are rejected here — they're
     restocked by adding a new ProductVariant row (a new animal), not by a
@@ -367,7 +377,7 @@ class PosRestockView(APIView):
                 status=400,
             )
 
-        movement_type = 'harvest' if product.origin == 'farm' else 'purchase'
+        movement_type = 'harvest' if data['origin'] == 'farm' else 'purchase'
 
         try:
             with transaction.atomic():
@@ -391,11 +401,44 @@ class PosRestockView(APIView):
             'status': 'ok',
             'product_id': product.id,
             'current_stock': str(current_stock),
-            'is_low': current_stock <= product.low_stock_threshold,
+            'is_low': current_stock < product.low_stock_threshold,
             'is_available': product.is_available,
             'last_restocked_at': movement.created_at.isoformat(),
             'movement_type': movement_type,
         }, status=status.HTTP_201_CREATED)
+
+
+class PosProductOriginUpdateView(APIView):
+    """PATCH /api/v1/pos/products/<product_id>/origin/ — changes a
+    product's own default origin going forward (the inline edit control
+    next to "Restock Method" on the POS stock screen), separate from
+    PosRestockView's per-restock origin override above: this is for when a
+    product's actual long-term sourcing changes (you start growing
+    something you used to buy, or vice versa), not for recording what
+    happened on one specific restock."""
+
+    authentication_classes = [SessionAuthentication]
+    permission_classes = [IsStaffUser]
+
+    def patch(self, request, *args, **kwargs):
+        from shop.models import Product
+
+        serializer = ProductOriginUpdateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            product = Product.objects.get(id=kwargs['product_id'])
+        except Product.DoesNotExist:
+            return Response({'status': 'error', 'message': 'Product not found.'}, status=404)
+
+        product.origin = serializer.validated_data['origin']
+        product.save(update_fields=['origin'])
+        return Response({
+            'status': 'ok',
+            'product_id': product.id,
+            'origin': product.origin,
+            'restock_method': 'Own farm' if product.origin == 'farm' else 'Outsourced',
+        })
 
 
 class PosUnlockView(APIView):
@@ -508,14 +551,49 @@ class CustomerLookupView(APIView):
         return Response(CustomerSerializer(customers, many=True).data)
 
 
-class CustomerCreateView(APIView):
-    """POST /api/v1/pos/customers/ — creates a new credit customer, used
-    when CustomerLookupView comes back empty. A fresh customer always
-    starts at balance 0 (CreditTransaction rows only ever get created by an
-    actual sale/repayment, never by this view)."""
+class CustomerListCreateView(APIView):
+    """GET/POST /api/v1/pos/customers/.
+
+    GET powers the Repay Credit screen's customer table (name, nickname,
+    phone, address, outstanding balance, and their most recent repayment
+    amount/date, or null if they've never repaid) — every customer, not
+    phone-filtered like CustomerLookupView above (that one's for the
+    payment panel's credit-sale lookup, a separate flow this doesn't
+    touch). phone isn't unique (shared family phones), so the Repay Credit
+    screen does its own live substring filtering over this list client-side
+    rather than hitting the server per keystroke.
+
+    POST creates a new credit customer — unchanged from before. A fresh
+    customer always starts at balance 0 (CreditTransaction rows only ever
+    get created by an actual sale/repayment, never by this view)."""
 
     authentication_classes = [SessionAuthentication]
     permission_classes = [IsStaffUser]
+
+    def get(self, request, *args, **kwargs):
+        data = []
+        for customer in Customer.objects.all():
+            # -id as a tiebreaker: two repayments recorded in the same
+            # request-handling instant can share an identical created_at
+            # (auto_now_add's resolution), and id is the one field that's
+            # guaranteed to break the tie in actual insertion order.
+            last_repayment = (
+                customer.credit_transactions
+                .filter(transaction_type='repayment')
+                .order_by('-created_at', '-id')
+                .first()
+            )
+            data.append({
+                'id': customer.id,
+                'name': customer.name,
+                'nickname': customer.nickname,
+                'phone': customer.phone,
+                'address': customer.address,
+                'outstanding_balance': str(customer.outstanding_balance()),
+                'last_repaid_amount': str(last_repayment.amount) if last_repayment else None,
+                'last_repaid_at': last_repayment.created_at.isoformat() if last_repayment else None,
+            })
+        return Response(data)
 
     def post(self, request, *args, **kwargs):
         serializer = CustomerCreateSerializer(data=request.data)

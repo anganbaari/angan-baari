@@ -748,7 +748,7 @@ class Customer(models.Model):
     name = models.CharField(max_length=200)
     nickname = models.CharField(max_length=100, blank=True)
     phone = models.CharField(max_length=20, db_index=True)
-    address = models.TextField(blank=True)
+    address = models.TextField(help_text='Required -- needed to actually find a उधारो customer in person if a debt goes unpaid.')
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

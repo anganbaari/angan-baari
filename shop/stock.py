@@ -22,8 +22,13 @@ def get_stock_table_rows():
     """Returns one dict per non-fixed_weight Product (available or not):
 
         product_id, name, current_stock (Decimal), low_stock_threshold (int),
-        is_low (bool), restock_method ("Own farm" / "Outsourced"),
+        is_low (bool), origin ('farm' / 'sourced'),
+        restock_method ("Own farm" / "Outsourced" -- origin's display text),
         last_restocked_at (datetime or None), is_available (bool)
+
+    is_low is a strict less-than: a product sitting exactly AT threshold is
+    not yet low, only below it. Mirrored by the Telegram-alert crossing
+    check in shop/signals.py -- keep both in sync if this ever changes.
 
     Sort order: is_low=True rows first (ascending by current_stock, so the
     most urgent restock need is at the very top), then everything else
@@ -35,12 +40,16 @@ def get_stock_table_rows():
     for product in products:
         current_stock = InventoryMovement.current_stock(product)
         threshold = product.low_stock_threshold
-        is_low = current_stock <= threshold
+        is_low = current_stock < threshold
 
+        # -id as a tiebreaker: two movements recorded in the same
+        # request-handling instant can share an identical created_at
+        # (auto_now_add's resolution), and id is the one field guaranteed
+        # to break the tie in actual insertion order.
         last_movement = (
             InventoryMovement.objects
             .filter(product=product, movement_type__in=RESTOCK_MOVEMENT_TYPES)
-            .order_by('-created_at')
+            .order_by('-created_at', '-id')
             .first()
         )
 
@@ -50,6 +59,7 @@ def get_stock_table_rows():
             'current_stock': current_stock,
             'low_stock_threshold': threshold,
             'is_low': is_low,
+            'origin': product.origin,
             'restock_method': 'Own farm' if product.origin == 'farm' else 'Outsourced',
             'last_restocked_at': last_movement.created_at if last_movement else None,
             'is_available': product.is_available,

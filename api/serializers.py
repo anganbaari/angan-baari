@@ -420,7 +420,7 @@ class CustomerCreateSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=200)
     nickname = serializers.CharField(max_length=100, required=False, allow_blank=True, default='')
     phone = serializers.CharField(max_length=20)
-    address = serializers.CharField(required=False, allow_blank=True, default='')
+    address = serializers.CharField()
 
 
 class CouponValidateSerializer(serializers.Serializer):
@@ -438,11 +438,28 @@ class PosRestockSerializer(serializers.Serializer):
     the model's own 3-decimal-place precision (InventoryMovement.quantity)
     so a scale-weighed restock isn't forced to the nearest 10g. The actual
     business rules (which movement_type, full_clean()'s own checks) live in
-    PosRestockView/InventoryMovement.clean() -- not here."""
+    PosRestockView/InventoryMovement.clean() -- not here.
+
+    origin is explicit per restock, not derived from product.origin -- a
+    normally-farm-grown product (e.g. chilly) is occasionally bought in
+    when the farm has none that day, and the ledger needs to record what
+    actually happened, not just the product's usual default. The POS
+    restock modal pre-selects product.origin so the common case stays one
+    click, but staff can override it for this one restock."""
 
     product_id = serializers.IntegerField()
     quantity = serializers.DecimalField(max_digits=8, decimal_places=3, min_value=Decimal('0.001'))
+    origin = serializers.ChoiceField(choices=Product.ORIGIN_CHOICES)
     note = serializers.CharField(max_length=300, required=False, allow_blank=True, default='')
+
+
+class ProductOriginUpdateSerializer(serializers.Serializer):
+    """Input-shape validation for patching a product's own default origin
+    from the POS stock screen -- separate from PosRestockSerializer's
+    per-restock origin override above: this changes what the product's
+    sourcing normally is going forward, not just one restock event."""
+
+    origin = serializers.ChoiceField(choices=Product.ORIGIN_CHOICES)
 
 
 class CreditRepaySerializer(serializers.Serializer):

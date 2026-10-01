@@ -160,13 +160,17 @@
            like the other side-button columns, not like a data box. */
         .stock-col {
             width: 110px; align-items: center; justify-content: center; cursor: pointer;
-            background: var(--pos-bg); border: 2px solid var(--pos-border-dark); border-radius: 12px;
-            box-shadow: 0 4px 10px rgba(26,47,30,0.1); padding: 7px; text-align: center;
+            border: none; border-radius: 12px; box-shadow: 0 4px 10px rgba(26,47,30,0.22);
+            padding: 7px; text-align: center;
         }
-        .stock-indicator-text { font-weight: 800; font-size: 0.92rem; line-height: 1.25; font-family: 'Noto Sans Devanagari', 'DM Sans', sans-serif; }
-        .stock-col.stock-has-low { border-color: #b23b3b; }
-        .stock-col.stock-has-low .stock-indicator-text { color: #b23b3b; }
-        .stock-col.stock-all-ok .stock-indicator-text { color: var(--pos-text-green); }
+        .stock-indicator-text { font-weight: 800; font-size: 0.92rem; line-height: 1.25; color: #fff; font-family: 'Noto Sans Devanagari', 'DM Sans', sans-serif; }
+        /* Filled solid background + white text, same visual weight as the
+           Repay Credit (green) / Offers (orange) buttons either side of it
+           -- blue for "nothing's low" rather than another shade of green,
+           so it doesn't read as a near-duplicate of Repay Credit sitting
+           right next to it. */
+        .stock-col.stock-all-ok { background: #2f6690; }
+        .stock-col.stock-has-low { background: #b23b3b; }
 
         .tax-box { flex: 1; min-width: 0; background: var(--pos-bg); border: 2px solid var(--pos-border-dark); border-radius: 6px; overflow: hidden; height: fit-content; }
         .tax-box .tax-row { display: flex; justify-content: space-between; padding: 4px 14px; font-size: 0.95rem; border-bottom: 1px solid var(--pos-border-dark); font-family: 'Noto Sans Devanagari', 'DM Sans', sans-serif; }
@@ -253,6 +257,35 @@
             cursor: pointer; background: var(--pos-text-green); color: #fff; font-family: inherit;
         }
         .stock-table .stock-unavailable-tag { font-size: 0.72rem; color: var(--text-muted); font-weight: 700; }
+        .stock-table .stock-origin-cell { white-space: nowrap; }
+        .stock-table .stock-origin-edit-icon {
+            margin-left: 7px; font-size: 0.78rem; color: var(--text-muted); cursor: pointer;
+        }
+        .stock-table .stock-origin-edit-icon:hover { color: var(--moss); }
+        .stock-table .stock-origin-select {
+            font-family: inherit; font-size: 0.82rem; font-weight: 700; color: var(--forest);
+            border: 1.5px solid var(--moss); border-radius: 6px; padding: 3px 4px; background: var(--white);
+        }
+
+        /* Repay Credit modal's customer table -- same fixed-header,
+           vertical-scroll pattern as .stock-table/.stock-table-wrap above,
+           for visual consistency between the two POS tables. */
+        .repay-modal-card { max-width: 820px; width: 92vw; }
+        .repay-table-wrap {
+            max-height: 42vh; overflow-y: auto; overflow-x: auto; border: 2px solid var(--pos-border-dark);
+            border-radius: 6px; margin-bottom: 4px;
+        }
+        .repay-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+        .repay-table th, .repay-table td {
+            padding: 7px 10px; text-align: left; border-bottom: 1px solid var(--pos-border-dark);
+            color: var(--pos-text-black); white-space: nowrap;
+        }
+        .repay-table th { background: var(--pos-bg); font-weight: 800; position: sticky; top: 0; z-index: 2; }
+        .repay-table tbody tr { cursor: pointer; }
+        .repay-table tbody tr:hover td { background: #f3f8f3; }
+        .repay-table tbody tr.selected td { background: #eef6ee; }
+        .repay-table .repay-no-results td { text-align: center; color: var(--text-muted); cursor: default; }
+        .repay-table .repay-no-results:hover td { background: transparent; }
 
         /* ── Lock banner: a true centered modal overlay, dimming everything
            behind it -- NOT positioned relative to the table, so it can never
@@ -306,6 +339,13 @@
             cursor: pointer; font-family: inherit; font-size: 0.85rem; color: var(--forest); font-weight: 600;
         }
         .variant-option:hover { border-color: var(--moss); background: #f3f8f3; }
+
+        .restock-origin-row { display: flex; gap: 8px; margin-bottom: 8px; }
+        .restock-origin-btn {
+            flex: 1; padding: 9px 6px; border: 1.5px solid var(--mist); border-radius: 8px; background: var(--white);
+            font-family: inherit; font-weight: 700; font-size: 0.82rem; color: var(--forest); cursor: pointer;
+        }
+        .restock-origin-btn.selected { border-color: var(--moss); background: #f3f8f3; color: var(--moss); }
 
         .item-modal-card.offers-mode { max-width: 440px; }
         .offers-list { max-height: 50vh; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
@@ -606,7 +646,8 @@
                 <input type="text" id="newCustName" placeholder="Full name">
                 <input type="text" id="newCustNickname" placeholder="Nickname (optional)">
                 <input type="text" id="newCustPhone" placeholder="Phone">
-                <input type="text" id="newCustAddress" placeholder="Address (optional)">
+                <input type="text" id="newCustAddress" placeholder="Address">
+                <div id="newCustAddressError" style="display:none;color:#b23b3b;font-size:0.78rem;font-weight:700;margin-top:-4px;"></div>
                 <button type="button" class="side-btn payment-btn-main" id="createCustomerBtn">Create customer</button>
             </div>
         </div>
@@ -616,13 +657,28 @@
 
     <!-- Repay credit modal (reuses #itemModal chrome via its own simple overlay) -->
     <div id="repayBackdrop" style="display:none;position:fixed;inset:0;background:rgba(26,47,30,0.45);z-index:320;align-items:center;justify-content:center;">
-        <div class="item-modal-card" style="max-width:380px;">
+        <div class="item-modal-card repay-modal-card">
             <h3>Repay Credit / उधारो तिर्नुहोस्</h3>
-            <input type="text" id="repayPhoneInput" placeholder="Customer phone number" inputmode="numeric"
+            <input type="text" id="repayPhoneSearch" placeholder="Search by phone number…" inputmode="numeric"
                    style="width:100%;padding:9px 12px;border:1.5px solid var(--mist);border-radius:8px;font-family:inherit;margin-bottom:8px;">
-            <button type="button" class="side-btn payment-btn-main" style="width:100%;margin-bottom:10px;" id="repayLookupBtn">Look up</button>
-            <div id="repayCustomerResults"></div>
-            <div id="repaySelectedLabel" style="font-size:0.85rem;color:var(--moss);font-weight:700;display:none;margin-bottom:8px;"></div>
+            <div class="repay-table-wrap">
+                <table class="repay-table">
+                    <thead>
+                        <tr>
+                            <th>No.</th>
+                            <th>Name</th>
+                            <th>Nickname</th>
+                            <th>Phone</th>
+                            <th>Address</th>
+                            <th>Current Credit</th>
+                            <th>Last Repaid Amount</th>
+                            <th>Last Repaid Date</th>
+                        </tr>
+                    </thead>
+                    <tbody id="repayCustomerTableBody"></tbody>
+                </table>
+            </div>
+            <div id="repaySelectedLabel" style="font-size:0.85rem;color:var(--moss);font-weight:700;display:none;margin:10px 0 8px;"></div>
             <input type="text" id="repayAmountInput" placeholder="Amount (Rs.)" inputmode="decimal"
                    style="width:100%;padding:9px 12px;border:1.5px solid var(--mist);border-radius:8px;font-family:inherit;margin-bottom:12px;display:none;">
             <div class="item-modal-actions">
@@ -638,6 +694,10 @@
             <h3 id="restockTitle">Restock</h3>
             <input type="text" id="restockQtyInput" placeholder="Quantity" inputmode="decimal"
                    style="width:100%;padding:9px 12px;border:1.5px solid var(--mist);border-radius:8px;font-family:inherit;margin-bottom:8px;">
+            <div class="restock-origin-row" id="restockOriginRow">
+                <button type="button" class="restock-origin-btn" data-origin="farm">From our farm</button>
+                <button type="button" class="restock-origin-btn" data-origin="sourced">Purchased / outsourced</button>
+            </div>
             <input type="text" id="restockNoteInput" placeholder="Note (optional)"
                    style="width:100%;padding:9px 12px;border:1.5px solid var(--mist);border-radius:8px;font-family:inherit;margin-bottom:12px;">
             <div class="item-modal-actions">
@@ -911,6 +971,7 @@
             document.getElementById('shoppingView').style.display = 'none';
             document.getElementById('stockView').style.display = 'none';
             renderCategoryRow();
+            loadStockData(); // fresh every time the Stock box comes back into view, not a cached value
         }
 
         function showShoppingView() {
@@ -928,7 +989,8 @@
             document.getElementById('shoppingView').style.display = 'none';
             document.getElementById('stockView').style.display = 'flex';
             renderCategoryRow();
-            renderStockTable();
+            renderStockTable(); // paint whatever we already have instantly, avoiding a blank flash
+            loadStockData();    // then refresh with a fresh fetch -- never rely on a cached value here
         }
 
         function updateCartIndicator() {
@@ -993,7 +1055,11 @@
                     <td class="stock-col-name">${r.name}${r.is_available ? '' : ' <span class="stock-unavailable-tag">(disabled)</span>'}</td>
                     <td>${formatStockQty(r.current_stock)}</td>
                     <td>${r.low_stock_threshold}</td>
-                    <td>${r.restock_method}</td>
+                    <td class="stock-origin-cell" data-pid="${r.product_id}">
+                        <span class="stock-origin-text">${r.restock_method}</span>
+                        <i class="fas fa-pencil-alt stock-origin-edit-icon" data-pid="${r.product_id}"
+                           title="Change this product's default sourcing going forward"></i>
+                    </td>
                     <td>${formatLastRestocked(r.last_restocked_at)}</td>
                     <td><button type="button" class="stock-restock-btn" data-pid="${r.product_id}">Restock</button></td>
                 </tr>`
@@ -1001,13 +1067,67 @@
             body.querySelectorAll('.stock-restock-btn').forEach(btn => {
                 btn.addEventListener('click', () => openRestockModal(parseInt(btn.dataset.pid, 10)));
             });
+            body.querySelectorAll('.stock-origin-edit-icon').forEach(icon => {
+                icon.addEventListener('click', () => startEditingOrigin(parseInt(icon.dataset.pid, 10)));
+            });
+        }
+
+        // Inline edit for a product's own default origin (NOT the per-
+        // restock override in the Restock modal above -- this changes what
+        // the product's sourcing normally is going forward, e.g. you start
+        // growing something you used to buy, or vice versa).
+        function startEditingOrigin(productId) {
+            const row = stockData.find(r => r.product_id === productId);
+            const cell = document.querySelector(`.stock-origin-cell[data-pid="${productId}"]`);
+            if (!row || !cell) return;
+            cell.innerHTML = `
+                <select class="stock-origin-select">
+                    <option value="farm"${row.origin === 'farm' ? ' selected' : ''}>Own farm</option>
+                    <option value="sourced"${row.origin === 'sourced' ? ' selected' : ''}>Outsourced</option>
+                </select>`;
+            const select = cell.querySelector('select');
+            select.focus();
+            select.addEventListener('change', async () => {
+                const newOrigin = select.value;
+                const response = await apiFetch(`/api/v1/pos/products/${productId}/origin/`, {
+                    method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ origin: newOrigin }),
+                });
+                const data = await response.json().catch(() => ({}));
+                if (!response.ok) { showToast(data.message || 'Could not update sourcing'); renderStockTable(); return; }
+                row.origin = data.origin;
+                row.restock_method = data.restock_method;
+                showToast(`${row.name} sourcing set to "${data.restock_method}"`);
+                renderStockTable();
+            });
+            select.addEventListener('blur', () => renderStockTable()); // clicked away without changing -- cancel the edit
         }
 
         let restockTargetId = null;
+        let restockSelectedOrigin = null;
+
+        function renderRestockOriginButtons() {
+            document.querySelectorAll('.restock-origin-btn').forEach(btn => {
+                btn.classList.toggle('selected', btn.dataset.origin === restockSelectedOrigin);
+            });
+        }
+        document.querySelectorAll('.restock-origin-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                restockSelectedOrigin = btn.dataset.origin;
+                renderRestockOriginButtons();
+            });
+        });
+
         function openRestockModal(productId) {
             const row = stockData.find(r => r.product_id === productId);
             if (!row) return;
             restockTargetId = productId;
+            // Defaults to the product's current origin -- overridable per
+            // restock (e.g. chilly is normally farm-grown but occasionally
+            // bought in when the farm has none that day); this never
+            // changes the product's own default, only this one movement.
+            restockSelectedOrigin = row.origin;
+            renderRestockOriginButtons();
             document.getElementById('restockTitle').textContent = `Restock — ${row.name}`;
             document.getElementById('restockQtyInput').value = '';
             document.getElementById('restockNoteInput').value = '';
@@ -1020,11 +1140,14 @@
         document.getElementById('restockConfirmBtn').addEventListener('click', async () => {
             const qty = parseFloat(document.getElementById('restockQtyInput').value);
             if (!restockTargetId || !(qty > 0)) { showToast('Enter a valid quantity'); return; }
+            if (!restockSelectedOrigin) { showToast('Choose where this restock came from'); return; }
             const note = document.getElementById('restockNoteInput').value.trim();
 
             const response = await apiFetch('/api/v1/pos/restock/', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ product_id: restockTargetId, quantity: qty.toFixed(3), note }),
+                body: JSON.stringify({
+                    product_id: restockTargetId, quantity: qty.toFixed(3), origin: restockSelectedOrigin, note,
+                }),
             });
             const data = await response.json().catch(() => ({}));
             if (response.status === 403) {
@@ -1037,7 +1160,10 @@
             if (!response.ok) { showToast(data.message || 'Could not record restock'); return; }
 
             // Update just this row's stock/last-restocked values client-side
-            // rather than refetching the whole table.
+            // rather than refetching the whole table. Note: this restock's
+            // origin does NOT change row.origin/restock_method -- that's
+            // the product's own default, untouched by a one-off override
+            // (see the inline Restock Method edit control for changing it).
             const row = stockData.find(r => r.product_id === restockTargetId);
             if (row) {
                 row.current_stock = data.current_stock;
@@ -2052,7 +2178,14 @@
             });
         });
 
+        function setNewCustAddressError(message) {
+            const errEl = document.getElementById('newCustAddressError');
+            errEl.textContent = message || '';
+            errEl.style.display = message ? '' : 'none';
+        }
+
         document.getElementById('createCustomerBtn').addEventListener('click', async () => {
+            setNewCustAddressError('');
             const payload = {
                 name: document.getElementById('newCustName').value.trim(),
                 nickname: document.getElementById('newCustNickname').value.trim(),
@@ -2060,17 +2193,32 @@
                 address: document.getElementById('newCustAddress').value.trim(),
             };
             if (!payload.name || !payload.phone) { showToast('Name and phone are required'); return; }
+            if (!payload.address) { setNewCustAddressError('Address is required.'); return; }
             const response = await apiFetch('/api/v1/pos/customers/', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
             });
             const data = await response.json().catch(() => ({}));
-            if (!response.ok) { showToast(data.message || 'Could not create customer'); return; }
+            if (!response.ok) {
+                // DRF's default field-errors shape ({"address": ["This field
+                // is required."]}) is distinct from the {status, message}
+                // shape other custom views use -- surface it inline on the
+                // address field specifically when present, rather than
+                // falling back to a generic toast that hides which field was
+                // the problem.
+                if (Array.isArray(data.address) && data.address.length) {
+                    setNewCustAddressError(data.address[0]);
+                } else {
+                    showToast(data.message || 'Could not create customer');
+                }
+                return;
+            }
             selectedCustomer = data;
             document.getElementById('newCustomerForm').classList.remove('active');
             document.getElementById('newCustName').value = '';
             document.getElementById('newCustNickname').value = '';
             document.getElementById('newCustPhone').value = '';
             document.getElementById('newCustAddress').value = '';
+            setNewCustAddressError('');
             const label = document.getElementById('selectedCustomerLabel');
             label.textContent = `Selected: ${data.name} (balance Rs. ${data.outstanding_balance})`;
             label.style.display = '';
@@ -2135,50 +2283,46 @@
         });
 
         // ══════════════════════════════════════════════════════════════
-        // Repay credit — standalone flow, no cart involved
+        // Repay credit — standalone flow, no cart involved.
+        // Shows every customer in a table (GET /api/v1/pos/customers/)
+        // with a live phone-substring filter, since phone numbers aren't
+        // unique (shared family phones) -- a name/nickname search would
+        // be ambiguous in a way phone substring-match tolerates fine for
+        // staff who already know roughly who they're looking for.
         // ══════════════════════════════════════════════════════════════
+        let repayAllCustomers = [];
         let repaySelectedCustomer = null;
-        function openRepayModal() {
-            repaySelectedCustomer = null;
-            document.getElementById('repayPhoneInput').value = '';
-            document.getElementById('repayCustomerResults').innerHTML = '';
-            document.getElementById('repaySelectedLabel').style.display = 'none';
-            document.getElementById('repayAmountInput').style.display = 'none';
-            document.getElementById('repayAmountInput').value = '';
-            document.getElementById('repayConfirmBtn').style.display = 'none';
-            document.getElementById('repayBackdrop').style.display = 'flex';
-        }
-        document.getElementById('openRepayBtn').addEventListener('click', openRepayModal);
-        document.getElementById('repayCancelBtn').addEventListener('click', () => {
-            document.getElementById('repayBackdrop').style.display = 'none';
-        });
 
-        let repayLookupSeq = 0;
-        document.getElementById('repayLookupBtn').addEventListener('click', async () => {
-            const phone = document.getElementById('repayPhoneInput').value.trim();
-            if (!phone) return;
-            const mySeq = ++repayLookupSeq;
-            const resultsEl = document.getElementById('repayCustomerResults');
-            resultsEl.innerHTML = '';
-            repaySelectedCustomer = null;
-            document.getElementById('repaySelectedLabel').style.display = 'none';
-            document.getElementById('repayAmountInput').style.display = 'none';
-            document.getElementById('repayConfirmBtn').style.display = 'none';
-            const response = await apiFetch(`/api/v1/pos/customers/lookup/?phone=${encodeURIComponent(phone)}`);
-            const results = await response.json().catch(() => []);
-            if (mySeq !== repayLookupSeq) return; // a newer search has since started; discard this stale response
-            if (!results.length) { resultsEl.innerHTML = '<p style="font-size:0.82rem;color:var(--text-muted);">No existing account found for that number.</p>'; return; }
-            resultsEl.innerHTML = results.map(c => `
-                <div class="customer-card" data-id="${c.id}">
-                    <span>${c.name}${c.nickname ? ' (' + c.nickname + ')' : ''}</span>
-                    <span>Rs. ${c.outstanding_balance}</span>
-                </div>`
+        function formatRepayDate(iso) {
+            if (!iso) return '';
+            return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+        }
+
+        function renderRepayCustomerTable() {
+            const filter = document.getElementById('repayPhoneSearch').value.trim();
+            const filtered = filter ? repayAllCustomers.filter(c => c.phone.includes(filter)) : repayAllCustomers;
+            const body = document.getElementById('repayCustomerTableBody');
+            if (!filtered.length) {
+                body.innerHTML = '<tr class="repay-no-results"><td colspan="8">No customers match that number.</td></tr>';
+                return;
+            }
+            body.innerHTML = filtered.map((c, i) => `
+                <tr class="${repaySelectedCustomer && repaySelectedCustomer.id === c.id ? 'selected' : ''}" data-id="${c.id}">
+                    <td>${i + 1}</td>
+                    <td>${c.name}</td>
+                    <td>${c.nickname || ''}</td>
+                    <td>${c.phone}</td>
+                    <td>${c.address || ''}</td>
+                    <td>Rs. ${c.outstanding_balance}</td>
+                    <td>${c.last_repaid_amount !== null ? 'Rs. ' + c.last_repaid_amount : ''}</td>
+                    <td>${formatRepayDate(c.last_repaid_at)}</td>
+                </tr>`
             ).join('');
-            resultsEl.querySelectorAll('.customer-card').forEach(card => {
-                card.addEventListener('click', () => {
-                    repaySelectedCustomer = results.find(c => String(c.id) === card.dataset.id);
-                    resultsEl.querySelectorAll('.customer-card').forEach(c => c.classList.remove('selected'));
-                    card.classList.add('selected');
+            body.querySelectorAll('tr[data-id]').forEach(row => {
+                row.addEventListener('click', () => {
+                    repaySelectedCustomer = repayAllCustomers.find(c => String(c.id) === row.dataset.id);
+                    body.querySelectorAll('tr').forEach(r => r.classList.remove('selected'));
+                    row.classList.add('selected');
                     const label = document.getElementById('repaySelectedLabel');
                     label.textContent = `${repaySelectedCustomer.name} — owes Rs. ${repaySelectedCustomer.outstanding_balance}`;
                     label.style.display = '';
@@ -2186,7 +2330,26 @@
                     document.getElementById('repayConfirmBtn').style.display = '';
                 });
             });
+        }
+
+        async function openRepayModal() {
+            repaySelectedCustomer = null;
+            document.getElementById('repayPhoneSearch').value = '';
+            document.getElementById('repaySelectedLabel').style.display = 'none';
+            document.getElementById('repayAmountInput').style.display = 'none';
+            document.getElementById('repayAmountInput').value = '';
+            document.getElementById('repayConfirmBtn').style.display = 'none';
+            document.getElementById('repayCustomerTableBody').innerHTML = '<tr class="repay-no-results"><td colspan="8">Loading…</td></tr>';
+            document.getElementById('repayBackdrop').style.display = 'flex';
+            const response = await apiFetch('/api/v1/pos/customers/');
+            repayAllCustomers = response.ok ? await response.json() : [];
+            renderRepayCustomerTable();
+        }
+        document.getElementById('openRepayBtn').addEventListener('click', openRepayModal);
+        document.getElementById('repayCancelBtn').addEventListener('click', () => {
+            document.getElementById('repayBackdrop').style.display = 'none';
         });
+        document.getElementById('repayPhoneSearch').addEventListener('input', renderRepayCustomerTable);
 
         document.getElementById('repayConfirmBtn').addEventListener('click', async () => {
             const amount = parseFloat(document.getElementById('repayAmountInput').value);
