@@ -152,19 +152,21 @@
         .offers-col { width: 100px; }
         .payment-col { width: 130px; }
 
+        /* A single-line indicator, not a list -- deliberately has no content
+           that can grow with the number of low-stock products, so it can
+           never again stretch .receipt-combined-row taller than the
+           reminder card / tax box and squeeze the other columns (the actual
+           bug in the earlier per-item-list version). Sized and centered
+           like the other side-button columns, not like a data box. */
         .stock-col {
-            width: 130px; flex-direction: column; background: var(--pos-bg); border: 2px solid var(--pos-border-dark);
-            border-radius: 6px; overflow: hidden; padding: 4px 6px;
+            width: 110px; align-items: center; justify-content: center; cursor: pointer;
+            background: var(--pos-bg); border: 2px solid var(--pos-border-dark); border-radius: 12px;
+            box-shadow: 0 4px 10px rgba(26,47,30,0.1); padding: 7px; text-align: center;
         }
-        .stock-box-title { font-weight: 800; font-size: 0.82rem; color: #b23b3b; margin-bottom: 2px; }
-        .stock-box-list { flex: 1; overflow-y: auto; min-height: 0; font-size: 0.78rem; }
-        .stock-box-item { display: flex; justify-content: space-between; gap: 4px; padding: 1px 0; color: var(--pos-text-black); }
-        .stock-box-item span:last-child { font-weight: 800; color: #b23b3b; flex-shrink: 0; }
-        .stock-box-empty { color: var(--text-muted); font-size: 0.78rem; }
-        .stock-view-all-btn {
-            border: none; background: none; color: var(--pos-text-green); font-weight: 800; font-size: 0.78rem;
-            cursor: pointer; padding: 2px 0 0; text-align: left; font-family: inherit;
-        }
+        .stock-indicator-text { font-weight: 800; font-size: 0.92rem; line-height: 1.25; font-family: 'Noto Sans Devanagari', 'DM Sans', sans-serif; }
+        .stock-col.stock-has-low { border-color: #b23b3b; }
+        .stock-col.stock-has-low .stock-indicator-text { color: #b23b3b; }
+        .stock-col.stock-all-ok .stock-indicator-text { color: var(--pos-text-green); }
 
         .tax-box { flex: 1; min-width: 0; background: var(--pos-bg); border: 2px solid var(--pos-border-dark); border-radius: 6px; overflow: hidden; height: fit-content; }
         .tax-box .tax-row { display: flex; justify-content: space-between; padding: 4px 14px; font-size: 0.95rem; border-bottom: 1px solid var(--pos-border-dark); font-family: 'Noto Sans Devanagari', 'DM Sans', sans-serif; }
@@ -502,9 +504,7 @@
                     </div>
 
                     <div class="stock-col" id="stockBox">
-                        <div class="stock-box-title">&#9888; Low Stock</div>
-                        <div class="stock-box-list" id="stockBoxList"></div>
-                        <button type="button" class="stock-view-all-btn" id="viewAllStockBtn">View all »</button>
+                        <span class="stock-indicator-text" id="stockIndicatorText">Stock OK</span>
                     </div>
 
                     <div class="repay-col">
@@ -956,22 +956,20 @@
             if (currentView === 'stock') renderStockTable();
         }
 
+        // A single-line indicator, not a list -- the itemized low-stock
+        // list only ever appears on the full stockView table (see
+        // renderStockTable()). This box just answers "is anything low right
+        // now?" so it can never grow past one line regardless of how many
+        // products are flagged.
         function renderStockBox() {
-            const list = document.getElementById('stockBoxList');
-            const lowItems = stockData.filter(r => r.is_low);
-            if (!lowItems.length) {
-                list.innerHTML = '<div class="stock-box-empty">All good</div>';
-                return;
-            }
-            list.innerHTML = lowItems.map(r => `
-                <div class="stock-box-item"><span>${r.name}</span><span>${formatStockQty(r.current_stock)}</span></div>`
-            ).join('');
+            const box = document.getElementById('stockBox');
+            const text = document.getElementById('stockIndicatorText');
+            const hasLow = stockData.some(r => r.is_low);
+            box.classList.toggle('stock-has-low', hasLow);
+            box.classList.toggle('stock-all-ok', !hasLow);
+            text.innerHTML = hasLow ? '&#9888; Low Stock' : 'Stock OK';
         }
         document.getElementById('stockBox').addEventListener('click', showStockView);
-        document.getElementById('viewAllStockBtn').addEventListener('click', (e) => {
-            e.stopPropagation(); // stockBox itself also opens the stock view on click
-            showStockView();
-        });
         document.getElementById('backFromStockBtn').addEventListener('click', showReceiptView);
 
         // Stock can be a plain integer count (jars, pieces) or a 3-decimal
