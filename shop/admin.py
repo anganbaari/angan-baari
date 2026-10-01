@@ -318,7 +318,7 @@ class POSSalePaymentInline(admin.TabularInline):
 
 @admin.register(POSSale)
 class POSSaleAdmin(admin.ModelAdmin):
-    list_display = ['sale_number', 'cashier', 'customer', 'payment_method', 'coupon', 'discount_amount', 'total_amount', 'created_at']
+    list_display = ['sale_number', 'cashier', 'customer', 'payment_method', 'coupon', 'discount_amount', 'round_off_amount', 'total_amount', 'created_at']
     list_filter = ['payment_method', 'cashier', 'coupon', 'created_at']
     search_fields = ['sale_number']
     date_hierarchy = 'created_at'
@@ -326,7 +326,8 @@ class POSSaleAdmin(admin.ModelAdmin):
     inlines = [POSSalePaymentInline]
     readonly_fields = [
         'sale_number', 'cashier', 'customer', 'payment_method', 'cart_snapshot', 'total_amount',
-        'client_sale_id', 'taxable_value', 'exempt_value', 'vat_amount', 'coupon', 'discount_amount', 'created_at',
+        'client_sale_id', 'taxable_value', 'exempt_value', 'vat_amount', 'coupon', 'discount_amount',
+        'round_off_amount', 'created_at',
     ]
 
     def has_add_permission(self, request):
@@ -353,8 +354,6 @@ class UserProfileInlineForm(forms.ModelForm):
         fields = ['role', 'staff_number']
 
     def clean_pin(self):
-        from django.contrib.auth.hashers import check_password
-
         pin = self.cleaned_data.get('pin', '').strip()
         if not pin:
             return pin
@@ -364,11 +363,13 @@ class UserProfileInlineForm(forms.ModelForm):
         # pin_hash is hashed at rest, so there's no query that can check this
         # directly -- has to walk every other profile's hash and re-derive
         # whether the submitted raw PIN matches it, same as a login check.
+        # Goes through UserProfile.check_pin() rather than hashing here
+        # directly, so this form never needs to know the hash format.
         others = UserProfile.objects.exclude(pin_hash='')
         if self.instance.pk:
             others = others.exclude(pk=self.instance.pk)
         for other in others:
-            if check_password(pin, other.pin_hash):
+            if other.check_pin(pin):
                 raise forms.ValidationError('This PIN is already in use by another staff member.')
 
         return pin

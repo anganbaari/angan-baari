@@ -128,7 +128,7 @@ class POSSaleReadSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'sale_number', 'cashier', 'cashier_username', 'payment_method',
             'payment_method_display', 'cart_snapshot', 'total_amount',
-            'client_sale_id', 'created_at', 'coupon_code', 'discount_amount',
+            'client_sale_id', 'created_at', 'coupon_code', 'discount_amount', 'round_off_amount',
         ]
 
 

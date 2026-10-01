@@ -27,12 +27,38 @@ class UserProfile(models.Model):
     )
 
     def set_pin(self, raw_pin: str):
-        from django.contrib.auth.hashers import make_password
-        self.pin_hash = make_password(raw_pin)
+        """Fast HMAC-SHA256 + per-profile salt, deliberately NOT Django's own
+        password hashers (PBKDF2 at 600k+ iterations). A 4-digit PIN's real
+        protection is the 7-attempt/5-minute lockout in PosUnlockView, not
+        hash cost -- a slow hash here only adds latency (this was the
+        ~4-second PIN-unlock delay on PythonAnywhere's free-tier CPU,
+        multiplied by every staff profile PosUnlockView has to check).
+        Stored as 'salt$digest' (hex), both derived from HMAC with
+        settings.PIN_HASH_SECRET (falling back to SECRET_KEY) as the pepper.
+        This is a different format from Django's own hashers, so existing
+        PINs set before this change won't verify -- staff re-set their PIN
+        once via the admin form after this deploys."""
+        import hashlib
+        import hmac
+        import os
+        from django.conf import settings
+
+        salt = os.urandom(16).hex()
+        pepper = getattr(settings, 'PIN_HASH_SECRET', None) or settings.SECRET_KEY
+        digest = hmac.new((pepper + salt).encode(), raw_pin.encode(), hashlib.sha256).hexdigest()
+        self.pin_hash = f'{salt}${digest}'
 
     def check_pin(self, raw_pin: str) -> bool:
-        from django.contrib.auth.hashers import check_password
-        return bool(self.pin_hash) and check_password(raw_pin, self.pin_hash)
+        import hashlib
+        import hmac
+        from django.conf import settings
+
+        if not self.pin_hash or '$' not in self.pin_hash:
+            return False
+        salt, digest = self.pin_hash.split('$', 1)
+        pepper = getattr(settings, 'PIN_HASH_SECRET', None) or settings.SECRET_KEY
+        expected = hmac.new((pepper + salt).encode(), raw_pin.encode(), hashlib.sha256).hexdigest()
+        return hmac.compare_digest(expected, digest)
 
     def __str__(self):
         return f"{self.user.username} ({self.get_role_display()})"
@@ -617,10 +643,12 @@ class InventoryMovement(models.Model):
     movement_type = models.CharField(max_length=20, choices=MOVEMENT_TYPE_CHOICES)
     source = models.CharField(max_length=20, choices=SOURCE_CHOICES, default='admin')
     quantity = models.DecimalField(
-        max_digits=8, decimal_places=2,
+        max_digits=8, decimal_places=3,
         help_text='Always a POSITIVE number, in the product\'s own unit. The '
                    'movement type above decides whether it adds to or removes '
-                   'from stock — you never need to enter a minus sign.'
+                   'from stock — you never need to enter a minus sign. 3 decimal '
+                   'places so a single-gram scale reading (e.g. 0.335kg from a '
+                   '335g reading) can be recorded exactly, not just the nearest 10g.'
     )
     related_order = models.ForeignKey(
         'ProductOrder', null=True, blank=True, on_delete=models.SET_NULL,
@@ -787,10 +815,17 @@ class POSSale(models.Model):
     # POS Phase C: coupon discounts. Reuses the same Coupon model the
     # website checkout uses (festival codes like DASHAIN25) rather than a
     # parallel POS-only discount system — one place discount rules live,
-    # one used_count counter, one "My Coupons" list. Offer-style automatic
-    # per-product/category discounts are a website-only concept for now
-    # (they'd need per-line price overrides in the product grid) and are
-    # deliberately not part of this.
+    # one used_count counter, one "My Coupons" list.
+    #
+    # Offer-style automatic per-product/combo discounts (POS Phase D) are a
+    # separate mechanism, not reflected on this field: a discounted single
+    # product is just an ordinary cart line priced lower (its discount is
+    # baked into that line's own price in cart_snapshot, not tracked here),
+    # and a combo is several ordinary cart lines sharing a combo_instance_id
+    # in cart_snapshot. See resolve_pos_offer_discount()/
+    # resolve_pos_combo_lines() in shop/views.py — this field/discount_amount
+    # are specifically about the one coupon code a sale can have, which is
+    # independent of and stacks with any offer-priced lines in the same cart.
     coupon = models.ForeignKey(
         Coupon, on_delete=models.SET_NULL, null=True, blank=True, related_name='pos_sales',
         help_text='The coupon code applied to this sale, if any.',
@@ -798,6 +833,20 @@ class POSSale(models.Model):
     discount_amount = models.DecimalField(
         max_digits=10, decimal_places=2, default=0,
         help_text='Amount knocked off the pre-tax subtotal by the coupon above. Zero when no coupon was used.',
+    )
+
+    # Standard retail cash rounding: nobody pays paisa, so the grand total is
+    # rounded to the nearest whole rupee (round-half-up) and the difference
+    # is recorded here rather than silently absorbed -- same bookkeeping
+    # spirit as discount_amount. taxable_value/exempt_value/vat_amount above
+    # stay exactly as computed (unrounded); only total_amount and this field
+    # change, so the detailed breakdown still adds up precisely on its own
+    # and this is the one place the rounding difference lives.
+    round_off_amount = models.DecimalField(
+        max_digits=4, decimal_places=2, default=0,
+        help_text='required_total rounded to the nearest rupee, minus required_total itself -- '
+                   'e.g. -0.37 if a Rs. 222.37 total was rounded down to Rs. 222. Always between '
+                   '-0.99 and +0.99.'
     )
 
     created_at = models.DateTimeField(auto_now_add=True)

@@ -175,7 +175,7 @@ class POSSaleView(generics.ListAPIView):
         return Response(
             {
                 'status': 'ok', 'sale_number': sale.sale_number, 'total': str(sale.total_amount),
-                'discount_amount': str(sale.discount_amount),
+                'discount_amount': str(sale.discount_amount), 'round_off_amount': str(sale.round_off_amount),
             },
             status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
         )
@@ -209,6 +209,90 @@ class CouponValidateView(APIView):
             'code': coupon_obj.code,
             'discount_amount': str(discount_amount),
         })
+
+
+class PosOffersListView(APIView):
+    """GET /api/v1/pos/offers/ — POS Phase D: live Offers (percent/fixed
+    product discounts and combo bundles) for the offers picker, fetched
+    on demand rather than baked into the initial /pos/ page payload, since
+    a terminal can stay unlocked all day (see PosUnlockView) while an
+    offer's is_live() window starts or ends mid-shift.
+
+    A product/bundle item still being listed here doesn't guarantee it'll
+    still be available by the time the cashier taps Complete Sale —
+    resolve_pos_offer_discount()/resolve_pos_combo_lines() in
+    shop/views.py are the actual source of truth, re-checked fresh at sale
+    time, exactly like the coupon preview above. This is read-only and
+    makes no changes."""
+
+    authentication_classes = [SessionAuthentication]
+    permission_classes = [IsStaffUser]
+
+    def get(self, request, *args, **kwargs):
+        from shop.models import Offer
+
+        now = timezone.now()
+        live_offers = Offer.objects.filter(is_active=True, start_date__lte=now, end_date__gte=now)
+
+        discount_offers = []
+        combo_offers = []
+
+        for offer in live_offers:
+            if offer.discount_type == 'combo':
+                bundle_items = list(offer.bundle_items.select_related('product').all())
+                if not bundle_items:
+                    continue
+                natural_total = offer.get_bundle_natural_total()
+                if natural_total <= 0:
+                    continue
+
+                items = []
+                for bi in bundle_items:
+                    item = {
+                        'bundle_item_id': bi.id,
+                        'product_id': bi.product_id,
+                        'product_name': bi.product.name,
+                        'pricing_mode': bi.product.pricing_mode,
+                        'quantity': str(bi.quantity),
+                        'unit_label': 'kg' if bi.product.pricing_mode == 'fixed_weight' else (
+                            bi.product.weight_unit_label if bi.product.pricing_mode == 'variable_weight' else ''
+                        ),
+                        'available': bi.product.is_available,
+                    }
+                    if bi.product.pricing_mode == 'fixed_weight':
+                        item['available_variants'] = [
+                            {'id': v.id, 'weight': str(v.weight), 'label': v.label, 'total_price': str(v.total_price())}
+                            for v in bi.product.available_variants()
+                        ]
+                        item['available'] = bi.product.is_available and bool(item['available_variants'])
+                    items.append(item)
+
+                combo_offers.append({
+                    'offer_id': offer.id,
+                    'title': offer.title,
+                    'combo_price': str(offer.combo_price or natural_total),
+                    'natural_total': str(natural_total),
+                    'items': items,
+                    'fully_available': all(i['available'] for i in items),
+                })
+            else:
+                for product in offer.get_products():
+                    if not product.price or product.price <= 0:
+                        continue
+                    discount_offers.append({
+                        'offer_id': offer.id,
+                        'title': offer.title,
+                        'product_id': product.id,
+                        'product_name': product.name,
+                        'pricing_mode': product.pricing_mode,
+                        'original_price': str(product.price),
+                        'discounted_price': str(offer.discounted_price(product.price)),
+                        'discount_type': offer.discount_type,
+                        'discount_value': str(offer.discount_value),
+                        'available': product.is_available,
+                    })
+
+        return Response({'discount_offers': discount_offers, 'combo_offers': combo_offers})
 
 
 class PosUnlockView(APIView):

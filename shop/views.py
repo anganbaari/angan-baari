@@ -728,6 +728,122 @@ def resolve_pos_coupon(code, subtotal):
     return coupon_obj, discount_amount, None
 
 
+def resolve_pos_offer_discount(offer_id, product, base_price):
+    """Re-validates a single-product (percent/fixed) Offer server-side and
+    returns the discounted price for one unit of `base_price` — never trusts
+    a client-sent discounted price, same principle as resolve_pos_coupon().
+
+    `base_price` is whatever this cart line's own per-unit price would
+    normally be (product.price, a ProductSellingUnit's price, or a
+    fixed_weight variant's total_price) — Offer.discounted_price() just does
+    percent/fixed arithmetic on whatever Decimal it's given, so this works
+    the same way regardless of pricing_mode.
+
+    Raises POSSaleValidationError if the offer doesn't exist, isn't live,
+    is a combo (those go through resolve_pos_combo_lines() instead), or
+    doesn't actually include this product.
+    """
+    from .models import Offer
+
+    try:
+        offer = Offer.objects.get(id=offer_id)
+    except (Offer.DoesNotExist, ValueError, TypeError):
+        raise POSSaleValidationError('That offer no longer exists.')
+    if offer.discount_type == 'combo':
+        raise POSSaleValidationError(f'"{offer.title}" is a combo deal, not a per-product discount.')
+    if not offer.is_live():
+        raise POSSaleValidationError(f'"{offer.title}" is no longer available.')
+    if product not in offer.get_products():
+        raise POSSaleValidationError(f'{product.name} is not part of "{offer.title}".')
+    return offer.discounted_price(base_price)
+
+
+def resolve_pos_combo_lines(cart):
+    """Validates every combo-offer group in a cart and returns the
+    authoritative, server-computed price for each of their lines — a
+    client-sent combo line price is never trusted, same principle as
+    resolve_pos_coupon()/resolve_pos_offer_discount().
+
+    A combo "instance" is a set of cart lines sharing the same
+    combo_instance_id (a UUID the POS screen generates client-side when the
+    cashier taps a combo in the offers picker — one per Offer.bundle_items
+    row, exactly like how one real animal/weight/unit becomes one ordinary
+    cart line everywhere else in this file). This function:
+      1. Groups lines by combo_instance_id.
+      2. Re-fetches the combo Offer fresh and confirms it's still live.
+      3. Confirms the submitted lines are exactly the offer's current
+         BundleItem set (by product_id) — not stale, not tampered with.
+      4. Prices each line as its proportional share of combo_price, using
+         each BundleItem's *declared* quantity x product.price (not
+         whichever specific fixed_weight variant the cashier happened to
+         pick) as the apportionment weight — so the money math stays
+         deterministic regardless of which particular animal was in stock
+         that day. The last line in each group absorbs the rounding
+         remainder so the group's lines sum to combo_price exactly.
+
+    Returns {cart_index: Decimal(authoritative_price), ...} covering every
+    line that belongs to a combo. Raises POSSaleValidationError if any
+    combo group is incomplete, stale, or no longer live. Stock deduction
+    for these lines is untouched — each one is still a completely ordinary
+    product/variant/unit line as far as create_inventory_movements_from_
+    snapshot() is concerned; only the price is special-cased here.
+    """
+    from decimal import Decimal, ROUND_HALF_UP
+    from .models import Offer
+
+    groups = {}
+    for index, line in enumerate(cart):
+        combo_instance_id = line.get('combo_instance_id')
+        if combo_instance_id:
+            groups.setdefault(combo_instance_id, []).append((index, line))
+
+    line_prices = {}
+    for combo_instance_id, entries in groups.items():
+        offer_id = entries[0][1].get('offer_id')
+        try:
+            offer = Offer.objects.get(id=offer_id, discount_type='combo')
+        except (Offer.DoesNotExist, ValueError, TypeError):
+            raise POSSaleValidationError('One of the combo offers in this cart no longer exists.')
+        if not offer.is_live():
+            raise POSSaleValidationError(f'"{offer.title}" is no longer available.')
+
+        bundle_items = list(offer.bundle_items.select_related('product').all())
+        natural_total = offer.get_bundle_natural_total()
+        if not bundle_items or natural_total <= 0:
+            raise POSSaleValidationError(f'"{offer.title}" is not configured correctly.')
+        if len(entries) != len(bundle_items):
+            raise POSSaleValidationError(
+                f'"{offer.title}" in the cart doesn\'t match the current bundle contents — remove and re-add it.'
+            )
+
+        # Match each cart line to exactly one BundleItem by product, consuming
+        # each BundleItem at most once (handles a product appearing twice in
+        # one bundle) rather than assuming cart order matches bundle order.
+        remaining = list(bundle_items)
+        allocations = []
+        for index, line in entries:
+            match = next((bi for bi in remaining if bi.product_id == line.get('product_id')), None)
+            if not match:
+                raise POSSaleValidationError(
+                    f'"{offer.title}" in the cart doesn\'t match the current bundle contents — remove and re-add it.'
+                )
+            remaining.remove(match)
+            allocations.append((index, match))
+
+        combo_price = offer.combo_price or natural_total
+        running_total = Decimal('0')
+        for position, (index, bundle_item) in enumerate(allocations):
+            if position == len(allocations) - 1:
+                price = combo_price - running_total  # last line absorbs the rounding remainder
+            else:
+                share = (bundle_item.line_total() / natural_total) * combo_price
+                price = share.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+                running_total += price
+            line_prices[index] = price
+
+    return line_prices
+
+
 def create_pos_sale(*, client_sale_id, cart, payments, operator_user, customer=None,
                      source='pos', note_prefix='POS sale', coupon_code=None):
     """Shared by pos_create_sale() (traditional, what templates/pos.html
@@ -755,6 +871,17 @@ def create_pos_sale(*, client_sale_id, cart, payments, operator_user, customer=N
     resolve_pos_coupon() for the coupon rules themselves and
     pos_validate_coupon() for the pre-checkout preview that uses the same
     function.
+
+    Offers (POS Phase D) live on individual cart lines, not as a function
+    parameter, since (unlike one coupon per sale) a cart can mix several
+    offer-discounted lines and several combo instances at once:
+      - A line with offer_id but no combo_instance_id is a single discounted
+        product — resolve_pos_offer_discount() re-derives its price.
+      - A group of lines sharing a combo_instance_id is one combo instance —
+        resolve_pos_combo_lines() validates the whole group against the
+        offer's current BundleItem set and prices every line in it. Stock
+        validation/deduction is unaffected either way; offers only ever
+        override price.
 
     Returns (sale, created) — created is False on the idempotent-replay
     path, so callers that distinguish 200 vs 201 (the API path) still can.
@@ -789,34 +916,59 @@ def create_pos_sale(*, client_sale_id, cart, payments, operator_user, customer=N
 
     settings_row = BusinessSettings.get_solo()
 
+    # POS Phase D: offers. A combo group's lines are priced entirely by
+    # resolve_pos_combo_lines() below (apportioned shares of combo_price);
+    # a single-product offer line just gets its usual per-pricing-mode price
+    # discounted via resolve_pos_offer_discount(). Either way, stock
+    # validation/deduction for every line stays completely ordinary — offers
+    # only ever override the money, never the product/variant/unit logic.
+    combo_line_prices = resolve_pos_combo_lines(cart)
+
     total = Decimal('0')
     taxable_value = Decimal('0')
     exempt_value = Decimal('0')
     cart_snapshot = []
     try:
-        for line in cart:
+        for index, line in enumerate(cart):
             product = Product.objects.get(id=line.get('product_id'), is_available=True)
             qty = int(line.get('qty', 1) or 1)
             weight = line.get('weight')
             variant_id = line.get('variant_id')
             unit_id = line.get('unit_id')
             unit = None
+            offer_id = line.get('offer_id')
+            combo_instance_id = line.get('combo_instance_id')
+            # A combo line's price is fixed by resolve_pos_combo_lines() --
+            # offer_id is still recorded on it (set alongside combo_instance_id
+            # by the POS screen) but never re-applied as a separate discount.
+            is_single_offer_line = bool(offer_id) and not combo_instance_id
 
             if product.pricing_mode == 'fixed_weight':
                 variant = product.variants.filter(id=variant_id, is_available=True).first() if variant_id else None
                 if not variant:
                     raise POSSaleValidationError(f'{product.name}: that animal is no longer available.')
                 line_total = variant.total_price()
+                if is_single_offer_line:
+                    line_total = resolve_pos_offer_discount(offer_id, product, line_total)
             elif product.pricing_mode == 'variable_weight':
-                line_total = Decimal(str(product.price)) * Decimal(str(weight or 0))
+                unit_price = Decimal(str(product.price))
+                if is_single_offer_line:
+                    unit_price = resolve_pos_offer_discount(offer_id, product, unit_price)
+                line_total = unit_price * Decimal(str(weight or 0))
             else:
                 if unit_id:
                     unit = product.selling_units.filter(id=unit_id, is_available=True).first()
                     if not unit:
                         raise POSSaleValidationError(f'{product.name}: that selling unit is no longer available.')
-                    line_total = unit.price * qty
+                    unit_price = unit.price
                 else:
-                    line_total = Decimal(str(product.price)) * qty
+                    unit_price = Decimal(str(product.price))
+                if is_single_offer_line:
+                    unit_price = resolve_pos_offer_discount(offer_id, product, unit_price)
+                line_total = unit_price * qty
+
+            if combo_instance_id:
+                line_total = combo_line_prices[index]
 
             total += line_total
             if settings_row.is_vat_enabled and product.is_taxable:
@@ -828,6 +980,7 @@ def create_pos_sale(*, client_sale_id, cart, payments, operator_user, customer=N
                 'product_id': product.id, 'weight': weight, 'qty': qty, 'variant_id': variant_id,
                 'unit_id': unit.id if unit else None,
                 'unit_name': unit.get_name_display() if unit else None,
+                'offer_id': offer_id, 'combo_instance_id': combo_instance_id,
             })
     except (Product.DoesNotExist, InvalidOperation, TypeError, ValueError):
         raise POSSaleValidationError('One of the items in this cart is no longer valid.')
@@ -861,6 +1014,18 @@ def create_pos_sale(*, client_sale_id, cart, payments, operator_user, customer=N
         exempt_value = discounted_subtotal
         required_total = discounted_subtotal
 
+    # Standard retail cash rounding: nobody pays paisa, so the grand total
+    # itself is rounded to the nearest rupee (round-half-up, not Python's
+    # bare round() which does banker's rounding and would round e.g. 222.50
+    # down to 222 instead of up to 223). taxable_value/exempt_value/
+    # vat_amount above are left exactly as computed -- only required_total
+    # (what payments must actually match) and the stored round_off_amount
+    # change, so the detailed tax breakdown still adds up precisely on its
+    # own and the rounding difference lives in exactly one place.
+    rounded_total = required_total.quantize(Decimal('1'), rounding=ROUND_HALF_UP)
+    round_off_amount = (rounded_total - required_total).quantize(Decimal('0.01'))
+    required_total = rounded_total
+
     payments_sum = sum((Decimal(str(line['amount'])) for line in payments), Decimal('0'))
     if payments_sum != required_total:
         raise POSSaleValidationError(
@@ -883,6 +1048,7 @@ def create_pos_sale(*, client_sale_id, cart, payments, operator_user, customer=N
                 vat_amount=vat_amount,
                 coupon=coupon_obj,
                 discount_amount=discount_amount,
+                round_off_amount=round_off_amount,
             )
             if coupon_obj:
                 coupon_obj.used_count += 1
@@ -1062,7 +1228,7 @@ def pos_create_sale(request):
 
     return JsonResponse({
         'status': 'ok', 'sale_number': sale.sale_number, 'total': str(sale.total_amount),
-        'discount_amount': str(sale.discount_amount),
+        'discount_amount': str(sale.discount_amount), 'round_off_amount': str(sale.round_off_amount),
     })
 
 def line_subtotal(item):

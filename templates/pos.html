@@ -143,13 +143,13 @@
         .reminder-card ul { margin: 0; padding-left: 0; list-style: none; font-size: 1.05rem; font-weight: 700; color: var(--pos-text-green); line-height: 1.4; font-family: 'Noto Sans Devanagari', 'DM Sans', sans-serif; }
         .reminder-card ul li::before { content: "* "; font-weight: 700; }
 
-        /* Five standalone columns: reminder | Repay Credit | Counter | tax
+        /* Five standalone columns: reminder | Repay Credit | Offers | tax
            box | payment method -- each button gets its own column instead
-           of Counter/Payment stacking, which is the main lever for keeping
+           of Offers/Payment stacking, which is the main lever for keeping
            this row's height down now that it's five columns wide. */
-        .repay-col, .counter-col, .payment-col { display: flex; flex-shrink: 0; }
+        .repay-col, .offers-col, .payment-col { display: flex; flex-shrink: 0; }
         .repay-col { width: 110px; }
-        .counter-col { width: 100px; }
+        .offers-col { width: 100px; }
         .payment-col { width: 130px; }
 
         .tax-box { flex: 1; min-width: 0; background: var(--pos-bg); border: 2px solid var(--pos-border-dark); border-radius: 6px; overflow: hidden; height: fit-content; }
@@ -178,7 +178,7 @@
             font-size: 1rem; cursor: pointer; color: #fff; text-align: center; line-height: 1.25;
             box-shadow: 0 4px 10px rgba(26,47,30,0.22); flex: 1;
         }
-        .side-btn.counter-btn { background: var(--pos-enter-orange); cursor: default; }
+        .side-btn.offers-btn { background: var(--pos-enter-orange); cursor: pointer; }
         .side-btn.payment-btn-main { background: var(--pos-text-green); }
         .side-btn.payment-btn-main:disabled { opacity: 0.45; cursor: not-allowed; }
         .side-btn.repay-btn { background: var(--pos-lock-pill); width: 100%; }
@@ -259,6 +259,24 @@
             cursor: pointer; font-family: inherit; font-size: 0.85rem; color: var(--forest); font-weight: 600;
         }
         .variant-option:hover { border-color: var(--moss); background: #f3f8f3; }
+
+        .item-modal-card.offers-mode { max-width: 440px; }
+        .offers-list { max-height: 50vh; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+        .offer-option {
+            display: block; width: 100%; text-align: left; padding: 10px 14px;
+            border: 1.5px solid var(--mist); border-radius: 10px; background: var(--white);
+            cursor: pointer; font-family: inherit;
+        }
+        .offer-option:hover { border-color: var(--moss); background: #f3f8f3; }
+        .offer-option.offer-unavailable { opacity: 0.55; cursor: not-allowed; }
+        .offer-option-title { font-weight: 800; color: var(--forest); font-size: 0.95rem; }
+        .offer-combo-badge {
+            display: inline-block; background: var(--gold); color: var(--forest); font-size: 0.68rem;
+            font-weight: 800; padding: 1px 7px; border-radius: 8px; margin-left: 6px; vertical-align: middle;
+        }
+        .offer-option-sub { font-size: 0.8rem; color: var(--text-muted); margin: 2px 0 4px; }
+        .offer-option-price { font-weight: 700; color: var(--moss); font-size: 0.88rem; }
+        .offer-strike { text-decoration: line-through; color: var(--text-muted); font-weight: 500; margin-right: 6px; }
         .item-modal-actions { display: flex; gap: 10px; margin-top: 6px; }
         .item-modal-actions button { flex: 1; padding: 12px; border-radius: 10px; border: none; font-family: inherit; font-weight: 700; cursor: pointer; }
         .item-modal-actions .btn-confirm { background: var(--forest); color: var(--gold); }
@@ -442,8 +460,8 @@
                         <button type="button" class="side-btn repay-btn" id="openRepayBtn">उधारो तिर्नुहोस्<br><span style="font-weight:700;font-size:0.85rem;">Repay Credit</span></button>
                     </div>
 
-                    <div class="counter-col">
-                        <button type="button" class="side-btn counter-btn"><i class="fas fa-broom"></i><br>Counter<br>सफा राख्नुहोस्।</button>
+                    <div class="offers-col">
+                        <button type="button" class="side-btn offers-btn" id="openOffersBtn"><i class="fas fa-tags"></i><br>Offers<br>अफर</button>
                     </div>
 
                     <div class="tax-box">
@@ -455,6 +473,7 @@
                         <div class="tax-row"><span>कुल कर</span><span id="taxVat">Rs. 0</span></div>
                         <div class="tax-row"><span>कर बा. मूल्य</span><span id="taxTaxable">Rs. 0</span></div>
                         <div class="tax-row"><span>कर स. मूल्य</span><span id="taxExempt">Rs. 0</span></div>
+                        <div class="tax-row round-off-row" id="roundOffRow" style="display:none;"><span>राउन्ड अफ</span><span id="taxRoundOff">Rs. 0</span></div>
                         <div class="tax-row grand-total"><span>जम्मा</span><span id="cartTotal">Rs. 0</span></div>
                     </div>
 
@@ -550,7 +569,7 @@
         const VAT_RATE = {{ vat_rate }};
 
         let activeCategory = CATEGORIES[0] || null;
-        let cart = []; // { product_id, name, pricing_mode, qty, weight, variant_id, unit_id, unit_name, detail, line_total, is_taxable }
+        let cart = []; // { product_id, name, pricing_mode, qty, weight, variant_id, unit_id, unit_name, offer_id, combo_instance_id, detail, unit_price, line_total, is_taxable }
         let currentView = 'receipt'; // 'receipt' | 'shopping'
         let isUnlocked = false;
         let currentOperator = null; // { id, name, staff_number, role }
@@ -558,6 +577,7 @@
         let payments = { cash: '', esewa: '', khalti: '', bank_transfer: '', credit: '' };
         let selectedCustomer = null;
         let appliedCoupon = null; // { code, discount_amount, subtotalAtApply } — see renderReceipt()
+        let liveOffers = null; // { discount_offers, combo_offers } — fetched fresh each time the Offers modal opens
         let idleTimer = null;
         const IDLE_LIMIT_MS = 20 * 60 * 1000;
 
@@ -591,12 +611,15 @@
             showToast._t = setTimeout(() => toast.classList.remove('show'), 1800);
         }
 
-        function newClientSaleId() {
-            clientSaleId = (crypto.randomUUID ? crypto.randomUUID() :
+        function generateUuid() {
+            return crypto.randomUUID ? crypto.randomUUID() :
                 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
                     const r = Math.random() * 16 | 0;
                     return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
-                }));
+                });
+        }
+        function newClientSaleId() {
+            clientSaleId = generateUuid();
         }
         newClientSaleId();
 
@@ -864,9 +887,15 @@
         // Receipt display convention for any variable_weight line: under
         // 1000g shows as whole grams ("230g"), 1000g and up shows as kg with
         // 3 decimal places ("1.150kg", "2.785kg") -- regardless of which
-        // unit (Kg or Gram) the cashier actually typed it in.
-        function formatWeightDisplay(weightKg) {
-            const grams = Math.round(weightKg * 1000);
+        // unit (Kg or Gram) the cashier actually typed it in. Only applies
+        // when the product's own unit really is kg -- Banana is sold by the
+        // dozen, which has no smaller sub-unit to fall back to the way kg
+        // has grams, so a non-kg unitLabel just shows the plain amount.
+        function formatWeightDisplay(weight, unitLabel) {
+            if (unitLabel && unitLabel.toLowerCase() !== 'kg') {
+                return `${parseFloat(weight.toFixed(2))} ${unitLabel}`;
+            }
+            const grams = Math.round(weight * 1000);
             if (grams < 1000) return `${grams}g`;
             return `${(grams / 1000).toFixed(3)}kg`;
         }
@@ -907,6 +936,7 @@
         //   maxDigits (default 5)
         function openKeypadModal(product, editIndex, cfg) {
             const body = document.getElementById('itemModalBody');
+            body.classList.remove('offers-mode');
             body.classList.add('keypad-mode');
 
             const units = cfg.units || [];
@@ -1048,7 +1078,7 @@
                 onConfirm: (value, unitObj) => {
                     const kg = unitObj.id === 'gram' ? value / 1000 : value;
                     const finalWeight = parseFloat(kg.toFixed(3));
-                    confirmWeightLine(product, editIndex, finalWeight, formatWeightDisplay(finalWeight));
+                    confirmWeightLine(product, editIndex, finalWeight, formatWeightDisplay(finalWeight, product.weight_unit_label));
                 },
             });
         }
@@ -1117,7 +1147,7 @@
 
         function openVariantModal(product, editIndex) {
             const body = document.getElementById('itemModalBody');
-            body.classList.remove('keypad-mode');
+            body.classList.remove('keypad-mode', 'offers-mode');
             body.innerHTML = `<h3>${product.name} — choose one</h3>` +
                 product.variants.map(v => `
                     <button type="button" class="variant-option" data-vid="${v.id}">
@@ -1134,6 +1164,7 @@
                         line.detail = `${variant.weight} kg${variant.label ? ' — ' + variant.label : ''}`;
                         line.unit_price = parseFloat(variant.total_price);
                         line.line_total = parseFloat(variant.total_price);
+                        if (product.offer_id) line.offer_id = product.offer_id;
                         renderReceipt();
                         updateCartIndicator();
                     } else {
@@ -1149,10 +1180,74 @@
         // Tapping an existing row's qty/weight cell reopens the same modal
         // that added it, pre-filled with the current value, and rewrites
         // that line in place on confirm instead of adding a new one.
+        // Mirrors Offer.discounted_price() in shop/models.py exactly (percent
+        // or fixed-amount off a single base price) so the live POS preview
+        // always matches what resolve_pos_offer_discount() will charge
+        // server-side -- same "client math == server math" principle as
+        // computeTotals()'s coupon preview.
+        function applyOfferDiscount(originalPrice, offer) {
+            const value = parseFloat(offer.discount_value);
+            if (offer.discount_type === 'percent') {
+                return Math.max(0, round2(originalPrice - (originalPrice * value / 100)));
+            }
+            if (offer.discount_type === 'fixed') {
+                return Math.max(0, round2(originalPrice - value));
+            }
+            return originalPrice;
+        }
+
+        // Builds a discounted stand-in for a live PRODUCTS entry so it can be
+        // handed straight to onProductTap()/openWeightModal()/openQtyModal()/
+        // openVariantModal() unchanged -- those only ever read .price/
+        // .variants/.units off whatever object they're given, so overriding
+        // those fields here is enough to make the existing add-to-cart flow
+        // charge the offer price without a second, parallel code path.
+        function cloneProductWithOffer(product, offer) {
+            const clone = Object.assign({}, product, {
+                offer_id: offer.offer_id,
+                price: applyOfferDiscount(parseFloat(product.price), offer),
+            });
+            if (product.variants) {
+                clone.variants = product.variants.map(v => Object.assign({}, v, {
+                    total_price: String(applyOfferDiscount(parseFloat(v.total_price), offer)),
+                }));
+            }
+            if (product.units) {
+                clone.units = product.units.map(u => Object.assign({}, u, {
+                    price: String(applyOfferDiscount(parseFloat(u.price), offer)),
+                }));
+            }
+            return clone;
+        }
+
+        // Reopening an offer-priced line for editing (qty/weight change only
+        // -- never re-derives the discount) must keep charging exactly the
+        // rate already on the line, not whatever the live offer currently
+        // computes -- same reasoning confirmWeightLine/confirmQtyLine never
+        // recompute an unrelated value on edit. Doesn't depend on liveOffers
+        // still being populated/fresh, unlike re-deriving from the offer.
+        function productWithFixedRate(product, line) {
+            const clone = Object.assign({}, product, { offer_id: line.offer_id, price: line.unit_price });
+            if (product.variants && line.variant_id != null) {
+                clone.variants = product.variants.map(v => v.id === line.variant_id
+                    ? Object.assign({}, v, { total_price: String(line.unit_price) }) : v);
+            }
+            if (product.units && line.unit_id != null) {
+                clone.units = product.units.map(u => u.id === line.unit_id
+                    ? Object.assign({}, u, { price: String(line.unit_price) }) : u);
+            }
+            return clone;
+        }
+
         function editCartLine(index) {
             const line = cart[index];
-            const product = PRODUCTS.find(p => p.id === line.product_id);
+            if (line.combo_instance_id) {
+                showToast('This is part of a combo — remove and re-add the whole combo to change it');
+                return;
+            }
+            let product = PRODUCTS.find(p => p.id === line.product_id);
             if (!product) { showToast('This product is no longer available to edit'); return; }
+            if (line.offer_id) product = productWithFixedRate(product, line);
             if (line.pricing_mode === 'variable_weight') {
                 openWeightModal(product, index);
             } else if (line.pricing_mode === 'fixed_weight') {
@@ -1193,6 +1288,12 @@
         // ══════════════════════════════════════════════════════════════
         function addToCart(product, opts) {
             const line = { product_id: product.id, name: product.name, pricing_mode: product.pricing_mode, is_taxable: !!product.is_taxable };
+            // product.offer_id is only ever set when product is a discounted
+            // clone built by cloneProductWithOffer()/productWithFixedRate()
+            // (see the Offers picker) -- every price below already reflects
+            // that discount, this just tags the line so editing/removal know
+            // it's offer-priced and the server can re-validate it.
+            if (product.offer_id) line.offer_id = product.offer_id;
             if (opts.variant) {
                 line.variant_id = opts.variant.id;
                 line.detail = `${opts.variant.weight} kg${opts.variant.label ? ' — ' + opts.variant.label : ''}`;
@@ -1226,11 +1327,188 @@
             showToast(`${product.name} added`);
         }
 
+        // Combo lines all share a combo_instance_id (see addComboToCart) --
+        // removing one without the others would leave an incomplete bundle
+        // in the cart that the server would reject at Complete Sale, so
+        // removing any line in a combo removes the whole instance.
         function removeFromCart(index) {
-            cart.splice(index, 1);
+            const line = cart[index];
+            if (line && line.combo_instance_id) {
+                const id = line.combo_instance_id;
+                cart = cart.filter(l => l.combo_instance_id !== id);
+                showToast('Combo removed');
+            } else {
+                cart.splice(index, 1);
+            }
             renderReceipt();
             updateCartIndicator();
         }
+
+        // ══════════════════════════════════════════════════════════════
+        // Offers picker (POS Phase D) — percent/fixed product discounts and
+        // combo bundles, fetched live from /api/v1/pos/offers/ each time the
+        // modal opens (see PosOffersListView for why this isn't baked into
+        // the initial page payload). create_pos_sale() re-validates
+        // everything from scratch regardless -- this is a browse/preview UI,
+        // same spirit as the coupon input.
+        // ══════════════════════════════════════════════════════════════
+        async function openOffersModal() {
+            const body = document.getElementById('itemModalBody');
+            body.classList.remove('keypad-mode');
+            body.classList.add('offers-mode');
+            body.innerHTML = `<h3>Offers</h3><div style="text-align:center;color:var(--text-muted);padding:20px 0;">Loading…</div>`;
+            document.getElementById('itemModal').classList.add('active');
+
+            try {
+                const response = await apiFetch('/api/v1/pos/offers/');
+                liveOffers = await response.json();
+            } catch (err) {
+                body.innerHTML = `<h3>Offers</h3><div style="text-align:center;color:var(--text-muted);padding:20px 0;">Couldn't load offers — check the connection and try again.</div>
+                    <div class="item-modal-actions"><button type="button" class="btn-cancel" id="offersCancel">Close</button></div>`;
+                document.getElementById('offersCancel').addEventListener('click', closeItemModal);
+                return;
+            }
+
+            const discountItems = (liveOffers.discount_offers || []).filter(o => o.available);
+            const comboItems = liveOffers.combo_offers || [];
+
+            if (!discountItems.length && !comboItems.length) {
+                body.innerHTML = `<h3>Offers</h3><div style="text-align:center;color:var(--text-muted);padding:20px 0;">No offers live right now.</div>
+                    <div class="item-modal-actions"><button type="button" class="btn-cancel" id="offersCancel">Close</button></div>`;
+                document.getElementById('offersCancel').addEventListener('click', closeItemModal);
+                return;
+            }
+
+            body.innerHTML = `<h3>Offers</h3><div class="offers-list">` +
+                comboItems.map((c, i) => `
+                    <button type="button" class="offer-option offer-combo${c.fully_available ? '' : ' offer-unavailable'}" data-combo-i="${i}">
+                        <div class="offer-option-title">${c.title} <span class="offer-combo-badge">Combo</span></div>
+                        <div class="offer-option-sub">${c.items.map(it => `${it.quantity}${it.unit_label ? ' ' + it.unit_label : ''} ${it.product_name}`).join(' + ')}</div>
+                        <div class="offer-option-price">${c.fully_available ? 'Rs. ' + formatMoney(c.combo_price) : 'Not fully available'}</div>
+                    </button>`
+                ).join('') +
+                discountItems.map((d, i) => `
+                    <button type="button" class="offer-option" data-discount-i="${i}">
+                        <div class="offer-option-title">${d.product_name}</div>
+                        <div class="offer-option-sub">${d.title}</div>
+                        <div class="offer-option-price"><span class="offer-strike">Rs. ${formatMoney(d.original_price)}</span> Rs. ${formatMoney(d.discounted_price)}</div>
+                    </button>`
+                ).join('') +
+                `</div><div class="item-modal-actions"><button type="button" class="btn-cancel" id="offersCancel">Close</button></div>`;
+
+            body.querySelectorAll('[data-combo-i]').forEach(btn => {
+                btn.addEventListener('click', () => addComboToCart(comboItems[parseInt(btn.dataset.comboI, 10)]));
+            });
+            body.querySelectorAll('[data-discount-i]').forEach(btn => {
+                btn.addEventListener('click', () => addOfferProductToCart(discountItems[parseInt(btn.dataset.discountI, 10)]));
+            });
+            document.getElementById('offersCancel').addEventListener('click', closeItemModal);
+        }
+
+        function addOfferProductToCart(offerEntry) {
+            const product = PRODUCTS.find(p => p.id === offerEntry.product_id);
+            if (!product) { showToast(`${offerEntry.product_name} is no longer available`); return; }
+            closeItemModal();
+            onProductTap(cloneProductWithOffer(product, offerEntry));
+        }
+
+        // One tap in the picker between the cashier and the combo's chosen
+        // animal(s) -- resolves to the picked variant, or null if cancelled.
+        // Only shown when a bundle's fixed_weight slot has 2+ available
+        // variants; auto-picked (no prompt) when there's exactly one.
+        function pickVariantForCombo(productName, variants) {
+            return new Promise(resolve => {
+                const body = document.getElementById('itemModalBody');
+                body.classList.remove('keypad-mode', 'offers-mode');
+                body.innerHTML = `<h3>Choose a ${productName}</h3>` +
+                    variants.map(v => `
+                        <button type="button" class="variant-option" data-vid="${v.id}">
+                            <span>${v.weight} kg${v.label ? ' — ' + v.label : ''}</span><span>Rs. ${v.total_price}</span>
+                        </button>`
+                    ).join('') +
+                    `<div class="item-modal-actions"><button type="button" class="btn-cancel" id="comboVariantCancel">Cancel combo</button></div>`;
+                body.querySelectorAll('.variant-option').forEach(b => {
+                    b.addEventListener('click', () => resolve(variants.find(v => v.id == b.dataset.vid)));
+                });
+                document.getElementById('comboVariantCancel').addEventListener('click', () => resolve(null));
+            });
+        }
+
+        // Expands a combo into one ordinary cart line per BundleItem, all
+        // sharing a fresh combo_instance_id -- see resolve_pos_combo_lines()
+        // in shop/views.py for why this is the shape the server expects, and
+        // for the authoritative version of the proportional-pricing math
+        // mirrored here for the live preview.
+        async function addComboToCart(combo) {
+            if (!combo.fully_available) {
+                showToast(`${combo.title} isn't fully available right now`);
+                return;
+            }
+
+            const comboInstanceId = generateUuid();
+            const naturalTotal = parseFloat(combo.natural_total);
+            const comboPrice = parseFloat(combo.combo_price);
+            const newLines = [];
+            let runningTotal = 0;
+
+            for (let i = 0; i < combo.items.length; i++) {
+                const item = combo.items[i];
+                const product = PRODUCTS.find(p => p.id === item.product_id);
+                if (!product) { showToast(`${item.product_name} is no longer available`); closeItemModal(); return; }
+
+                let variant = null;
+                if (item.pricing_mode === 'fixed_weight') {
+                    if (item.available_variants.length === 1) {
+                        variant = item.available_variants[0];
+                    } else {
+                        variant = await pickVariantForCombo(item.product_name, item.available_variants);
+                        if (!variant) { showToast(`${combo.title} cancelled`); closeItemModal(); return; }
+                    }
+                }
+
+                const isLast = i === combo.items.length - 1;
+                const naturalLineValue = parseFloat(item.quantity) * parseFloat(product.price || 0);
+                let price;
+                if (isLast) {
+                    price = round2(comboPrice - runningTotal);
+                } else {
+                    price = round2((naturalLineValue / naturalTotal) * comboPrice);
+                    runningTotal += price;
+                }
+
+                const line = {
+                    product_id: product.id,
+                    name: `${product.name} (${combo.title})`,
+                    pricing_mode: item.pricing_mode,
+                    is_taxable: !!product.is_taxable,
+                    offer_id: combo.offer_id,
+                    combo_instance_id: comboInstanceId,
+                    qty: 1,
+                    unit_price: price,
+                    line_total: price,
+                };
+                if (item.pricing_mode === 'variable_weight') {
+                    line.weight = parseFloat(item.quantity);
+                    line.detail = formatWeightDisplay(line.weight, product.weight_unit_label);
+                } else if (item.pricing_mode === 'fixed_weight') {
+                    line.variant_id = variant.id;
+                    line.detail = `${variant.weight} kg${variant.label ? ' — ' + variant.label : ''}`;
+                } else {
+                    line.qty = Math.round(parseFloat(item.quantity)) || 1;
+                    line.detail = `Qty ${line.qty}`;
+                }
+                newLines.push(line);
+            }
+
+            cart.push(...newLines);
+            receiptPage = Math.ceil(cart.length / RECEIPT_PAGE_SIZE) - 1;
+            closeItemModal();
+            renderReceipt();
+            updateCartIndicator();
+            showToast(`${combo.title} added — Rs. ${formatMoney(comboPrice)}`);
+        }
+
+        document.getElementById('openOffersBtn').addEventListener('click', openOffersModal);
 
         function lineTax(line) {
             if (!IS_VAT_ENABLED || !line.is_taxable) return 0;
@@ -1239,6 +1517,15 @@
 
         function round2(n) {
             return Math.round(n * 100) / 100;
+        }
+
+        // Matches create_pos_sale()'s ROUND_HALF_UP (not JS Math.round's own
+        // round-half-up-for-positive-only quirk at exact float .5 boundaries,
+        // and not banker's rounding) -- the tiny epsilon nudge avoids a
+        // total like 222.50 landing on 222.4999999999 from float arithmetic
+        // and rounding down when it should round up.
+        function roundHalfUpToRupee(n) {
+            return Math.round(n + 1e-9);
         }
 
         function cartSubtotal() {
@@ -1261,7 +1548,10 @@
             const taxableValue = IS_VAT_ENABLED ? round2(discountedSubtotal * ratio) : 0;
             const exemptValue = IS_VAT_ENABLED ? discountedSubtotal - taxableValue : discountedSubtotal;
             const vatAmount = IS_VAT_ENABLED ? round2(taxableValue * VAT_RATE) : 0;
-            return { subtotal, discount, taxableValue, exemptValue, vatAmount, grandTotal: exemptValue + taxableValue + vatAmount };
+            const preRoundTotal = exemptValue + taxableValue + vatAmount;
+            const grandTotal = roundHalfUpToRupee(preRoundTotal);
+            const roundOff = round2(grandTotal - preRoundTotal);
+            return { subtotal, discount, taxableValue, exemptValue, vatAmount, roundOff, grandTotal };
         }
 
         function updateCouponUI(discount) {
@@ -1275,6 +1565,17 @@
                 row.style.display = 'none';
                 btn.textContent = 'Apply';
             }
+        }
+
+        function updateRoundOffUI(roundOff) {
+            const row = document.getElementById('roundOffRow');
+            if (Math.abs(roundOff) < 0.005) {
+                row.style.display = 'none';
+                return;
+            }
+            row.style.display = '';
+            const sign = roundOff > 0 ? '+' : '−';
+            document.getElementById('taxRoundOff').textContent = `${sign} Rs. ${formatMoney(Math.abs(roundOff))}`;
         }
 
         function clearCoupon(silent) {
@@ -1355,6 +1656,7 @@
             document.getElementById('taxTaxable').textContent = 'Rs. ' + formatMoney(totals.taxableValue);
             document.getElementById('taxExempt').textContent = 'Rs. ' + formatMoney(totals.exemptValue);
             updateCouponUI(totals.discount);
+            updateRoundOffUI(totals.roundOff);
             document.getElementById('openPaymentBtn').disabled = cart.length === 0;
         }
 
@@ -1573,7 +1875,10 @@
 
             const payload = {
                 client_sale_id: clientSaleId,
-                cart: cart.map(l => ({ product_id: l.product_id, qty: l.qty, weight: l.weight || null, variant_id: l.variant_id || null, unit_id: l.unit_id || null })),
+                cart: cart.map(l => ({
+                    product_id: l.product_id, qty: l.qty, weight: l.weight || null, variant_id: l.variant_id || null,
+                    unit_id: l.unit_id || null, offer_id: l.offer_id || null, combo_instance_id: l.combo_instance_id || null,
+                })),
                 payments: paymentsPayload,
             };
             if (selectedCustomer) payload.customer_id = selectedCustomer.id;

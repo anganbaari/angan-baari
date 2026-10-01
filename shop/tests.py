@@ -147,6 +147,55 @@ class UserProfileInlineFormTests(TestCase):
         self.assertEqual(saved.pin_hash, '')
 
 
+class UserProfilePinHashTests(TestCase):
+    """set_pin()/check_pin() use a fast HMAC-SHA256 + per-profile salt, not
+    Django's own password hashers (PBKDF2 at 600k+ iterations) -- a 4-digit
+    PIN's real protection is PosUnlockView's 7-attempt/5-minute lockout, not
+    hash cost, and the slow hasher was the ~4 second PIN-unlock delay on
+    PythonAnywhere's free-tier CPU (see api/tests.py's PosUnlockApiTests for
+    the end-to-end unlock behavior this format change must not disturb)."""
+
+    def setUp(self):
+        self.user = User.objects.create_user('alice', password='pw', is_staff=True)
+        self.profile = UserProfile.objects.create(user=self.user)
+
+    def test_set_pin_does_not_use_djangos_password_hashers(self):
+        self.profile.set_pin('1234')
+        self.assertNotIn('pbkdf2', self.profile.pin_hash)
+        self.assertNotIn('argon2', self.profile.pin_hash)
+        self.assertNotIn('bcrypt', self.profile.pin_hash)
+        self.assertIn('$', self.profile.pin_hash)  # salt$digest
+
+    def test_check_pin_round_trips(self):
+        self.profile.set_pin('4321')
+        self.assertTrue(self.profile.check_pin('4321'))
+        self.assertFalse(self.profile.check_pin('1234'))
+
+    def test_two_profiles_with_the_same_pin_get_different_hashes(self):
+        """Per-profile random salt -- two staff sharing the same PIN must
+        never produce the same stored hash (that would leak who shares a
+        PIN with whom just by comparing pin_hash columns)."""
+        other = UserProfile.objects.create(user=User.objects.create_user('bob', password='pw', is_staff=True))
+        self.profile.set_pin('1234')
+        other.set_pin('1234')
+        self.assertNotEqual(self.profile.pin_hash, other.pin_hash)
+        self.assertTrue(self.profile.check_pin('1234'))
+        self.assertTrue(other.check_pin('1234'))
+
+    def test_pin_set_before_this_change_no_longer_verifies(self):
+        """Simple cutover (confirmed, only 2 real staff): a pin_hash already
+        stored in Django's old hasher format doesn't match the new scheme's
+        'salt$digest' parsing and must fail closed, not crash -- staff
+        re-set their PIN once via the admin form after this deploys."""
+        from django.contrib.auth.hashers import make_password
+        self.profile.pin_hash = make_password('1234')
+        self.profile.save()
+        self.assertFalse(self.profile.check_pin('1234'))
+
+    def test_check_pin_false_for_blank_hash(self):
+        self.assertFalse(self.profile.check_pin('1234'))
+
+
 class PosCreateSaleViewTests(TestCase):
     """pos_create_sale() — the traditional view templates/pos.html actually
     calls. Thin parity coverage confirming it's correctly wired to the same

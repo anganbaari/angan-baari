@@ -12,8 +12,8 @@ from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
 
 from shop.models import (
-    BusinessSettings, Category, Coupon, CreditTransaction, Customer, InventoryMovement, POSSale,
-    POSSalePayment, Product, ProductOrder, ProductVariant, UserProfile, Wishlist,
+    BundleItem, BusinessSettings, Category, Coupon, CreditTransaction, Customer, InventoryMovement,
+    Offer, POSSale, POSSalePayment, Product, ProductOrder, ProductVariant, UserProfile, Wishlist,
 )
 
 
@@ -352,6 +352,38 @@ class POSSaleApiTests(ApiTestBase):
         # Nothing partially created -- stock untouched either.
         self.assertEqual(InventoryMovement.current_stock(self.jar), Decimal('10'))
 
+    def test_exact_gram_scale_reading_not_a_multiple_of_10g_saves_end_to_end(self):
+        """InventoryMovement.quantity supports 3 decimal places (not 2) so a
+        real scale reading like 335g (0.335kg) -- the ordinary case for
+        'exact' weight_entry_mode produce (Papaya, Dragon Fruit, Cauliflower,
+        Coriander, Watermelon), not just round multiples of 10g -- is
+        recorded exactly rather than failing full_clean() with 'no more than
+        2 decimal places' at Complete Sale."""
+        papaya = Product.objects.create(
+            name='Papaya', slug='papaya', category=self.category, description='test',
+            price=Decimal('200.00'), pricing_mode='variable_weight', weight_entry_mode='exact',
+        )
+        InventoryMovement.objects.create(
+            product=papaya, movement_type='harvest', source='admin', quantity=Decimal('10.000'),
+        )
+
+        self.client.login(username='cashier', password='pw')
+        self.unlock_terminal()
+        payload = {
+            'client_sale_id': str(uuid.uuid4()),
+            # 200/kg x 0.335kg = 67.00 exactly -- no coupon/VAT/rounding
+            # involved, isolating this test to the precision fix itself.
+            'payments': [{'method': 'cash', 'amount': '67.00'}],
+            'cart': [{'product_id': papaya.id, 'qty': 1, 'weight': '0.335'}],
+        }
+        response = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertEqual(Decimal(response.data['total']), Decimal('67.00'))
+
+        self.assertEqual(InventoryMovement.current_stock(papaya), Decimal('9.665'))  # 10.000 - 0.335
+        movement = InventoryMovement.objects.get(product=papaya, movement_type='sale')
+        self.assertEqual(movement.quantity, Decimal('0.335'))
+
     def test_old_sale_without_payments_still_shows_sensible_payment_method(self):
         """A sale created before this feature existed has no POSSalePayment
         rows at all -- payment_method (still a real stored field, just no
@@ -548,7 +580,8 @@ class POSCouponApiTests(ApiTestBase):
         payload = {
             'client_sale_id': client_sale_id,
             'coupon_code': 'dashain25',
-            'payments': [{'method': 'cash', 'amount': '187.50'}],  # 250 - 25% = 187.50
+            # 250 - 25% = 187.50 -- rounds UP to 188 (POS cash rounding, ROUND_HALF_UP).
+            'payments': [{'method': 'cash', 'amount': '188.00'}],
             'cart': [{'product_id': self.jar.id, 'qty': 1}],
         }
         first = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
@@ -567,10 +600,12 @@ class POSCouponApiTests(ApiTestBase):
         # jar (taxable) 2 x 250 = 500; fruit (exempt) 2kg x 300 = 600. Subtotal 1100.
         # FLAT50 knocks 50 off the subtotal -> discounted 1050, split proportionally:
         # taxable share = 500/1100 * 1050 = 477.27, exempt = 572.73, VAT = 13% of 477.27 = 62.05
+        # Pre-round total 1112.05 rounds DOWN to 1112 (POS cash rounding) --
+        # the detailed breakdown above stays exactly as computed either way.
         payload = {
             'client_sale_id': str(uuid.uuid4()),
             'coupon_code': 'FLAT50',
-            'payments': [{'method': 'cash', 'amount': '1112.05'}],
+            'payments': [{'method': 'cash', 'amount': '1112.00'}],
             'cart': [
                 {'product_id': self.jar.id, 'qty': 2},
                 {'product_id': self.fruit.id, 'qty': 1, 'weight': '2.00'},
@@ -584,7 +619,323 @@ class POSCouponApiTests(ApiTestBase):
         self.assertEqual(sale.taxable_value, Decimal('477.27'))
         self.assertEqual(sale.exempt_value, Decimal('572.73'))
         self.assertEqual(sale.vat_amount, Decimal('62.05'))
-        self.assertEqual(sale.total_amount, Decimal('1112.05'))
+        self.assertEqual(sale.total_amount, Decimal('1112.00'))
+        self.assertEqual(sale.round_off_amount, Decimal('-0.05'))
+
+
+class POSRoundOffApiTests(ApiTestBase):
+    """POS cash rounding: the grand total is rounded to the nearest rupee
+    (round-half-up, not Python's banker's-rounding round()) and the
+    difference is stored in round_off_amount — see create_pos_sale() in
+    shop/views.py, right before the payments_sum check."""
+
+    def setUp(self):
+        super().setUp()
+        self.client.login(username='cashier', password='pw')
+        self.unlock_terminal()
+        # A dedicated weight-based product priced so that ordinary
+        # 2-decimal-place weights (InventoryMovement.quantity only supports
+        # 2dp) still land on a fractional rupee total -- self.fruit's 300/kg
+        # price is a round multiple of 100, so any 2dp weight against it
+        # always lands on a whole number of rupees, which can't exercise
+        # rounding at all.
+        self.round_test_product = Product.objects.create(
+            name='Round Test Produce', slug='round-test-produce', category=self.category,
+            description='test', price=Decimal('233.00'), pricing_mode='variable_weight',
+        )
+        InventoryMovement.objects.create(
+            product=self.round_test_product, movement_type='harvest', source='admin', quantity=Decimal('20.00'),
+        )
+
+    def test_total_rounds_up_at_exact_half_rupee(self):
+        # 233/kg x 0.50kg = 116.50 exactly -- ROUND_HALF_UP must round up to
+        # 117, not down to 116 the way Python's bare round() would (banker's
+        # rounding rounds .50 to the nearest EVEN integer).
+        payload = {
+            'client_sale_id': str(uuid.uuid4()),
+            'payments': [{'method': 'cash', 'amount': '117.00'}],
+            'cart': [{'product_id': self.round_test_product.id, 'qty': 1, 'weight': '0.50'}],
+        }
+        response = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertEqual(Decimal(response.data['total']), Decimal('117.00'))
+        self.assertEqual(Decimal(response.data['round_off_amount']), Decimal('0.50'))
+
+        sale = POSSale.objects.get(sale_number=response.data['sale_number'])
+        self.assertEqual(sale.total_amount, Decimal('117.00'))
+        self.assertEqual(sale.round_off_amount, Decimal('0.50'))
+
+    def test_total_rounds_down_below_half_rupee(self):
+        # 233/kg x 0.43kg = 100.19 -- rounds down to 100.
+        payload = {
+            'client_sale_id': str(uuid.uuid4()),
+            'payments': [{'method': 'cash', 'amount': '100.00'}],
+            'cart': [{'product_id': self.round_test_product.id, 'qty': 1, 'weight': '0.43'}],
+        }
+        response = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertEqual(Decimal(response.data['total']), Decimal('100.00'))
+        self.assertEqual(Decimal(response.data['round_off_amount']), Decimal('-0.19'))
+
+    def test_whole_rupee_total_has_zero_round_off(self):
+        payload = {
+            'client_sale_id': str(uuid.uuid4()),
+            'payments': [{'method': 'cash', 'amount': '250.00'}],
+            'cart': [{'product_id': self.jar.id, 'qty': 1}],
+        }
+        response = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertEqual(Decimal(response.data['round_off_amount']), Decimal('0.00'))
+
+    def test_payment_must_match_rounded_total_not_the_precise_total(self):
+        # Paying the PRE-round figure (116.50) must be rejected now that the
+        # server requires the rounded whole-rupee total (117) instead.
+        payload = {
+            'client_sale_id': str(uuid.uuid4()),
+            'payments': [{'method': 'cash', 'amount': '116.50'}],
+            'cart': [{'product_id': self.round_test_product.id, 'qty': 1, 'weight': '0.50'}],
+        }
+        response = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(POSSale.objects.filter(client_sale_id=payload['client_sale_id']).exists())
+
+    def test_round_off_combined_with_coupon_discount(self):
+        now = timezone.now()
+        coupon = Coupon.objects.create(
+            code='SAVE10', discount_type='fixed', discount_value=Decimal('10'),
+            start_date=now - timedelta(days=1), end_date=now + timedelta(days=1),
+        )
+        # 233/kg x 0.50kg = 116.50, minus Rs.10 fixed = 106.50 -- rounds up to 107.
+        payload = {
+            'client_sale_id': str(uuid.uuid4()),
+            'coupon_code': 'SAVE10',
+            'payments': [{'method': 'cash', 'amount': '107.00'}],
+            'cart': [{'product_id': self.round_test_product.id, 'qty': 1, 'weight': '0.50'}],
+        }
+        response = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+
+        sale = POSSale.objects.get(sale_number=response.data['sale_number'])
+        self.assertEqual(sale.discount_amount, Decimal('10.00'))  # discount itself stays precise
+        self.assertEqual(sale.total_amount, Decimal('107.00'))
+        self.assertEqual(sale.round_off_amount, Decimal('0.50'))
+        coupon.refresh_from_db()
+        self.assertEqual(coupon.used_count, 1)
+
+    def test_round_off_combined_with_vat_leaves_breakdown_precise(self):
+        BusinessSettings.objects.update_or_create(pk=1, defaults={'is_vat_enabled': True})
+        self.jar.is_taxable = True
+        self.jar.save(update_fields=['is_taxable'])
+
+        # 250.00 + 13% VAT (32.50) = 282.50 exactly -- rounds up to 283.
+        payload = {
+            'client_sale_id': str(uuid.uuid4()),
+            'payments': [{'method': 'cash', 'amount': '283.00'}],
+            'cart': [{'product_id': self.jar.id, 'qty': 1}],
+        }
+        response = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+
+        sale = POSSale.objects.get(sale_number=response.data['sale_number'])
+        # The detailed tax breakdown stays exactly as computed (unrounded) --
+        # only total_amount and round_off_amount change.
+        self.assertEqual(sale.taxable_value, Decimal('250.00'))
+        self.assertEqual(sale.vat_amount, Decimal('32.50'))
+        self.assertEqual(sale.exempt_value, Decimal('0.00'))
+        self.assertEqual(sale.total_amount, Decimal('283.00'))
+        self.assertEqual(sale.round_off_amount, Decimal('0.50'))
+        # taxable + exempt + vat (282.50) != total_amount (283) -- the gap
+        # is exactly round_off_amount, not silently lost or double-counted.
+        self.assertEqual(
+            sale.taxable_value + sale.exempt_value + sale.vat_amount + sale.round_off_amount,
+            sale.total_amount,
+        )
+
+
+class POSOfferApiTests(ApiTestBase):
+    """POS Phase D — offers at checkout. Single-product percent/fixed
+    discounts are an ordinary cart line at a discounted price
+    (resolve_pos_offer_discount()); combo deals expand into one ordinary
+    cart line per BundleItem, all sharing a combo_instance_id
+    (resolve_pos_combo_lines()) — see shop/views.py for why BundleItem's
+    lack of a variant_id meant pure "expand and reuse per-product movement
+    logic" needed the fixed_weight slot to carry a real picked variant_id
+    on its cart line, same as any other fixed_weight purchase."""
+
+    def setUp(self):
+        super().setUp()
+        self.client.login(username='cashier', password='pw')
+        self.unlock_terminal()
+        now = timezone.now()
+        self.percent_offer = Offer.objects.create(
+            title='Jar Sale', discount_type='percent', discount_value=Decimal('20'),
+            start_date=now - timedelta(days=1), end_date=now + timedelta(days=1),
+        )
+        self.percent_offer.products.add(self.jar)
+
+    def test_single_product_offer_discount_is_applied_and_revalidated(self):
+        # 20% off Rs.250 = Rs.200.
+        payload = {
+            'client_sale_id': str(uuid.uuid4()),
+            'payments': [{'method': 'cash', 'amount': '200.00'}],
+            'cart': [{'product_id': self.jar.id, 'qty': 1, 'offer_id': self.percent_offer.id}],
+        }
+        response = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertEqual(Decimal(response.data['total']), Decimal('200.00'))
+        self.assertEqual(InventoryMovement.current_stock(self.jar), Decimal('9'))  # 10 - 1, stock unaffected by offers
+
+    def test_client_sent_price_is_never_trusted_only_offer_id_matters(self):
+        # Posting qty=2 still charges 2 x the server-recomputed discounted
+        # price, regardless of what a tampered client might imply elsewhere.
+        payload = {
+            'client_sale_id': str(uuid.uuid4()),
+            'payments': [{'method': 'cash', 'amount': '400.00'}],  # 2 x 200
+            'cart': [{'product_id': self.jar.id, 'qty': 2, 'offer_id': self.percent_offer.id}],
+        }
+        response = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertEqual(Decimal(response.data['total']), Decimal('400.00'))
+
+    def test_expired_offer_is_rejected(self):
+        self.percent_offer.end_date = timezone.now() - timedelta(hours=1)
+        self.percent_offer.save(update_fields=['end_date'])
+        payload = {
+            'client_sale_id': str(uuid.uuid4()),
+            'payments': [{'method': 'cash', 'amount': '200.00'}],
+            'cart': [{'product_id': self.jar.id, 'qty': 1, 'offer_id': self.percent_offer.id}],
+        }
+        response = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(POSSale.objects.filter(client_sale_id=payload['client_sale_id']).exists())
+
+    def test_offer_not_covering_this_product_is_rejected(self):
+        payload = {
+            'client_sale_id': str(uuid.uuid4()),
+            'payments': [{'method': 'cash', 'amount': '240.00'}],  # fruit isn't discounted
+            'cart': [{'product_id': self.fruit.id, 'qty': 1, 'weight': '0.80', 'offer_id': self.percent_offer.id}],
+        }
+        response = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def _create_combo(self, combo_price):
+        combo = Offer.objects.create(
+            title='Dashain Special', discount_type='combo', discount_value=Decimal('0'),
+            combo_price=Decimal(combo_price),
+            start_date=timezone.now() - timedelta(days=1), end_date=timezone.now() + timedelta(days=1),
+        )
+        BundleItem.objects.create(offer=combo, product=self.fruit, quantity=Decimal('2.00'))   # 2kg x 300 = 600
+        BundleItem.objects.create(offer=combo, product=self.jar, quantity=Decimal('3'))         # 3 x 250 = 750
+        BundleItem.objects.create(offer=combo, product=self.goat, quantity=Decimal('20.00'))    # natural 20 x 1200 = 24000
+        return combo
+
+    def test_combo_expands_into_one_line_per_bundle_item_summing_to_combo_price(self):
+        combo = self._create_combo('20000.00')
+        combo_instance_id = str(uuid.uuid4())
+        payload = {
+            'client_sale_id': str(uuid.uuid4()),
+            'payments': [{'method': 'cash', 'amount': '20000.00'}],
+            'cart': [
+                {'product_id': self.fruit.id, 'qty': 1, 'weight': '2.00', 'offer_id': combo.id, 'combo_instance_id': combo_instance_id},
+                {'product_id': self.jar.id, 'qty': 3, 'offer_id': combo.id, 'combo_instance_id': combo_instance_id},
+                {'product_id': self.goat.id, 'qty': 1, 'variant_id': self.goat_variant.id, 'offer_id': combo.id, 'combo_instance_id': combo_instance_id},
+            ],
+        }
+        response = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertEqual(Decimal(response.data['total']), Decimal('20000.00'))
+
+        # Stock deducted normally for every line -- offers only override price.
+        self.assertEqual(InventoryMovement.current_stock(self.fruit), Decimal('18.00'))  # 20 - 2
+        self.assertEqual(InventoryMovement.current_stock(self.jar), Decimal('7'))        # 10 - 3
+        self.assertEqual(InventoryMovement.current_stock(self.goat, variant=self.goat_variant), Decimal('0'))  # 1 - 1
+
+        sale = POSSale.objects.get(sale_number=response.data['sale_number'])
+        self.assertEqual(len(sale.cart_snapshot), 3)
+        for line in sale.cart_snapshot:
+            self.assertEqual(line['combo_instance_id'], combo_instance_id)
+            self.assertEqual(line['offer_id'], combo.id)
+
+    def test_combo_rejects_incomplete_bundle(self):
+        combo = self._create_combo('20000.00')
+        combo_instance_id = str(uuid.uuid4())
+        # Missing the goat line entirely.
+        payload = {
+            'client_sale_id': str(uuid.uuid4()),
+            'payments': [{'method': 'cash', 'amount': '1000.00'}],
+            'cart': [
+                {'product_id': self.fruit.id, 'qty': 1, 'weight': '2.00', 'offer_id': combo.id, 'combo_instance_id': combo_instance_id},
+                {'product_id': self.jar.id, 'qty': 3, 'offer_id': combo.id, 'combo_instance_id': combo_instance_id},
+            ],
+        }
+        response = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(POSSale.objects.filter(client_sale_id=payload['client_sale_id']).exists())
+
+    def test_combo_rejects_a_product_not_in_the_bundle(self):
+        combo = self._create_combo('20000.00')
+        combo_instance_id = str(uuid.uuid4())
+        other_product = Product.objects.create(
+            name='Honey', slug='honey', category=self.category, description='Honey',
+            price=Decimal('800.00'), pricing_mode='variable_weight',
+        )
+        payload = {
+            'client_sale_id': str(uuid.uuid4()),
+            'payments': [{'method': 'cash', 'amount': '20000.00'}],
+            'cart': [
+                {'product_id': self.fruit.id, 'qty': 1, 'weight': '2.00', 'offer_id': combo.id, 'combo_instance_id': combo_instance_id},
+                {'product_id': self.jar.id, 'qty': 3, 'offer_id': combo.id, 'combo_instance_id': combo_instance_id},
+                {'product_id': other_product.id, 'qty': 1, 'weight': '1.00', 'offer_id': combo.id, 'combo_instance_id': combo_instance_id},
+            ],
+        }
+        response = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_combo_rejects_when_offer_no_longer_live(self):
+        combo = self._create_combo('20000.00')
+        combo.end_date = timezone.now() - timedelta(hours=1)
+        combo.save(update_fields=['end_date'])
+        combo_instance_id = str(uuid.uuid4())
+        payload = {
+            'client_sale_id': str(uuid.uuid4()),
+            'payments': [{'method': 'cash', 'amount': '20000.00'}],
+            'cart': [
+                {'product_id': self.fruit.id, 'qty': 1, 'weight': '2.00', 'offer_id': combo.id, 'combo_instance_id': combo_instance_id},
+                {'product_id': self.jar.id, 'qty': 3, 'offer_id': combo.id, 'combo_instance_id': combo_instance_id},
+                {'product_id': self.goat.id, 'qty': 1, 'variant_id': self.goat_variant.id, 'offer_id': combo.id, 'combo_instance_id': combo_instance_id},
+            ],
+        }
+        response = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(POSSale.objects.filter(client_sale_id=payload['client_sale_id']).exists())
+
+    def test_pos_offers_list_endpoint_returns_live_discount_and_combo_offers(self):
+        combo = self._create_combo('20000.00')
+        response = self.client.get(reverse('v1_pos_offers_list'))
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        discount_ids = [o['offer_id'] for o in response.data['discount_offers']]
+        combo_ids = [o['offer_id'] for o in response.data['combo_offers']]
+        self.assertIn(self.percent_offer.id, discount_ids)
+        self.assertIn(combo.id, combo_ids)
+
+        combo_entry = next(o for o in response.data['combo_offers'] if o['offer_id'] == combo.id)
+        self.assertEqual(len(combo_entry['items']), 3)
+        self.assertTrue(combo_entry['fully_available'])
+        goat_item = next(i for i in combo_entry['items'] if i['product_id'] == self.goat.id)
+        self.assertEqual(len(goat_item['available_variants']), 1)
+
+    def test_pos_offers_list_requires_staff(self):
+        self.client.logout()
+        response = self.client.get(reverse('v1_pos_offers_list'))
+        self.assertIn(response.status_code, (status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN))
+
+    def test_combo_marked_not_fully_available_when_fixed_weight_item_has_no_stock(self):
+        combo = self._create_combo('20000.00')
+        self.goat_variant.is_available = False
+        self.goat_variant.save(update_fields=['is_available'])
+        response = self.client.get(reverse('v1_pos_offers_list'))
+        combo_entry = next(o for o in response.data['combo_offers'] if o['offer_id'] == combo.id)
+        self.assertFalse(combo_entry['fully_available'])
 
 
 class CustomerApiTests(ApiTestBase):
