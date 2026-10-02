@@ -1,6 +1,7 @@
 import uuid
 from datetime import timedelta
 from decimal import Decimal
+from unittest.mock import patch
 
 from django.contrib.auth.models import User
 from django.core.cache import cache
@@ -216,7 +217,7 @@ class POSSaleApiTests(ApiTestBase):
         response = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
         self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
         # 2 jars @ 250 + 2kg mango @ 300/kg = 500 + 600 = 1100
-        # (Decimal multiplication yields trailing zeros, same as pos_create_sale()'s str(total).)
+        # (Decimal multiplication yields trailing zeros in str(total).)
         self.assertEqual(Decimal(response.data['total']), Decimal('1100.00'))
 
         self.assertEqual(InventoryMovement.current_stock(self.jar), Decimal('8'))
@@ -1166,6 +1167,46 @@ class POSOfferApiTests(ApiTestBase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('no longer available', response.data['message'])
         self.assertFalse(POSSale.objects.filter(client_sale_id=payload['client_sale_id']).exists())
+
+
+class PosQueueFailureAlertApiTests(ApiTestBase):
+    """POST /api/v1/pos/queue/report-failed/ -- the offline sale queue
+    (static/js/pos-offline-queue.js) calls this once per queued entry the
+    first time it fails to sync for a real (non-network, non-auth) reason,
+    so a lost sale is at least noticed via Telegram rather than only
+    existing in that one device's IndexedDB."""
+
+    def setUp(self):
+        super().setUp()
+        self.client.login(username='cashier', password='pw')
+
+    def test_requires_staff(self):
+        self.client.logout()
+        response = self.client.post(reverse('v1_pos_queue_report_failed'), {
+            'client_sale_id': 'abc', 'error': 'x', 'payload': {},
+        }, format='json')
+        self.assertIn(response.status_code, (status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN))
+
+    @patch('shop.emails.send_telegram')
+    def test_sends_telegram_alert_with_sale_summary(self, mock_send_telegram):
+        response = self.client.post(reverse('v1_pos_queue_report_failed'), {
+            'client_sale_id': 'abc-123',
+            'error': 'Not enough stock: only 0 available.',
+            'payload': {
+                'cart': [{'product_id': self.jar.id, 'qty': 1}],
+                'payments': [{'method': 'cash', 'amount': '250.00'}],
+            },
+        }, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        mock_send_telegram.assert_called_once()
+        message = mock_send_telegram.call_args[0][0]
+        self.assertIn('abc-123', message)
+        self.assertIn('250.00', message)
+        self.assertIn('Not enough stock', message)
+
+    def test_rejects_missing_fields(self):
+        response = self.client.post(reverse('v1_pos_queue_report_failed'), {'client_sale_id': 'abc'}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
 
 class PosStockApiTests(ApiTestBase):

@@ -50,6 +50,7 @@ from .serializers import (
     OrderStatusSerializer,
     PasswordResetConfirmSerializer,
     PasswordResetRequestSerializer,
+    PosQueueFailureAlertSerializer,
     PosRestockSerializer,
     PosUnlockSerializer,
     POSSaleCreateSerializer,
@@ -138,10 +139,11 @@ class InventoryMovementListView(generics.ListAPIView):
 
 class POSSaleView(generics.ListAPIView):
     """GET: sale history (staff-only). POST: create a sale via the API —
-    delegates to create_pos_sale() (shop/views.py), shared with
-    pos_create_sale(), the traditional view templates/pos.html actually
-    calls. Same server-side total/VAT recomputation, same payments-sum
-    validation, same client_sale_id idempotency either way."""
+    delegates to create_pos_sale() (shop/views.py). This is the only way a
+    POS sale gets created: templates/pos.html's completeSaleBtn posts here
+    directly (POS-PWA Phase 1) — the earlier plain-Django-view wrapper
+    (pos_create_sale, at /pos/sale/) was removed once nothing called it
+    anymore."""
 
     queryset = POSSale.objects.select_related('cashier').order_by('-created_at')
     serializer_class = POSSaleReadSerializer
@@ -182,6 +184,51 @@ class POSSaleView(generics.ListAPIView):
             },
             status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
         )
+
+
+class PosQueueFailureAlertView(APIView):
+    """POST /api/v1/pos/queue/report-failed/ — staff-only. The offline sale
+    queue (static/js/pos-offline-queue.js) calls this exactly once, the
+    moment a queued sale's replay comes back with a real validation/stock
+    rejection rather than a network or auth failure (posReplayQueue()'s
+    'failed' branch, not 'pending'/'needsReauth') — an entry in that state
+    is never retried automatically again.
+
+    A failed queue entry otherwise only ever exists in that one device's
+    IndexedDB: if the browser data is cleared, the device is wiped, or the
+    PWA is reinstalled, there would be zero server-side trace a sale was
+    ever attempted — and the cashier already told that customer the sale
+    went through (the whole point of queuing is not blocking them at the
+    till). This can't recover the sale itself (the server already rejected
+    it for a real reason, re-trying won't change that), it just makes sure
+    a human actually sees it happened — same low-effort Telegram-alert
+    pattern already used for low-stock crossings (shop/signals.py)."""
+
+    authentication_classes = [SessionAuthentication]
+    permission_classes = [IsStaffUser]
+
+    def post(self, request, *args, **kwargs):
+        from shop.emails import send_telegram
+
+        serializer = PosQueueFailureAlertSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        cart = data['payload'].get('cart') or []
+        sale_payments = data['payload'].get('payments') or []
+        try:
+            total = sum(float(p.get('amount') or 0) for p in sale_payments)
+        except (TypeError, ValueError):
+            total = 0
+
+        send_telegram(
+            '⚠️ <b>Queued POS sale failed to sync</b>\n'
+            f'Staff: {request.user.get_full_name() or request.user.username}\n'
+            f"client_sale_id: {data['client_sale_id']}\n"
+            f'Amount: Rs. {total:.2f}, {len(cart)} line(s)\n'
+            f"Reason: {data.get('error') or 'unknown'}\n"
+            'This sale is NOT recorded — check with the cashier.'
+        )
+        return Response({'status': 'ok'})
 
 
 class CouponValidateView(APIView):

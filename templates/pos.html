@@ -5,6 +5,22 @@
     <meta charset="UTF-8">
     <title>POS — Angan Baari</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- PWA shell -- POS screen only (scope "/pos/" in both the manifest
+         and the service worker registration below). manifest.json itself
+         can be a plain static file since its own URL doesn't constrain
+         the SW's scope, only where the SW SCRIPT is served from does --
+         see the service worker registration comment further down. -->
+    <link rel="manifest" href="{% static 'pos-manifest.json' %}">
+    <meta name="theme-color" content="#285917">
+    <link rel="apple-touch-icon" href="{% static 'images/pos-icon-192.png' %}">
+    <!-- iOS ignores the manifest for install/standalone behavior entirely
+         -- these three tags are what actually make "Add to Home Screen"
+         launch without Safari chrome and pick up a sensible status bar/
+         title there. apple-touch-icon above is the icon iOS actually uses
+         (also manifest-independent). -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="AB POS">
     <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600&family=DM+Sans:wght@400;500;600;700&family=Noto+Sans+Devanagari:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
     <link rel="stylesheet" href="{% static 'style.css' %}">
@@ -176,6 +192,14 @@
            right next to it. */
         .stock-col.stock-all-ok { background: #2f6690; }
         .stock-col.stock-has-low { background: #b23b3b; }
+
+        /* Offline sale queue -- amber while everything just needs the
+           network back (expected, will resolve itself), red once anything
+           needs staff attention (session/PIN expired, or a real failure
+           that can't just be retried). */
+        .queue-col { cursor: pointer; }
+        .queue-col.queue-pending { background: #b4790f; }
+        .queue-col.queue-attention { background: #b23b3b; }
 
         .tax-box { flex: 1; min-width: 0; background: var(--pos-bg); border: 2px solid var(--pos-border-dark); border-radius: 6px; overflow: hidden; height: fit-content; }
         .tax-box .tax-row { display: flex; justify-content: space-between; padding: 4px 14px; font-size: 0.95rem; border-bottom: 1px solid var(--pos-border-dark); font-family: 'Noto Sans Devanagari', 'DM Sans', sans-serif; }
@@ -568,6 +592,13 @@
                         <span class="stock-indicator-text" id="stockIndicatorText">Stock OK</span>
                     </div>
 
+                    <!-- Hidden whenever the offline queue is empty -- the
+                         common case -- so it never crowds this row; shown
+                         (and colored) the moment a sale is queued. -->
+                    <div class="stock-col queue-col" id="queueBox" style="display:none;">
+                        <span class="stock-indicator-text" id="queueIndicatorText">0 Queued</span>
+                    </div>
+
                     <div class="repay-col">
                         <button type="button" class="side-btn repay-btn" id="openRepayBtn">उधारो तिर्नुहोस्<br><span style="font-weight:700;font-size:0.85rem;">Repay Credit</span></button>
                     </div>
@@ -733,6 +764,7 @@
 
     <script id="posProductsData" type="application/json">{{ products_json|safe }}</script>
     <script id="posCategoriesData" type="application/json">{{ categories_json|safe }}</script>
+    <script src="{% static 'js/pos-offline-queue.js' %}"></script>
     <script>
         const PRODUCTS = JSON.parse(document.getElementById('posProductsData').textContent);
         const CATEGORIES = JSON.parse(document.getElementById('posCategoriesData').textContent);
@@ -2370,13 +2402,19 @@
             if (appliedCoupon) payload.coupon_code = appliedCoupon.code;
 
             try {
-                const response = await apiFetch('/pos/sale/', {
+                const response = await apiFetch('/api/v1/sales/', {
                     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
                 });
                 const data = await response.json().catch(() => ({}));
-                if (response.status === 403) {
-                    // Idle-locked mid-checkout -- cart/payment state stays intact,
-                    // resuming right after a fresh PIN unlock.
+                if (response.status === 401 || response.status === 403) {
+                    // Idle-locked mid-checkout (403, Phase A PIN lock) or the
+                    // underlying Django session itself has expired (401,
+                    // DRF SessionAuthentication) -- either way the cart/
+                    // payment state stays intact, resuming right after a
+                    // fresh PIN unlock (401 additionally needs a real
+                    // re-login, but that's a full-page redirect the staff
+                    // will hit on their own next action; this terminal
+                    // doesn't try to auto-redirect out of an active sale).
                     closePaymentPanel();
                     currentOperator = null;
                     setLocked(true);
@@ -2394,16 +2432,147 @@
                     updateCartIndicator();
                     showReceiptView();
                 } else {
-                    showToast(data.message || 'Something went wrong');
+                    // A real validation/stock error (400/409) -- either
+                    // POSSaleValidationError's {status,message} shape, or
+                    // DRF's own {field: [errors]} shape if the payload
+                    // itself failed POSSaleCreateSerializer -- queuing this
+                    // would just fail identically again, so it's shown as
+                    // a normal failure, never queued.
+                    showToast(extractErrorMessage(data));
                     btn.disabled = false;
                 }
             } catch (err) {
-                showToast('Network error — please try again');
-                btn.disabled = false;
+                // fetch() itself threw -- no response at all, i.e. a real
+                // connectivity failure, not a validation error. Queue the
+                // sale instead of losing it: idempotent on client_sale_id,
+                // so it's safe to replay later even if this same request
+                // actually reached the server moments before the
+                // connection dropped.
+                await posQueueEnqueue(payload);
+                await registerPosBackgroundSync();
+                renderQueueBox();
+                showToast('Sale queued — will sync when back online');
+                cart = [];
+                receiptPage = 0;
+                clearCoupon(true);
+                newClientSaleId();
+                closePaymentPanel();
+                renderReceipt();
+                updateCartIndicator();
+                showReceiptView();
             } finally {
                 btn.textContent = originalText;
             }
         });
+
+        function extractErrorMessage(data) {
+            if (data.message) return data.message;
+            if (data.detail) return data.detail;
+            const firstField = Object.keys(data).find(k => Array.isArray(data[k]) && data[k].length);
+            if (firstField) return data[firstField][0];
+            return 'Something went wrong';
+        }
+
+        // ══════════════════════════════════════════════════════════════
+        // Offline sale queue (IndexedDB, see static/js/pos-offline-queue.js)
+        // -- a sale that fails to reach POST /api/v1/sales/ purely because
+        // of a connectivity drop (not a real validation error) is queued
+        // instead of lost, then replayed in order once back online: via
+        // Background Sync where supported (the service worker's 'sync'
+        // handler keeps working even if this tab isn't focused/open), and
+        // via these online/visibilitychange listeners everywhere else --
+        // notably Safari/iOS, which doesn't support Background Sync at all.
+        // ══════════════════════════════════════════════════════════════
+        async function registerPosBackgroundSync() {
+            if (!('serviceWorker' in navigator)) return;
+            try {
+                const reg = await navigator.serviceWorker.ready;
+                if ('sync' in reg) await reg.sync.register('pos-replay-queue');
+            } catch (err) { /* unsupported/denied -- the listeners below still cover it */ }
+        }
+
+        async function renderQueueBox() {
+            const entries = await posQueueList();
+            const box = document.getElementById('queueBox');
+            const text = document.getElementById('queueIndicatorText');
+            if (!entries.length) { box.style.display = 'none'; return; }
+            box.style.display = '';
+            const needsAttention = entries.some(e => e.status === 'needsReauth' || e.status === 'failed');
+            box.classList.toggle('queue-attention', needsAttention);
+            box.classList.toggle('queue-pending', !needsAttention);
+            text.innerHTML = needsAttention
+                ? `${entries.length} Queued<br>&#9888; needs attention`
+                : `${entries.length} Queued`;
+        }
+
+        async function openQueuePanel() {
+            const body = document.getElementById('itemModalBody');
+            body.classList.remove('keypad-mode', 'offers-mode');
+            const entries = await posQueueList();
+            const rows = entries.map(e => {
+                const amount = (e.payload.payments || []).reduce((s, p) => s + parseFloat(p.amount || 0), 0);
+                let statusLine = '<div class="offer-option-sub">Waiting for connection…</div>';
+                if (e.status === 'needsReauth') {
+                    statusLine = '<div class="offer-option-sub" style="color:#b23b3b;">Needs a fresh PIN unlock (or login) to sync</div>';
+                } else if (e.status === 'failed') {
+                    statusLine = `<div class="offer-option-sub" style="color:#b23b3b;">${e.lastError || 'Could not sync this sale.'}</div>`;
+                }
+                const retryBtn = e.status !== 'pending'
+                    ? `<button type="button" class="side-btn payment-btn-main queue-retry-btn" data-id="${e.client_sale_id}" style="margin-top:6px;width:auto;padding:6px 14px;font-size:0.8rem;">Retry now</button>`
+                    : '';
+                return `
+                    <div class="offer-option" style="cursor:default;">
+                        <div class="offer-option-title">Rs. ${formatMoney(amount)} — queued ${new Date(e.queuedAt).toLocaleString()}</div>
+                        ${statusLine}
+                        ${retryBtn}
+                    </div>`;
+            }).join('');
+            body.innerHTML = `<h3>Sale Queue</h3>` +
+                (entries.length
+                    ? `<div class="offers-list">${rows}</div>`
+                    : `<div style="text-align:center;color:var(--text-muted);padding:20px 0;">Nothing queued.</div>`) +
+                `<div class="item-modal-actions"><button type="button" class="btn-cancel" id="queuePanelClose">Close</button></div>`;
+            body.querySelectorAll('.queue-retry-btn').forEach(retryBtn => {
+                retryBtn.addEventListener('click', async () => {
+                    await posQueueUpdate(retryBtn.dataset.id, { status: 'pending' });
+                    showToast('Retrying…');
+                    await posReplayQueue();
+                    await renderQueueBox();
+                    openQueuePanel();
+                });
+            });
+            document.getElementById('itemModal').classList.add('active');
+            document.getElementById('queuePanelClose').addEventListener('click', closeItemModal);
+        }
+        document.getElementById('queueBox').addEventListener('click', openQueuePanel);
+
+        window.addEventListener('online', async () => {
+            await posReplayQueue();
+            await renderQueueBox();
+        });
+        document.addEventListener('visibilitychange', async () => {
+            if (!document.hidden) {
+                await posReplayQueue();
+                await renderQueueBox();
+            }
+        });
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register("{% url 'pos_service_worker' %}", { scope: '/pos/' })
+                .catch(err => console.warn('POS service worker registration failed:', err));
+            navigator.serviceWorker.addEventListener('message', (event) => {
+                if (event.data && event.data.type === 'POS_QUEUE_SYNCED') renderQueueBox();
+            });
+        }
+        // Attempt a replay on every fresh page load, not just paint whatever
+        // was left queued -- this is the fallback that actually matters on
+        // iOS Safari, which has no Background Sync API at all (the 'sync'
+        // event in pos-sw.js simply never fires there). Without this, a
+        // sale queued on iOS would sit untouched until the online/
+        // visibilitychange listeners above happen to fire, which doesn't
+        // reliably happen just from reopening the installed app from the
+        // home screen -- a fresh load is the one moment iOS is guaranteed
+        // to give this code a chance to run.
+        posReplayQueue().then(renderQueueBox);
 
         // ══════════════════════════════════════════════════════════════
         // Repay credit — a full view (repayView), same currentView toggle

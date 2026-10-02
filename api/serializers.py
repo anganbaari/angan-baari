@@ -135,10 +135,8 @@ class POSSaleReadSerializer(serializers.ModelSerializer):
 class POSSaleCreateSerializer(serializers.Serializer):
     """Input-shape validation only — the actual total/VAT computation,
     payments-sum check, and InventoryMovement writes happen in
-    create_pos_sale() (shop/views.py), shared with pos_create_sale() (the
-    traditional view templates/pos.html actually calls), since that's
-    where product/variant lookups and server-side price recomputation have
-    to happen anyway.
+    create_pos_sale() (shop/views.py), since that's where product/variant
+    lookups and server-side price recomputation have to happen anyway.
 
     No operator_id here deliberately: the operator comes from
     request.session (set only by a verified PIN on POST /pos/unlock/, see
@@ -421,6 +419,18 @@ class CustomerCreateSerializer(serializers.Serializer):
     nickname = serializers.CharField(max_length=100, required=False, allow_blank=True, default='')
     phone = serializers.CharField(max_length=20)
     address = serializers.CharField()
+
+
+class PosQueueFailureAlertSerializer(serializers.Serializer):
+    """Input-shape validation for the offline-queue failure alert endpoint
+    -- see PosQueueFailureAlertView's docstring (api/views.py) for why this
+    exists. `payload` is the exact sale body the queue tried to replay
+    (cart/payments/etc.), passed through as-is just to summarize in the
+    Telegram message -- not re-validated or acted on here."""
+
+    client_sale_id = serializers.CharField(max_length=64)
+    error = serializers.CharField(allow_blank=True, required=False, default='')
+    payload = serializers.DictField()
 
 
 class CouponValidateSerializer(serializers.Serializer):

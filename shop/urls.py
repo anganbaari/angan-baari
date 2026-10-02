@@ -27,5 +27,5 @@ urlpatterns = [
     path('wishlist/set-variant/<int:product_id>/', views.wishlist_set_variant, name='wishlist_set_variant'),
     path('wishlist/move-to-cart/<int:product_id>/', views.wishlist_move_to_cart, name='wishlist_move_to_cart'),
     path('pos/', views.pos_view, name='pos'),
-    path('pos/sale/', views.pos_create_sale, name='pos_create_sale'),   
+    path('pos/service-worker.js', views.pos_service_worker, name='pos_service_worker'),
 ]

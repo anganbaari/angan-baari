@@ -4,7 +4,6 @@ from django.utils.html import escape
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.contrib.admin.views.decorators import staff_member_required
-from django.views.decorators.http import require_POST
 from django.urls import reverse
 from django.contrib import messages
 from .models import NewsletterSubscriber, ContactMessage, ProductOrder, Review, Wishlist
@@ -907,9 +906,11 @@ def resolve_pos_combo_lines(cart):
 
 def create_pos_sale(*, client_sale_id, cart, payments, operator_user, customer=None,
                      source='pos', note_prefix='POS sale', coupon_code=None):
-    """Shared by pos_create_sale() (traditional, what templates/pos.html
-    actually calls) and POSSaleView.post() (API) — the two entry points
-    for completing a POS sale. Computes the cart total (and, once
+    """Called by POSSaleView.post() (api/views.py) — the sole entry point
+    for completing a POS sale since templates/pos.html's completeSaleBtn
+    switched to POST /api/v1/sales/ (POS-PWA Phase 1); the earlier plain-
+    Django-view wrapper (pos_create_sale, at /pos/sale/) was removed once
+    nothing called it anymore. Computes the cart total (and, once
     BusinessSettings.is_vat_enabled is switched on, the taxable/exempt/VAT
     split), validates the payment lines against it, and — all inside one
     atomic transaction — creates the POSSale, one POSSalePayment per
@@ -1165,6 +1166,38 @@ def create_pos_sale(*, client_sale_id, cart, payments, operator_user, customer=N
     return sale, True
 
 
+def pos_service_worker(request):
+    """Serves static/js/pos-sw.js at /pos/service-worker.js -- NOT through
+    Django's normal static-files pipeline, and deliberately not staff-only
+    (a service worker request has no session cookie context worth gating,
+    and browsers won't send credentials for it anyway).
+
+    This has to be a real view under /pos/ rather than a plain static file
+    under /static/js/, because a service worker's effective scope can
+    never exceed the directory its own script URL lives in unless the
+    response sends a Service-Worker-Allowed header -- and PythonAnywhere's
+    static-file mapping (the Web tab UI) has no way to attach a custom
+    header to one specific file. Reading the source directly from
+    static/js/pos-sw.js (not STATIC_ROOT/collectstatic output) means this
+    works identically in local dev and in production without depending on
+    collectstatic having been run for this one file.
+    """
+    from pathlib import Path
+    from django.conf import settings
+    from django.http import Http404, HttpResponse
+
+    sw_path = Path(settings.BASE_DIR) / 'static' / 'js' / 'pos-sw.js'
+    try:
+        content = sw_path.read_text(encoding='utf-8')
+    except FileNotFoundError:
+        raise Http404()
+
+    response = HttpResponse(content, content_type='application/javascript')
+    response['Service-Worker-Allowed'] = '/pos/'
+    response['Cache-Control'] = 'no-cache'  # staff should get SW updates on next load, not a stale cached copy
+    return response
+
+
 @staff_member_required
 def pos_view(request):
     """The shop POS screen. Staff-only (Django's own is_staff flag — same
@@ -1254,64 +1287,6 @@ def pos_view(request):
         'vat_rate': VAT_RATE,
     })
 
-
-@staff_member_required
-@require_POST
-def pos_create_sale(request):
-    """Complete a POS sale — thin request-parsing wrapper around
-    create_pos_sale(), which does all the actual validation/creation work
-    (shared with POSSaleView.post() in api/views.py). This is the endpoint
-    templates/pos.html actually calls.
-
-    client_sale_id is required (idempotency — a repeated request with the
-    same id returns the original sale rather than creating a duplicate).
-    The operator (who's actually running this sale, which may not be
-    request.user — the terminal's own day-long login) comes from
-    request.session, set only by a verified PIN on POST /pos/unlock/ — see
-    get_pos_operator(). customer_id is only required when at least one
-    payment line uses 'credit'.
-    """
-    import json
-    from .models import Customer
-
-    try:
-        data = json.loads(request.body)
-    except (json.JSONDecodeError, TypeError):
-        return JsonResponse({'status': 'error', 'message': 'Invalid request body.'}, status=400)
-
-    client_sale_id = data.get('client_sale_id')
-    if not client_sale_id:
-        return JsonResponse({'status': 'error', 'message': 'Missing client_sale_id.'}, status=400)
-
-    try:
-        operator_user = get_pos_operator(request)
-    except POSSaleValidationError as e:
-        return JsonResponse({'status': 'error', 'message': e.message}, status=e.status)
-
-    customer = None
-    customer_id = data.get('customer_id')
-    if customer_id:
-        try:
-            customer = Customer.objects.get(id=customer_id)
-        except (Customer.DoesNotExist, TypeError, ValueError):
-            return JsonResponse({'status': 'error', 'message': 'Customer not found.'}, status=400)
-
-    try:
-        sale, _created = create_pos_sale(
-            client_sale_id=client_sale_id,
-            cart=data.get('cart') or [],
-            payments=data.get('payments') or [],
-            operator_user=operator_user,
-            customer=customer,
-            coupon_code=data.get('coupon_code'),
-        )
-    except POSSaleValidationError as e:
-        return JsonResponse({'status': 'error', 'message': e.message}, status=e.status)
-
-    return JsonResponse({
-        'status': 'ok', 'sale_number': sale.sale_number, 'total': str(sale.total_amount),
-        'discount_amount': str(sale.discount_amount), 'round_off_amount': str(sale.round_off_amount),
-    })
 
 def line_subtotal(item):
     try:

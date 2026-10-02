@@ -15,6 +15,7 @@ urlpatterns = [
     path('pos/customers/', views.CustomerListCreateView.as_view(), name='v1_pos_customer_create'),
     path('pos/credit/repay/', views.CreditRepayView.as_view(), name='v1_pos_credit_repay'),
     path('pos/coupon/validate/', views.CouponValidateView.as_view(), name='v1_pos_coupon_validate'),
+    path('pos/queue/report-failed/', views.PosQueueFailureAlertView.as_view(), name='v1_pos_queue_report_failed'),
     path('pos/offers/', views.PosOffersListView.as_view(), name='v1_pos_offers_list'),
     path('pos/stock/', views.PosStockListView.as_view(), name='v1_pos_stock_list'),
     path('pos/restock/', views.PosRestockView.as_view(), name='v1_pos_restock'),
