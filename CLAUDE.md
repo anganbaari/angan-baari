@@ -156,8 +156,13 @@ Endpoints:
 - `GET/POST /api/v1/sales/` — staff-only, session-authed. POST recomputes
   totals server-side, enforces stock, supports `client_sale_id`
   idempotency, and reuses `create_inventory_movements_from_snapshot(...,
-  strict=True)` inside `transaction.atomic()` — the same helper
-  `pos_create_sale()` uses.
+  strict=True)` inside `transaction.atomic()` via the shared
+  `create_pos_sale()` helper. As of the POS-PWA Phase 1 work, this is the
+  **only** way a POS sale gets created — `templates/pos.html`'s
+  `completeSaleBtn` posts here directly now, not to a separate
+  session-authed Django view (the old `pos_create_sale`/`/pos/sale/` thin
+  wrapper around the same helper was removed as dead code once nothing
+  called it anymore).
 - `POST /api/v1/orders/` — public, guest checkout. Reuses
   `create_order_inventory_movements()` /
   `create_inventory_movements_from_snapshot(..., strict=False)`.
@@ -179,16 +184,65 @@ total and deducted stock, idempotent resubmission returned the same
 order creation worked with no auth, and the order token gate correctly
 limited/expanded fields as designed.
 
-**Known non-blocking technical debt:** `POSSaleView.post()` in
-`api/views.py` duplicates the per-`pricing_mode` total computation logic
-that already exists in `pos_create_sale()` in `shop/views.py` — a future
-refactor should extract this into one shared function both call, to avoid
-the two drifting apart if pricing rules change.
-
 **Gotcha:** DRF's `SessionAuthentication` does its own CSRF check
-independent of Django's middleware — this matters once/if `pos.html`'s JS
-is ever pointed at this API; it must keep sending its existing
-`X-CSRFToken` header.
+independent of Django's middleware. `pos.html`'s JS is now actually
+pointed at this API (see "POS-PWA (Phase 1)" below) — it keeps sending
+its existing `X-CSRFToken` header (via `apiFetch()`) on every call, which
+is load-bearing, not optional.
+
+## POS-PWA (Phase 1 — PWA shell + offline sale queue)
+
+Scoped to `/pos/` only; nothing else on the site is a PWA. Phase 2
+(caching the catalog so `/pos/` can cold-start with zero connectivity) is
+intentionally not built yet — Phase 1 only covers a connectivity drop
+*during* an already-open session.
+
+- `static/pos-manifest.json` — `start_url`/`scope` both `/pos/`,
+  `display: standalone`. Icons include both `any` and `maskable` variants
+  (`static/images/pos-icon-*.png` / `pos-icon-*-maskable.png`, the
+  maskable ones padded to the safe-zone convention, generated from
+  `static/images/logo-icon.png`). iOS ignores the manifest for
+  install/standalone behavior — `templates/pos.html`'s `<head>` also has
+  the `apple-mobile-web-app-*` meta tags and an `apple-touch-icon` link,
+  which is what iOS actually reads.
+- `static/js/pos-sw.js` — the service worker, scope `/pos/`. Served at
+  `/pos/service-worker.js` by a dedicated view (`pos_service_worker` in
+  `shop/views.py`), **not** through the normal static-files pipeline —
+  load-bearing, not a style choice: a service worker's effective scope
+  can never exceed the directory its own script URL lives in unless the
+  response sends a `Service-Worker-Allowed` header, and PythonAnywhere's
+  static-file mapping (the Web tab UI) has no way to attach a custom
+  header to one specific file. No catalog/asset caching yet (Phase 2) —
+  Phase 1's `fetch` handler is a plain pass-through, present only because
+  some browsers' installability checks still look for one.
+- `static/js/pos-offline-queue.js` — an IndexedDB-backed queue, loaded
+  both as a classic `<script>` in `pos.html` and via `importScripts()` in
+  the service worker (same file, two contexts). `completeSaleBtn` posts to
+  `POST /api/v1/sales/`; a real validation/stock rejection (4xx) is shown
+  as a normal failure same as always, but a genuine network failure
+  (`fetch()` itself throwing) queues the sale instead of losing it, relying
+  on `client_sale_id` idempotency to make a later double-send harmless.
+  Replay is attempted on page load, on the browser's `online` event, on
+  `visibilitychange`, and via the Background Sync API where supported —
+  **Safari/iOS has no Background Sync at all**, so the page-load attempt is
+  what actually covers it there (reopening an installed PWA from the home
+  screen is a fresh load, not reliably an `online`/`visibilitychange`
+  transition). A queued entry that comes back `401`/`403` on replay is
+  marked `needsReauth` (session/PIN expired while offline) rather than
+  retried forever or dropped; one that comes back a real `400`/`409` is
+  marked `failed` and also fires one (not repeated) Telegram alert via
+  `PosQueueFailureAlertView` (`POST /api/v1/pos/queue/report-failed/`),
+  since a failed entry otherwise only exists in that one device's
+  IndexedDB — cleared browser data, a wiped device, or a PWA reinstall
+  would otherwise erase the only trace a sale was ever attempted, even
+  though the cashier already told that customer it went through.
+- **Not yet done — needs a real device before this is fully trusted**:
+  actual install-to-home-screen + airplane-mode-mid-sale + reconnect
+  testing on a real Android phone (and iOS, if the farm uses one). What's
+  verified so far is CDP-scripted against a desktop headless browser —
+  solid evidence the logic is correct, but not a substitute for seeing
+  Background Sync actually fire on a real OS while the app isn't in the
+  foreground.
 
 ## Deferred work (known, intentional, not yet built)
 
@@ -225,8 +279,10 @@ is ever pointed at this API; it must keep sending its existing
   (`--font-body`), Cinzel (`--font-accent`)
 - Cache-bust static assets with `?v=N` when editing CSS/JS
 - URL names in use: `home`, `shop`, `cart`, `offers`, `profile`, `login`,
-  `pos`, `pos_create_sale`, plus cart/wishlist/checkout sub-routes (see
-  `shop/urls.py`)
+  `pos`, `pos_service_worker`, plus cart/wishlist/checkout sub-routes (see
+  `shop/urls.py`). `pos_create_sale`/`/pos/sale/` was removed (POS-PWA
+  Phase 1) once `templates/pos.html` switched to posting directly to
+  `POST /api/v1/sales/` and nothing else referenced it.
 
 ## Key files
 
@@ -235,8 +291,8 @@ is ever pointed at this API; it must keep sending its existing
   InventoryMovement, POSSale
 - `shop/views.py` — all view logic: cart (session-based), save-for-later,
   wishlist, checkout, coupon/offer application, POS (`pos_view`,
-  `pos_create_sale`), the shared `create_inventory_movements_from_snapshot()`
-  helper
+  `pos_service_worker`), the shared `create_inventory_movements_from_snapshot()`
+  and `create_pos_sale()` helpers
 - `shop/admin.py` — Django admin customizations, including a custom
   newsletter-campaign compose form (`NewsletterAdmin`) and computed stock
   display on `ProductAdmin`
