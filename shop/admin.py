@@ -14,7 +14,7 @@ from .emails import send_newsletter_campaign
 from .models import InventoryMovement
 from .models import (
     Offer, Coupon, BundleItem, ProductVariant, ProductSellingUnit, InventoryMovement, POSSale, UserProfile,
-    BusinessSettings, CreditTransaction, Customer, POSSalePayment,
+    BusinessSettings, CreditTransaction, Customer, POSSalePayment, RevenueTarget,
 )
 from .stock import get_stock_table_rows
 from .utils import format_money
@@ -497,3 +497,15 @@ class BusinessSettingsAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+@admin.register(RevenueTarget)
+class RevenueTargetAdmin(admin.ModelAdmin):
+    """Entered in plain A.D. dates deliberately -- see the model's own
+    docstring. The Reports dashboard (/dashboard/) reads this and displays
+    everything in B.S."""
+
+    list_display = ['name', 'amount', 'start_date', 'end_date', 'is_active']
+    list_filter = ['is_active']
+    list_editable = ['is_active']
+    ordering = ['-start_date']

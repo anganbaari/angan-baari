@@ -984,3 +984,37 @@ class BusinessSettings(models.Model):
 
     def __str__(self):
         return 'Business Settings'
+
+
+class RevenueTarget(models.Model):
+    """A revenue goal for the Reports dashboard's sidebar Target card
+    (shop/reports.py's get_target_progress()). Entered in plain A.D. dates
+    here in admin — the owner picks whatever period they mean (a Nepali
+    fiscal year, a calendar year, a single month) by just setting
+    start_date/end_date; the dashboard itself displays everything in B.S.,
+    but there's no reason to make the admin form itself BS-only for a
+    field two people type into a handful of times a year.
+
+    "Achieved" against this target is always POS sales only (never
+    online orders), for the same reason revenue is POS-only everywhere
+    else on this dashboard: ProductOrder has no stored price. See
+    shop/reports.py's module docstring.
+    """
+
+    name = models.CharField(max_length=100, help_text='e.g. "FY 2083/84" or "2026 Goal" — shown on the dashboard as-is.')
+    start_date = models.DateField()
+    end_date = models.DateField()
+    amount = models.DecimalField(max_digits=12, decimal_places=2, help_text='Target revenue in Rs.')
+    is_active = models.BooleanField(
+        default=True,
+        help_text='Only active targets are ever shown on the dashboard. If more than one active '
+                   "target's period contains today, the dashboard prefers that one; otherwise it "
+                   'shows the most recently started active target.'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-start_date']
+
+    def __str__(self):
+        return f'{self.name} (Rs {self.amount:,.0f}, {self.start_date} to {self.end_date})'
