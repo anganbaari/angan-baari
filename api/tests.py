@@ -1311,6 +1311,89 @@ class PosQueueFailureAlertApiTests(ApiTestBase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
 
+class PosQueueDismissedReportApiTests(ApiTestBase):
+    """POST /api/v1/pos/queue/report-dismissed/ -- see
+    PosQueueDismissedReportView's docstring (api/views.py) for why this
+    exists and why, unlike PosQueueFailureAlertView above, it must not
+    fail silently: pos.html only removes a dismissed queue entry after
+    this call returns 200."""
+
+    def setUp(self):
+        super().setUp()
+        self.client.login(username='cashier', password='pw')
+
+    def test_requires_staff(self):
+        self.client.logout()
+        response = self.client.post(reverse('v1_pos_queue_report_dismissed'), {
+            'client_sale_id': 'abc', 'payload': {}, 'status': 'failed',
+        }, format='json')
+        self.assertIn(response.status_code, (status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN))
+
+    @patch('shop.emails.send_telegram')
+    def test_sends_detailed_telegram_report(self, mock_send_telegram):
+        customer = Customer.objects.create(name='Hari Prasad', phone='9811111111')
+        response = self.client.post(reverse('v1_pos_queue_report_dismissed'), {
+            'client_sale_id': 'dismiss-1',
+            'status': 'stockConflict',
+            'last_error': 'Pickle Jar — only 0 currently available.',
+            'queued_at': '2026-10-06T10:00:00.000Z',
+            'payload': {
+                'cart': [{'product_id': self.jar.id, 'qty': 2}],
+                'payments': [{'method': 'cash', 'amount': '500.00'}],
+                'customer_id': customer.id,
+                'queued_operator_id': self.staff.id,
+            },
+        }, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        mock_send_telegram.assert_called_once()
+        message = mock_send_telegram.call_args[0][0]
+        self.assertIn('dismiss-1', message)
+        self.assertIn('Pickle Jar', message)
+        self.assertIn('Hari Prasad', message)
+        self.assertIn('500.00', message)
+        self.assertIn('stockConflict', message)
+        self.assertIn(self.staff.username, message)  # self.staff has no full name set
+        self.assertTrue(mock_send_telegram.call_args.kwargs.get('raise_on_failure'))
+
+    @patch('shop.emails.send_telegram')
+    def test_resolves_deleted_product_variant_and_customer_gracefully(self, mock_send_telegram):
+        deleted_product_id = self.jar.id + 9999
+        response = self.client.post(reverse('v1_pos_queue_report_dismissed'), {
+            'client_sale_id': 'dismiss-2',
+            'status': 'failed',
+            'payload': {
+                'cart': [
+                    {'product_id': deleted_product_id, 'qty': 1},
+                    {'product_id': self.goat.id, 'variant_id': 999999, 'qty': 1},
+                ],
+                'payments': [{'method': 'cash', 'amount': '100.00'}],
+                'customer_id': 999999,
+            },
+        }, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        message = mock_send_telegram.call_args[0][0]
+        self.assertIn('deleted product', message)
+        self.assertIn('no longer found', message)  # the deleted variant
+        self.assertIn('deleted customer', message)
+        self.assertIn('not recorded', message)  # no queued_operator_id was sent
+
+    @patch('shop.emails.send_telegram', side_effect=Exception('Telegram unreachable'))
+    def test_telegram_failure_returns_error_so_entry_stays_queued(self, mock_send_telegram):
+        response = self.client.post(reverse('v1_pos_queue_report_dismissed'), {
+            'client_sale_id': 'dismiss-3',
+            'status': 'failed',
+            'payload': {
+                'cart': [{'product_id': self.jar.id, 'qty': 1}],
+                'payments': [{'method': 'cash', 'amount': '250.00'}],
+            },
+        }, format='json')
+        self.assertEqual(response.status_code, status.HTTP_502_BAD_GATEWAY)
+
+    def test_rejects_missing_fields(self):
+        response = self.client.post(reverse('v1_pos_queue_report_dismissed'), {'client_sale_id': 'abc'}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+
 class PosStockApiTests(ApiTestBase):
     """GET /api/v1/pos/stock/ and POST /api/v1/pos/restock/ -- the list
     reuses get_stock_table_rows() (shop/stock.py), the exact same function

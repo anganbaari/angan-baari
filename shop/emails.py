@@ -6,19 +6,31 @@ from django.conf import settings
 logger = logging.getLogger(__name__)
 
 
-def send_telegram(message):
-    """Send a Telegram notification to the admin."""
+def send_telegram(message, raise_on_failure=False):
+    """Send a Telegram notification to the admin.
+
+    Swallows its own failures by default -- best-effort, since a Telegram
+    outage must never break whatever primary action (an order, a low-stock
+    signal, a queue-failure alert) triggered this notification. Pass
+    raise_on_failure=True for the rare caller where sending this message
+    successfully IS the entire point of the request, not a side effect of
+    it -- PosQueueDismissedReportView (api/views.py) is the one example:
+    dismissing an offline sale-queue entry destroys its only server-side
+    trace, so the caller needs to know definitively whether this report
+    actually reached Telegram, not have the request "succeed" either way."""
     try:
         token = settings.TELEGRAM_BOT_TOKEN
         chat_id = settings.TELEGRAM_CHAT_ID
         url = f"https://api.telegram.org/bot{token}/sendMessage"
-        requests.post(url, data={
+        response = requests.post(url, data={
             'chat_id': chat_id,
             'text': message,
             'parse_mode': 'HTML',
         }, timeout=5)
+        response.raise_for_status()
     except Exception:
-        pass
+        if raise_on_failure:
+            raise
 
 
 def send_resend_email(to, subject, body):

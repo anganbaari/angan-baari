@@ -50,6 +50,7 @@ from .serializers import (
     OrderStatusSerializer,
     PasswordResetConfirmSerializer,
     PasswordResetRequestSerializer,
+    PosQueueDismissedReportSerializer,
     PosQueueFailureAlertSerializer,
     PosRestockSerializer,
     PosUnlockSerializer,
@@ -237,6 +238,121 @@ class PosQueueFailureAlertView(APIView):
             f"Reason: {data.get('error') or 'unknown'}\n"
             'This sale is NOT recorded — check with the cashier.'
         )
+        return Response({'status': 'ok'})
+
+
+class PosQueueDismissedReportView(APIView):
+    """POST /api/v1/pos/queue/report-dismissed/ — staff-only. Called once,
+    right before static/js/pos-offline-queue.js's posQueueRemove()
+    permanently deletes a stockConflict/offerChanged/failed queue entry
+    that staff have confirmed (openQueuePanel()'s Dismiss confirmation step
+    in pos.html) they're giving up on.
+
+    Unlike PosQueueFailureAlertView above — fired automatically, once, the
+    moment an entry FIRST turns 'failed', deliberately best-effort — this
+    one is NOT allowed to fail silently: a queue entry is a device-local
+    IndexedDB record with zero server-side trace of its own, so if this
+    report never reaches the owner, Dismiss has just destroyed the only
+    remaining evidence that sale was ever attempted. pos.html only removes
+    the entry from the queue AFTER this call returns 200; a non-2xx
+    response (including send_telegram actually failing to reach Telegram,
+    not just this request failing to reach the server) means the entry
+    stays in the queue with an explicit "can't dismiss offline" message.
+
+    Resolves as much as it can from the raw queued payload into a human-
+    readable summary (product/variant/unit names, the customer, the
+    operator) for whoever reads the Telegram message to re-enter the sale
+    or reconcile it by hand — anything that no longer resolves (a deleted
+    product, variant, customer, or staff profile) is reported as such
+    rather than silently dropped, since this message is the only remaining
+    safety net for this sale."""
+
+    authentication_classes = [SessionAuthentication]
+    permission_classes = [IsStaffUser]
+
+    def post(self, request, *args, **kwargs):
+        from decimal import Decimal, InvalidOperation
+
+        from shop.emails import send_telegram
+        from shop.models import Customer, Product, ProductSellingUnit, ProductVariant, UserProfile
+
+        serializer = PosQueueDismissedReportSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        payload = data['payload']
+        cart = payload.get('cart') or []
+        sale_payments = payload.get('payments') or []
+
+        lines = []
+        for line in cart:
+            try:
+                name = Product.objects.get(id=line.get('product_id')).name
+            except (Product.DoesNotExist, ValueError, TypeError):
+                name = f"[deleted product #{line.get('product_id')}]"
+            detail_bits = []
+            if line.get('variant_id'):
+                try:
+                    variant = ProductVariant.objects.get(id=line['variant_id'])
+                    detail_bits.append(f'{variant.weight}kg animal')
+                except (ProductVariant.DoesNotExist, ValueError, TypeError):
+                    detail_bits.append(f"variant #{line['variant_id']} (no longer found)")
+            elif line.get('weight'):
+                detail_bits.append(f"{line['weight']}kg")
+            elif line.get('unit_id'):
+                try:
+                    unit = ProductSellingUnit.objects.get(id=line['unit_id'])
+                    detail_bits.append(f"{line.get('qty', 1)} {unit.get_name_display()}")
+                except (ProductSellingUnit.DoesNotExist, ValueError, TypeError):
+                    detail_bits.append(f"qty {line.get('qty', 1)}, unit #{line['unit_id']} (no longer found)")
+            elif line.get('qty'):
+                detail_bits.append(f"qty {line['qty']}")
+            lines.append(f"  • {name} ({', '.join(detail_bits) or '1'})")
+
+        try:
+            total = sum(Decimal(str(p.get('amount') or 0)) for p in sale_payments)
+        except (TypeError, ValueError, InvalidOperation):
+            total = Decimal('0')
+        payment_bits = ', '.join(
+            f"{p.get('method')}: Rs.{p.get('amount')}" for p in sale_payments
+        ) or 'none recorded'
+
+        customer_label = 'none (cash/non-credit sale)'
+        customer_id = payload.get('customer_id')
+        if customer_id:
+            try:
+                customer_label = Customer.objects.get(id=customer_id).name
+            except (Customer.DoesNotExist, ValueError, TypeError):
+                customer_label = f'[deleted customer #{customer_id}]'
+
+        operator_label = 'unknown (not recorded)'
+        operator_id = payload.get('queued_operator_id')
+        if operator_id:
+            try:
+                operator_user = UserProfile.objects.select_related('user').get(user_id=operator_id).user
+                operator_label = operator_user.get_full_name() or operator_user.username
+            except (UserProfile.DoesNotExist, ValueError, TypeError):
+                operator_label = f'[staff id {operator_id}, no longer found]'
+
+        message = (
+            '🗑 <b>Queued POS sale dismissed — needs manual reconciliation</b>\n'
+            f"client_sale_id: {data['client_sale_id']}\n"
+            f"Originally rung up: {data.get('queued_at') or 'unknown'}\n"
+            f'Operator: {operator_label}\n'
+            f'Customer: {customer_label}\n'
+            'Items:\n' + '\n'.join(lines) + '\n'
+            f'Payments: {payment_bits}\n'
+            f'Total: Rs. {total:.2f}\n'
+            f"Stuck as: {data['status']} — {data.get('last_error') or 'no error message recorded'}\n"
+            'This sale was NEVER recorded in the system. If the customer paid, '
+            'reconcile by hand; if it should still go through, re-enter it as a new sale.'
+        )
+        try:
+            send_telegram(message, raise_on_failure=True)
+        except Exception:
+            return Response(
+                {'status': 'error', 'message': 'Could not send the report — try again once online.'},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
         return Response({'status': 'ok'})
 
 

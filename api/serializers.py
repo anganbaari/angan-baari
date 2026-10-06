@@ -441,6 +441,23 @@ class PosQueueFailureAlertSerializer(serializers.Serializer):
     payload = serializers.DictField()
 
 
+class PosQueueDismissedReportSerializer(serializers.Serializer):
+    """Input-shape validation for the dismissed-queue-entry report endpoint
+    -- see PosQueueDismissedReportView's docstring (api/views.py). Unlike
+    PosQueueFailureAlertSerializer above, nothing here is re-validated or
+    acted on either (this view only ever sends a Telegram message, never
+    writes anything to the database), so there's no risk in trusting these
+    fields as display text -- `status`/`last_error`/`queued_at` exist
+    purely to tell a human reading the report what state this entry was
+    stuck in and when it was originally rung up."""
+
+    client_sale_id = serializers.CharField(max_length=64)
+    payload = serializers.DictField()
+    status = serializers.CharField(max_length=20)
+    last_error = serializers.CharField(allow_blank=True, required=False, default='')
+    queued_at = serializers.CharField(allow_blank=True, required=False, default='')
+
+
 class CouponValidateSerializer(serializers.Serializer):
     """Input-shape validation for the POS coupon-preview endpoint. The
     actual coupon rules (is_live, min_order_amount, discount calculation)

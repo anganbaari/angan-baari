@@ -2835,14 +2835,24 @@
                 const retryBtn = e.status !== 'pending'
                     ? `<button type="button" class="side-btn payment-btn-main queue-retry-btn" data-id="${e.client_sale_id}" style="margin-top:6px;width:auto;padding:6px 14px;font-size:0.8rem;">Retry now</button>`
                     : '';
-                const dismissBtn = dismissable
-                    ? `<button type="button" class="btn-cancel queue-dismiss-btn" data-id="${e.client_sale_id}" style="margin-top:6px;margin-left:6px;width:auto;padding:6px 14px;font-size:0.8rem;">Dismiss</button>`
-                    : '';
+                // Dismiss itself is a two-step action -- see
+                // confirmDismissSale() below for why: the entry about to be
+                // deleted is the ONLY trace this sale was ever attempted, so
+                // a single accidental tap must not be enough to lose it.
+                let dismissControls = '';
+                if (pendingDismissId === e.client_sale_id) {
+                    dismissControls = `
+                        <div class="offer-option-sub" style="color:#b23b3b;font-weight:700;margin-top:6px;">This sale will be removed from the queue. Have you re-entered it as a new sale (or reconciled it by hand)?</div>
+                        <button type="button" class="btn-confirm queue-dismiss-confirm-btn" data-id="${e.client_sale_id}" style="margin-top:6px;width:auto;padding:6px 14px;font-size:0.8rem;">Yes, remove it</button>
+                        <button type="button" class="btn-cancel queue-dismiss-cancel-btn" style="margin-top:6px;margin-left:6px;width:auto;padding:6px 14px;font-size:0.8rem;">Cancel</button>`;
+                } else if (dismissable) {
+                    dismissControls = `<button type="button" class="btn-cancel queue-dismiss-btn" data-id="${e.client_sale_id}" style="margin-top:6px;margin-left:6px;width:auto;padding:6px 14px;font-size:0.8rem;">Dismiss</button>`;
+                }
                 return `
                     <div class="offer-option" style="cursor:default;">
                         <div class="offer-option-title">Rs. ${formatMoney(amount)} — queued ${new Date(e.queuedAt).toLocaleString()}</div>
                         ${statusLine}
-                        ${retryBtn}${dismissBtn}
+                        ${retryBtn}${dismissControls}
                     </div>`;
             }).join('');
             body.innerHTML = `<h3>Sale Queue</h3>` +
@@ -2860,15 +2870,66 @@
                 });
             });
             body.querySelectorAll('.queue-dismiss-btn').forEach(dismissBtn => {
-                dismissBtn.addEventListener('click', async () => {
-                    await posQueueRemove(dismissBtn.dataset.id);
-                    showToast('Removed from the queue — no sale was recorded for it.');
-                    await renderQueueBox();
+                dismissBtn.addEventListener('click', () => {
+                    pendingDismissId = dismissBtn.dataset.id;
                     openQueuePanel();
+                });
+            });
+            body.querySelectorAll('.queue-dismiss-cancel-btn').forEach(cancelBtn => {
+                cancelBtn.addEventListener('click', () => {
+                    pendingDismissId = null;
+                    openQueuePanel();
+                });
+            });
+            body.querySelectorAll('.queue-dismiss-confirm-btn').forEach(confirmBtn => {
+                confirmBtn.addEventListener('click', async () => {
+                    const entry = entries.find(e => e.client_sale_id === confirmBtn.dataset.id);
+                    if (!entry) { pendingDismissId = null; openQueuePanel(); return; }
+                    confirmBtn.disabled = true;
+                    confirmBtn.textContent = 'Reporting…';
+                    await confirmDismissSale(entry);
                 });
             });
             document.getElementById('itemModal').classList.add('active');
             document.getElementById('queuePanelClose').addEventListener('click', closeItemModal);
+        }
+
+        // Dismiss permanently deletes this queue entry -- its only server-
+        // side trace is whatever this call manages to report, so the
+        // entry is only actually removed once POST
+        // /api/v1/pos/queue/report-dismissed/ (PosQueueDismissedReportView,
+        // api/views.py) confirms it got through: that view sends a
+        // detailed Telegram message (items, payments, customer, operator,
+        // when it was rung up) and deliberately does NOT fail silently --
+        // see its docstring for why. If this call fails for any reason
+        // (offline, or the server couldn't reach Telegram itself), the
+        // entry stays in the queue and staff are told why, rather than a
+        // Dismiss that looked like it worked silently losing the sale's
+        // only record.
+        async function confirmDismissSale(entry) {
+            try {
+                const response = await apiFetch('/api/v1/pos/queue/report-dismissed/', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        client_sale_id: entry.client_sale_id,
+                        payload: entry.payload,
+                        status: entry.status,
+                        last_error: entry.lastError || '',
+                        queued_at: entry.queuedAt || '',
+                    }),
+                });
+                if (!response.ok) throw new Error('report-dismissed failed: ' + response.status);
+            } catch (err) {
+                pendingDismissId = null;
+                showToast("Offline — can't dismiss this sale until the till is back online.");
+                openQueuePanel();
+                return;
+            }
+            await posQueueRemove(entry.client_sale_id);
+            pendingDismissId = null;
+            showToast('Removed from the queue — reported for manual reconciliation.');
+            await renderQueueBox();
+            openQueuePanel();
         }
         document.getElementById('queueBox').addEventListener('click', openQueuePanel);
 

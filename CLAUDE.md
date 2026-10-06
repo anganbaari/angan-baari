@@ -346,9 +346,39 @@ customer lookup, offers/combos, and coupon gating.
     in-place "edit the cart and resubmit" — ringing up a fresh, corrected
     sale (e.g. without the sold-out line) and then dismissing the stuck
     one is the supported workaround; building a real queued-cart editor
-    was judged disproportionate to this phase's scope. Any cash the
-    customer already handed over for a dismissed sale is a human
-    reconciliation problem outside the software, and the panel says so.
+    was judged disproportionate to this phase's scope.
+    - **Dismiss is a two-step, reported action, not a plain delete.**
+      Found by testing: the IndexedDB record being dismissed was the ONLY
+      trace a real sale was ever attempted — a single accidental tap
+      silently erased it with no server-side record anywhere. Tapping
+      Dismiss now shows an explicit confirmation ("This sale will be
+      removed from the queue. Have you re-entered it as a new sale...?")
+      before anything happens, and confirming calls
+      `confirmDismissSale()` (`pos.html`), which POSTs the full sale
+      snapshot — items (resolved to product/variant/unit names, not just
+      ids), payments, customer, operator, and when it was originally rung
+      up — to `POST /api/v1/pos/queue/report-dismissed/`
+      (`PosQueueDismissedReportView`, `api/views.py`), a sibling of
+      `PosQueueFailureAlertView` below, not an extension of it (different
+      trigger — an explicit human Dismiss vs. an automatic first-failure
+      alert — and different payload needs: full line-item detail, not
+      just a count). The entry is only actually removed from IndexedDB
+      *after* that call returns 200. **If the report fails for any reason
+      — the till itself is offline, or the server reached the network but
+      couldn't reach Telegram — the entry stays in the queue** and staff
+      see "can't dismiss until the till is back online," rather than a
+      Dismiss that silently appears to work while losing the sale's only
+      record. This is why `send_telegram()` (`shop/emails.py`) gained a
+      `raise_on_failure` parameter (default `False`, preserving its
+      existing best-effort behavior for every other caller — low-stock
+      alerts, order notifications, the `report-failed` alert above):
+      `PosQueueDismissedReportView` is the one caller that passes
+      `raise_on_failure=True`, because here the Telegram send succeeding
+      *is* the point of the request, not a side effect of it. Any cash the
+      customer already handed over for a dismissed sale is still a human
+      reconciliation problem outside the software — the Telegram message
+      says so, and is now the mechanism for actually reconciling it, not
+      just a courtesy notice.
   - any other `4xx` → `failed`, fires one (not repeated) Telegram alert
     via `PosQueueFailureAlertView` (`POST /api/v1/pos/queue/report-failed/`)
     — a failed entry otherwise only exists in that one device's
