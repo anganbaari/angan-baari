@@ -230,6 +230,36 @@ a connectivity drop *during* an already-open session; Phase 2 makes
     registered — only the *next* navigation is. The very first `/pos/`
     load after a SW update won't populate the shell cache; the one after
     that will. This is standard SW behavior, not a bug here.
+  - **Versioning:** `POS_SHELL_CACHE` in `pos-sw.js` (`'pos-shell-v2'` as
+    of this writing) must be bumped by hand whenever a deploy changes the
+    `/pos/` page structure or what it depends on in `/static/` — there's
+    no build step in this project to bump it automatically (see Stack
+    above), same manual-discipline spirit as the existing
+    "cache-bust static assets with `?v=N`" convention. The `activate`
+    handler deletes every other `pos-shell-*` cache on each activation, so
+    bumping this is what actually forces old cached shells off every
+    device.
+  - **Update behavior:** `install` calls `self.skipWaiting()` and
+    `activate` calls `self.clients.claim()` — together these mean a newly
+    deployed SW version goes from "installed" to "fully active and
+    controlling the one open `/pos/` tab" as soon as the browser notices
+    the changed `pos-sw.js` bytes (normally on that tab's next
+    navigation/reload), with no "wait for every tab to close first" delay.
+    That's deliberate for a single shared till where there's only ever one
+    tab to wait on anyway. The risk this creates — the tab's already-
+    loaded page JS (including `pos-offline-queue.js`, loaded once at page
+    load, never live-updated) could keep running under a newer, possibly
+    schema-incompatible SW — is closed by a
+    `navigator.serviceWorker.addEventListener('controllerchange', ...)`
+    listener in `pos.html`: the moment a new SW takes over, the page
+    reloads itself, so the mismatch window is only the instant between
+    `clients.claim()` firing and that reload completing. **What staff
+    see:** normally nothing disruptive — if the cart is empty when the
+    handover happens, the page just reloads itself once, unprompted. If a
+    sale is mid-ring-up, the reload is deferred (a toast says so) until the
+    cart empties again (sale completed, queued, or cleared), so an
+    in-progress, not-yet-submitted cart (session-only, never persisted) is
+    never silently lost by an update landing at the wrong moment.
 - `static/js/pos-offline-queue.js` — an IndexedDB-backed queue (DB
   `angan-baari-pos`, now at version 2 for the Phase 2 `meta` store below),
   loaded both as a classic `<script>` in `pos.html` and via
@@ -253,6 +283,21 @@ a connectivity drop *during* an already-open session; Phase 2 makes
     product/variant in its message so staff know which line item is the
     problem. Deliberately does **not** fire the Telegram alert below —
     that channel is for real bugs, not routine sold-out conflicts.
+    **Resolving one:** the queue panel offers Retry (try again as-is — a
+    restock since the conflict could make it succeed) or Dismiss, for both
+    `stockConflict` and `failed` (not `needsReauth` — that state means we
+    don't yet know if the sale is valid, so dismissing it risks silently
+    losing a perfectly good one; only a state the server has actually
+    rejected is safe to give up on). Dismissing never touches inventory or
+    the ledger either way: the server rejected the attempt, so nothing was
+    ever deducted for it — dismissing just removes the IndexedDB record, it
+    doesn't reverse anything because nothing happened. There is no
+    in-place "edit the cart and resubmit" — ringing up a fresh, corrected
+    sale (e.g. without the sold-out line) and then dismissing the stuck
+    one is the supported workaround; building a real queued-cart editor
+    was judged disproportionate to this phase's scope. Any cash the
+    customer already handed over for a dismissed sale is a human
+    reconciliation problem outside the software, and the panel says so.
   - any other `4xx` → `failed`, fires one (not repeated) Telegram alert
     via `PosQueueFailureAlertView` (`POST /api/v1/pos/queue/report-failed/`)
     — a failed entry otherwise only exists in that one device's
@@ -263,16 +308,59 @@ a connectivity drop *during* an already-open session; Phase 2 makes
   - The same database's `meta` store (Phase 2) holds `lastCachedAt`
     (`posSetMeta`/`posGetMeta`), written by the service worker every time
     it successfully caches a fresh `/pos/` response — `pos.html` reads it
-    for the `#offlineBanner` ("Offline — showing data as of ...") shown
-    purely off `navigator.onLine`, not "was this specific page load
-    served from cache" (even a page that loaded fresh moments ago is now
-    showing frozen data the instant connectivity drops, which is the
-    thing actually worth warning staff about).
+    for the `#offlineBanner` ("Offline — showing data as of ..."). Shown
+    on any ONE of three independent signals, not just `navigator.onLine`
+    (which stays `true` on "wifi connected, no actual internet" — a dead
+    router or ISP outage leaves the network *interface* up, which is all
+    `navigator.onLine` ever reflects): (1) `navigator.onLine === false`,
+    (2) this exact page load was served from the SW's offline cache
+    fallback (it injects a `<meta name="pos-cache-fallback">` tag into the
+    HTML when that happens, since a page can't otherwise read its own
+    navigation response's headers after the fact), or (3) a lightweight,
+    uncached, unauthenticated same-origin probe fetch (to the SW's own
+    script URL) actually fails. Re-checked on `online`/`offline`,
+    `visibilitychange`, and a 60-second interval while the tab is visible
+    — the interval exists specifically for "wifi died silently mid-shift
+    with no OS-level event to react to," which a receipt screen can sit on
+    for hours between sales.
+- **Logout and cache hygiene:** the POS's own Logout button (clears the
+  PIN-unlock session, see "architecture decisions" above — not a full
+  Django logout) purges the cached `/pos/` entry from Cache Storage and
+  reloads, so the next person on this terminal gets a genuinely fresh load
+  rather than instantly seeing whatever the previous shift last cached —
+  but only when `posProbeConnectivity()` confirms real connectivity first.
+  Purging unconditionally was tried and found to be a real bug during
+  testing: the SW's navigation handler is network-first regardless, so
+  purging buys nothing extra when actually online, but purging while
+  offline (including "wifi but no internet") deletes the one thing Phase 2
+  exists to provide, and the reload that follows then hits the SW's "no
+  cached copy" 503 dead end — turning a tap of Logout into a stranded
+  terminal. When the probe says there's no real connectivity, Logout skips
+  the purge and the reload entirely and just locks locally (same as the
+  idle-timeout auto-lock), attempting the server-side unlock-session clear
+  best-effort only.
+  The offline sale queue (IndexedDB) deliberately survives a logout —
+  purging it would mean a sale rung up right before someone logs out for
+  the night gets silently lost. This is safe because replaying a queued
+  sale always requires a currently-valid PIN-unlock (`pos_operator_id` in
+  the session) regardless of who logs in afterward — an expired/absent
+  session correctly lands the entry in `needsReauth` rather than replaying
+  it. Note this does mean a queued sale that syncs after a shift change
+  gets attributed to whoever is PIN-unlocked *at sync time*, not
+  necessarily whoever actually rang it up while offline — the payload
+  never carries an operator id for the server to trust (same reasoning as
+  never trusting a client-supplied `operator_id` for an online sale), so
+  this is an accepted tradeoff, not an oversight.
 - **Not yet done — needs a real device before this is fully trusted**:
   actual install-to-home-screen + airplane-mode-mid-sale + reconnect
-  testing on a real Android phone (and iOS, if the farm uses one). What's
-  verified so far (both phases) is CDP-scripted against a desktop headless
-  browser, including genuinely toggling the browser's network to offline
+  testing on a real Android phone (and iOS, if the farm uses one),
+  **including a wifi-connected-but-no-internet check** (join a wifi
+  network with no real uplink, e.g. by disconnecting its router's WAN
+  cable, and confirm the offline banner still appears — this is the one
+  case `navigator.onLine` alone can't catch, which is why the banner also
+  probes connectivity directly; see above). What's verified so far (both
+  phases) is CDP-scripted against a desktop headless browser, including
+  genuinely toggling the browser's network to offline
   (not just stubbing `fetch`) and confirming `/pos/` still renders with
   the right cached catalog data — solid evidence the logic is correct, but
   not a substitute for seeing Background Sync actually fire on a real OS

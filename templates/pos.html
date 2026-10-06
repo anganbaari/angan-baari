@@ -1121,6 +1121,21 @@
         document.getElementById('stockBox').addEventListener('click', showStockView);
         document.getElementById('backFromStockBtn').addEventListener('click', showReceiptView);
 
+        // Deletes just the cached /pos/ page entry (not the whole shell
+        // cache -- style.css/icons/etc. are harmless to keep and worth
+        // keeping for a faster next load) from whichever cache bucket
+        // holds it, without needing to know pos-sw.js's current
+        // POS_SHELL_CACHE version string. Cache Storage is available from
+        // page context too, not just inside the service worker.
+        async function purgeCachedPosShell() {
+            if (!('caches' in window)) return;
+            const names = await caches.keys();
+            await Promise.all(names.map(async (name) => {
+                const cache = await caches.open(name);
+                await cache.delete('/pos/');
+            }));
+        }
+
         // Clears the current operator's PIN-unlock session (same
         // /api/v1/pos/lock/ call the idle-timeout auto-lock above uses --
         // PosLockView just pops pos_operator_id/pos_operator_unlocked_at
@@ -1130,8 +1145,47 @@
         // PIN-unlock layer only tracks who's currently operating an
         // already-logged-in terminal, it was never the terminal's own
         // access control, so the underlying staff session stays active.
+        //
+        // Purges the cached /pos/ shell first so the next person on this
+        // terminal gets a genuinely fresh load rather than instantly seeing
+        // whatever was last cached, possibly stale, possibly from a
+        // different person's shift. The offline sale queue (IndexedDB) is
+        // deliberately left untouched -- see CLAUDE.md's POS-PWA section
+        // for why queued sales survive a logout, and how replaying them
+        // still always requires a fresh PIN-unlock regardless of who's
+        // logged in when they sync.
+        //
+        // Only purge+reload when posProbeConnectivity() confirms a real
+        // network round trip, not just navigator.onLine -- the SW's
+        // navigation handler is network-first regardless, so purging buys
+        // nothing extra when online, but purging while genuinely offline
+        // (including "wifi but no internet", the exact case that probe
+        // exists for) would delete the one thing Phase 2 exists to provide:
+        // a usable offline /pos/ load. The reload that follows would then
+        // hit the SW's "no cached copy" 503 dead end instead. So when the
+        // probe says we're not really online, skip the purge and the
+        // reload entirely and just lock locally, the same way the idle-
+        // timeout auto-lock above does -- the server-side unlock-session
+        // clear is attempted best-effort but not required for the till to
+        // visibly lock in front of whoever's next.
         document.getElementById('logoutBtn').addEventListener('click', async () => {
-            await apiFetch('/api/v1/pos/lock/', { method: 'POST' });
+            const reallyOnline = await posProbeConnectivity();
+            if (!reallyOnline) {
+                apiFetch('/api/v1/pos/lock/', { method: 'POST' }).catch(() => {});
+                currentOperator = null;
+                setLocked(true);
+                return;
+            }
+            await purgeCachedPosShell();
+            try {
+                await apiFetch('/api/v1/pos/lock/', { method: 'POST' });
+            } catch (err) {
+                // Connectivity vanished between the probe and here -- fall
+                // through to the reload anyway so the terminal still
+                // visibly locks; the SW's network-first nav handler will
+                // itself fail over to whatever's cached (possibly nothing,
+                // since we just purged it) same as any other offline load.
+            }
             window.location.href = "{% url 'pos' %}";
         });
 
@@ -2451,6 +2505,7 @@
                     renderReceipt();
                     updateCartIndicator();
                     showReceiptView();
+                    posReloadIfUpdatePending();
                 } else {
                     // A real validation/stock error (400/409) -- either
                     // POSSaleValidationError's {status,message} shape, or
@@ -2480,6 +2535,7 @@
                 renderReceipt();
                 updateCartIndicator();
                 showReceiptView();
+                posReloadIfUpdatePending();
             } finally {
                 btn.textContent = originalText;
             }
@@ -2538,6 +2594,14 @@
             const rows = entries.map(e => {
                 const amount = (e.payload.payments || []).reduce((s, p) => s + parseFloat(p.amount || 0), 0);
                 let statusLine = '<div class="offer-option-sub">Waiting for connection…</div>';
+                // Dismiss is only offered for stockConflict/failed -- both
+                // mean the server already looked at this specific attempt
+                // and rejected it for a real reason, so giving up on it is a
+                // safe, informed choice. needsReauth means we don't even
+                // know yet whether the sale is valid (we just couldn't
+                // check) -- dismissing THAT would risk silently throwing
+                // away a perfectly good sale, so it only ever gets Retry.
+                let dismissable = false;
                 if (e.status === 'needsReauth') {
                     statusLine = '<div class="offer-option-sub" style="color:#b23b3b;">Needs a fresh PIN unlock (or login) to sync</div>';
                 } else if (e.status === 'stockConflict') {
@@ -2545,18 +2609,25 @@
                     // terminal was offline) -- the orange matches the queue box's
                     // own queue-conflict color, deliberately distinct from the red
                     // used for a real failed/needsReauth entry below.
-                    statusLine = `<div class="offer-option-sub" style="color:var(--pos-enter-orange);">Stock conflict — ${e.lastError || 'an item in this sale sold out while offline.'}</div>`;
+                    statusLine = `<div class="offer-option-sub" style="color:var(--pos-enter-orange);">Stock conflict — ${e.lastError || 'an item in this sale sold out while offline.'}</div>
+                        <div class="offer-option-sub" style="font-size:0.72rem;">Nothing was deducted from inventory for this attempt -- the server never accepted it. To sell the rest of this cart, ring it up as a new sale without the sold-out item, then Dismiss this one. If the customer already paid, that's handled outside the system.</div>`;
+                    dismissable = true;
                 } else if (e.status === 'failed') {
-                    statusLine = `<div class="offer-option-sub" style="color:#b23b3b;">${e.lastError || 'Could not sync this sale.'}</div>`;
+                    statusLine = `<div class="offer-option-sub" style="color:#b23b3b;">${e.lastError || 'Could not sync this sale.'}</div>
+                        <div class="offer-option-sub" style="font-size:0.72rem;">Nothing was deducted from inventory for this attempt -- the server never accepted it. Dismissing removes it from this queue only; if the customer already paid, that's handled outside the system.</div>`;
+                    dismissable = true;
                 }
                 const retryBtn = e.status !== 'pending'
                     ? `<button type="button" class="side-btn payment-btn-main queue-retry-btn" data-id="${e.client_sale_id}" style="margin-top:6px;width:auto;padding:6px 14px;font-size:0.8rem;">Retry now</button>`
+                    : '';
+                const dismissBtn = dismissable
+                    ? `<button type="button" class="btn-cancel queue-dismiss-btn" data-id="${e.client_sale_id}" style="margin-top:6px;margin-left:6px;width:auto;padding:6px 14px;font-size:0.8rem;">Dismiss</button>`
                     : '';
                 return `
                     <div class="offer-option" style="cursor:default;">
                         <div class="offer-option-title">Rs. ${formatMoney(amount)} — queued ${new Date(e.queuedAt).toLocaleString()}</div>
                         ${statusLine}
-                        ${retryBtn}
+                        ${retryBtn}${dismissBtn}
                     </div>`;
             }).join('');
             body.innerHTML = `<h3>Sale Queue</h3>` +
@@ -2573,25 +2644,70 @@
                     openQueuePanel();
                 });
             });
+            body.querySelectorAll('.queue-dismiss-btn').forEach(dismissBtn => {
+                dismissBtn.addEventListener('click', async () => {
+                    await posQueueRemove(dismissBtn.dataset.id);
+                    showToast('Removed from the queue — no sale was recorded for it.');
+                    await renderQueueBox();
+                    openQueuePanel();
+                });
+            });
             document.getElementById('itemModal').classList.add('active');
             document.getElementById('queuePanelClose').addEventListener('click', closeItemModal);
         }
         document.getElementById('queueBox').addEventListener('click', openQueuePanel);
 
-        // Phase 2 staleness banner -- keyed off navigator.onLine, not "was
-        // this page served from cache" (see the HTML comment above
-        // #offlineBanner for why). lastCachedAt is written by pos-sw.js's
-        // navigation handler every time it successfully caches a fresh
-        // /pos/ response.
+        // Staleness banner. navigator.onLine alone is NOT reliable --
+        // "wifi connected, no actual internet" (dead router, captive
+        // portal, ISP outage) leaves it stuck at true, since it only
+        // reflects whether the network INTERFACE is up, not whether this
+        // device can actually reach anything. Three independent signals,
+        // any one of which shows the banner:
+        //   1. navigator.onLine === false (the interface itself is down).
+        //   2. This exact page load was served from pos-sw.js's offline
+        //      cache fallback -- it injects a <meta name="pos-cache-
+        //      fallback"> tag into the HTML when that happens (see
+        //      pos-sw.js), since there's no direct JS API for a page to
+        //      read its own navigation response's headers after the fact.
+        //   3. A real same-origin request actually fails -- checked via
+        //      posProbeConnectivity() below, a lightweight fetch to this
+        //      worker's own script (never cached, never auth-gated, so a
+        //      failure here can only mean a genuine network problem, not
+        //      an expired session). This is what catches the "wifi but no
+        //      internet" case signal #1 and #2 both miss.
+        // lastCachedAt is written by pos-sw.js's navigation handler every
+        // time it successfully caches a fresh /pos/ response.
+        const posServedFromCacheFallback = !!document.querySelector('meta[name="pos-cache-fallback"]');
+
+        async function posProbeConnectivity() {
+            if (!navigator.onLine) return false;
+            try {
+                // Reaching the server at all -- any status code -- proves
+                // real connectivity; checking response.ok (2xx-only) would
+                // be the wrong test here, since even an error response only
+                // happens after a successful round trip.
+                await fetch("{% url 'pos_service_worker' %}", { method: 'GET', cache: 'no-store' });
+                return true;
+            } catch (err) {
+                return false; // the fetch itself threw -- no connectivity, not just a bad response
+            }
+        }
+
         async function updateOfflineBanner() {
             const banner = document.getElementById('offlineBanner');
-            if (navigator.onLine) { banner.style.display = 'none'; return; }
+            const reallyOnline = posServedFromCacheFallback ? false : await posProbeConnectivity();
+            if (reallyOnline) { banner.style.display = 'none'; return; }
             const lastCachedAt = await posGetMeta('lastCachedAt');
             document.getElementById('offlineBannerTimestamp').textContent = lastCachedAt
                 ? new Date(lastCachedAt).toLocaleString()
                 : 'unknown — no successful load recorded on this device yet';
             banner.style.display = 'block'; // .offline-banner's own rule is display:none -- '' would just fall back to it
         }
+        // Show immediately, synchronously, if we already know for certain
+        // (no probe needed) -- avoids a flash of "no banner" while the
+        // async checks above are still in flight.
+        if (posServedFromCacheFallback) document.getElementById('offlineBanner').style.display = 'block';
+
         window.addEventListener('online', async () => {
             await updateOfflineBanner();
             await posReplayQueue();
@@ -2600,17 +2716,63 @@
         window.addEventListener('offline', updateOfflineBanner);
         document.addEventListener('visibilitychange', async () => {
             if (!document.hidden) {
+                await updateOfflineBanner();
                 await posReplayQueue();
                 await renderQueueBox();
             }
         });
+        // Catches the "wifi silently died mid-shift with no OS-level event"
+        // case -- the online/offline/visibilitychange listeners above are
+        // all reactive to something actually happening; this is the one
+        // active check, on a terminal that can otherwise sit on the
+        // receipt screen for hours between sales with nothing triggering a
+        // re-check.
+        setInterval(async () => {
+            if (document.hidden) return;
+            await updateOfflineBanner();
+            await posReplayQueue();
+            await renderQueueBox();
+        }, 60000);
+
+        // A new service worker version taking over (skipWaiting +
+        // clients.claim in pos-sw.js, see its activate handler for the
+        // full explanation) must force a reload here -- otherwise this
+        // tab's already-loaded page JS, including pos-offline-queue.js
+        // (loaded once at page load, never live-updated), would keep
+        // running under a NEW active service worker, which matters most if
+        // a future version ever bumps POS_QUEUE_DB_VERSION: IndexedDB only
+        // allows opening a database at the same or higher version it's
+        // already at, so this tab's still-loaded, lower-version code would
+        // start failing every queue operation until it reloads anyway.
+        // Deferred (not immediate) if there's an unsaved cart -- an
+        // unprompted reload mid-sale would silently lose whatever's on the
+        // receipt screen (session-only, never persisted); it's safe to
+        // reload the instant the cart is empty again; see
+        // posReloadIfUpdatePending(), called after every point the cart
+        // gets cleared.
+        let posUpdateReloadPending = false;
         if ('serviceWorker' in navigator) {
+            let posControllerChanged = false;
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+                if (posControllerChanged) return; // guard against firing more than once
+                posControllerChanged = true;
+                if (cart.length === 0) {
+                    window.location.reload();
+                } else {
+                    posUpdateReloadPending = true;
+                    showToast('A new POS version is ready — it will load once this sale is done.');
+                }
+            });
             navigator.serviceWorker.register("{% url 'pos_service_worker' %}", { scope: '/pos/' })
                 .catch(err => console.warn('POS service worker registration failed:', err));
             navigator.serviceWorker.addEventListener('message', (event) => {
                 if (event.data && event.data.type === 'POS_QUEUE_SYNCED') renderQueueBox();
             });
         }
+        function posReloadIfUpdatePending() {
+            if (posUpdateReloadPending) window.location.reload();
+        }
+
         updateOfflineBanner();
         // Attempt a replay on every fresh page load, not just paint whatever
         // was left queued -- this is the fallback that actually matters on

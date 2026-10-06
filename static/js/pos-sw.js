@@ -45,15 +45,50 @@
 
 importScripts('/static/js/pos-offline-queue.js');
 
-var POS_SHELL_CACHE = 'pos-shell-v1';
+// BUMP THIS whenever a deploy changes anything the shell cache holds the
+// shape/meaning of -- the /pos/ page structure, what's embedded in it, or
+// which /static/ assets it depends on. The `activate` handler below
+// deletes every OTHER 'pos-shell-*' cache on each activation, so bumping
+// this is what actually forces every device to drop its old cached shell
+// and rebuild from a fresh network load, rather than serving a
+// structurally-stale cached page forever. It is NOT bumped automatically
+// by a deploy -- there's no build step in this project to hook that into
+// (see CLAUDE.md's Stack section), so this is a manual, deliberate step,
+// same spirit as the "cache-bust static assets with ?v=N" convention
+// already used for CSS/JS elsewhere.
+var POS_SHELL_CACHE = 'pos-shell-v2';
 
 self.addEventListener('install', function (event) {
-    self.skipWaiting(); // don't make staff wait through an update prompt on a shared till
+    // Skip the normal "new SW waits until every tab using the old one
+    // closes" phase -- a shared till only ever has one tab open, so there's
+    // nothing to wait FOR, and waiting would just mean staff never get the
+    // update until someone thinks to fully close and reopen the browser.
+    self.skipWaiting();
 });
 
 self.addEventListener('activate', function (event) {
     event.waitUntil(
         Promise.all([
+            // Take control of any already-open /pos/ tab immediately,
+            // without it needing to navigate again first. Combined with
+            // skipWaiting() above, a new SW version goes from "deployed" to
+            // "fully active and controlling the open tab" as soon as the
+            // browser notices the updated pos-sw.js bytes -- normally on
+            // this tab's next navigation/reload, since that's when browsers
+            // check a registered SW's script for changes. See the
+            // controllerchange listener in pos.html for why the page itself
+            // then forces a reload the moment that handover happens: without
+            // it, the OLD page JS (pos-offline-queue.js loaded once at page
+            // load, never live-updated) would keep running while the NEW SW
+            // is already active underneath it, which matters most if a
+            // future version ever bumps the IndexedDB schema (POS_QUEUE_DB_VERSION
+            // in pos-offline-queue.js) -- IndexedDB only allows opening a
+            // database at the SAME OR HIGHER version it's already at, so the
+            // old page's still-loaded, lower-version code would start
+            // failing every queue operation until it reloads anyway. Forcing
+            // the reload ourselves, right when the handover happens, means
+            // staff see one unprompted screen refresh instead of a broken
+            // queue.
             self.clients.claim(),
             caches.keys().then(function (names) {
                 return Promise.all(
@@ -89,10 +124,27 @@ self.addEventListener('fetch', function (event) {
                 return response;
             }).catch(function () {
                 return caches.match(request).then(function (cached) {
-                    return cached || new Response(
-                        'Offline, and no cached copy of /pos/ is available yet -- load it once while online first.',
-                        { status: 503, headers: { 'Content-Type': 'text/plain' } }
-                    );
+                    if (!cached) {
+                        return new Response(
+                            'Offline, and no cached copy of /pos/ is available yet -- load it once while online first.',
+                            { status: 503, headers: { 'Content-Type': 'text/plain' } }
+                        );
+                    }
+                    // Mark the served HTML so the page itself can tell, at
+                    // its OWN init time, that THIS load came from the
+                    // offline fallback rather than a fresh network response
+                    // -- navigator.onLine alone can't answer that (it only
+                    // reflects whether the network interface is up, not
+                    // whether this specific request actually reached the
+                    // server), and there's no direct JS API for a page to
+                    // read its own navigation response's headers after the
+                    // fact. See updateOfflineBanner() in pos.html.
+                    return cached.text().then(function (html) {
+                        var marked = html.replace('<head>', '<head><meta name="pos-cache-fallback" content="true">');
+                        return new Response(marked, {
+                            status: cached.status, statusText: cached.statusText, headers: cached.headers,
+                        });
+                    });
                 });
             })
         );
