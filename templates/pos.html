@@ -1163,6 +1163,14 @@
         function renderStockBox() {
             const box = document.getElementById('stockBox');
             const text = document.getElementById('stockIndicatorText');
+            // Empty means never-yet-fetched (offline cold start before any
+            // successful load), not genuinely "nothing low" -- claiming
+            // "Stock OK" here would be actively misleading, not just blank.
+            if (!stockData.length) {
+                box.classList.remove('stock-has-low', 'stock-all-ok');
+                text.innerHTML = 'Stock unavailable offline';
+                return;
+            }
             const hasLow = stockData.some(r => r.is_low);
             box.classList.toggle('stock-has-low', hasLow);
             box.classList.toggle('stock-all-ok', !hasLow);
@@ -1264,6 +1272,15 @@
 
         function renderStockTable() {
             const body = document.getElementById('stockTableBody');
+            // Empty only ever means this device has never successfully
+            // fetched /api/v1/pos/stock/ (loadStockData() otherwise keeps
+            // whatever it last had rather than wiping it on a failed
+            // refresh) -- cheap to say so instead of leaving a blank table
+            // with no explanation.
+            if (!stockData.length) {
+                body.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);">Stock unavailable offline — connect online once to load it.</td></tr>';
+                return;
+            }
             body.innerHTML = stockData.map(r => `
                 <tr class="${r.is_low ? 'stock-row-low' : ''}">
                     <td class="stock-col-name">${r.name}${r.is_available ? '' : ' <span class="stock-unavailable-tag">(disabled)</span>'}</td>
@@ -1945,27 +1962,47 @@
             body.innerHTML = `<h3>Offers</h3><div style="text-align:center;color:var(--text-muted);padding:20px 0;">Loading…</div>`;
             document.getElementById('itemModal').classList.add('active');
 
+            // Stale-while-revalidate: always try the live fetch first (an
+            // offer/combo's is_live() window can start or end mid-shift, so
+            // a terminal that's been online all along should never show
+            // anything but fresh data) and cache it on success
+            // (posCacheOffers(), static/js/pos-offline-queue.js). Only on a
+            // genuine network failure does this fall back to whatever was
+            // cached from the last successful fetch -- not a build-time or
+            // page-load snapshot, since offers are never embedded in
+            // /pos/'s own server-rendered payload the way PRODUCTS/
+            // CATEGORIES are (see this function's own header comment for
+            // why). An expired cache (same POS_OFFLINE_PIN_EXPIRY_MS window
+            // as the PIN/credit-customer caches) is treated as no cache.
+            let offersHeaderNote = '';
             try {
                 const response = await apiFetch('/api/v1/pos/offers/');
                 liveOffers = await response.json();
+                posCacheOffers(liveOffers);
             } catch (err) {
-                body.innerHTML = `<h3>Offers</h3><div style="text-align:center;color:var(--text-muted);padding:20px 0;">Couldn't load offers — check the connection and try again.</div>
-                    <div class="item-modal-actions"><button type="button" class="btn-cancel" id="offersCancel">Close</button></div>`;
-                document.getElementById('offersCancel').addEventListener('click', closeItemModal);
-                return;
+                const cached = await posGetCachedOffers();
+                const cacheAge = cached.cachedAt ? Date.now() - new Date(cached.cachedAt).getTime() : Infinity;
+                if (!cached.data || cacheAge > POS_OFFLINE_PIN_EXPIRY_MS) {
+                    body.innerHTML = `<h3>Offers</h3><div style="text-align:center;color:var(--text-muted);padding:20px 0;">Offline, and no cached offers on this device yet — connect online once first.</div>
+                        <div class="item-modal-actions"><button type="button" class="btn-cancel" id="offersCancel">Close</button></div>`;
+                    document.getElementById('offersCancel').addEventListener('click', closeItemModal);
+                    return;
+                }
+                liveOffers = cached.data;
+                offersHeaderNote = `<p style="font-size:0.78rem;color:var(--text-muted);margin:2px 0 8px;">Offline — showing offers as of ${new Date(cached.cachedAt).toLocaleString()}, may be out of date. The server re-checks every offer at Complete Sale regardless.</p>`;
             }
 
             const discountItems = (liveOffers.discount_offers || []).filter(o => o.available);
             const comboItems = liveOffers.combo_offers || [];
 
             if (!discountItems.length && !comboItems.length) {
-                body.innerHTML = `<h3>Offers</h3><div style="text-align:center;color:var(--text-muted);padding:20px 0;">No offers live right now.</div>
+                body.innerHTML = `<h3>Offers</h3>${offersHeaderNote}<div style="text-align:center;color:var(--text-muted);padding:20px 0;">No offers live right now.</div>
                     <div class="item-modal-actions"><button type="button" class="btn-cancel" id="offersCancel">Close</button></div>`;
                 document.getElementById('offersCancel').addEventListener('click', closeItemModal);
                 return;
             }
 
-            body.innerHTML = `<h3>Offers</h3><div class="offers-list">` +
+            body.innerHTML = `<h3>Offers</h3>${offersHeaderNote}<div class="offers-list">` +
                 comboItems.map((c, i) => `
                     <button type="button" class="offer-option offer-combo${c.fully_available ? '' : ' offer-unavailable'}" data-combo-i="${i}">
                         <div class="offer-option-title">${c.title} <span class="offer-combo-badge">Combo</span></div>
@@ -2201,11 +2238,29 @@
             document.getElementById('taxRoundOff').textContent = `${sign} Rs. ${formatMoney(Math.abs(roundOff))}`;
         }
 
+        // Coupons are never validated offline (resolve_pos_coupon() needs a
+        // server round trip, and there's nothing to usefully cache -- a
+        // code's validity depends on used_count/min_order_amount/timing
+        // that's only meaningful checked fresh). Unlike offers, this is a
+        // straight block, not stale-while-revalidate: disables the input
+        // itself while offline rather than letting staff type a code and
+        // fail on Apply. Only gates APPLYING a new code -- applyCouponBtn's
+        // own "remove an already-applied one" branch needs no network at
+        // all and stays available regardless of connectivity, see below.
+        function updateCouponAvailability() {
+            if (appliedCoupon) return; // disabled because applied, not because of connectivity -- leave it alone
+            const input = document.getElementById('couponInput');
+            const offline = !navigator.onLine;
+            input.disabled = offline;
+            input.placeholder = offline ? 'Coupons need a connection' : 'Coupon code';
+        }
+
         function clearCoupon(silent) {
             if (!appliedCoupon) return;
             appliedCoupon = null;
             document.getElementById('couponInput').value = '';
             document.getElementById('couponInput').disabled = false;
+            updateCouponAvailability();
             if (!silent) showToast('Coupon removed');
         }
 
@@ -2382,6 +2437,10 @@
             if (appliedCoupon) {
                 clearCoupon();
                 renderReceipt();
+                return;
+            }
+            if (!navigator.onLine) {
+                showToast('Coupons need a connection');
                 return;
             }
             const input = document.getElementById('couponInput');
@@ -2710,18 +2769,25 @@
             if (!entries.length) { box.style.display = 'none'; return; }
             box.style.display = '';
             const needsAttention = entries.some(e => e.status === 'needsReauth' || e.status === 'failed');
-            const hasStockConflict = entries.some(e => e.status === 'stockConflict');
+            const hasStockConflict = entries.some(e => e.status === 'stockConflict' || e.status === 'offerChanged');
             box.classList.toggle('queue-attention', needsAttention);
             box.classList.toggle('queue-conflict', !needsAttention && hasStockConflict);
             box.classList.toggle('queue-pending', !needsAttention && !hasStockConflict);
             if (needsAttention) {
                 text.innerHTML = `${entries.length} Queued<br>&#9888; needs attention`;
             } else if (hasStockConflict) {
-                text.innerHTML = `${entries.length} Queued<br>stock conflict`;
+                text.innerHTML = `${entries.length} Queued<br>price/stock changed`;
             } else {
                 text.innerHTML = `${entries.length} Queued`;
             }
         }
+
+        // Set while a Dismiss confirmation prompt is showing for one entry
+        // (openQueuePanel() re-renders the whole panel on every state
+        // change, same pattern already used for Retry -- see below -- so
+        // tracking "which one" here is simpler than trying to patch a
+        // single row in place).
+        let pendingDismissId = null;
 
         async function openQueuePanel() {
             const body = document.getElementById('itemModalBody');
@@ -2730,13 +2796,14 @@
             const rows = entries.map(e => {
                 const amount = (e.payload.payments || []).reduce((s, p) => s + parseFloat(p.amount || 0), 0);
                 let statusLine = '<div class="offer-option-sub">Waiting for connection…</div>';
-                // Dismiss is only offered for stockConflict/failed -- both
-                // mean the server already looked at this specific attempt
-                // and rejected it for a real reason, so giving up on it is a
-                // safe, informed choice. needsReauth means we don't even
-                // know yet whether the sale is valid (we just couldn't
-                // check) -- dismissing THAT would risk silently throwing
-                // away a perfectly good sale, so it only ever gets Retry.
+                // Dismiss is only offered for stockConflict/offerChanged/
+                // failed -- all three mean the server already looked at
+                // this specific attempt and rejected it for a real reason,
+                // so giving up on it is a safe, informed choice. needsReauth
+                // means we don't even know yet whether the sale is valid
+                // (we just couldn't check) -- dismissing THAT would risk
+                // silently throwing away a perfectly good sale, so it only
+                // ever gets Retry.
                 let dismissable = false;
                 if (e.status === 'needsReauth') {
                     statusLine = '<div class="offer-option-sub" style="color:#b23b3b;">Needs a fresh PIN unlock (or login) to sync</div>';
@@ -2747,6 +2814,18 @@
                     // used for a real failed/needsReauth entry below.
                     statusLine = `<div class="offer-option-sub" style="color:var(--pos-enter-orange);">Stock conflict — ${e.lastError || 'an item in this sale sold out while offline.'}</div>
                         <div class="offer-option-sub" style="font-size:0.72rem;">Nothing was deducted from inventory for this attempt -- the server never accepted it. To sell the rest of this cart, ring it up as a new sale without the sold-out item, then Dismiss this one. If the customer already paid, that's handled outside the system.</div>`;
+                    dismissable = true;
+                } else if (e.status === 'offerChanged') {
+                    // A coupon/offer/combo this sale relied on expired or
+                    // changed between queuing and replay (reason:
+                    // 'offer_unavailable' from the server -- see
+                    // POSSaleValidationError in shop/views.py). Same
+                    // "expected, routine" framing as stockConflict, same
+                    // orange, since it's the same class of problem: the
+                    // sale as rung up can no longer be created exactly as
+                    // priced, not a bug and not stock-related.
+                    statusLine = `<div class="offer-option-sub" style="color:var(--pos-enter-orange);">Price changed — ${e.lastError || 'a discount on this sale is no longer valid.'}</div>
+                        <div class="offer-option-sub" style="font-size:0.72rem;">Nothing was deducted from inventory for this attempt -- the server never accepted it. To sell this cart at today's price, ring it up as a new sale, then Dismiss this one. If the customer already paid the old (discounted) amount, that difference is handled outside the system.</div>`;
                     dismissable = true;
                 } else if (e.status === 'failed') {
                     statusLine = `<div class="offer-option-sub" style="color:#b23b3b;">${e.lastError || 'Could not sync this sale.'}</div>
@@ -2848,16 +2927,19 @@
             await updateOfflineBanner();
             await posReplayQueue();
             await renderQueueBox();
+            updateCouponAvailability();
             refreshCreditCustomerCacheQuietly(); // "refresh whenever the till is online" -- not awaited, non-blocking
         });
-        window.addEventListener('offline', updateOfflineBanner);
+        window.addEventListener('offline', () => { updateOfflineBanner(); updateCouponAvailability(); });
         document.addEventListener('visibilitychange', async () => {
             if (!document.hidden) {
                 await updateOfflineBanner();
                 await posReplayQueue();
                 await renderQueueBox();
+                updateCouponAvailability();
             }
         });
+        updateCouponAvailability();
         // Catches the "wifi silently died mid-shift with no OS-level event"
         // case -- the online/offline/visibilitychange listeners above are
         // all reactive to something actually happening; this is the one

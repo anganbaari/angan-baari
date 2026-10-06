@@ -586,6 +586,22 @@ class POSCouponApiTests(ApiTestBase):
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
+    def test_expired_coupon_at_replay_is_tagged_offer_unavailable(self):
+        """Simulates a replayed offline-queued sale whose coupon expired
+        between queueing and sync -- the offline queue needs reason to be
+        'offer_unavailable' to show a distinct message, not a generic one."""
+        self.percent_coupon.end_date = timezone.now() - timedelta(hours=1)
+        self.percent_coupon.save(update_fields=['end_date'])
+        payload = {
+            'client_sale_id': str(uuid.uuid4()),
+            'coupon_code': 'dashain25',
+            'payments': [{'method': 'cash', 'amount': '375.00'}],
+            'cart': [{'product_id': self.jar.id, 'qty': 2}],
+        }
+        response = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data['reason'], 'offer_unavailable')
+
     def test_sale_with_percent_coupon_reduces_total_and_increments_used_count(self):
         payload = {
             'client_sale_id': str(uuid.uuid4()),
@@ -901,6 +917,24 @@ class POSOfferApiTests(ApiTestBase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
         self.assertEqual(Decimal(response.data['total']), Decimal('200.00'))
         self.assertEqual(InventoryMovement.current_stock(self.jar), Decimal('9'))  # 10 - 1, stock unaffected by offers
+
+    def test_expired_offer_at_replay_is_tagged_offer_unavailable(self):
+        """Simulates the exact scenario a replayed offline-queued sale hits
+        if the offer expired between when it was rung up and when it
+        syncs: resolve_pos_offer_discount() rejects it, and the response
+        must carry reason='offer_unavailable' so the offline queue
+        (pos-offline-queue.js) can give this its own distinct state instead
+        of lumping it in with an unrelated validation failure."""
+        self.percent_offer.end_date = timezone.now() - timedelta(hours=1)
+        self.percent_offer.save(update_fields=['end_date'])
+        payload = {
+            'client_sale_id': str(uuid.uuid4()),
+            'payments': [{'method': 'cash', 'amount': '200.00'}],
+            'cart': [{'product_id': self.jar.id, 'qty': 1, 'offer_id': self.percent_offer.id}],
+        }
+        response = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data['reason'], 'offer_unavailable')
 
     def test_client_sent_price_is_never_trusted_only_offer_id_matters(self):
         # Posting qty=2 still charges 2 x the server-recomputed discounted

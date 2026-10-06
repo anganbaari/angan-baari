@@ -175,7 +175,16 @@ class POSSaleView(generics.ListAPIView):
                 coupon_code=data.get('coupon_code'),
             )
         except POSSaleValidationError as e:
-            return Response({'status': 'error', 'message': e.message}, status=e.status)
+            # `reason` lets the offline queue (static/js/pos-offline-queue.js)
+            # tell "a coupon/offer this sale relied on is no longer valid"
+            # apart from every other 400 -- only ever set for that specific
+            # class of failure (see POSSaleValidationError's docstring), so
+            # this key is simply absent for every other validation error,
+            # same response shape as before.
+            body = {'status': 'error', 'message': e.message}
+            if e.reason:
+                body['reason'] = e.reason
+            return Response(body, status=e.status)
 
         return Response(
             {

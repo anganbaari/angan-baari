@@ -224,18 +224,23 @@ function posAlertQueueFailure(clientSaleId, payload, error) {
 //     a malformed payload that can never succeed. The 409 message already
 //     names which product/variant is short (see InventoryMovement.clean()
 //     in shop/models.py) so staff know which line item to deal with.
-//   - any other 4xx (a real validation bug, not a stock conflict) -> marked
-//     'failed' and left in the queue for staff to review/dismiss, with one
-//     Telegram alert -- not retried forever either, since retrying an
-//     inherently invalid payload can never succeed.
+//   - a 400 carrying reason:'offer_unavailable' (a coupon/offer/combo this
+//     sale relied on expired, or changed, between queuing and replay --
+//     see POSSaleValidationError in shop/views.py) -> marked
+//     'offerChanged', same spirit as stockConflict: an expected, routine
+//     outcome of offline selling, NOT a bug, so NOT Telegram-alerted either.
+//   - any other 4xx (a real validation bug, not a stock/offer conflict) ->
+//     marked 'failed' and left in the queue for staff to review/dismiss,
+//     with one Telegram alert -- not retried forever either, since
+//     retrying an inherently invalid payload can never succeed.
 //   - a thrown fetch (genuine network failure, not a server response at
 //     all) -> left 'pending', and the whole replay loop stops immediately
 //     (if we're still offline, every remaining entry would fail the same
 //     way -- no point burning through them one at a time).
 //
-// Returns {synced, needsReauth, stockConflict, failed: [client_sale_id,...], stillOffline: bool}.
+// Returns {synced, needsReauth, stockConflict, offerChanged, failed: [client_sale_id,...], stillOffline: bool}.
 function posReplayQueue() {
-    var result = { synced: [], needsReauth: [], stockConflict: [], failed: [], stillOffline: false };
+    var result = { synced: [], needsReauth: [], stockConflict: [], offerChanged: [], failed: [], stillOffline: false };
     return posQueueList().then(function (entries) {
         var pending = entries.filter(function (e) { return e.status === 'pending'; });
         var chain = Promise.resolve();
@@ -267,6 +272,12 @@ function posReplayQueue() {
                                 result.stockConflict.push(entry.client_sale_id);
                                 return posQueueUpdate(entry.client_sale_id, {
                                     status: 'stockConflict', lastAttemptAt: new Date().toISOString(), lastError: message,
+                                });
+                            }
+                            if (data.reason === 'offer_unavailable') {
+                                result.offerChanged.push(entry.client_sale_id);
+                                return posQueueUpdate(entry.client_sale_id, {
+                                    status: 'offerChanged', lastAttemptAt: new Date().toISOString(), lastError: message,
                                 });
                             }
                             result.failed.push(entry.client_sale_id);
@@ -526,4 +537,24 @@ function posPurgeCreditCustomerCache() {
             tx.onerror = function () { reject(tx.error); };
         });
     });
+}
+
+// ══════════════════════════════════════════════════════════════
+// Offline offers/combos (Phase 4) -- stale-while-revalidate via the `meta`
+// store, not a dedicated object store: the offers payload is one nested
+// JSON blob (discount_offers/combo_offers), not a list of independent
+// records worth indexing separately. Not PII, so unlike the credit-
+// customer cache above this is NOT purged on Logout or given a short
+// expiry -- it's product/pricing data, same privacy class as the
+// PRODUCTS/CATEGORIES already embedded in the cached /pos/ shell.
+function posCacheOffers(data) {
+    return Promise.all([
+        posSetMeta('cachedOffers', data),
+        posSetMeta('offersCachedAt', new Date().toISOString()),
+    ]);
+}
+
+function posGetCachedOffers() {
+    return Promise.all([posGetMeta('cachedOffers'), posGetMeta('offersCachedAt')])
+        .then(function (results) { return { data: results[0], cachedAt: results[1] }; });
 }

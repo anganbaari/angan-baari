@@ -652,11 +652,23 @@ class POSSaleValidationError(Exception):
     credit line, insufficient stock). Callers translate .message/.status
     into their own response shape (JsonResponse for the traditional POS
     view, DRF Response for the API one) rather than each re-implementing
-    the same validation."""
+    the same validation.
 
-    def __init__(self, message, status=400):
+    `reason` is an optional short machine-readable tag, distinct from the
+    human-readable `message`, that lets a caller distinguish WHICH kind of
+    400 this is without string-matching the message. Currently only set to
+    'offer_unavailable' by resolve_pos_coupon()/resolve_pos_offer_discount()/
+    resolve_pos_combo_lines() — this is what lets
+    static/js/pos-offline-queue.js give "a discount on this queued sale is
+    no longer valid" its own distinct queue state (`offerChanged`) instead
+    of lumping it in with every other unrelated 400 under the generic
+    `failed` state. None (the default) for every other validation failure,
+    which keeps falling into the existing generic-400 handling unchanged."""
+
+    def __init__(self, message, status=400, reason=None):
         self.message = message
         self.status = status
+        self.reason = reason
         super().__init__(message)
 
 
@@ -770,13 +782,13 @@ def resolve_pos_offer_discount(offer_id, product, base_price):
     try:
         offer = Offer.objects.get(id=offer_id)
     except (Offer.DoesNotExist, ValueError, TypeError):
-        raise POSSaleValidationError('That offer no longer exists.')
+        raise POSSaleValidationError('That offer no longer exists.', reason='offer_unavailable')
     if offer.discount_type == 'combo':
         raise POSSaleValidationError(f'"{offer.title}" is a combo deal, not a per-product discount.')
     if not offer.is_live():
-        raise POSSaleValidationError(f'"{offer.title}" is no longer available.')
+        raise POSSaleValidationError(f'"{offer.title}" is no longer available.', reason='offer_unavailable')
     if product not in offer.get_products():
-        raise POSSaleValidationError(f'{product.name} is not part of "{offer.title}".')
+        raise POSSaleValidationError(f'{product.name} is not part of "{offer.title}".', reason='offer_unavailable')
     return offer.discounted_price(base_price)
 
 
@@ -855,9 +867,9 @@ def resolve_pos_combo_lines(cart):
         try:
             offer = Offer.objects.get(id=offer_id, discount_type='combo')
         except (Offer.DoesNotExist, ValueError, TypeError):
-            raise POSSaleValidationError('One of the combo offers in this cart no longer exists.')
+            raise POSSaleValidationError('One of the combo offers in this cart no longer exists.', reason='offer_unavailable')
         if not offer.is_live():
-            raise POSSaleValidationError(f'"{offer.title}" is no longer available.')
+            raise POSSaleValidationError(f'"{offer.title}" is no longer available.', reason='offer_unavailable')
 
         bundle_items = list(offer.bundle_items.select_related('product').all())
         natural_total = offer.get_bundle_natural_total()
@@ -865,7 +877,8 @@ def resolve_pos_combo_lines(cart):
             raise POSSaleValidationError(f'"{offer.title}" is not configured correctly.')
         if len(entries) != len(bundle_items):
             raise POSSaleValidationError(
-                f'"{offer.title}" in the cart doesn\'t match the current bundle contents — remove and re-add it.'
+                f'"{offer.title}" in the cart doesn\'t match the current bundle contents — remove and re-add it.',
+                reason='offer_unavailable',
             )
 
         # Match each cart line to exactly one BundleItem by product, consuming
@@ -877,7 +890,8 @@ def resolve_pos_combo_lines(cart):
             match = next((bi for bi in remaining if bi.product_id == line.get('product_id')), None)
             if not match:
                 raise POSSaleValidationError(
-                    f'"{offer.title}" in the cart doesn\'t match the current bundle contents — remove and re-add it.'
+                    f'"{offer.title}" in the cart doesn\'t match the current bundle contents — remove and re-add it.',
+                    reason='offer_unavailable',
                 )
             remaining.remove(match)
             allocations.append((index, match))
@@ -1093,7 +1107,7 @@ def create_pos_sale(*, client_sale_id, cart, payments, operator_user, customer=N
     else:
         coupon_obj, discount_amount, coupon_error = resolve_pos_coupon(coupon_code, coupon_eligible_subtotal)
     if coupon_error:
-        raise POSSaleValidationError(coupon_error)
+        raise POSSaleValidationError(coupon_error, reason='offer_unavailable')
     discounted_subtotal = total - discount_amount
 
     if settings_row.is_vat_enabled:

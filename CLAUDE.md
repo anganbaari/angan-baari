@@ -190,13 +190,13 @@ pointed at this API (see "POS-PWA (Phase 1)" below) — it keeps sending
 its existing `X-CSRFToken` header (via `apiFetch()`) on every call, which
 is load-bearing, not optional.
 
-## POS-PWA (Phase 1 + 2 + 3 + 4 — PWA shell, offline sale queue, offline-first cold start, offline PIN unlock, offline credit-customer lookup)
+## POS-PWA (Phase 1 + 2 + 3 + 4 — PWA shell, offline sale queue, offline-first cold start, offline PIN unlock, offline offers/coupons/credit-lookup)
 
 Scoped to `/pos/` only; nothing else on the site is a PWA. Phase 1 covered
 a connectivity drop *during* an already-open session; Phase 2 makes
 `/pos/` itself cold-start with zero connectivity at all; Phase 3 makes PIN
-unlock itself work offline; Phase 4 extends offline support to
-credit-customer lookup.
+unlock itself work offline; Phase 4 extends offline support to credit-
+customer lookup, offers/combos, and coupon gating.
 
 - `static/pos-manifest.json` — `start_url`/`scope` both `/pos/`,
   `display: standalone`. Icons include both `any` and `maskable` variants
@@ -334,14 +334,15 @@ credit-customer lookup.
     problem. Deliberately does **not** fire the Telegram alert below —
     that channel is for real bugs, not routine sold-out conflicts.
     **Resolving one:** the queue panel offers Retry (try again as-is — a
-    restock since the conflict could make it succeed) or Dismiss, for both
-    `stockConflict` and `failed` (not `needsReauth` — that state means we
-    don't yet know if the sale is valid, so dismissing it risks silently
-    losing a perfectly good one; only a state the server has actually
-    rejected is safe to give up on). Dismissing never touches inventory or
-    the ledger either way: the server rejected the attempt, so nothing was
-    ever deducted for it — dismissing just removes the IndexedDB record, it
-    doesn't reverse anything because nothing happened. There is no
+    restock since the conflict could make it succeed) or Dismiss, for
+    `stockConflict`, `offerChanged` (see below), and `failed` (not
+    `needsReauth` — that state means we don't yet know if the sale is
+    valid, so dismissing it risks silently losing a perfectly good one;
+    only a state the server has actually rejected is safe to give up on).
+    Dismissing never touches inventory or the ledger either way: the
+    server rejected the attempt, so nothing was ever deducted for it —
+    dismissing just removes the IndexedDB record, it doesn't reverse
+    anything because nothing happened. There is no
     in-place "edit the cart and resubmit" — ringing up a fresh, corrected
     sale (e.g. without the sold-out line) and then dismissing the stuck
     one is the supported workaround; building a real queued-cart editor
@@ -512,6 +513,63 @@ credit-customer lookup.
     sale is accepted regardless of existing outstanding balance. This was
     a deliberate check, not an oversight to fix here — flagged in case a
     limit is wanted as a future feature, not built speculatively.
+- **Offline offers/combos (Phase 4).** `openOffersModal()` already
+  degraded gracefully offline before this (a real try/catch showing
+  "couldn't load offers"), so this was a genuine feature gap, not a bug —
+  offers/combos are fetched live from `/api/v1/pos/offers/` every time the
+  modal opens (deliberately not baked into `/pos/`'s own payload, see
+  `PosOffersListView`'s docstring, since an offer's live window can start
+  or end mid-shift), with nothing cached for when that fetch fails.
+  - Now stale-while-revalidate: still always tries the live fetch first
+    when the modal opens (an offer going live or expiring mid-shift should
+    never show stale data on a terminal that's been online all along), and
+    caches the response (`posCacheOffers()`, reusing the `meta` store as a
+    single JSON blob — this isn't per-record data worth a dedicated object
+    store) on success. Only falls back to the cached blob on a genuine
+    network failure, shown with a "may be out of date" note. Not PII, so
+    unlike the credit-customer cache above, this is NOT purged on Logout
+    and has no short expiry tradeoff to document — same privacy class as
+    the PRODUCTS/CATEGORIES already embedded in the cached `/pos/` shell.
+  - **If an offer/coupon expired between when a sale was queued and when
+    it replays**, `create_pos_sale()` already rejected it (via
+    `resolve_pos_offer_discount()`/`resolve_pos_combo_lines()`/
+    `resolve_pos_coupon()` raising `POSSaleValidationError`) — what was
+    missing was a way for the offline queue to tell that failure apart
+    from an unrelated one. `POSSaleValidationError` now takes an optional
+    `reason` (currently only ever `'offer_unavailable'`), surfaced in the
+    API error response, which the offline queue (`posReplayQueue()`) uses
+    to mark the entry `offerChanged` instead of the generic `failed` —
+    same "expected, routine, not a bug, not Telegram-alerted" treatment as
+    `stockConflict`. **What staff should do:** nothing was deducted from
+    inventory or charged for this attempt (same as `stockConflict`/
+    `failed`); ring the cart up as a new sale at today's price, then
+    Dismiss the stuck entry. If the customer already paid the old
+    (discounted) amount, that difference is a human reconciliation problem
+    outside the software, same as the other dismissable states.
+- **Coupons stay online-only (Phase 4) — deliberately not cached.**
+  Unlike offers, a coupon's validity (`used_count`, `min_order_amount`,
+  timing) isn't meaningfully cacheable, so this is a straight block, not
+  stale-while-revalidate: `couponInput` is disabled with a "Coupons need a
+  connection" placeholder whenever offline (`updateCouponAvailability()`,
+  reactive to the existing `online`/`offline`/`visibilitychange`
+  listeners), and `applyCouponBtn`'s own click handler refuses to even
+  attempt validation offline. **An already-applied coupon is NOT stripped**
+  when connectivity drops — it rides through to Complete Sale exactly as
+  before, whether that POST succeeds live or gets queued; removing an
+  applied coupon (`clearCoupon()`) needs no network at all and stays
+  available regardless of connectivity. If a queued sale's coupon turns
+  out to be invalid by replay time, that's the same `offerChanged` state
+  described above — `resolve_pos_coupon()`'s errors carry the same
+  `reason='offer_unavailable'` tag.
+- **Stock offline:** `loadStockData()` already handled this correctly —
+  confirmed by testing, no change needed there (a failed refresh keeps
+  whatever `stockData` already had rather than wiping it). The one gap:
+  if `stockData` is still empty (a device that's never successfully
+  fetched it at all, e.g. offline since its first-ever cold start), the
+  Stock view and its header indicator used to render a blank table and a
+  misleading "Stock OK" respectively. Both now say "Stock unavailable
+  offline" instead — cheap, since the fix is just checking
+  `stockData.length` before claiming anything about it.
 - **Not yet done — needs a real device before this is fully trusted**:
   actual install-to-home-screen + airplane-mode-mid-sale + reconnect
   testing on a real Android phone (and iOS, if the farm uses one),
