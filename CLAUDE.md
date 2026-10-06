@@ -190,12 +190,11 @@ pointed at this API (see "POS-PWA (Phase 1)" below) — it keeps sending
 its existing `X-CSRFToken` header (via `apiFetch()`) on every call, which
 is load-bearing, not optional.
 
-## POS-PWA (Phase 1 — PWA shell + offline sale queue)
+## POS-PWA (Phase 1 + 2 — PWA shell, offline sale queue, offline-first cold start)
 
-Scoped to `/pos/` only; nothing else on the site is a PWA. Phase 2
-(caching the catalog so `/pos/` can cold-start with zero connectivity) is
-intentionally not built yet — Phase 1 only covers a connectivity drop
-*during* an already-open session.
+Scoped to `/pos/` only; nothing else on the site is a PWA. Phase 1 covered
+a connectivity drop *during* an already-open session; Phase 2 makes
+`/pos/` itself cold-start with zero connectivity at all.
 
 - `static/pos-manifest.json` — `start_url`/`scope` both `/pos/`,
   `display: standalone`. Icons include both `any` and `maskable` variants
@@ -212,37 +211,72 @@ intentionally not built yet — Phase 1 only covers a connectivity drop
   can never exceed the directory its own script URL lives in unless the
   response sends a `Service-Worker-Allowed` header, and PythonAnywhere's
   static-file mapping (the Web tab UI) has no way to attach a custom
-  header to one specific file. No catalog/asset caching yet (Phase 2) —
-  Phase 1's `fetch` handler is a plain pass-through, present only because
-  some browsers' installability checks still look for one.
-- `static/js/pos-offline-queue.js` — an IndexedDB-backed queue, loaded
-  both as a classic `<script>` in `pos.html` and via `importScripts()` in
-  the service worker (same file, two contexts). `completeSaleBtn` posts to
-  `POST /api/v1/sales/`; a real validation/stock rejection (4xx) is shown
-  as a normal failure same as always, but a genuine network failure
-  (`fetch()` itself throwing) queues the sale instead of losing it, relying
-  on `client_sale_id` idempotency to make a later double-send harmless.
-  Replay is attempted on page load, on the browser's `online` event, on
-  `visibilitychange`, and via the Background Sync API where supported —
-  **Safari/iOS has no Background Sync at all**, so the page-load attempt is
-  what actually covers it there (reopening an installed PWA from the home
-  screen is a fresh load, not reliably an `online`/`visibilitychange`
-  transition). A queued entry that comes back `401`/`403` on replay is
-  marked `needsReauth` (session/PIN expired while offline) rather than
-  retried forever or dropped; one that comes back a real `400`/`409` is
-  marked `failed` and also fires one (not repeated) Telegram alert via
-  `PosQueueFailureAlertView` (`POST /api/v1/pos/queue/report-failed/`),
-  since a failed entry otherwise only exists in that one device's
-  IndexedDB — cleared browser data, a wiped device, or a PWA reinstall
-  would otherwise erase the only trace a sale was ever attempted, even
-  though the cashier already told that customer it went through.
+  header to one specific file.
+  - **Cold-start caching (Phase 2):** deliberately did NOT move the
+    catalog to a separate API-fetch-and-cache flow — `pos.html` still gets
+    `PRODUCTS`/`CATEGORIES` as server-rendered embedded JSON exactly as
+    before, zero client-side-rendering rewrite. Instead the `fetch`
+    handler caches the **whole `/pos/` navigation response** (network-first,
+    cache-on-success, fall back to the cached copy when the network
+    fails) — the cached page already contains whatever catalog data it
+    was rendered with, so there's no separate cache to keep in sync.
+    Same-origin `/static/` assets (CSS/JS/icons) get stale-while-revalidate
+    so a cold load doesn't block on them either. Cross-origin CDN assets
+    (Google Fonts, Font Awesome) are intentionally NOT cached — they just
+    fail offline like any ordinary page would, not worth the
+    opaque-response/versioning complexity for this phase.
+  - **Gotcha, confirmed by testing:** a page's OWN navigation request is
+    never controlled by the service worker that request itself just
+    registered — only the *next* navigation is. The very first `/pos/`
+    load after a SW update won't populate the shell cache; the one after
+    that will. This is standard SW behavior, not a bug here.
+- `static/js/pos-offline-queue.js` — an IndexedDB-backed queue (DB
+  `angan-baari-pos`, now at version 2 for the Phase 2 `meta` store below),
+  loaded both as a classic `<script>` in `pos.html` and via
+  `importScripts()` in the service worker (same file, two contexts).
+  `completeSaleBtn` posts to `POST /api/v1/sales/`; a real validation/stock
+  rejection (4xx) is shown as a normal failure same as always, but a
+  genuine network failure (`fetch()` itself throwing) queues the sale
+  instead of losing it, relying on `client_sale_id` idempotency to make a
+  later double-send harmless. Replay is attempted on page load, on the
+  browser's `online` event, on `visibilitychange`, and via the Background
+  Sync API where supported — **Safari/iOS has no Background Sync at all**,
+  so the page-load attempt is what actually covers it there (reopening an
+  installed PWA from the home screen is a fresh load, not reliably an
+  `online`/`visibilitychange` transition). Each replay attempt has four
+  outcomes, not three:
+  - `401`/`403` → `needsReauth` (session/PIN expired while offline) —
+    never silently dropped or retried forever.
+  - `409` → `stockConflict` (Phase 2) — stock genuinely ran out while
+    offline, an expected/routine outcome of offline selling, NOT a bug.
+    `InventoryMovement.clean()` (`shop/models.py`) names the specific
+    product/variant in its message so staff know which line item is the
+    problem. Deliberately does **not** fire the Telegram alert below —
+    that channel is for real bugs, not routine sold-out conflicts.
+  - any other `4xx` → `failed`, fires one (not repeated) Telegram alert
+    via `PosQueueFailureAlertView` (`POST /api/v1/pos/queue/report-failed/`)
+    — a failed entry otherwise only exists in that one device's
+    IndexedDB, and the cashier already told that customer the sale went
+    through.
+  - a thrown fetch (no response at all) → stays `pending`, replay loop
+    stops (still offline).
+  - The same database's `meta` store (Phase 2) holds `lastCachedAt`
+    (`posSetMeta`/`posGetMeta`), written by the service worker every time
+    it successfully caches a fresh `/pos/` response — `pos.html` reads it
+    for the `#offlineBanner` ("Offline — showing data as of ...") shown
+    purely off `navigator.onLine`, not "was this specific page load
+    served from cache" (even a page that loaded fresh moments ago is now
+    showing frozen data the instant connectivity drops, which is the
+    thing actually worth warning staff about).
 - **Not yet done — needs a real device before this is fully trusted**:
   actual install-to-home-screen + airplane-mode-mid-sale + reconnect
   testing on a real Android phone (and iOS, if the farm uses one). What's
-  verified so far is CDP-scripted against a desktop headless browser —
-  solid evidence the logic is correct, but not a substitute for seeing
-  Background Sync actually fire on a real OS while the app isn't in the
-  foreground.
+  verified so far (both phases) is CDP-scripted against a desktop headless
+  browser, including genuinely toggling the browser's network to offline
+  (not just stubbing `fetch`) and confirming `/pos/` still renders with
+  the right cached catalog data — solid evidence the logic is correct, but
+  not a substitute for seeing Background Sync actually fire on a real OS
+  while the app isn't in the foreground.
 
 ## Deferred work (known, intentional, not yet built)
 

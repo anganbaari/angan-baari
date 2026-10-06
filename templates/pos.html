@@ -66,6 +66,11 @@
         .pos-brand img.flag { width: 34px; height: auto; margin-left: 6px; }
         .pos-header-divider { width: 1.5px; align-self: stretch; background: var(--mist); }
         .pos-header-right { flex: 1; display: flex; align-items: center; justify-content: flex-end; gap: 14px; text-align: right; z-index: 1; }
+
+        .offline-banner {
+            display: none; background: #b4790f; color: #fff; text-align: center; font-weight: 700;
+            font-size: 0.85rem; padding: 6px 12px; flex-shrink: 0; font-family: 'DM Sans', sans-serif;
+        }
         .pos-lock-instruction { font-size: 0.82rem; color: var(--pos-text-green); line-height: 1.4; font-weight: 700; }
         .pos-operator { font-size: 1.15rem; font-weight: 800; color: var(--pos-text-green); letter-spacing: 0.03em; min-width: 220px; text-align: center; }
 
@@ -194,11 +199,15 @@
         .stock-col.stock-has-low { background: #b23b3b; }
 
         /* Offline sale queue -- amber while everything just needs the
-           network back (expected, will resolve itself), red once anything
-           needs staff attention (session/PIN expired, or a real failure
-           that can't just be retried). */
+           network back (expected, will resolve itself), the same orange
+           as the Offers button for a stock conflict (a routine, expected
+           outcome of offline selling -- someone else sold the last one --
+           not a problem with the app), red once anything needs real staff
+           attention (session/PIN expired, or a failure that can't just be
+           retried). */
         .queue-col { cursor: pointer; }
         .queue-col.queue-pending { background: #b4790f; }
+        .queue-col.queue-conflict { background: var(--pos-enter-orange); }
         .queue-col.queue-attention { background: #b23b3b; }
 
         .tax-box { flex: 1; min-width: 0; background: var(--pos-bg); border: 2px solid var(--pos-border-dark); border-radius: 6px; overflow: hidden; height: fit-content; }
@@ -544,6 +553,17 @@
         </div>
     </div>
 
+    <!-- Phase 2 staleness banner -- shown purely off navigator.onLine, not
+         "was this specific page load served from cache": even a page that
+         loaded fresh moments ago is now showing frozen data the instant
+         connectivity drops, and that's the thing staff actually need to
+         know not to trust. lastCachedAt (posGetMeta, written by pos-sw.js
+         whenever it successfully caches /pos/) answers "how stale could
+         this be", not "is this page itself cached". -->
+    <div id="offlineBanner" class="offline-banner">
+        📡 Offline — showing data as of <span id="offlineBannerTimestamp">—</span>. Stock counts and prices may be out of date.
+    </div>
+
     <div class="pos-body" id="posBody">
         <div class="pos-content">
             <!-- Receipt view -->
@@ -649,7 +669,7 @@
                             <tr>
                                 <th class="stock-col-name">Name</th>
                                 <th>Current Stock</th>
-                                <th>Minimum Stock</th>
+                                <th>Minimum Stock</th> 
                                 <th>Restock Method</th>
                                 <th>Last Restocked</th>
                                 <th></th>
@@ -2498,11 +2518,17 @@
             if (!entries.length) { box.style.display = 'none'; return; }
             box.style.display = '';
             const needsAttention = entries.some(e => e.status === 'needsReauth' || e.status === 'failed');
+            const hasStockConflict = entries.some(e => e.status === 'stockConflict');
             box.classList.toggle('queue-attention', needsAttention);
-            box.classList.toggle('queue-pending', !needsAttention);
-            text.innerHTML = needsAttention
-                ? `${entries.length} Queued<br>&#9888; needs attention`
-                : `${entries.length} Queued`;
+            box.classList.toggle('queue-conflict', !needsAttention && hasStockConflict);
+            box.classList.toggle('queue-pending', !needsAttention && !hasStockConflict);
+            if (needsAttention) {
+                text.innerHTML = `${entries.length} Queued<br>&#9888; needs attention`;
+            } else if (hasStockConflict) {
+                text.innerHTML = `${entries.length} Queued<br>stock conflict`;
+            } else {
+                text.innerHTML = `${entries.length} Queued`;
+            }
         }
 
         async function openQueuePanel() {
@@ -2514,6 +2540,12 @@
                 let statusLine = '<div class="offer-option-sub">Waiting for connection…</div>';
                 if (e.status === 'needsReauth') {
                     statusLine = '<div class="offer-option-sub" style="color:#b23b3b;">Needs a fresh PIN unlock (or login) to sync</div>';
+                } else if (e.status === 'stockConflict') {
+                    // Expected/routine (someone else sold the last one while this
+                    // terminal was offline) -- the orange matches the queue box's
+                    // own queue-conflict color, deliberately distinct from the red
+                    // used for a real failed/needsReauth entry below.
+                    statusLine = `<div class="offer-option-sub" style="color:var(--pos-enter-orange);">Stock conflict — ${e.lastError || 'an item in this sale sold out while offline.'}</div>`;
                 } else if (e.status === 'failed') {
                     statusLine = `<div class="offer-option-sub" style="color:#b23b3b;">${e.lastError || 'Could not sync this sale.'}</div>`;
                 }
@@ -2546,10 +2578,26 @@
         }
         document.getElementById('queueBox').addEventListener('click', openQueuePanel);
 
+        // Phase 2 staleness banner -- keyed off navigator.onLine, not "was
+        // this page served from cache" (see the HTML comment above
+        // #offlineBanner for why). lastCachedAt is written by pos-sw.js's
+        // navigation handler every time it successfully caches a fresh
+        // /pos/ response.
+        async function updateOfflineBanner() {
+            const banner = document.getElementById('offlineBanner');
+            if (navigator.onLine) { banner.style.display = 'none'; return; }
+            const lastCachedAt = await posGetMeta('lastCachedAt');
+            document.getElementById('offlineBannerTimestamp').textContent = lastCachedAt
+                ? new Date(lastCachedAt).toLocaleString()
+                : 'unknown — no successful load recorded on this device yet';
+            banner.style.display = 'block'; // .offline-banner's own rule is display:none -- '' would just fall back to it
+        }
         window.addEventListener('online', async () => {
+            await updateOfflineBanner();
             await posReplayQueue();
             await renderQueueBox();
         });
+        window.addEventListener('offline', updateOfflineBanner);
         document.addEventListener('visibilitychange', async () => {
             if (!document.hidden) {
                 await posReplayQueue();
@@ -2563,6 +2611,7 @@
                 if (event.data && event.data.type === 'POS_QUEUE_SYNCED') renderQueueBox();
             });
         }
+        updateOfflineBanner();
         // Attempt a replay on every fresh page load, not just paint whatever
         // was left queued -- this is the fallback that actually matters on
         // iOS Safari, which has no Background Sync API at all (the 'sync'

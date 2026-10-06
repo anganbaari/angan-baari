@@ -263,6 +263,26 @@ class POSSaleApiTests(ApiTestBase):
         second = self.client.post(reverse('v1_sale_list_create'), payload2, format='json')
         self.assertEqual(second.status_code, status.HTTP_400_BAD_REQUEST)
 
+    def test_oversell_returns_409_naming_the_product(self):
+        # jar isn't fixed_weight, so there's no is_available-syncs-from-
+        # stock signal to catch this earlier (see the fixed_weight variant
+        # test above, which hits a different, earlier check) -- this is the
+        # actual InventoryMovement.clean() ledger-shortage path, the one
+        # the offline queue's 'stockConflict' state (pos-offline-queue.js)
+        # depends on for a message that actually names which line item is
+        # the problem, not just a generic "not enough stock".
+        self.client.login(username='cashier', password='pw')
+        self.unlock_terminal()
+        payload = {
+            'client_sale_id': str(uuid.uuid4()),
+            'payments': [{'method': 'cash', 'amount': '2750.00'}],  # 11 x 250, only 10 in stock
+            'cart': [{'product_id': self.jar.id, 'qty': 11}],
+        }
+        response = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT, response.data)
+        self.assertIn(self.jar.name, response.data['message'])
+        self.assertFalse(POSSale.objects.filter(client_sale_id=payload['client_sale_id']).exists())
+
     def test_sale_list_requires_staff(self):
         response = self.client.get(reverse('v1_sale_list_create'))
         self.assertIn(response.status_code, (status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN))

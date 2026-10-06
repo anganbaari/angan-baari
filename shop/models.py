@@ -735,9 +735,17 @@ class InventoryMovement(models.Model):
                 existing = existing.exclude(pk=self.pk)
             available = sum((m.signed_quantity() for m in existing), Decimal('0'))
             if available - Decimal(str(self.quantity)) < 0:
+                # "ProductName: ..." (+ weight, for a specific animal) so a
+                # stock-conflict message is actually useful to a human
+                # reading it later -- e.g. in the POS offline queue panel,
+                # where this is the one detail staff need to find which
+                # line item in an already-queued sale is the problem.
+                who = self.product.name
+                if self.variant_id:
+                    who += f' ({self.variant.weight}kg)'
                 raise ValidationError({
-                    'quantity': f'Not enough stock — only {available} currently available '
-                                f'for this product/variant, cannot remove {self.quantity}.'
+                    'quantity': f'{who} — only {available} currently available, '
+                                f'cannot remove {self.quantity}.'
                 })
 
     @classmethod

@@ -15,28 +15,108 @@
 // covers /pos/), and the view sets Service-Worker-Allowed: /pos/ anyway as
 // a second line of defense.
 //
-// Phase 1 scope only (see CLAUDE.md / the POS-PWA roadmap): this worker
-// exists to (a) make /pos/ installable and (b) run Background Sync so a
-// sale queued while offline (see static/js/pos-offline-queue.js) can
-// replay even if the POS tab isn't focused or open. It does NOT cache the
-// catalog or any page assets for cold-start offline use -- that's Phase 2.
+// Phase 2 (this version): /pos/ itself can cold-start with zero
+// connectivity, not just survive a connectivity drop mid-session (Phase 1).
+// Two cache strategies, deliberately NOT a client-side-rendering rewrite --
+// pos.html still gets PRODUCTS/CATEGORIES as server-rendered embedded JSON
+// exactly as before, this just makes sure a COPY of that rendered page is
+// always sitting in Cache Storage:
+//   1. Navigating to /pos/ itself: network-first, caching every successful
+//      response as the new "last known good" snapshot (including its
+//      embedded posProductsData/posCategoriesData JSON verbatim), falling
+//      back to that cached snapshot when the network fetch fails. This is
+//      why a cold load with no connectivity at all still renders the POS
+//      screen with the catalog as of the last time it loaded online --
+//      there's no separate catalog cache to keep in sync, the cached PAGE
+//      already contains whatever catalog data it was rendered with.
+//   2. Same-origin /static/ assets (CSS/JS/icons) the cached page needs to
+//      actually render correctly offline: stale-while-revalidate -- serve
+//      the cached copy immediately if there is one (so a cold load doesn't
+//      block on the network for these), refreshing the cache in the
+//      background when online. Cross-origin assets (Google Fonts, Font
+//      Awesome's CDN) are NOT cached -- they'll just fail to load offline,
+//      same as any ordinary page; caching third-party CDN responses is a
+//      bigger can of worms (versioning, opaque responses) than this phase
+//      needs for "the product grid still works."
+// API calls (/api/v1/..., /pos/service-worker.js) are never cached --
+// they're either live session-bound data (stock, sales) that would be
+// actively wrong to serve stale, or the worker's own script (the browser
+// handles that caching/update lifecycle itself).
 
 importScripts('/static/js/pos-offline-queue.js');
+
+var POS_SHELL_CACHE = 'pos-shell-v1';
 
 self.addEventListener('install', function (event) {
     self.skipWaiting(); // don't make staff wait through an update prompt on a shared till
 });
 
 self.addEventListener('activate', function (event) {
-    event.waitUntil(self.clients.claim());
+    event.waitUntil(
+        Promise.all([
+            self.clients.claim(),
+            caches.keys().then(function (names) {
+                return Promise.all(
+                    names
+                        .filter(function (name) { return name.indexOf('pos-shell-') === 0 && name !== POS_SHELL_CACHE; })
+                        .map(function (name) { return caches.delete(name); })
+                );
+            }),
+        ])
+    );
 });
 
-// A plain network pass-through -- no caching here (Phase 2). Some browsers'
-// installability checks still look for the presence of a fetch handler,
-// so this exists even though it does nothing beyond what the network
-// would do unhandled.
+function posIsNavigationToPosScreen(request) {
+    if (request.mode !== 'navigate') return false;
+    var url = new URL(request.url);
+    return url.pathname === '/pos/';
+}
+
+function posIsCacheableStaticAsset(request) {
+    var url = new URL(request.url);
+    return url.origin === self.location.origin && url.pathname.indexOf('/static/') === 0;
+}
+
 self.addEventListener('fetch', function (event) {
-    event.respondWith(fetch(event.request));
+    var request = event.request;
+
+    if (posIsNavigationToPosScreen(request)) {
+        event.respondWith(
+            fetch(request).then(function (response) {
+                var copy = response.clone();
+                caches.open(POS_SHELL_CACHE).then(function (cache) { cache.put(request, copy); });
+                posSetMeta('lastCachedAt', new Date().toISOString());
+                return response;
+            }).catch(function () {
+                return caches.match(request).then(function (cached) {
+                    return cached || new Response(
+                        'Offline, and no cached copy of /pos/ is available yet -- load it once while online first.',
+                        { status: 503, headers: { 'Content-Type': 'text/plain' } }
+                    );
+                });
+            })
+        );
+        return;
+    }
+
+    if (posIsCacheableStaticAsset(request)) {
+        event.respondWith(
+            caches.open(POS_SHELL_CACHE).then(function (cache) {
+                return cache.match(request).then(function (cached) {
+                    var networkFetch = fetch(request).then(function (response) {
+                        cache.put(request, response.clone());
+                        return response;
+                    }).catch(function () { return cached; }); // offline and nothing cached -- let it fail naturally
+                    return cached || networkFetch;
+                });
+            })
+        );
+        return;
+    }
+
+    // Everything else (API calls, cross-origin CDN assets): plain
+    // pass-through, same as Phase 1 -- never cached.
+    event.respondWith(fetch(request));
 });
 
 function posBroadcastQueueResult(result) {

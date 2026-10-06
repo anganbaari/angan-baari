@@ -7,15 +7,17 @@
 //   - importScripts(...) inside static/js/pos-sw.js (service worker context
 //     -- same functions land as globals on the worker's `self`)
 //
-// Phase 1 scope only: this queue exists so a sale that fails to reach
-// POST /api/v1/sales/ because of a NETWORK failure (not a real validation
-// error) isn't lost -- it's retried later, in order, relying on
-// client_sale_id idempotency to make a double-send harmless. It does not
-// do any catalog/offline-browsing caching (that's Phase 2).
+// This queue exists so a sale that fails to reach POST /api/v1/sales/
+// because of a NETWORK failure (not a real validation error) isn't lost --
+// it's retried later, in order, relying on client_sale_id idempotency to
+// make a double-send harmless. The same database also holds a small `meta`
+// store (Phase 2) recording when /pos/ was last successfully cached, for
+// the "showing data as of ..." staleness banner in pos.html.
 
 var POS_QUEUE_DB_NAME = 'angan-baari-pos';
-var POS_QUEUE_DB_VERSION = 1;
+var POS_QUEUE_DB_VERSION = 2;
 var POS_QUEUE_STORE = 'queuedSales';
+var POS_META_STORE = 'meta';
 
 function posQueueOpenDB() {
     return new Promise(function (resolve, reject) {
@@ -25,9 +27,40 @@ function posQueueOpenDB() {
             if (!db.objectStoreNames.contains(POS_QUEUE_STORE)) {
                 db.createObjectStore(POS_QUEUE_STORE, { keyPath: 'client_sale_id' });
             }
+            if (!db.objectStoreNames.contains(POS_META_STORE)) {
+                db.createObjectStore(POS_META_STORE, { keyPath: 'key' });
+            }
         };
         req.onsuccess = function () { resolve(req.result); };
         req.onerror = function () { reject(req.error); };
+    });
+}
+
+// Small key/value store shared by the page and the service worker --
+// currently just 'lastCachedAt' (ISO timestamp), written by pos-sw.js every
+// time it successfully caches a fresh /pos/ response, read by pos.html to
+// show "Offline -- showing data as of {that timestamp}" whenever
+// navigator.onLine is false. Not folded into localStorage because a
+// service worker has no access to it at all.
+function posSetMeta(key, value) {
+    return posQueueOpenDB().then(function (db) {
+        return new Promise(function (resolve, reject) {
+            var tx = db.transaction(POS_META_STORE, 'readwrite');
+            tx.objectStore(POS_META_STORE).put({ key: key, value: value });
+            tx.oncomplete = function () { resolve(); };
+            tx.onerror = function () { reject(tx.error); };
+        });
+    });
+}
+
+function posGetMeta(key) {
+    return posQueueOpenDB().then(function (db) {
+        return new Promise(function (resolve, reject) {
+            var tx = db.transaction(POS_META_STORE, 'readonly');
+            var req = tx.objectStore(POS_META_STORE).get(key);
+            req.onsuccess = function () { resolve(req.result ? req.result.value : null); };
+            req.onerror = function () { reject(req.error); };
+        });
     });
 }
 
@@ -39,7 +72,7 @@ function posQueueEnqueue(payload) {
                 client_sale_id: payload.client_sale_id,
                 payload: payload,
                 queuedAt: new Date().toISOString(),
-                status: 'pending', // 'pending' | 'needsReauth' | 'failed'
+                status: 'pending', // 'pending' | 'needsReauth' | 'stockConflict' | 'failed'
                 lastError: null,
                 lastAttemptAt: null,
             });
@@ -140,18 +173,26 @@ function posAlertQueueFailure(clientSaleId, payload, error) {
 //     'needsReauth' and left in the queue -- never silently dropped, never
 //     retried forever; the UI must surface this so staff know to re-log-in
 //     or re-enter their PIN before it can sync.
-//   - any other 4xx (a real validation/stock/409 failure) -> marked
-//     'failed' and left in the queue for staff to review/dismiss -- not
-//     retried forever either, since retrying an inherently invalid payload
-//     can never succeed.
+//   - 409 (stock genuinely ran out while offline) -> marked 'stockConflict',
+//     NOT 'failed' and NOT Telegram-alerted. This is an expected, routine
+//     outcome of offline operation (someone else sold the last one before
+//     this queued sale replayed), not a bug -- it shouldn't look the same
+//     to staff, or to whoever reads the failure-alert Telegram channel, as
+//     a malformed payload that can never succeed. The 409 message already
+//     names which product/variant is short (see InventoryMovement.clean()
+//     in shop/models.py) so staff know which line item to deal with.
+//   - any other 4xx (a real validation bug, not a stock conflict) -> marked
+//     'failed' and left in the queue for staff to review/dismiss, with one
+//     Telegram alert -- not retried forever either, since retrying an
+//     inherently invalid payload can never succeed.
 //   - a thrown fetch (genuine network failure, not a server response at
 //     all) -> left 'pending', and the whole replay loop stops immediately
 //     (if we're still offline, every remaining entry would fail the same
 //     way -- no point burning through them one at a time).
 //
-// Returns {synced: [client_sale_id,...], needsReauth: [...], failed: [...], stillOffline: bool}.
+// Returns {synced, needsReauth, stockConflict, failed: [client_sale_id,...], stillOffline: bool}.
 function posReplayQueue() {
-    var result = { synced: [], needsReauth: [], failed: [], stillOffline: false };
+    var result = { synced: [], needsReauth: [], stockConflict: [], failed: [], stillOffline: false };
     return posQueueList().then(function (entries) {
         var pending = entries.filter(function (e) { return e.status === 'pending'; });
         var chain = Promise.resolve();
@@ -178,8 +219,14 @@ function posReplayQueue() {
                             });
                         }
                         return response.json().catch(function () { return {}; }).then(function (data) {
-                            result.failed.push(entry.client_sale_id);
                             var message = data.message || 'Could not sync this sale.';
+                            if (response.status === 409) {
+                                result.stockConflict.push(entry.client_sale_id);
+                                return posQueueUpdate(entry.client_sale_id, {
+                                    status: 'stockConflict', lastAttemptAt: new Date().toISOString(), lastError: message,
+                                });
+                            }
+                            result.failed.push(entry.client_sale_id);
                             var wasAlreadyFailed = entry.status === 'failed';
                             return posQueueUpdate(entry.client_sale_id, {
                                 status: 'failed', lastAttemptAt: new Date().toISOString(), lastError: message,
