@@ -190,11 +190,12 @@ pointed at this API (see "POS-PWA (Phase 1)" below) — it keeps sending
 its existing `X-CSRFToken` header (via `apiFetch()`) on every call, which
 is load-bearing, not optional.
 
-## POS-PWA (Phase 1 + 2 — PWA shell, offline sale queue, offline-first cold start)
+## POS-PWA (Phase 1 + 2 + 3 — PWA shell, offline sale queue, offline-first cold start, offline PIN unlock)
 
 Scoped to `/pos/` only; nothing else on the site is a PWA. Phase 1 covered
 a connectivity drop *during* an already-open session; Phase 2 makes
-`/pos/` itself cold-start with zero connectivity at all.
+`/pos/` itself cold-start with zero connectivity at all; Phase 3 makes PIN
+unlock itself work offline.
 
 - `static/pos-manifest.json` — `start_url`/`scope` both `/pos/`,
   `display: standalone`. Icons include both `any` and `maskable` variants
@@ -224,21 +225,65 @@ a connectivity drop *during* an already-open session; Phase 2 makes
     so a cold load doesn't block on them either. Cross-origin CDN assets
     (Google Fonts, Font Awesome) are intentionally NOT cached — they just
     fail offline like any ordinary page would, not worth the
-    opaque-response/versioning complexity for this phase.
+    opaque-response/versioning complexity for this phase. Confirmed by
+    testing: no hang on those uncached CDN assets when offline, since
+    nothing in `pos.html` blocks rendering on them.
   - **Gotcha, confirmed by testing:** a page's OWN navigation request is
     never controlled by the service worker that request itself just
-    registered — only the *next* navigation is. The very first `/pos/`
-    load after a SW update won't populate the shell cache; the one after
-    that will. This is standard SW behavior, not a bug here.
-  - **Versioning:** `POS_SHELL_CACHE` in `pos-sw.js` (`'pos-shell-v2'` as
-    of this writing) must be bumped by hand whenever a deploy changes the
-    `/pos/` page structure or what it depends on in `/static/` — there's
-    no build step in this project to bump it automatically (see Stack
-    above), same manual-discipline spirit as the existing
-    "cache-bust static assets with `?v=N`" convention. The `activate`
-    handler deletes every other `pos-shell-*` cache on each activation, so
-    bumping this is what actually forces old cached shells off every
-    device.
+    registered — only the *next* navigation is. Confirmed this is wider
+    than just "the very first load's own HTML": on a genuinely clean
+    profile, a single load with no reload left Cache Storage completely
+    empty, including the `/static/` assets requested during that same
+    load — whether they get caught by the stale-while-revalidate handler
+    depends on a timing race (did the SW finish activating before those
+    requests fired?) that usually resolves in a reload's favor on a fast
+    local connection but isn't guaranteed on a slow one. Two fixes close
+    this instead of relying on the race: (1) `pos-sw.js`'s `install`
+    handler now explicitly precaches every `/static/` file `pos.html`
+    needs (`POS_PRECACHE_URLS`), each caught independently so one missing
+    asset doesn't void the rest; (2) `pos.html` itself writes its own
+    rendered HTML into Cache Storage under the `/pos/` key immediately
+    after every successful load (`posSelfCachePosPage()`), from the page's
+    own context — this isn't subject to the "can't control its own
+    navigation" limitation at all, so it guarantees a snapshot exists
+    after the FIRST load, not just a lucky-timing reload.
+  - **Gotcha #2, found by testing, more serious than the above:** the
+    navigation handler's `fetch(request)` call can return an **opaque
+    redirect** response (status 0, empty, unreadable) if the server
+    redirects — e.g. `@staff_member_required` bouncing an expired session
+    to `/admin/login/`. `event.request` for an intercepted navigation has
+    an implicit `redirect: 'manual'`, so this doesn't follow the redirect
+    the way a normal `fetch()` would. The browser still shows the user the
+    right page regardless (confirmed by testing), but the ORIGINAL code
+    blindly cached this opaque response under the `/pos/` key, silently
+    **replacing the last known good cached page with a useless blank one**
+    — worse than stale data, since the next offline load would render
+    nothing at all. Fixed by checking `response.type !== 'opaqueredirect'
+    && response.ok` before caching. `posSelfCachePosPage()` above sidesteps
+    this risk a different way for its own write: it only ever runs from
+    inside `pos.html`'s own script, which can't execute at all unless the
+    load genuinely reached the real page, not a login redirect.
+  - **If site data gets cleared** (any reason — browser setting, storage
+    pressure, manual reset), the service worker, Cache Storage, and
+    IndexedDB are ALL wiped together. There is no way to open `/pos/`
+    offline immediately after that — the terminal needs one real online
+    visit to re-register the SW and rebuild both the shell cache and (see
+    offline PIN unlock below) at least one operator's cached PIN hash
+    before any offline capability works again. The SW's own "no cached
+    copy" 503 message already says this; `/pos/`'s locked-screen offline
+    PIN error (below) says the equivalent for PIN unlock.
+  - **Versioning:** `POS_SHELL_CACHE` (declared once in
+    `pos-offline-queue.js` — not `pos-sw.js` — specifically so `pos.html`'s
+    `posSelfCachePosPage()` and `pos-sw.js`'s fetch handler are guaranteed
+    to agree on the same cache name instead of hand-syncing a literal
+    string in two files; `'pos-shell-v3'` as of this writing) must be
+    bumped by hand whenever a deploy changes the `/pos/` page structure or
+    what it depends on in `/static/` — there's no build step in this
+    project to bump it automatically (see Stack above), same
+    manual-discipline spirit as the existing "cache-bust static assets
+    with `?v=N`" convention. The `activate` handler deletes every other
+    `pos-shell-*` cache on each activation, so bumping this is what
+    actually forces old cached shells off every device.
   - **Update behavior:** `install` calls `self.skipWaiting()` and
     `activate` calls `self.clients.claim()` — together these mean a newly
     deployed SW version goes from "installed" to "fully active and
@@ -261,7 +306,8 @@ a connectivity drop *during* an already-open session; Phase 2 makes
     in-progress, not-yet-submitted cart (session-only, never persisted) is
     never silently lost by an update landing at the wrong moment.
 - `static/js/pos-offline-queue.js` — an IndexedDB-backed queue (DB
-  `angan-baari-pos`, now at version 2 for the Phase 2 `meta` store below),
+  `angan-baari-pos`, now at version 3 — version 2 added the Phase 2 `meta`
+  store below, version 3 the Phase 3 `offlineOperators` store further down),
   loaded both as a classic `<script>` in `pos.html` and via
   `importScripts()` in the service worker (same file, two contexts).
   `completeSaleBtn` posts to `POST /api/v1/sales/`; a real validation/stock
@@ -341,16 +387,81 @@ a connectivity drop *during* an already-open session; Phase 2 makes
   best-effort only.
   The offline sale queue (IndexedDB) deliberately survives a logout —
   purging it would mean a sale rung up right before someone logs out for
-  the night gets silently lost. This is safe because replaying a queued
-  sale always requires a currently-valid PIN-unlock (`pos_operator_id` in
-  the session) regardless of who logs in afterward — an expired/absent
-  session correctly lands the entry in `needsReauth` rather than replaying
-  it. Note this does mean a queued sale that syncs after a shift change
-  gets attributed to whoever is PIN-unlocked *at sync time*, not
-  necessarily whoever actually rang it up while offline — the payload
-  never carries an operator id for the server to trust (same reasoning as
-  never trusting a client-supplied `operator_id` for an online sale), so
-  this is an accepted tradeoff, not an oversight.
+  the night gets silently lost.
+
+  **Queued-sale attribution (revised):** earlier versions of this file
+  documented that a queued sale gets attributed to whoever is PIN-unlocked
+  *at sync time*, since the server never trusted a client-supplied operator
+  id. Found by testing to be a real misattribution problem after a shift
+  change, so this was deliberately reversed: `pos.html` now captures
+  `currentOperator.id` into the payload as `queued_operator_id` at the
+  moment a sale is QUEUED (not replayed), and `get_pos_operator()`
+  (`shop/views.py`) trusts that id for a replay specifically, instead of
+  resolving from `request.session` — see that function's docstring for the
+  full reasoning. This is still independently re-validated against
+  `UserProfile`/`is_active`/`is_staff` at replay time, so an operator
+  deactivated between queuing and replay is rejected (lands in
+  `needsReauth`) exactly like any other invalid operator. The id is
+  trusted ONLY on this one path (an offline-queued sale actually replaying)
+  — a live online sale never sends `queued_operator_id` at all, and still
+  resolves purely from the session, unaffected. This grants no new system
+  access (every POST here already requires a live `is_staff` session
+  regardless of which operator id is used) — it only changes who a sale is
+  ATTRIBUTED to. The residual risk is narrow and accepted: a currently
+  logged-in staff member could misattribute a sale to a colleague by
+  tampering with their own client before it queues, which is a trust/HR
+  concern, not a new way to affect inventory or payment totals.
+- **Offline PIN unlock (Phase 3).** `submitPin()` previously had no
+  try/catch at all around its call to `POST /api/v1/pos/unlock/` — found
+  by testing that going offline and entering a PIN threw an UNCAUGHT
+  exception, leaving staff stuck on the lock screen with zero feedback.
+  Now: if that request can't even reach the server (a thrown `fetch`, not
+  a 401/403 response), it falls back to `posVerifyOfflineOperator()`
+  (`static/js/pos-offline-queue.js`), checking the PIN against a
+  **PBKDF2-SHA256 hash cached locally** from that operator's last
+  successful ONLINE unlock on this exact device (`posStoreOfflineOperator()`,
+  called every time an online unlock succeeds — routine daily use is what
+  keeps resetting the expiry clock below). Only operators who have
+  unlocked online on this device at least once can ever unlock offline.
+  - **Deliberate, accepted security tradeoff — a 4-digit PIN is only
+    10,000 combinations, and no amount of PBKDF2 iteration count fixes
+    that.** An attacker with the physical device can read the hash
+    directly out of IndexedDB and brute-force all 10,000 guesses in well
+    under a minute even at a deliberately slow iteration count (210,000
+    here — a real current PBKDF2-SHA256 floor, not a token default, but it
+    only costs a legitimate unlock a negligible delay, not meaningful
+    attacker cost). The lockout (5 wrong attempts, 5-minute cooldown,
+    device-wide not per-operator — mirrors `PosUnlockView`'s own
+    reasoning) only deters a casual guesser; anyone who can read the
+    IndexedDB store directly can also clear or edit the lockout counter
+    sitting next to it. **Accepted anyway, for the same reason the
+    server-side hash already accepts it** (see `UserProfile.set_pin`'s own
+    comment in `shop/models.py`): this PIN layer identifies who's
+    operating an already-access-controlled terminal, it was never the
+    terminal's own access control — that's still the underlying `is_staff`
+    Django session, completely unaffected by any of this. A stolen,
+    already-logged-in till is a bigger exposure than PIN attribution
+    either way. Cached hashes expire after 7 days without a fresh online
+    unlock (`POS_OFFLINE_PIN_EXPIRY_MS`), after which offline unlock for
+    that operator stops working until they unlock online again.
+  - Surviving a Logout/lock is intentional, same reasoning as the queue
+    surviving it above — if it were purged on lock, offline unlock would
+    stop working for literally everyone the first time anyone locks the
+    till while offline.
+  - **Queued-sale state reset.** Found by testing: `payments` and
+    `selectedCustomer` were reset lazily, only the next time
+    `openPaymentPanel()` happened to run, in BOTH the success and queued
+    outcomes — not actually exploitable through the normal UI today
+    (`openPaymentPanel()` is the only way those fields become visible
+    again, and it always wipes them first), but one future change away
+    from actually leaking stale amounts into the next sale.
+    `completeSaleBtn`'s success and queued paths now share one
+    `resetPostSaleState()` that clears cart, coupon, `clientSaleId`,
+    `payments`, and `selectedCustomer` eagerly, immediately, in both
+    outcomes — not deferred to the next panel open. Separately confirmed:
+    `clientSaleId` already rotated correctly on every outcome (success,
+    queued, stockConflict, failed, Dismiss) before this change — the
+    duplicate-sale risk from a stale id was never actually present.
 - **Not yet done — needs a real device before this is fully trusted**:
   actual install-to-home-screen + airplane-mode-mid-sale + reconnect
   testing on a real Android phone (and iOS, if the farm uses one),
@@ -358,13 +469,16 @@ a connectivity drop *during* an already-open session; Phase 2 makes
   network with no real uplink, e.g. by disconnecting its router's WAN
   cable, and confirm the offline banner still appears — this is the one
   case `navigator.onLine` alone can't catch, which is why the banner also
-  probes connectivity directly; see above). What's verified so far (both
-  phases) is CDP-scripted against a desktop headless browser, including
-  genuinely toggling the browser's network to offline
-  (not just stubbing `fetch`) and confirming `/pos/` still renders with
-  the right cached catalog data — solid evidence the logic is correct, but
-  not a substitute for seeing Background Sync actually fire on a real OS
-  while the app isn't in the foreground.
+  probes connectivity directly; see above), **and an offline-PIN-unlock
+  check** (unlock online once, go offline, lock, confirm the same PIN
+  unlocks again without a network round trip, and confirm 5 wrong PINs in
+  a row locks it out same as the online path does). What's verified so far
+  (all three phases) is CDP-scripted against a desktop headless browser,
+  including genuinely toggling the browser's network to offline (not just
+  stubbing `fetch`) and confirming `/pos/` still renders with the right
+  cached catalog data — solid evidence the logic is correct, but not a
+  substitute for seeing Background Sync actually fire on a real OS while
+  the app isn't in the foreground.
 
 ## Deferred work (known, intentional, not yet built)
 

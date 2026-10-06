@@ -982,30 +982,79 @@
         }
         ['click', 'keydown', 'input'].forEach(evt => document.addEventListener(evt, resetIdleTimer));
 
+        // Shown by both the online (server) and offline (cached-PIN) lockout
+        // paths below -- identical countdown behavior either way, so staff
+        // see the same thing regardless of which check actually ran.
+        function showLockoutCountdown(msgEl, retryAfterSeconds) {
+            let remaining = retryAfterSeconds || 0;
+            const tick = () => {
+                msgEl.textContent = `Too many attempts. Try again in ${remaining}s.`;
+                if (remaining <= 0) { clearInterval(iv); msgEl.textContent = ''; msgEl.className = 'lock-msg'; }
+                remaining -= 1;
+            };
+            tick();
+            const iv = setInterval(tick, 1000);
+        }
+
+        // PosUnlockView (api/views.py) is the real check. If that request
+        // can't even reach the server -- apiFetch() throwing, a genuine
+        // connectivity failure, not a 401/403 response -- this falls back
+        // to posVerifyOfflineOperator() (static/js/pos-offline-queue.js),
+        // which checks the PIN against a locally-cached PBKDF2 hash from
+        // this operator's last successful ONLINE unlock on this device.
+        // See CLAUDE.md's POS-PWA section for the security tradeoff this
+        // accepts (a 4-digit PIN's full 10,000-guess space is always
+        // crackable by whoever can read the device's own IndexedDB, no
+        // matter the hash cost) and why it's accepted anyway: this PIN
+        // layer was never the terminal's access control, only "who's
+        // currently operating it" -- is_staff login is unaffected either
+        // way. Previously this function had no try/catch at all, so a
+        // connectivity failure surfaced as an uncaught exception and left
+        // staff stuck on the lock screen with no feedback whatsoever.
         async function submitPin(pin) {
             const msgEl = document.getElementById('lockMsg');
-            const response = await apiFetch('/api/v1/pos/unlock/', {
-                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pin }),
-            });
+            let response;
+            try {
+                response = await apiFetch('/api/v1/pos/unlock/', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pin }),
+                });
+            } catch (err) {
+                return submitPinOffline(pin, msgEl);
+            }
             const data = await response.json().catch(() => ({}));
             if (response.ok) {
                 currentOperator = data;
+                posStoreOfflineOperator(data, pin).catch(() => {}); // best-effort -- unlock itself already succeeded
                 setLocked(false);
                 return;
             }
             document.getElementById('lockPinInput').value = '';
             msgEl.className = 'lock-msg error';
             if (data.error === 'locked_out') {
-                let remaining = data.retry_after_seconds || 0;
-                const tick = () => {
-                    msgEl.textContent = `Too many attempts. Try again in ${remaining}s.`;
-                    if (remaining <= 0) { clearInterval(iv); msgEl.textContent = ''; msgEl.className = 'lock-msg'; }
-                    remaining -= 1;
-                };
-                tick();
-                const iv = setInterval(tick, 1000);
+                showLockoutCountdown(msgEl, data.retry_after_seconds);
             } else {
                 msgEl.textContent = `Wrong PIN — ${data.attempts_remaining ?? 0} attempt(s) left.`;
+            }
+        }
+
+        async function submitPinOffline(pin, msgEl) {
+            const result = await posVerifyOfflineOperator(pin);
+            document.getElementById('lockPinInput').value = '';
+            if (result.ok) {
+                currentOperator = result.operator;
+                setLocked(false);
+                showToast('Unlocked offline — will confirm with the server once back online.');
+                return;
+            }
+            msgEl.className = 'lock-msg error';
+            if (result.reason === 'locked_out') {
+                showLockoutCountdown(msgEl, result.retryAfterSeconds);
+            } else if (result.reason === 'no_cached_operators') {
+                msgEl.textContent = 'Offline, and no PIN has been unlocked on this device yet — connect once online first.';
+            } else if (result.reason === 'expired') {
+                msgEl.textContent = 'Offline PIN has expired — connect online once to refresh it.';
+            } else {
+                msgEl.textContent = `Wrong PIN (checked offline) — ${result.attemptsRemaining ?? 0} attempt(s) left.`;
             }
         }
 
@@ -2497,15 +2546,7 @@
                 }
                 if (data.status === 'ok') {
                     showToast(`Sale ${data.sale_number} — Rs. ${data.total} recorded`);
-                    cart = [];
-                    receiptPage = 0;
-                    clearCoupon(true);
-                    newClientSaleId();
-                    closePaymentPanel();
-                    renderReceipt();
-                    updateCartIndicator();
-                    showReceiptView();
-                    posReloadIfUpdatePending();
+                    resetPostSaleState();
                 } else {
                     // A real validation/stock error (400/409) -- either
                     // POSSaleValidationError's {status,message} shape, or
@@ -2523,23 +2564,54 @@
                 // so it's safe to replay later even if this same request
                 // actually reached the server moments before the
                 // connection dropped.
+                //
+                // queued_operator_id captures WHO is unlocked right now, at
+                // the moment this sale is actually being rung up -- not
+                // whoever happens to be unlocked later when this replays.
+                // Without it, create_pos_sale() would attribute the sale to
+                // the session's operator AT REPLAY TIME, which after a
+                // shift change is a different person (or nobody) than
+                // whoever actually handled this sale. The server still
+                // independently re-verifies this id is still active staff
+                // at replay time (get_pos_operator() in shop/views.py) --
+                // this changes who a sale is ATTRIBUTED to, not whether the
+                // request is authorized at all, since every POST here
+                // already requires a live is_staff session regardless. See
+                // CLAUDE.md's POS-PWA section for the full reasoning.
+                payload.queued_operator_id = currentOperator ? currentOperator.id : null;
                 await posQueueEnqueue(payload);
                 await registerPosBackgroundSync();
                 renderQueueBox();
                 showToast('Sale queued — will sync when back online');
-                cart = [];
-                receiptPage = 0;
-                clearCoupon(true);
-                newClientSaleId();
-                closePaymentPanel();
-                renderReceipt();
-                updateCartIndicator();
-                showReceiptView();
-                posReloadIfUpdatePending();
+                resetPostSaleState();
             } finally {
                 btn.textContent = originalText;
             }
         });
+
+        // Shared by both the success and queued-offline outcomes above --
+        // previously each path reset cart/coupon/clientSaleId immediately
+        // but left `payments`/`selectedCustomer` to be cleared lazily, only
+        // the NEXT time openPaymentPanel() happened to run. That was safe
+        // today only because openPaymentPanel() is the sole gateway to
+        // both reading and displaying them again, but it meant stale
+        // amounts sat in memory in the meantime -- one future change away
+        // from actually leaking into the next sale. Reset everything a
+        // sale outcome could have touched, eagerly, right here instead.
+        function resetPostSaleState() {
+            cart = [];
+            receiptPage = 0;
+            clearCoupon(true);
+            newClientSaleId();
+            payments = { cash: '', esewa: '', khalti: '', bank_transfer: '', credit: '' };
+            selectedCustomer = null;
+            document.getElementById('selectedCustomerLabel').style.display = 'none';
+            closePaymentPanel();
+            renderReceipt();
+            updateCartIndicator();
+            showReceiptView();
+            posReloadIfUpdatePending();
+        }
 
         function extractErrorMessage(data) {
             if (data.message) return data.message;
@@ -2772,6 +2844,38 @@
         function posReloadIfUpdatePending() {
             if (posUpdateReloadPending) window.location.reload();
         }
+
+        // Writes THIS page's own just-rendered HTML into Cache Storage
+        // under the '/pos/' key, from the page's own context -- independent
+        // of whether the service worker happened to control this
+        // particular navigation. This is what actually closes the "one
+        // load, no reload, then offline" gap: pos-sw.js's navigation
+        // handler can only cache a response it was given a chance to
+        // intercept, and per spec a page's own navigation is NEVER
+        // intercepted by the service worker that same navigation just
+        // registered -- confirmed by testing that a single clean load left
+        // Cache Storage completely empty. The page itself has no such
+        // restriction, so it can guarantee a snapshot exists after EVERY
+        // successful load, not just the ones lucky enough to already be
+        // SW-controlled.
+        //
+        // Skipped when this load was itself served from the SW's offline
+        // fallback (posServedFromCacheFallback) -- that HTML already has
+        // this round's injected pos-cache-fallback marker baked in, and
+        // re-caching it would just be writing the same (possibly stale)
+        // snapshot back over itself, permanently stamped with a marker
+        // meant to be transient.
+        function posSelfCachePosPage() {
+            if (posServedFromCacheFallback || !('caches' in window)) return;
+            var html = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+            caches.open(POS_SHELL_CACHE).then(function (cache) {
+                cache.put('/pos/', new Response(html, {
+                    status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' },
+                }));
+            });
+            posSetMeta('lastCachedAt', new Date().toISOString());
+        }
+        posSelfCachePosPage();
 
         updateOfflineBanner();
         // Attempt a replay on every fresh page load, not just paint whatever

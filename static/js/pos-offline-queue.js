@@ -12,12 +12,37 @@
 // it's retried later, in order, relying on client_sale_id idempotency to
 // make a double-send harmless. The same database also holds a small `meta`
 // store (Phase 2) recording when /pos/ was last successfully cached, for
-// the "showing data as of ..." staleness banner in pos.html.
+// the "showing data as of ..." staleness banner in pos.html, and (Phase 3)
+// an `offlineOperators` store letting PIN unlock work without a network
+// connection -- see posStoreOfflineOperator()/posVerifyOfflineOperator()
+// below.
 
 var POS_QUEUE_DB_NAME = 'angan-baari-pos';
-var POS_QUEUE_DB_VERSION = 2;
+var POS_QUEUE_DB_VERSION = 3;
 var POS_QUEUE_STORE = 'queuedSales';
+
+// The Cache Storage bucket holding the cached /pos/ shell and its
+// precached /static/ dependencies. Declared here (not in pos-sw.js) so
+// pos.html's own posSelfCachePosPage() and pos-sw.js's fetch handler are
+// guaranteed to agree on the exact same cache name -- both load this file
+// (a <script> tag in pos.html, importScripts() in pos-sw.js), so one
+// declaration here reaches both contexts instead of needing to be kept in
+// sync as two separate literals.
+//
+// BUMP THIS whenever a deploy changes anything the shell cache holds the
+// shape/meaning of -- the /pos/ page structure, what's embedded in it, or
+// which /static/ assets it depends on. pos-sw.js's `activate` handler
+// deletes every OTHER 'pos-shell-*' cache on each activation, so bumping
+// this is what actually forces every device to drop its old cached shell
+// and rebuild from a fresh network load, rather than serving a
+// structurally-stale cached page forever. It is NOT bumped automatically
+// by a deploy -- there's no build step in this project to hook that into
+// (see CLAUDE.md's Stack section), so this is a manual, deliberate step,
+// same spirit as the "cache-bust static assets with ?v=N" convention
+// already used for CSS/JS elsewhere.
+var POS_SHELL_CACHE = 'pos-shell-v3';
 var POS_META_STORE = 'meta';
+var POS_OFFLINE_PIN_STORE = 'offlineOperators';
 
 function posQueueOpenDB() {
     return new Promise(function (resolve, reject) {
@@ -29,6 +54,9 @@ function posQueueOpenDB() {
             }
             if (!db.objectStoreNames.contains(POS_META_STORE)) {
                 db.createObjectStore(POS_META_STORE, { keyPath: 'key' });
+            }
+            if (!db.objectStoreNames.contains(POS_OFFLINE_PIN_STORE)) {
+                db.createObjectStore(POS_OFFLINE_PIN_STORE, { keyPath: 'operator_id' });
             }
         };
         req.onsuccess = function () { resolve(req.result); };
@@ -245,5 +273,162 @@ function posReplayQueue() {
             });
         });
         return chain.then(function () { return result; });
+    });
+}
+
+// ══════════════════════════════════════════════════════════════
+// Offline PIN unlock (Phase 3).
+//
+// PosUnlockView (api/views.py) is the real check -- this is only a local
+// fallback for when that request can't reach the server at all, so the
+// till isn't permanently stuck on the lock screen for the rest of a
+// connectivity outage. posStoreOfflineOperator() is called once, right
+// after a SUCCESSFUL online unlock (see submitPin() in pos.html), caching
+// a PBKDF2-SHA256 hash of that PIN under a per-operator random salt.
+// posVerifyOfflineOperator() is what a failed-to-reach-server unlock
+// attempt falls back to.
+//
+// Deliberate, documented tradeoff (see CLAUDE.md's POS-PWA section): a
+// 4-digit PIN is only 10,000 combinations, and PBKDF2's iteration count
+// cannot fix that -- an attacker with the stolen device can read this
+// hash directly out of IndexedDB and brute-force all 10,000 guesses in
+// well under a minute even at a deliberately slow iteration count. The
+// iteration count below is still set to a real, current PBKDF2-SHA256
+// minimum (not left at some trivial default) because it costs a
+// legitimate unlock nothing noticeable, but it must not be mistaken for
+// real protection -- the actual boundary this relies on is the same one
+// the server-side PIN already relies on (CLAUDE.md, UserProfile.set_pin):
+// this identifies who is operating an already-access-controlled terminal,
+// it was never the terminal's own access control (that's still the
+// underlying is_staff Django session, unaffected by any of this). The
+// lockout below is a deterrent against a casual guesser, not a dedicated
+// attacker -- anyone who can read this store directly can also clear or
+// edit the lockout counter sitting right next to it.
+var POS_OFFLINE_PIN_ITERATIONS = 210000; // current (2020s) PBKDF2-SHA256 floor -- see tradeoff note above
+var POS_OFFLINE_PIN_MAX_ATTEMPTS = 5;
+var POS_OFFLINE_PIN_LOCKOUT_MS = 5 * 60 * 1000; // mirrors PosUnlockView's own window
+var POS_OFFLINE_PIN_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000; // must re-unlock online at least weekly
+
+function posHexFromBuffer(buf) {
+    return Array.from(new Uint8Array(buf)).map(function (b) { return b.toString(16).padStart(2, '0'); }).join('');
+}
+
+function posBufferFromHex(hex) {
+    var bytes = new Uint8Array(hex.length / 2);
+    for (var i = 0; i < bytes.length; i++) bytes[i] = parseInt(hex.substr(i * 2, 2), 16);
+    return bytes;
+}
+
+function posGenerateSaltHex() {
+    return posHexFromBuffer(crypto.getRandomValues(new Uint8Array(16)).buffer);
+}
+
+function posPbkdf2HashHex(pin, saltHex, iterations) {
+    var enc = new TextEncoder();
+    return crypto.subtle.importKey('raw', enc.encode(pin), { name: 'PBKDF2' }, false, ['deriveBits'])
+        .then(function (keyMaterial) {
+            return crypto.subtle.deriveBits(
+                { name: 'PBKDF2', salt: posBufferFromHex(saltHex), iterations: iterations, hash: 'SHA-256' },
+                keyMaterial, 256
+            );
+        })
+        .then(function (bits) { return posHexFromBuffer(bits); });
+}
+
+// operator: { id, name, role } -- the exact shape PosUnlockView already
+// returns on success, so the offline path can set currentOperator from
+// either source without the rest of pos.html needing to know which one
+// ran. Re-storing on every successful ONLINE unlock (not just the first
+// time) is what satisfies "must be refreshed online after N days" --
+// routine daily use naturally keeps resetting the expiry clock.
+function posStoreOfflineOperator(operator, pin) {
+    var salt = posGenerateSaltHex();
+    return posPbkdf2HashHex(pin, salt, POS_OFFLINE_PIN_ITERATIONS).then(function (hash) {
+        return posQueueOpenDB().then(function (db) {
+            return new Promise(function (resolve, reject) {
+                var tx = db.transaction(POS_OFFLINE_PIN_STORE, 'readwrite');
+                var store = tx.objectStore(POS_OFFLINE_PIN_STORE);
+                store.put({
+                    operator_id: operator.id, name: operator.name, role: operator.role,
+                    salt: salt, hash: hash, iterations: POS_OFFLINE_PIN_ITERATIONS,
+                    createdAt: new Date().toISOString(),
+                });
+                // Opportunistic cleanup -- drop any OTHER cached operator whose
+                // entry has already aged past the expiry window, so stale
+                // records don't accumulate forever as staff come and go. Only
+                // runs when a fresh entry is being written, which is enough:
+                // an operator who never unlocks online again also never
+                // offline-unlocks again past their own expiry anyway.
+                var cutoff = Date.now() - POS_OFFLINE_PIN_EXPIRY_MS;
+                var cursorReq = store.openCursor();
+                cursorReq.onsuccess = function () {
+                    var cursor = cursorReq.result;
+                    if (!cursor) return;
+                    if (new Date(cursor.value.createdAt).getTime() < cutoff) cursor.delete();
+                    cursor.continue();
+                };
+                tx.oncomplete = function () { resolve(); };
+                tx.onerror = function () { reject(tx.error); };
+            });
+        });
+    });
+}
+
+// Returns one of:
+//   { ok: true, operator: {id, name, role} }
+//   { ok: false, reason: 'locked_out', retryAfterSeconds }
+//   { ok: false, reason: 'invalid_pin', attemptsRemaining }
+//   { ok: false, reason: 'expired' }           -- cached PIN(s) exist but are too old
+//   { ok: false, reason: 'no_cached_operators' } -- this device has never unlocked online
+//
+// The failed-attempt lockout is device-wide, not per-operator -- same
+// reasoning PosUnlockView's own docstring already gives for its session-
+// scoped (not per-user) lockout: it's throttling guesses at THIS
+// terminal, not tracking any one staff account.
+function posVerifyOfflineOperator(pin) {
+    return posGetMeta('offlineLockoutUntil').then(function (lockoutUntil) {
+        if (lockoutUntil && Date.now() < lockoutUntil) {
+            return { ok: false, reason: 'locked_out', retryAfterSeconds: Math.ceil((lockoutUntil - Date.now()) / 1000) };
+        }
+        return posQueueOpenDB().then(function (db) {
+            return new Promise(function (resolve, reject) {
+                var tx = db.transaction(POS_OFFLINE_PIN_STORE, 'readonly');
+                var req = tx.objectStore(POS_OFFLINE_PIN_STORE).getAll();
+                req.onsuccess = function () { resolve(req.result); };
+                req.onerror = function () { reject(req.error); };
+            });
+        }).then(function (records) {
+            if (!records.length) return { ok: false, reason: 'no_cached_operators' };
+            var cutoff = Date.now() - POS_OFFLINE_PIN_EXPIRY_MS;
+            var fresh = records.filter(function (r) { return new Date(r.createdAt).getTime() >= cutoff; });
+            if (!fresh.length) return { ok: false, reason: 'expired' };
+            return Promise.all(fresh.map(function (r) {
+                return posPbkdf2HashHex(pin, r.salt, r.iterations).then(function (hash) {
+                    return hash === r.hash ? r : null;
+                });
+            })).then(function (results) {
+                var match = results.find(function (r) { return r; });
+                if (match) {
+                    return posSetMeta('offlineFailedAttempts', 0).then(function () {
+                        return { ok: true, operator: { id: match.operator_id, name: match.name, role: match.role } };
+                    });
+                }
+                return posGetMeta('offlineFailedAttempts').then(function (attempts) {
+                    attempts = (attempts || 0) + 1;
+                    if (attempts >= POS_OFFLINE_PIN_MAX_ATTEMPTS) {
+                        var until = Date.now() + POS_OFFLINE_PIN_LOCKOUT_MS;
+                        return Promise.all([
+                            posSetMeta('offlineFailedAttempts', 0),
+                            posSetMeta('offlineLockoutUntil', until),
+                        ]).then(function () {
+                            return { ok: false, reason: 'locked_out', retryAfterSeconds: Math.ceil(POS_OFFLINE_PIN_LOCKOUT_MS / 1000) };
+                        });
+                    }
+                    return posSetMeta('offlineFailedAttempts', attempts).then(function () {
+                        return { ok: false, reason: 'invalid_pin', attemptsRemaining: POS_OFFLINE_PIN_MAX_ATTEMPTS - attempts };
+                    });
+                });
+            });
+        });
     });
 }

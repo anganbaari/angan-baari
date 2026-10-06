@@ -138,11 +138,18 @@ class POSSaleCreateSerializer(serializers.Serializer):
     create_pos_sale() (shop/views.py), since that's where product/variant
     lookups and server-side price recomputation have to happen anyway.
 
-    No operator_id here deliberately: the operator comes from
-    request.session (set only by a verified PIN on POST /pos/unlock/, see
-    get_pos_operator() in shop/views.py), never from client-supplied
-    request data — otherwise any request could just claim to be any staff
-    member without that person actually entering their PIN.
+    No general operator_id field here deliberately: the operator normally
+    comes from request.session (set only by a verified PIN on POST
+    /pos/unlock/, see get_pos_operator() in shop/views.py), never from
+    client-supplied request data — otherwise any request could just claim
+    to be any staff member without that person actually entering their PIN.
+
+    queued_operator_id is the one narrow, deliberate exception: see
+    get_pos_operator()'s docstring. It's only ever populated by
+    static/js/pos-offline-queue.js replaying a sale that was queued while
+    offline (pos.html captures currentOperator.id into the payload at the
+    moment it's queued, not at replay time) — a live online sale never
+    sends it, and still relies on request.session exactly as before.
 
     payments/cart are left as loose dicts (not nested serializers) to
     match this file's existing cart-shape convention — real validation of
@@ -153,6 +160,7 @@ class POSSaleCreateSerializer(serializers.Serializer):
     cart = serializers.ListField(child=serializers.DictField(), allow_empty=False)
     payments = serializers.ListField(child=serializers.DictField(), allow_empty=False)
     coupon_code = serializers.CharField(max_length=30, required=False, allow_null=True, allow_blank=True)
+    queued_operator_id = serializers.IntegerField(required=False, allow_null=True)
 
 
 class PosUnlockSerializer(serializers.Serializer):

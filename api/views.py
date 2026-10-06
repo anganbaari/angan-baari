@@ -164,7 +164,7 @@ class POSSaleView(generics.ListAPIView):
                 return Response({'status': 'error', 'message': 'Customer not found.'}, status=400)
 
         try:
-            operator_user = get_pos_operator(request)
+            operator_user = get_pos_operator(request, queued_operator_id=data.get('queued_operator_id'))
             sale, created = create_pos_sale(
                 client_sale_id=data['client_sale_id'],
                 cart=data['cart'],

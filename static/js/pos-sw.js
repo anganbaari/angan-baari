@@ -45,18 +45,44 @@
 
 importScripts('/static/js/pos-offline-queue.js');
 
-// BUMP THIS whenever a deploy changes anything the shell cache holds the
-// shape/meaning of -- the /pos/ page structure, what's embedded in it, or
-// which /static/ assets it depends on. The `activate` handler below
-// deletes every OTHER 'pos-shell-*' cache on each activation, so bumping
-// this is what actually forces every device to drop its old cached shell
-// and rebuild from a fresh network load, rather than serving a
-// structurally-stale cached page forever. It is NOT bumped automatically
-// by a deploy -- there's no build step in this project to hook that into
-// (see CLAUDE.md's Stack section), so this is a manual, deliberate step,
-// same spirit as the "cache-bust static assets with ?v=N" convention
-// already used for CSS/JS elsewhere.
-var POS_SHELL_CACHE = 'pos-shell-v2';
+// POS_SHELL_CACHE itself is declared in pos-offline-queue.js, not here --
+// pos.html needs the exact same cache name too (see posSelfCachePosPage()
+// there), and that file is the one already loaded in both contexts
+// (importScripts() here, a plain <script> tag in pos.html), so declaring
+// it there once is what keeps both sides using the identical bucket
+// without having to hand-sync a literal string in two files.
+
+// Every same-origin /static/ file pos.html actually needs to RENDER
+// correctly, precached explicitly here rather than left to the
+// stale-while-revalidate branch below. That branch only ever catches a
+// request if the SW is already controlling the page making it -- and per
+// spec, a page's own navigation (the very first /pos/ load after this SW
+// registers) is NEVER controlled by the SW it just registered, so none of
+// these would otherwise get cached until a SECOND load happens to request
+// them again while the SW has since finished activating. In practice that
+// second load usually wins the race fast enough on a quick local reload,
+// but on a slow connection (or PythonAnywhere's free-tier cold start) the
+// window where it DOESN'T is wide enough to matter -- confirmed by testing
+// a genuinely clean profile: a single load with no reload left Cache
+// Storage completely empty. Precaching here removes that race entirely.
+// /pos/ itself is deliberately NOT listed -- it needs an authenticated
+// session to mean anything, and precache's plain fetch() (unlike the
+// navigation handler below) follows redirects transparently, which would
+// risk caching a login-redirect page under the '/pos/' key during install.
+// Caching the real /pos/ response is instead handled by pos.html itself,
+// immediately after every successful load it renders (see posSelfCache()
+// in pos.html) -- that runs in the PAGE's own context, so it isn't subject
+// to the "can't control its own navigation" limitation at all.
+var POS_PRECACHE_URLS = [
+    '/static/style.css',
+    '/static/js/pos-offline-queue.js',
+    '/static/pos-manifest.json',
+    '/static/images/logo-icon.png',
+    '/static/images/pos-icon-192.png',
+    '/static/images/pos-icon-512.png',
+    '/static/images/pos-icon-192-maskable.png',
+    '/static/images/pos-icon-512-maskable.png',
+];
 
 self.addEventListener('install', function (event) {
     // Skip the normal "new SW waits until every tab using the old one
@@ -64,6 +90,19 @@ self.addEventListener('install', function (event) {
     // nothing to wait FOR, and waiting would just mean staff never get the
     // update until someone thinks to fully close and reopen the browser.
     self.skipWaiting();
+    event.waitUntil(
+        caches.open(POS_SHELL_CACHE).then(function (cache) {
+            // Each URL caught independently (not cache.addAll(), which
+            // aborts the ENTIRE batch if even one request fails) -- one
+            // missing/renamed asset shouldn't cost every other one its
+            // precache entry.
+            return Promise.all(POS_PRECACHE_URLS.map(function (url) {
+                return cache.add(url).catch(function (err) {
+                    console.warn('POS precache failed for', url, err);
+                });
+            }));
+        })
+    );
 });
 
 self.addEventListener('activate', function (event) {
@@ -118,9 +157,26 @@ self.addEventListener('fetch', function (event) {
     if (posIsNavigationToPosScreen(request)) {
         event.respondWith(
             fetch(request).then(function (response) {
-                var copy = response.clone();
-                caches.open(POS_SHELL_CACHE).then(function (cache) { cache.put(request, copy); });
-                posSetMeta('lastCachedAt', new Date().toISOString());
+                // A navigation's `event.request` has an implicit
+                // redirect:'manual' mode, so if the server redirects (e.g.
+                // @staff_member_required bouncing an expired session to
+                // /admin/login/), this `response` is an OPAQUE redirect --
+                // status 0, empty, unreadable body -- not the login page's
+                // content and definitely not /pos/'s. The browser still
+                // follows it correctly on its own for what the user
+                // actually sees (confirmed by testing), but caching this
+                // opaque response under the '/pos/' key would silently
+                // replace the last known GOOD cached page with a useless
+                // blank one -- worse than doing nothing, since the NEXT
+                // offline load would then render blank instead of falling
+                // back to genuinely stale-but-real content. response.ok is
+                // checked too, for the same reason: don't let a transient
+                // 500 overwrite a perfectly good existing cache entry.
+                if (response.type !== 'opaqueredirect' && response.ok) {
+                    var copy = response.clone();
+                    caches.open(POS_SHELL_CACHE).then(function (cache) { cache.put(request, copy); });
+                    posSetMeta('lastCachedAt', new Date().toISOString());
+                }
                 return response;
             }).catch(function () {
                 return caches.match(request).then(function (cached) {

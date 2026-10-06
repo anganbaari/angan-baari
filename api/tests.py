@@ -263,6 +263,54 @@ class POSSaleApiTests(ApiTestBase):
         second = self.client.post(reverse('v1_sale_list_create'), payload2, format='json')
         self.assertEqual(second.status_code, status.HTTP_400_BAD_REQUEST)
 
+    def test_queued_operator_id_attributes_sale_to_that_operator(self):
+        """A replayed offline sale carries queued_operator_id -- captured
+        client-side at the moment it was originally queued, not whoever
+        happens to be PIN-unlocked in THIS session right now. The second
+        operator here never unlocks this session at all; the server must
+        still attribute the sale to them, not to self.staff."""
+        other_staff = User.objects.create_user('other_cashier', password='pw', is_staff=True)
+        other_profile = UserProfile.objects.create(user=other_staff, role='cashier')
+        other_profile.set_pin('3391')
+        other_profile.save()
+
+        self.client.login(username='cashier', password='pw')
+        self.unlock_terminal()  # session operator is self.staff
+        payload = {
+            'client_sale_id': str(uuid.uuid4()),
+            'payments': [{'method': 'cash', 'amount': '250.00'}],
+            'cart': [{'product_id': self.jar.id, 'qty': 1}],
+            'queued_operator_id': other_staff.id,
+        }
+        response = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        sale = POSSale.objects.get(sale_number=response.data['sale_number'])
+        self.assertEqual(sale.cashier, other_staff)
+
+    def test_queued_operator_id_rejected_if_no_longer_active_staff(self):
+        """The claimed operator is still independently re-validated -- an
+        id deactivated between queuing and replay is rejected the same as
+        any other invalid operator, not trusted just because it's present."""
+        former_staff = User.objects.create_user('former_cashier', password='pw', is_staff=True)
+        former_profile = UserProfile.objects.create(user=former_staff, role='cashier')
+        former_profile.set_pin('3392')
+        former_profile.save()
+        former_staff.is_active = False
+        former_staff.save()
+
+        self.client.login(username='cashier', password='pw')
+        self.unlock_terminal()
+        client_sale_id = str(uuid.uuid4())
+        payload = {
+            'client_sale_id': client_sale_id,
+            'payments': [{'method': 'cash', 'amount': '250.00'}],
+            'cart': [{'product_id': self.jar.id, 'qty': 1}],
+            'queued_operator_id': former_staff.id,
+        }
+        response = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertFalse(POSSale.objects.filter(client_sale_id=client_sale_id).exists())
+
     def test_oversell_returns_409_naming_the_product(self):
         # jar isn't fixed_weight, so there's no is_available-syncs-from-
         # stock signal to catch this earlier (see the fixed_weight variant

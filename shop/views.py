@@ -665,23 +665,40 @@ VAT_RATE = 0.13  # 13% — Nepal's standard VAT rate. A constant, not a
                  # here, not scattered through every total computation.
 
 
-def get_pos_operator(request):
-    """Resolves the currently-unlocked operator from session state that
-    PosUnlockView sets on a successful PIN match — never from client
-    input (request.data), which would let any request just claim to be
-    any staff member without that person actually entering their PIN on
-    this terminal/session.
+def get_pos_operator(request, queued_operator_id=None):
+    """Resolves the operator a sale should be attributed to.
 
-    Raises POSSaleValidationError(status=403) if the terminal was never
-    unlocked, has since been locked (PosLockView), or the identified
-    profile's user is no longer active/staff (e.g. deactivated after the
-    unlock). Shared by sale creation and credit repayment — both callers
-    catch POSSaleValidationError the same way regardless of which one
-    raised it.
+    Normally (queued_operator_id=None) this is the currently-unlocked
+    operator from session state that PosUnlockView sets on a successful PIN
+    match — never from client input (request.data), which would let any
+    request just claim to be any staff member without that person actually
+    entering their PIN on this terminal/session.
+
+    queued_operator_id is the one deliberate, narrow exception to that: an
+    operator id captured client-side (pos.html's currentOperator.id) at the
+    exact moment an offline sale was QUEUED, carried in the queued payload's
+    queued_operator_id field (POSSaleCreateSerializer), and only ever
+    present when POSSaleView.post() is replaying that queued entry — a live
+    online sale never sends it. Without this, a queued sale replaying after
+    a shift change would be attributed to whoever happens to be PIN-
+    unlocked at REPLAY time, not whoever actually rang it up while offline.
+    This grants no additional access: every POST here already requires a
+    live is_staff Django session regardless of which operator id is used,
+    so this only changes who a sale is ATTRIBUTED to, never whether the
+    request is authorized. The id is still independently re-validated
+    against UserProfile/is_active/is_staff below, same as the normal path —
+    an operator deactivated between queuing and replay is rejected the same
+    as any other invalid operator.
+
+    Raises POSSaleValidationError(status=403) if there's no operator id to
+    resolve (terminal never unlocked / since locked), or the identified
+    profile's user is no longer active/staff. Shared by sale creation and
+    credit repayment — both callers catch POSSaleValidationError the same
+    way regardless of which one raised it.
     """
     from .models import UserProfile
 
-    operator_id = request.session.get('pos_operator_id')
+    operator_id = queued_operator_id or request.session.get('pos_operator_id')
     if not operator_id:
         raise POSSaleValidationError('Terminal is locked — enter a PIN first.', status=403)
     try:
