@@ -190,12 +190,13 @@ pointed at this API (see "POS-PWA (Phase 1)" below) — it keeps sending
 its existing `X-CSRFToken` header (via `apiFetch()`) on every call, which
 is load-bearing, not optional.
 
-## POS-PWA (Phase 1 + 2 + 3 — PWA shell, offline sale queue, offline-first cold start, offline PIN unlock)
+## POS-PWA (Phase 1 + 2 + 3 + 4 — PWA shell, offline sale queue, offline-first cold start, offline PIN unlock, offline credit-customer lookup)
 
 Scoped to `/pos/` only; nothing else on the site is a PWA. Phase 1 covered
 a connectivity drop *during* an already-open session; Phase 2 makes
 `/pos/` itself cold-start with zero connectivity at all; Phase 3 makes PIN
-unlock itself work offline.
+unlock itself work offline; Phase 4 extends offline support to
+credit-customer lookup.
 
 - `static/pos-manifest.json` — `start_url`/`scope` both `/pos/`,
   `display: standalone`. Icons include both `any` and `maskable` variants
@@ -276,7 +277,9 @@ unlock itself work offline.
     `pos-offline-queue.js` — not `pos-sw.js` — specifically so `pos.html`'s
     `posSelfCachePosPage()` and `pos-sw.js`'s fetch handler are guaranteed
     to agree on the same cache name instead of hand-syncing a literal
-    string in two files; `'pos-shell-v3'` as of this writing) must be
+    string in two files; `'pos-shell-v4'` as of this writing — bumped from
+    v3 since both `templates/pos.html` and this file changed structurally)
+    must be
     bumped by hand whenever a deploy changes the `/pos/` page structure or
     what it depends on in `/static/` — there's no build step in this
     project to bump it automatically (see Stack above), same
@@ -306,8 +309,9 @@ unlock itself work offline.
     in-progress, not-yet-submitted cart (session-only, never persisted) is
     never silently lost by an update landing at the wrong moment.
 - `static/js/pos-offline-queue.js` — an IndexedDB-backed queue (DB
-  `angan-baari-pos`, now at version 3 — version 2 added the Phase 2 `meta`
-  store below, version 3 the Phase 3 `offlineOperators` store further down),
+  `angan-baari-pos`, now at version 4 — version 2 added the Phase 2 `meta`
+  store below, version 3 the Phase 3 `offlineOperators` store further down,
+  version 4 the Phase 4 `creditCustomers` store),
   loaded both as a classic `<script>` in `pos.html` and via
   `importScripts()` in the service worker (same file, two contexts).
   `completeSaleBtn` posts to `POST /api/v1/sales/`; a real validation/stock
@@ -462,6 +466,52 @@ unlock itself work offline.
     `clientSaleId` already rotated correctly on every outcome (success,
     queued, stockConflict, failed, Dismiss) before this change — the
     duplicate-sale risk from a stale id was never actually present.
+- **Offline credit-customer lookup (Phase 4).** `lookupCustomerBtn`,
+  `createCustomerBtn`, `repayConfirmBtn`, and `loadRepayCustomers()` all
+  had the exact same uncaught-exception bug found and fixed for PIN unlock
+  in Phase 3 — none had a try/catch around their `apiFetch()` call, so
+  going offline threw uncaught and left the UI silently blank (credit
+  lookup) or permanently stuck on "Loading…" (Repay Credit table). Not a
+  regression — confirmed via testing that credit lookup works correctly
+  online; this is the same long-standing pattern, just never previously
+  tested offline.
+  - **Lookup and Repay Credit browsing** now fall back to a cached
+    snapshot (`posGetCachedCustomers()`, `static/js/pos-offline-queue.js`)
+    on a genuine network failure, refreshed via `fetchAndCacheCreditCustomers()`
+    whenever Repay Credit opens, at page load, and on every `online` event
+    (`refreshCreditCustomerCacheQuietly()`) — so lookup has a reasonably
+    fresh cache even on a device that never opens Repay Credit. Shown with
+    an explicit "balance as of [time], may be out of date" note.
+  - **Deliberate, documented privacy tradeoff:** the cache only stores
+    `id`/`name`/`nickname`/`phone`/`outstanding_balance` — never `address`
+    (its only real purpose is finding someone in person over an unpaid
+    debt; no reason to let it sit in a second place at rest) or repayment
+    history. Expires after the same 7-day window as the cached PIN data
+    (`POS_OFFLINE_PIN_EXPIRY_MS`) and is purged unconditionally on Logout
+    (`posPurgeCreditCustomerCache()`) — unlike the `/pos/` shell cache
+    purge, this one is NOT connectivity-gated, since purging it carries no
+    risk of stranding the terminal.
+  - **Creating a new customer and recording a repayment are blocked
+    offline outright, with a clear toast, never queued.** Unlike a sale
+    (which has `client_sale_id` specifically to make a double-send
+    harmless), neither of these has an idempotency key — a queued-then-
+    manually-retried repayment or customer creation risks silently
+    duplicating a record against a shared credit ledger, which is much
+    harder to untangle after the fact than a queued sale is. Browsing the
+    Repay Credit table from cache is still allowed (read-only, harmless);
+    only the actual repay/create actions are gated.
+  - **Queued credit sale replay, confirmed by testing:** if the referenced
+    `customer_id` no longer exists by replay time (deleted in the
+    meantime), the sale fails cleanly with "Customer not found" (400) —
+    no crash, no sale silently created without its customer attached. This
+    already worked correctly before Phase 4; no code change was needed,
+    only a test (`test_credit_sale_with_deleted_customer_fails_cleanly`,
+    `api/tests.py`) confirming it.
+  - **No credit limit exists anywhere in this system** — `Customer` has no
+    limit field, and nothing enforces one at sale or sync time. A credit
+    sale is accepted regardless of existing outstanding balance. This was
+    a deliberate check, not an oversight to fix here — flagged in case a
+    limit is wanted as a future feature, not built speculatively.
 - **Not yet done — needs a real device before this is fully trusted**:
   actual install-to-home-screen + airplane-mode-mid-sale + reconnect
   testing on a real Android phone (and iOS, if the farm uses one),
@@ -469,16 +519,20 @@ unlock itself work offline.
   network with no real uplink, e.g. by disconnecting its router's WAN
   cable, and confirm the offline banner still appears — this is the one
   case `navigator.onLine` alone can't catch, which is why the banner also
-  probes connectivity directly; see above), **and an offline-PIN-unlock
+  probes connectivity directly; see above), **an offline-PIN-unlock
   check** (unlock online once, go offline, lock, confirm the same PIN
   unlocks again without a network round trip, and confirm 5 wrong PINs in
-  a row locks it out same as the online path does). What's verified so far
-  (all three phases) is CDP-scripted against a desktop headless browser,
-  including genuinely toggling the browser's network to offline (not just
-  stubbing `fetch`) and confirming `/pos/` still renders with the right
-  cached catalog data — solid evidence the logic is correct, but not a
-  substitute for seeing Background Sync actually fire on a real OS while
-  the app isn't in the foreground.
+  a row locks it out same as the online path does), **and an offline
+  credit-lookup check** (look up a customer online once, go offline,
+  confirm the same phone number still finds them from cache with a
+  "may be out of date" note, and confirm creating a customer/recording a
+  repayment are both cleanly blocked rather than silently failing). What's
+  verified so far (all four phases) is CDP-scripted against a desktop
+  headless browser, including genuinely toggling the browser's network to
+  offline (not just stubbing `fetch`) and confirming `/pos/` still renders
+  with the right cached catalog data — solid evidence the logic is
+  correct, but not a substitute for seeing Background Sync actually fire
+  on a real OS while the app isn't in the foreground.
 
 ## Deferred work (known, intentional, not yet built)
 

@@ -12,13 +12,17 @@
 // it's retried later, in order, relying on client_sale_id idempotency to
 // make a double-send harmless. The same database also holds a small `meta`
 // store (Phase 2) recording when /pos/ was last successfully cached, for
-// the "showing data as of ..." staleness banner in pos.html, and (Phase 3)
-// an `offlineOperators` store letting PIN unlock work without a network
+// the "showing data as of ..." staleness banner in pos.html; (Phase 3) an
+// `offlineOperators` store letting PIN unlock work without a network
 // connection -- see posStoreOfflineOperator()/posVerifyOfflineOperator()
-// below.
+// below; and (Phase 4) a `creditCustomers` store letting credit-customer
+// lookup work offline too -- see posRefreshCreditCustomerCache()/
+// posGetCachedCustomers() below. Offers/combos data (also Phase 4) reuses
+// the `meta` store instead of a dedicated one, since it's cached as one
+// JSON blob under a single key, not a per-record list.
 
 var POS_QUEUE_DB_NAME = 'angan-baari-pos';
-var POS_QUEUE_DB_VERSION = 3;
+var POS_QUEUE_DB_VERSION = 4;
 var POS_QUEUE_STORE = 'queuedSales';
 
 // The Cache Storage bucket holding the cached /pos/ shell and its
@@ -40,9 +44,17 @@ var POS_QUEUE_STORE = 'queuedSales';
 // (see CLAUDE.md's Stack section), so this is a manual, deliberate step,
 // same spirit as the "cache-bust static assets with ?v=N" convention
 // already used for CSS/JS elsewhere.
-var POS_SHELL_CACHE = 'pos-shell-v3';
+//
+// v3 -> v4: both templates/pos.html and this file changed structurally in
+// this update cycle (credit-customer lookup/cache, offers cache, coupon
+// gating, the stock-unavailable message, and the Dismiss confirmation
+// step with its new report-dismissed call). A device that cold-starts
+// offline on an old v3 shell would otherwise keep running pos.html/
+// pos-offline-queue.js from before any of this existed.
+var POS_SHELL_CACHE = 'pos-shell-v4';
 var POS_META_STORE = 'meta';
 var POS_OFFLINE_PIN_STORE = 'offlineOperators';
+var POS_CREDIT_CUSTOMER_STORE = 'creditCustomers';
 
 function posQueueOpenDB() {
     return new Promise(function (resolve, reject) {
@@ -57,6 +69,9 @@ function posQueueOpenDB() {
             }
             if (!db.objectStoreNames.contains(POS_OFFLINE_PIN_STORE)) {
                 db.createObjectStore(POS_OFFLINE_PIN_STORE, { keyPath: 'operator_id' });
+            }
+            if (!db.objectStoreNames.contains(POS_CREDIT_CUSTOMER_STORE)) {
+                db.createObjectStore(POS_CREDIT_CUSTOMER_STORE, { keyPath: 'id' });
             }
         };
         req.onsuccess = function () { resolve(req.result); };
@@ -429,6 +444,86 @@ function posVerifyOfflineOperator(pin) {
                     });
                 });
             });
+        });
+    });
+}
+
+// ══════════════════════════════════════════════════════════════
+// Offline credit-customer lookup (Phase 4).
+//
+// Deliberate, documented privacy tradeoff (see CLAUDE.md's POS-PWA
+// section): this caches customer PII (name, phone, running balance) on
+// the device so credit-sale lookup and the Repay Credit screen can still
+// show a customer's last known balance with no connection. Deliberately
+// NOT caching address (not needed for lookup/display here, and it's the
+// one field whose only real purpose is finding someone in person over an
+// unpaid debt -- no reason to let it sit in a second place at rest) or
+// last-repayment history (same reasoning: the Repay Credit screen loses
+// those two columns when showing cached data, acceptable since repayment
+// itself is blocked offline anyway -- see completeSaleBtn/
+// repayConfirmBtn in pos.html). Expires after the same window as the
+// cached PIN data (POS_OFFLINE_PIN_EXPIRY_MS) and is purged on Logout,
+// for the same reason: this is sensitive enough that it shouldn't outlive
+// a shift on a device that leaves the till's custody.
+var POS_CREDIT_CACHE_EXPIRY_MS = POS_OFFLINE_PIN_EXPIRY_MS;
+
+// customers: the array POST /api/v1/pos/customers/ (or its phone-filtered
+// sibling) returns -- only id/name/nickname/phone/outstanding_balance are
+// kept, see the privacy note above. Clears the whole store first so a
+// customer deleted server-side also disappears from the cache, rather
+// than lingering forever.
+function posRefreshCreditCustomerCache(customers) {
+    return posQueueOpenDB().then(function (db) {
+        return new Promise(function (resolve, reject) {
+            var tx = db.transaction([POS_CREDIT_CUSTOMER_STORE, POS_META_STORE], 'readwrite');
+            var store = tx.objectStore(POS_CREDIT_CUSTOMER_STORE);
+            var clearReq = store.clear();
+            clearReq.onsuccess = function () {
+                customers.forEach(function (c) {
+                    store.put({
+                        id: c.id, name: c.name, nickname: c.nickname || '',
+                        phone: c.phone, outstanding_balance: c.outstanding_balance,
+                    });
+                });
+            };
+            tx.objectStore(POS_META_STORE).put({ key: 'creditCustomersCachedAt', value: new Date().toISOString() });
+            tx.oncomplete = function () { resolve(); };
+            tx.onerror = function () { reject(tx.error); };
+        });
+    });
+}
+
+// phone: exact match against the cached snapshot (same match semantics as
+// the live CustomerLookupView), or omit/pass a falsy value for every
+// cached customer (used by the Repay Credit screen's offline fallback).
+// Returns [] once the cache is older than POS_CREDIT_CACHE_EXPIRY_MS --
+// an old balance snapshot silently going stale is worse than just not
+// showing one, so an expired cache is treated the same as no cache at all.
+function posGetCachedCustomers(phone) {
+    return posGetMeta('creditCustomersCachedAt').then(function (cachedAt) {
+        if (!cachedAt || Date.now() - new Date(cachedAt).getTime() > POS_CREDIT_CACHE_EXPIRY_MS) return [];
+        return posQueueOpenDB().then(function (db) {
+            return new Promise(function (resolve, reject) {
+                var tx = db.transaction(POS_CREDIT_CUSTOMER_STORE, 'readonly');
+                var req = tx.objectStore(POS_CREDIT_CUSTOMER_STORE).getAll();
+                req.onsuccess = function () {
+                    var all = req.result;
+                    resolve(phone ? all.filter(function (c) { return c.phone === phone; }) : all);
+                };
+                req.onerror = function () { reject(req.error); };
+            });
+        });
+    });
+}
+
+function posPurgeCreditCustomerCache() {
+    return posQueueOpenDB().then(function (db) {
+        return new Promise(function (resolve, reject) {
+            var tx = db.transaction([POS_CREDIT_CUSTOMER_STORE, POS_META_STORE], 'readwrite');
+            tx.objectStore(POS_CREDIT_CUSTOMER_STORE).clear();
+            tx.objectStore(POS_META_STORE).delete('creditCustomersCachedAt');
+            tx.oncomplete = function () { resolve(); };
+            tx.onerror = function () { reject(tx.error); };
         });
     });
 }

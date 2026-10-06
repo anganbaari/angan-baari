@@ -687,6 +687,7 @@
                     <button type="button" class="side-btn payment-btn-main" id="backFromRepayBtn">&laquo; Back</button>
                 </div>
                 <input type="text" id="repayPhoneSearch" class="repay-search-input" placeholder="Search by phone number…" inputmode="numeric">
+                <p id="repayStaleNote" style="display:none;font-size:0.78rem;color:var(--text-muted);margin:4px 0;"></p>
                 <div class="repay-table-wrap">
                     <table class="repay-table">
                         <thead>
@@ -1218,6 +1219,15 @@
         // clear is attempted best-effort but not required for the till to
         // visibly lock in front of whoever's next.
         document.getElementById('logoutBtn').addEventListener('click', async () => {
+            // Unlike purgeCachedPosShell() below, this isn't gated on
+            // connectivity -- it carries no risk of stranding the terminal
+            // (nothing about /pos/ loading depends on it), and it's
+            // customer PII (name/phone/balance), not catalog data, so it
+            // gets cleared unconditionally on every Logout regardless of
+            // whether the purge-and-reload path below actually runs. See
+            // CLAUDE.md's POS-PWA section for the privacy tradeoff this
+            // cache accepts in exchange for offline credit-customer lookup.
+            posPurgeCreditCustomerCache().catch(() => {});
             const reallyOnline = await posProbeConnectivity();
             if (!reallyOnline) {
                 apiFetch('/api/v1/pos/lock/', { method: 'POST' }).catch(() => {});
@@ -2416,6 +2426,21 @@
         // faster later one -- without this, searching phone A (slow),
         // then quickly re-searching phone B (fast) could show A's
         // customer under B's search if A's response arrives last.
+        //
+        // Previously had no try/catch at all around apiFetch -- offline,
+        // this threw an UNCAUGHT exception right after resultsEl.innerHTML
+        // was cleared, so the search area was left permanently blank with
+        // zero error message ("search shows nothing"). Confirmed by
+        // testing this reproduces identically online (works correctly,
+        // the backend itself has no bug) vs offline (uncaught exception) --
+        // not a regression, the same long-standing uncaught-exception
+        // pattern already found and fixed for PIN unlock/logout/etc.
+        //
+        // Falls back to the cached snapshot (posGetCachedCustomers(),
+        // static/js/pos-offline-queue.js) on a genuine network failure --
+        // see CLAUDE.md's POS-PWA section for the privacy tradeoff that
+        // cache accepts and why it's purged on Logout and expires after a
+        // week.
         let customerLookupSeq = 0;
         document.getElementById('lookupCustomerBtn').addEventListener('click', async () => {
             const phone = document.getElementById('customerPhoneInput').value.trim();
@@ -2427,16 +2452,33 @@
             document.getElementById('selectedCustomerLabel').style.display = 'none';
             selectedCustomer = null;
             updatePaymentSummary();
-            const response = await apiFetch(`/api/v1/pos/customers/lookup/?phone=${encodeURIComponent(phone)}`);
-            const results = await response.json().catch(() => []);
+
+            let results;
+            let fromCache = false;
+            try {
+                const response = await apiFetch(`/api/v1/pos/customers/lookup/?phone=${encodeURIComponent(phone)}`);
+                results = await response.json().catch(() => []);
+            } catch (err) {
+                results = await posGetCachedCustomers(phone);
+                fromCache = true;
+            }
             if (mySeq !== customerLookupSeq) return; // a newer search has since started; discard this stale response
-            document.getElementById('newCustomerForm').classList.toggle('active', results.length === 0);
+            // Creating a new customer needs a network round trip (see
+            // createCustomerBtn) -- don't offer the form at all offline,
+            // even on a cache miss, rather than let staff fill it in only
+            // to find out it can't actually be submitted.
+            document.getElementById('newCustomerForm').classList.toggle('active', results.length === 0 && !fromCache);
             if (results.length === 0) {
-                resultsEl.innerHTML = '<p style="font-size:0.82rem;color:var(--text-muted);margin:4px 0;">No existing account found for that number.</p>';
-                document.getElementById('newCustPhone').value = phone;
+                resultsEl.innerHTML = fromCache
+                    ? '<p style="font-size:0.82rem;color:var(--text-muted);margin:4px 0;">Offline, and no cached match for that number — connect online to search the full list or create a new account.</p>'
+                    : '<p style="font-size:0.82rem;color:var(--text-muted);margin:4px 0;">No existing account found for that number.</p>';
+                if (!fromCache) document.getElementById('newCustPhone').value = phone;
                 return;
             }
-            resultsEl.innerHTML = results.map(c => `
+            const staleNote = fromCache
+                ? `<p style="font-size:0.72rem;color:var(--text-muted);margin:2px 0 6px;">Offline — balance as of ${await posCreditCacheTimeLabel()}, may be out of date.</p>`
+                : '';
+            resultsEl.innerHTML = staleNote + results.map(c => `
                 <div class="customer-card" data-id="${c.id}">
                     <span>${c.name}${c.nickname ? ' (' + c.nickname + ')' : ''}</span>
                     <span>Rs. ${c.outstanding_balance}</span>
@@ -2456,12 +2498,24 @@
             });
         });
 
+        async function posCreditCacheTimeLabel() {
+            const cachedAt = await posGetMeta('creditCustomersCachedAt');
+            return cachedAt ? new Date(cachedAt).toLocaleString() : 'unknown';
+        }
+
         function setNewCustAddressError(message) {
             const errEl = document.getElementById('newCustAddressError');
             errEl.textContent = message || '';
             errEl.style.display = message ? '' : 'none';
         }
 
+        // Creating a credit customer is deliberately NOT queued offline --
+        // unlike a sale, there's no idempotency key here to make a later
+        // double-send harmless, and a customer record created twice (once
+        // if a queued request quietly got through after all, once more on
+        // manual retry) is exactly the kind of silent duplicate that'd be
+        // hard to untangle later from a shared credit ledger. Blocked
+        // outright instead, with a clear message, same as repayConfirmBtn.
         document.getElementById('createCustomerBtn').addEventListener('click', async () => {
             setNewCustAddressError('');
             const payload = {
@@ -2472,9 +2526,19 @@
             };
             if (!payload.name || !payload.phone) { showToast('Name and phone are required'); return; }
             if (!payload.address) { setNewCustAddressError('Address is required.'); return; }
-            const response = await apiFetch('/api/v1/pos/customers/', {
-                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
-            });
+            if (!navigator.onLine) {
+                showToast('Offline — creating a new credit customer needs a connection. Try again once back online.');
+                return;
+            }
+            let response;
+            try {
+                response = await apiFetch('/api/v1/pos/customers/', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+                });
+            } catch (err) {
+                showToast('Offline — creating a new credit customer needs a connection. Try again once back online.');
+                return;
+            }
             const data = await response.json().catch(() => ({}));
             if (!response.ok) {
                 // DRF's default field-errors shape ({"address": ["This field
@@ -2784,6 +2848,7 @@
             await updateOfflineBanner();
             await posReplayQueue();
             await renderQueueBox();
+            refreshCreditCustomerCacheQuietly(); // "refresh whenever the till is online" -- not awaited, non-blocking
         });
         window.addEventListener('offline', updateOfflineBanner);
         document.addEventListener('visibilitychange', async () => {
@@ -2901,6 +2966,7 @@
         // ══════════════════════════════════════════════════════════════
         let repayAllCustomers = [];
         let repaySelectedCustomer = null;
+        let repayShowingCache = false;
 
         function formatRepayDate(iso) {
             if (!iso) return '';
@@ -2932,7 +2998,7 @@
                     <td>${c.phone}</td>
                     <td>${c.address || ''}</td>
                     <td>Rs. ${c.outstanding_balance}</td>
-                    <td>${c.last_repaid_amount !== null ? 'Rs. ' + c.last_repaid_amount : ''}</td>
+                    <td>${c.last_repaid_amount != null ? 'Rs. ' + c.last_repaid_amount : ''}</td>
                     <td>${formatRepayDate(c.last_repaid_at)}</td>
                 </tr>`
             ).join('');
@@ -2942,6 +3008,17 @@
                     body.querySelectorAll('tr').forEach(r => r.classList.remove('selected'));
                     row.classList.add('selected');
                     const label = document.getElementById('repaySelectedLabel');
+                    // Showing cached (possibly stale) data -- let staff see
+                    // the last-known balance, but don't offer the amount/
+                    // Confirm step at all, since repayConfirmBtn blocks the
+                    // actual repayment offline anyway. Clearer to not show
+                    // controls that can't work than to show them and fail
+                    // the attempt after the fact.
+                    if (repayShowingCache) {
+                        label.textContent = `${repaySelectedCustomer.name} — owed Rs. ${repaySelectedCustomer.outstanding_balance} as of last sync. Repayments need a connection.`;
+                        label.style.display = '';
+                        return;
+                    }
                     label.textContent = `${repaySelectedCustomer.name} — owes Rs. ${repaySelectedCustomer.outstanding_balance}`;
                     label.style.display = '';
                     document.getElementById('repayAmountInput').style.display = '';
@@ -2950,13 +3027,55 @@
             });
         }
 
+        // On a genuine network failure, falls back to the same cached
+        // snapshot credit-customer lookup uses (posGetCachedCustomers()) --
+        // browsing the table offline is harmless (it's read-only data), so
+        // this degrades to "may be out of date" rather than failing
+        // outright. The actual repayment action is still blocked offline
+        // regardless (see repayConfirmBtn) -- browsing and acting are
+        // separate gates here on purpose. address/last_repaid_* aren't in
+        // the cache (see posRefreshCreditCustomerCache()'s privacy note),
+        // so those columns just render blank for cached rows.
         async function loadRepayCustomers() {
             resetRepaySelection();
             document.getElementById('repayPhoneSearch').value = '';
             document.getElementById('repayCustomerTableBody').innerHTML = '<tr class="repay-no-results"><td colspan="8">Loading…</td></tr>';
-            const response = await apiFetch('/api/v1/pos/customers/');
-            repayAllCustomers = response.ok ? await response.json() : [];
+            const note = document.getElementById('repayStaleNote');
+            try {
+                repayAllCustomers = await fetchAndCacheCreditCustomers();
+                repayShowingCache = false;
+                note.style.display = 'none';
+            } catch (err) {
+                repayAllCustomers = await posGetCachedCustomers();
+                repayShowingCache = true;
+                const cachedAt = await posGetMeta('creditCustomersCachedAt');
+                note.textContent = cachedAt
+                    ? `Offline — showing balances as of ${new Date(cachedAt).toLocaleString()}, may be out of date. Repayments can't be recorded offline.`
+                    : 'Offline, and no cached customer list on this device yet — connect online once first.';
+                note.style.display = '';
+            }
             renderRepayCustomerTable();
+        }
+
+        // Shared by loadRepayCustomers() above and the page-init/online-
+        // event refresh below, so there's exactly one place that fetches
+        // the live list AND writes it into the offline cache
+        // (posRefreshCreditCustomerCache()) -- callers that only need the
+        // side effect (not the data) can just ignore the return value.
+        async function fetchAndCacheCreditCustomers() {
+            const response = await apiFetch('/api/v1/pos/customers/');
+            if (!response.ok) throw new Error('customers fetch failed: ' + response.status);
+            const data = await response.json();
+            await posRefreshCreditCustomerCache(data);
+            return data;
+        }
+
+        // Proactive refresh so credit-sale lookup (lookupCustomerBtn) has a
+        // reasonably fresh cache even on a device that never opens Repay
+        // Credit -- called once at page load and again every time
+        // connectivity returns (see the 'online' listener below).
+        async function refreshCreditCustomerCacheQuietly() {
+            try { await fetchAndCacheCreditCustomers(); } catch (err) { /* offline -- keep whatever's already cached */ }
         }
         document.getElementById('openRepayBtn').addEventListener('click', showRepayView);
         document.getElementById('backFromRepayBtn').addEventListener('click', showReceiptView);
@@ -2966,13 +3085,30 @@
         document.getElementById('repayCancelBtn').addEventListener('click', resetRepaySelection);
         document.getElementById('repayPhoneSearch').addEventListener('input', renderRepayCustomerTable);
 
+        // Recording a repayment is deliberately NOT queued offline, same
+        // reasoning as createCustomerBtn above: no idempotency key, so a
+        // queued-then-manually-retried repayment risks silently double-
+        // crediting a customer's account from a shared ledger that's much
+        // harder to untangle after the fact than a queued SALE is (sales
+        // have client_sale_id precisely to make a double-send harmless;
+        // this has no equivalent).
         document.getElementById('repayConfirmBtn').addEventListener('click', async () => {
             const amount = parseFloat(document.getElementById('repayAmountInput').value);
             if (!repaySelectedCustomer || !(amount > 0)) { showToast('Enter a valid amount'); return; }
-            const response = await apiFetch('/api/v1/pos/credit/repay/', {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ customer_id: repaySelectedCustomer.id, amount: amount.toFixed(2) }),
-            });
+            if (!navigator.onLine) {
+                showToast('Offline — recording a repayment needs a connection. Try again once back online.');
+                return;
+            }
+            let response;
+            try {
+                response = await apiFetch('/api/v1/pos/credit/repay/', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ customer_id: repaySelectedCustomer.id, amount: amount.toFixed(2) }),
+                });
+            } catch (err) {
+                showToast('Offline — recording a repayment needs a connection. Try again once back online.');
+                return;
+            }
             const data = await response.json().catch(() => ({}));
             if (response.status === 403) {
                 currentOperator = null;
@@ -2999,6 +3135,7 @@
         renderReceipt();
         setLocked(true);
         loadStockData();
+        refreshCreditCustomerCacheQuietly();
     </script>
 </body>
 </html>

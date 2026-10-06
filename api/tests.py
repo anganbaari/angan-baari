@@ -1535,6 +1535,26 @@ class CreditLedgerApiTests(ApiTestBase):
         super().setUp()
         self.credit_customer = Customer.objects.create(name='Hari Prasad', phone='9833333333')
 
+    def test_credit_sale_with_deleted_customer_fails_cleanly(self):
+        """Simulates a replayed offline-queued credit sale whose customer_id
+        no longer exists by the time it syncs (deleted in the meantime) --
+        must fail with a clear message, not a crash or a sale silently
+        created with no customer attached."""
+        deleted_id = self.credit_customer.id
+        self.credit_customer.delete()
+        self.client.login(username='cashier', password='pw')
+        self.unlock_terminal()
+        client_sale_id = str(uuid.uuid4())
+        payload = {
+            'client_sale_id': client_sale_id,
+            'customer_id': deleted_id,
+            'payments': [{'method': 'credit', 'amount': '250.00'}],
+            'cart': [{'product_id': self.jar.id, 'qty': 1}],
+        }
+        response = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(POSSale.objects.filter(client_sale_id=client_sale_id).exists())
+
     def test_repay_requires_prior_unlock(self):
         self.client.login(username='cashier', password='pw')
         payload = {'customer_id': self.credit_customer.id, 'amount': '50.00'}
