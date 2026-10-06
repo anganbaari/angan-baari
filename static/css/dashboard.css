@@ -52,7 +52,8 @@ body.dashboard-body, .dash-shell { overflow-x: hidden; }
 
 .dash-brand { display: flex; align-items: center; gap: 10px; padding: 0 4px; }
 .dash-brand img.logo { width: 38px; height: 38px; object-fit: contain; flex-shrink: 0; }
-.dash-brand .flag-svg { width: 22px; height: auto; flex-shrink: 0; }
+.dash-brand .brand-text { flex: 1; min-width: 0; }
+.dash-brand img.flag { height: 30px; width: auto; object-fit: contain; flex-shrink: 0; }
 .dash-brand .brand-text h1 {
     font-family: var(--font-display); font-weight: 600; font-size: 1.25rem; margin: 0; color: var(--dash-gold-light);
     line-height: 1.15;
@@ -259,7 +260,7 @@ table.dash-table tbody tr:hover { background: rgba(255, 255, 255, 0.025); }
 /* ── Responsive ── */
 @media (max-width: 1024px) {
     .dash-sidebar { width: 72px; padding: 14px 8px; }
-    .dash-brand .brand-text, .dash-nav-item span.label, .dash-bsgrid, .dash-target-card, .dash-sidebar-footer span.label { display: none; }
+    .dash-brand .brand-text, .dash-brand img.flag, .dash-nav-item span.label, .dash-bsgrid, .dash-target-card, .dash-sidebar-footer span.label { display: none; }
     .dash-nav-item { justify-content: center; }
     .dash-card.c3, .dash-card.c4 { grid-column: span 6; }
     .dash-card.c8 { grid-column: span 12; }
@@ -269,6 +270,7 @@ table.dash-table tbody tr:hover { background: rgba(255, 255, 255, 0.025); }
     .dash-sidebar { position: fixed; left: -260px; top: 0; width: 248px; z-index: 100; transition: left 0.25s ease-out; box-shadow: 0 0 40px rgba(0,0,0,0.5); }
     .dash-sidebar.open { left: 0; }
     .dash-sidebar .brand-text, .dash-nav-item span.label, .dash-bsgrid, .dash-target-card, .dash-sidebar-footer span.label { display: block; }
+    .dash-brand img.flag { display: inline-block; }
     .dash-sidebar { width: 248px; }
     .dash-mobile-bar { display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-bottom: 1px solid var(--dash-border-soft); position: sticky; top: 0; background: var(--dash-bg); z-index: 40; }
     .dash-mobile-bar button { background: var(--dash-card-bg); border: 1px solid var(--dash-border-soft); color: var(--dash-text); border-radius: 8px; padding: 6px 10px; cursor: pointer; }
