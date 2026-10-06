@@ -1459,12 +1459,19 @@ def _parse_page_params(request):
 
 class BaseReportView(APIView):
     """Shared param parsing for every /api/v1/reports/* endpoint: start,
-    end, channel, granularity, compare -- all optional, all validated by
-    shop/reports.py (which raises ReportValidationError, translated here
-    into a 400 with a clear message, never a 500)."""
+    end, channel, granularity, compare, payment_type, customer_type,
+    operator -- all optional, all validated by shop/reports.py (which
+    raises ReportValidationError, translated here into a 400 with a
+    clear message, never a 500).
+
+    filters_applicable on each response says whether payment_type/
+    customer_type/operator were actually used for that endpoint's
+    numbers -- False for Credit/Inventory/Online Orders (see
+    shop/reports.py's SaleFilters comment for why), True elsewhere."""
 
     authentication_classes = [SessionAuthentication]
     permission_classes = [IsOwnerOrManager]
+    filters_applicable = True
 
     def parse_params(self, request):
         params = request.query_params
@@ -1472,14 +1479,20 @@ class BaseReportView(APIView):
         channel = reports_lib.parse_channel(params.get('channel'))
         granularity = reports_lib.parse_granularity(params.get('granularity'))
         compare = params.get('compare') == 'true'
-        return start_date, end_date, channel, granularity, compare
+        filters = reports_lib.parse_sale_filters(params)
+        return start_date, end_date, channel, granularity, compare, filters
 
     def get(self, request, *args, **kwargs):
         try:
-            start_date, end_date, channel, granularity, compare = self.parse_params(request)
+            start_date, end_date, channel, granularity, compare, filters = self.parse_params(request)
         except reports_lib.ReportValidationError as exc:
             return Response({'status': 'error', 'message': exc.message}, status=400)
-        return self.build_response(request, start_date, end_date, channel, granularity, compare)
+        if not self.filters_applicable:
+            filters = reports_lib.NO_FILTERS
+        response = self.build_response(request, start_date, end_date, channel, granularity, compare, filters)
+        if isinstance(response, Response):
+            response.data['filters_applicable'] = self.filters_applicable
+        return response
 
 
 class ReportSummaryView(BaseReportView):
@@ -1487,8 +1500,8 @@ class ReportSummaryView(BaseReportView):
     deltas when compare=true), alerts strip, top-5 products, channel
     split, payment mix, and the sales-over-time series."""
 
-    def build_response(self, request, start_date, end_date, channel, granularity, compare):
-        data = reports_lib.get_summary(start_date, end_date, channel, compare, granularity=granularity)
+    def build_response(self, request, start_date, end_date, channel, granularity, compare, filters):
+        data = reports_lib.get_summary(start_date, end_date, channel, compare, granularity=granularity, filters=filters)
         data['range'] = {'start': start_date.isoformat(), 'end': end_date.isoformat()}
         return Response(data)
 
@@ -1500,15 +1513,15 @@ class ReportSalesTrendView(BaseReportView):
     sales-by-operator table. ?export=csv on this endpoint exports the
     recent-sales table (not the chart series)."""
 
-    def build_response(self, request, start_date, end_date, channel, granularity, compare):
-        trend = reports_lib.get_sales_trend(start_date, end_date, granularity, compare=compare)
-        by_operator = reports_lib.get_sales_by_operator(start_date, end_date)
+    def build_response(self, request, start_date, end_date, channel, granularity, compare, filters):
+        trend = reports_lib.get_sales_trend(start_date, end_date, granularity, compare=compare, filters=filters)
+        by_operator = reports_lib.get_sales_by_operator(start_date, end_date, filters)
 
         if request.query_params.get('export') == 'csv':
             page = 1
             all_rows = []
             while True:
-                chunk = reports_lib.get_recent_sales(start_date, end_date, page, 500)
+                chunk = reports_lib.get_recent_sales(start_date, end_date, page, 500, filters)
                 for r in chunk['results']:
                     all_rows.append({
                         'sale_number': r['sale_number'], 'date_time': r['created_at'],
@@ -1524,7 +1537,7 @@ class ReportSalesTrendView(BaseReportView):
             )
 
         page, page_size = _parse_page_params(request)
-        recent_sales = reports_lib.get_recent_sales(start_date, end_date, page, page_size)
+        recent_sales = reports_lib.get_recent_sales(start_date, end_date, page, page_size, filters)
         return Response({
             'trend': trend, 'by_operator': by_operator, 'recent_sales': recent_sales,
             'range': {'start': start_date.isoformat(), 'end': end_date.isoformat()},
@@ -1536,9 +1549,9 @@ class ReportPaymentsView(BaseReportView):
     used by the Overview doughnut (also embedded in /summary/, exposed
     standalone for a drill-down or a dedicated chart elsewhere)."""
 
-    def build_response(self, request, start_date, end_date, channel, granularity, compare):
+    def build_response(self, request, start_date, end_date, channel, granularity, compare, filters):
         return Response({
-            'payment_mix': reports_lib.get_payment_mix(start_date, end_date),
+            'payment_mix': reports_lib.get_payment_mix(start_date, end_date, filters),
             'range': {'start': start_date.isoformat(), 'end': end_date.isoformat()},
         })
 
@@ -1549,9 +1562,9 @@ class ReportProductsView(BaseReportView):
     table with trend, slow movers, and offers/coupons performance.
     ?export=csv exports the full product table."""
 
-    def build_response(self, request, start_date, end_date, channel, granularity, compare):
+    def build_response(self, request, start_date, end_date, channel, granularity, compare, filters):
         if request.query_params.get('export') == 'csv':
-            rows = reports_lib.get_product_table(start_date, end_date, compare=False)
+            rows = reports_lib.get_product_table(start_date, end_date, compare=False, filters=filters)
             csv_rows = [
                 {
                     'product': r['name'], 'qty': r['qty'], 'weight_kg': r['weight_kg'],
@@ -1567,11 +1580,11 @@ class ReportProductsView(BaseReportView):
         if by not in ('revenue', 'quantity'):
             return Response({'status': 'error', 'message': "'by' must be 'revenue' or 'quantity'."}, status=400)
         return Response({
-            'top_products': reports_lib.get_top_products(start_date, end_date, limit=10, by=by),
-            'category_breakdown': reports_lib.get_category_breakdown(start_date, end_date),
-            'product_table': reports_lib.get_product_table(start_date, end_date, compare=compare),
-            'slow_movers': reports_lib.get_slow_movers(start_date, end_date),
-            'offers_performance': reports_lib.get_offers_performance(start_date, end_date),
+            'top_products': reports_lib.get_top_products(start_date, end_date, limit=10, by=by, filters=filters),
+            'category_breakdown': reports_lib.get_category_breakdown(start_date, end_date, filters),
+            'product_table': reports_lib.get_product_table(start_date, end_date, compare=compare, filters=filters),
+            'slow_movers': reports_lib.get_slow_movers(start_date, end_date, filters),
+            'offers_performance': reports_lib.get_offers_performance(start_date, end_date, filters),
             'range': {'start': start_date.isoformat(), 'end': end_date.isoformat()},
         })
 
@@ -1581,9 +1594,15 @@ class ReportCreditView(BaseReportView):
     the given-vs-repaid trend, ageing buckets, and the sortable customer
     table. ?export=csv exports the customer table. Customer names/phones
     only ever appear here and in the Sales tab's recent-sales table, to
-    the same owner/manager-only audience this whole view is gated to."""
+    the same owner/manager-only audience this whole view is gated to.
 
-    def build_response(self, request, start_date, end_date, channel, granularity, compare):
+    payment_type/customer_type/operator filters do NOT apply here -- this
+    whole tab IS the credit slice already, and credit_transactions have
+    no payment-method or operator concept of their own."""
+
+    filters_applicable = False
+
+    def build_response(self, request, start_date, end_date, channel, granularity, compare, filters):
         buckets, customers = reports_lib.get_credit_ageing_and_customers()
 
         if request.query_params.get('export') == 'csv':
@@ -1606,9 +1625,15 @@ class ReportInventoryView(BaseReportView):
     """GET /api/v1/reports/inventory/ -- the Inventory tab: current
     stock per product (fixed-weight shows "animals available", matching
     the admin), the low-stock list, movements-by-type for the period, and
-    the waste/loss table. ?export=csv exports the current-stock table."""
+    the waste/loss table. ?export=csv exports the current-stock table.
 
-    def build_response(self, request, start_date, end_date, channel, granularity, compare):
+    payment_type/customer_type/operator filters do NOT apply -- the
+    inventory ledger has no payment-method, customer, or operator
+    concept (harvest/waste/adjustment movements aren't sales at all)."""
+
+    filters_applicable = False
+
+    def build_response(self, request, start_date, end_date, channel, granularity, compare, filters):
         stock_table = reports_lib.get_current_stock_table()
 
         if request.query_params.get('export') == 'csv':
@@ -1629,9 +1654,14 @@ class ReportOrdersView(BaseReportView):
     """GET /api/v1/reports/orders/ -- the Online Orders tab: counts by
     status, orders over time, and the paginated recent-orders table (each
     row links to its admin change page client-side using its id).
-    ?export=csv exports the recent-orders table."""
+    ?export=csv exports the recent-orders table.
 
-    def build_response(self, request, start_date, end_date, channel, granularity, compare):
+    payment_type/customer_type/operator filters do NOT apply -- an
+    online order has no POS payment method or operator at all."""
+
+    filters_applicable = False
+
+    def build_response(self, request, start_date, end_date, channel, granularity, compare, filters):
         if request.query_params.get('export') == 'csv':
             page = 1
             all_rows = []
@@ -1652,3 +1682,53 @@ class ReportOrdersView(BaseReportView):
             'recent_orders': reports_lib.get_recent_orders(start_date, end_date, page, page_size),
             'range': {'start': start_date.isoformat(), 'end': end_date.isoformat()},
         })
+
+
+class ReportAlertsView(APIView):
+    """GET /api/v1/reports/alerts/ -- the full Alerts section. Not
+    date-range-scoped by the filter bar: every alert here is a "right
+    now" state (current stock, current credit balances, orders pending
+    as of now, a lookback window fixed in shop/reports.py's own
+    constants), same reasoning as the Target card."""
+
+    authentication_classes = [SessionAuthentication]
+    permission_classes = [IsOwnerOrManager]
+
+    def get(self, request, *args, **kwargs):
+        return Response(reports_lib.get_alerts_detailed())
+
+
+class ReportTargetView(APIView):
+    """GET /api/v1/reports/target/ -- the sidebar Revenue Target card.
+    Not date-range-scoped by the filter bar at all (the target's own
+    period is what matters), so this deliberately does NOT extend
+    BaseReportView."""
+
+    authentication_classes = [SessionAuthentication]
+    permission_classes = [IsOwnerOrManager]
+
+    def get(self, request, *args, **kwargs):
+        return Response(reports_lib.get_target_progress())
+
+
+class ReportFilterOptionsView(APIView):
+    """GET /api/v1/reports/filter-options/ -- populates the operator
+    filter dropdown. Staff who have never rung up a POS sale aren't
+    listed -- there'd be nothing to filter by selecting them."""
+
+    authentication_classes = [SessionAuthentication]
+    permission_classes = [IsOwnerOrManager]
+
+    def get(self, request, *args, **kwargs):
+        operators = (
+            POSSale.objects.select_related('cashier').order_by('cashier__first_name')
+            .values('cashier_id', 'cashier__username', 'cashier__first_name', 'cashier__last_name')
+            .distinct()
+        )
+        seen = {}
+        for o in operators:
+            if o['cashier_id'] in seen:
+                continue
+            name = f"{o['cashier__first_name']} {o['cashier__last_name']}".strip() or o['cashier__username']
+            seen[o['cashier_id']] = {'id': o['cashier_id'], 'name': name}
+        return Response({'operators': sorted(seen.values(), key=lambda r: r['name'])})

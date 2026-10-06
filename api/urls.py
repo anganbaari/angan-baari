@@ -49,4 +49,7 @@ urlpatterns = [
     path('reports/credit/', views.ReportCreditView.as_view(), name='v1_report_credit'),
     path('reports/inventory/', views.ReportInventoryView.as_view(), name='v1_report_inventory'),
     path('reports/orders/', views.ReportOrdersView.as_view(), name='v1_report_orders'),
+    path('reports/alerts/', views.ReportAlertsView.as_view(), name='v1_report_alerts'),
+    path('reports/target/', views.ReportTargetView.as_view(), name='v1_report_target'),
+    path('reports/filter-options/', views.ReportFilterOptionsView.as_view(), name='v1_report_filter_options'),
 ]
