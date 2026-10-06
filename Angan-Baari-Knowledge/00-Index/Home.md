@@ -14,7 +14,7 @@ See `03-Decisions/Decision-Log.md` for the promotion rule between these three.
 - [[Project-Overview]] · [[Current-State]] · [[Roadmap]] — `01-Project/`
 - [[System-Architecture]] · [[Django]] · [[ABMS]] · [[POS]] · [[Inventory]] · [[REST-API]] — `02-Architecture/`
 - [[Architecture-Decisions]] · [[Decision-Log]] — `03-Decisions/`
-- `04-Features/` — per-feature deep dives (empty until a feature needs one)
+- [[Reports-Dashboard]] — `04-Features/`
 - [[Inventory-Rules]] — `05-Inventory/`
 - [[ABMS-Integration]] — `06-API/`
 - [[Deployment-Workflow]] — `07-Deployment/`

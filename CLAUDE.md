@@ -622,6 +622,84 @@ customer lookup, offers/combos, and coupon gating.
   correct, but not a substitute for seeing Background Sync actually fire
   on a real OS while the app isn't in the foreground.
 
+## Reports dashboard
+
+Staff-only, owner/manager role only (not every staff login) read-only
+reporting screen at `/dashboard/` — `templates/dashboard.html`, vanilla JS
+(`static/js/dashboard.js` + `static/css/dashboard.css`), Chart.js vendored
+at `static/vendor/chart.min.js` (not a CDN — see Frontend conventions
+below). All aggregation logic lives in `shop/reports.py`, which only ever
+**reads** `POSSale`/`ProductOrder`/`CreditTransaction`/`InventoryMovement`
+— nothing on this page can affect the POS, checkout, or the ledger.
+Deliberately outside `/pos/`'s service-worker scope: never cached, no
+offline mode, a fetch failure just shows a plain "needs a connection"
+message.
+
+**Permissions**: gated by a NEW `api.permissions.IsOwnerOrManager` (API
+side) and `shop.views._is_owner_or_manager()` (page-shell side) — both
+check `UserProfile.role in ('admin', 'manager')`, with a superuser bypass.
+This is the first real consumer of `UserProfile.role` anywhere in the
+codebase; every other POS permission check only ever used `is_staff`.
+
+**Endpoints**, all GET-only, session-authed, under `/api/v1/reports/`,
+sharing `start`/`end`/`channel` (all/pos/online)/`granularity`
+(day/week/month)/`compare` (true/false) query params:
+`summary` (Overview tab), `sales-trend` (Sales tab), `payments` (payment
+mix, also embedded in `summary`), `products` (Products tab), `credit`
+(Credit/उधारो tab), `inventory` (Inventory tab), `orders` (Online Orders
+tab). Most support `?export=csv` for their main table (UTF-8 BOM prefix
+so Excel renders Devanagari names correctly).
+
+**Metric definitions — these were explicit design decisions, not
+assumptions, confirmed during this feature's build before any code was
+written, because the underlying data genuinely can't support anything
+more precise:**
+
+- **Revenue is POS-only.** `ProductOrder` has no total/price field at all,
+  and its `cart_snapshot` deliberately omits price too (see that field's
+  own help_text — a reorder should re-price at today's rate). Online
+  orders are shown as a **count** everywhere on this dashboard, never
+  blended into a Rs figure.
+- **Per-product/category revenue is an ESTIMATE**, priced at TODAY's
+  rates (`cart_snapshot` never stored a per-line price for either
+  `POSSale` or `ProductOrder` — confirmed by reading `create_pos_sale()`'s
+  actual code, not its docstring). This silently overstates anything that
+  was offer/combo-discounted at sale time and is wrong for anything sold
+  before a later price change. The QUANTITY-based version of the same
+  breakdown is exact.
+- **Cash collected ≠ revenue.** Cash collected = non-credit POS payment
+  portions in the period + credit repayments *received* in the period. A
+  credit sale is revenue immediately but cash only once repaid.
+- **No profit/margin anywhere** — `Product` has no cost/purchase-price
+  field, so there is nothing to build one from.
+- **Offer discounts are not tracked as a number** (only that one was
+  used); **coupon discounts are exact** (`POSSale.discount_amount`).
+- **Outstanding credit is a live, all-time snapshot**, not scoped to the
+  filter date range — it always matches the Credit tab / `Customer.
+  outstanding_balance()` exactly, by construction (same method).
+
+**Timezone**: every day boundary uses `zoneinfo.ZoneInfo('Asia/Kathmandu')`
+explicitly (`shop/reports.py`'s `local_range_to_utc()`), not Django's
+ambient "current timezone" — a sale at 23:30 or 00:30 local always lands
+on the correct local calendar day.
+
+**No caching.** A short cache was allowed by this feature's brief only if
+it couldn't show a stale credit balance right after a repayment —
+invalidating one correctly would mean touching the POS/credit write paths,
+which this feature keeps strictly read-only. Every endpoint computes
+fresh every time.
+
+**Aggregation**: sale-level numbers use real DB `Sum`/`Count`/`Trunc*`
+aggregation. Per-line numbers (units by product, category breakdown,
+offer/combo usage) can't be — `cart_snapshot` is a JSON blob, not a
+related table — so those use exactly one bulk query across the date range
+plus an in-memory Python loop (`_iter_pos_cart_lines()`), never one query
+per row. If you extend this module: anything reading a related manager
+(`.variants.all()`, `.selling_units.all()`) inside a per-line loop needs
+`prefetch_related` on the bulk product lookup first — a real N+1 of
+exactly this shape was caught by `QueryCountTests` in
+`api/tests_reports.py` and fixed by prefetching `selling_units`.
+
 ## Deferred work (known, intentional, not yet built)
 
 - Local Egg / Vermicompost inventory bridge from ABMS (hook into ABMS's
@@ -657,10 +735,10 @@ customer lookup, offers/combos, and coupon gating.
   (`--font-body`), Cinzel (`--font-accent`)
 - Cache-bust static assets with `?v=N` when editing CSS/JS
 - URL names in use: `home`, `shop`, `cart`, `offers`, `profile`, `login`,
-  `pos`, `pos_service_worker`, plus cart/wishlist/checkout sub-routes (see
-  `shop/urls.py`). `pos_create_sale`/`/pos/sale/` was removed (POS-PWA
-  Phase 1) once `templates/pos.html` switched to posting directly to
-  `POST /api/v1/sales/` and nothing else referenced it.
+  `pos`, `pos_service_worker`, `dashboard`, plus cart/wishlist/checkout
+  sub-routes (see `shop/urls.py`). `pos_create_sale`/`/pos/sale/` was
+  removed (POS-PWA Phase 1) once `templates/pos.html` switched to posting
+  directly to `POST /api/v1/sales/` and nothing else referenced it.
 
 ## Key files
 
@@ -669,8 +747,13 @@ customer lookup, offers/combos, and coupon gating.
   InventoryMovement, POSSale
 - `shop/views.py` — all view logic: cart (session-based), save-for-later,
   wishlist, checkout, coupon/offer application, POS (`pos_view`,
-  `pos_service_worker`), the shared `create_inventory_movements_from_snapshot()`
+  `pos_service_worker`), the Reports dashboard shell (`dashboard_view`),
+  the shared `create_inventory_movements_from_snapshot()`
   and `create_pos_sale()` helpers
+- `shop/reports.py` — all Reports dashboard aggregation logic (read-only —
+  see the "Reports dashboard" section above)
+- `templates/dashboard.html` / `static/js/dashboard.js` /
+  `static/css/dashboard.css` — the Reports dashboard page
 - `shop/admin.py` — Django admin customizations, including a custom
   newsletter-campaign compose form (`NewsletterAdmin`) and computed stock
   display on `ProductAdmin`
