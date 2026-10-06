@@ -1,0 +1,18 @@
+{% extends "admin/index.html" %}
+{% load i18n %}
+
+{# Adds a link to the staff Reports & Dashboard (/dashboard/) above the
+   normal app list -- that page already enforces its own owner/manager
+   check (shop.views.dashboard_view), so this link is shown to every
+   staff user with admin access; clicking it is what actually gates
+   access, same as any other admin-index link to a view with its own
+   permission check. #}
+
+{% block content %}
+<div id="content-related" style="float: none; width: auto; margin: 0 0 20px;">
+    <div class="module" style="padding: 12px 16px;">
+        <a href="{% url 'dashboard' %}">&#128202; Reports &amp; Dashboard</a>
+    </div>
+</div>
+{{ block.super }}
+{% endblock %}

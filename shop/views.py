@@ -1316,7 +1316,48 @@ def pos_view(request):
         'payment_methods': POSSale.PAYMENT_METHOD_CHOICES,
         'is_vat_enabled': vat_settings.is_vat_enabled,
         'vat_rate': VAT_RATE,
+        'show_reports_link': _is_owner_or_manager(request.user),
     })
+
+
+def _is_owner_or_manager(user):
+    """Same gate as api.permissions.IsOwnerOrManager -- kept as a tiny
+    duplicate here rather than importing from the api app, since shop/
+    has no existing dependency on api/ in either direction and this is
+    one line of logic, not worth introducing one for."""
+    if not (user.is_authenticated and user.is_staff):
+        return False
+    if user.is_superuser:
+        return True
+    profile = getattr(user, 'profile', None)
+    return bool(profile and profile.role in ('admin', 'manager'))
+
+
+@staff_member_required
+def dashboard_view(request):
+    """The staff Reports & Dashboard screen at /dashboard/ -- server-
+    rendered shell only (vanilla JS, no React/Next.js, see CLAUDE.md's
+    Stack section); every number on the page is fetched client-side from
+    the read-only /api/v1/reports/* endpoints. Gated twice, deliberately:
+    @staff_member_required first (so a non-staff login gets Django's
+    normal "you don't have permission" page, consistent with every other
+    staff-only view in this project), then the owner/manager role check
+    below (so a cashier-level staff account — which IS staff, for POS
+    login — gets a clear, specific message instead of a blank or broken
+    page). The API endpoints enforce the same role check independently
+    (IsOwnerOrManager) — this view-level check is only for the page shell
+    itself, not relied on for the actual data.
+
+    Deliberately NOT inside /pos/: this page must never be cached or
+    served by pos-sw.js (whose scope is /pos/ only, so this is already
+    true by construction) and has no offline mode of its own -- a fetch
+    failure here just shows a plain "needs a connection" message."""
+    if not _is_owner_or_manager(request.user):
+        from django.http import HttpResponseForbidden
+        return HttpResponseForbidden(
+            'The Reports dashboard is restricted to owner/manager accounts.'
+        )
+    return render(request, 'dashboard.html', {})
 
 
 def line_subtotal(item):

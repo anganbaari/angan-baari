@@ -28,4 +28,5 @@ urlpatterns = [
     path('wishlist/move-to-cart/<int:product_id>/', views.wishlist_move_to_cart, name='wishlist_move_to_cart'),
     path('pos/', views.pos_view, name='pos'),
     path('pos/service-worker.js', views.pos_service_worker, name='pos_service_worker'),
+    path('dashboard/', views.dashboard_view, name='dashboard'),
 ]

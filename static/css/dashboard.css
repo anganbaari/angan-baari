@@ -1,0 +1,176 @@
+/* Staff Reports & Dashboard (/dashboard/) -- uses the site-wide brand
+   variables from style.css (--moss/--gold/--forest/--cream/--mist/
+   --text-muted, --font-display/--font-body) rather than the POS screen's
+   own mockup-sampled palette: this page is a normal staff admin screen,
+   not the till, so it should look like the rest of the site's brand. */
+
+* { box-sizing: border-box; }
+
+body.dashboard-body {
+    margin: 0;
+    font-family: var(--font-body);
+    background: var(--cream);
+    color: var(--forest);
+    -webkit-font-smoothing: antialiased;
+}
+
+.dash-wrap { max-width: 1320px; margin: 0 auto; padding: 0 16px 48px; }
+
+/* ── Header ── */
+.dash-header {
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    padding: 18px 16px; border-bottom: 2px solid var(--mist); flex-wrap: wrap;
+}
+.dash-header h1 {
+    font-family: var(--font-display); font-weight: 600; font-size: 1.9rem; margin: 0; color: var(--forest);
+}
+.dash-header .dash-sub { font-size: 0.85rem; color: var(--text-muted); margin-top: 2px; }
+.dash-header-links { display: flex; gap: 14px; align-items: center; }
+.dash-header-links a {
+    color: var(--moss); text-decoration: none; font-weight: 600; font-size: 0.9rem;
+    border: 1.5px solid var(--moss); border-radius: 8px; padding: 7px 14px;
+}
+.dash-header-links a:hover, .dash-header-links a:focus-visible { background: var(--moss); color: #fff; }
+
+/* ── Filter bar ── */
+.dash-filterbar {
+    display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px;
+    background: #fff; border: 1px solid var(--mist); border-radius: 12px;
+    padding: 14px 16px; margin: 16px 0; box-shadow: 0 1px 4px rgba(26,47,30,0.06);
+    position: sticky; top: 0; z-index: 20;
+}
+.dash-field { display: flex; flex-direction: column; gap: 4px; }
+.dash-field label { font-size: 0.72rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.03em; }
+.dash-field select, .dash-field input[type="date"] {
+    font-family: var(--font-body); font-size: 0.88rem; padding: 7px 9px; border: 1px solid var(--mist);
+    border-radius: 7px; background: #fff; color: var(--forest);
+}
+.dash-field select:focus-visible, .dash-field input:focus-visible, button:focus-visible, a:focus-visible, [tabindex]:focus-visible {
+    outline: 2.5px solid var(--gold); outline-offset: 1px;
+}
+.dash-presets { display: flex; flex-wrap: wrap; gap: 6px; }
+.dash-preset-btn {
+    font-size: 0.78rem; padding: 6px 11px; border-radius: 999px; border: 1px solid var(--mist);
+    background: var(--mist); color: var(--forest); cursor: pointer; font-family: var(--font-body);
+}
+.dash-preset-btn.active { background: var(--moss); border-color: var(--moss); color: #fff; font-weight: 700; }
+.dash-compare-toggle { display: flex; align-items: center; gap: 6px; font-size: 0.85rem; }
+.dash-refresh-btn {
+    background: var(--forest); color: #fff; border: none; border-radius: 8px; padding: 9px 16px;
+    font-weight: 700; cursor: pointer; font-size: 0.85rem; font-family: var(--font-body);
+}
+.dash-refresh-btn:hover { background: var(--moss); }
+.dash-last-updated { font-size: 0.75rem; color: var(--text-muted); align-self: center; }
+.dash-filter-error { color: #a3311a; font-size: 0.82rem; font-weight: 600; width: 100%; }
+
+/* ── Help panel ── */
+.dash-help { background: #fff; border: 1px solid var(--mist); border-radius: 10px; margin-bottom: 16px; }
+.dash-help summary { cursor: pointer; padding: 10px 14px; font-weight: 700; color: var(--moss); font-size: 0.9rem; }
+.dash-help .dash-help-body { padding: 0 16px 14px; font-size: 0.85rem; line-height: 1.6; color: var(--forest); }
+.dash-help .dash-help-body ul { margin: 6px 0; padding-left: 20px; }
+
+/* ── Tabs ── */
+.dash-tabs { display: flex; gap: 4px; border-bottom: 2px solid var(--mist); margin-bottom: 18px; flex-wrap: wrap; }
+.dash-tab {
+    background: none; border: none; padding: 10px 16px; font-size: 0.92rem; font-weight: 700;
+    color: var(--text-muted); cursor: pointer; border-bottom: 3px solid transparent; font-family: var(--font-body);
+    margin-bottom: -2px;
+}
+.dash-tab[aria-selected="true"] { color: var(--forest); border-bottom-color: var(--gold); }
+.dash-tabpanel { display: none; }
+.dash-tabpanel.active { display: block; }
+
+/* ── KPI cards ── */
+.dash-kpi-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; margin-bottom: 20px; }
+.dash-kpi-card {
+    background: #fff; border: 1px solid var(--mist); border-radius: 12px; padding: 14px 16px;
+    box-shadow: 0 1px 4px rgba(26,47,30,0.05);
+}
+.dash-kpi-card .dash-kpi-label { font-size: 0.72rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em; }
+.dash-kpi-card .dash-kpi-value {
+    font-family: var(--font-body); font-variant-numeric: tabular-nums; font-size: 1.5rem; font-weight: 700;
+    color: var(--forest); margin: 4px 0 2px;
+}
+.dash-kpi-delta { font-size: 0.78rem; font-weight: 700; display: flex; align-items: center; gap: 4px; }
+.dash-kpi-delta.up { color: #1a6b3c; }
+.dash-kpi-delta.down { color: #a3311a; }
+.dash-kpi-delta.flat, .dash-kpi-delta.new { color: var(--text-muted); }
+
+/* ── Chart / table grid ── */
+.dash-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; margin-bottom: 20px; }
+.dash-card {
+    background: #fff; border: 1px solid var(--mist); border-radius: 12px; padding: 16px;
+    box-shadow: 0 1px 4px rgba(26,47,30,0.05); min-width: 0;
+}
+.dash-card h3 { font-family: var(--font-display); font-weight: 600; font-size: 1.1rem; margin: 0 0 10px; color: var(--forest); }
+.dash-card.full-width { grid-column: 1 / -1; }
+.dash-chart-wrap { position: relative; height: 260px; }
+.dash-chart-wrap canvas { max-width: 100%; }
+.dash-view-as-table-btn {
+    font-size: 0.75rem; background: none; border: 1px solid var(--mist); border-radius: 6px;
+    padding: 3px 9px; cursor: pointer; color: var(--moss); float: right; font-family: var(--font-body);
+}
+
+/* ── Tables ── */
+.dash-table-scroll { overflow-x: auto; max-width: 100%; }
+table.dash-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+table.dash-table th, table.dash-table td { padding: 7px 10px; text-align: left; border-bottom: 1px solid var(--mist); white-space: nowrap; }
+table.dash-table td.num, table.dash-table th.num { text-align: right; font-variant-numeric: tabular-nums; }
+table.dash-table th { color: var(--text-muted); font-weight: 700; font-size: 0.72rem; text-transform: uppercase; cursor: pointer; user-select: none; }
+table.dash-table th .sort-arrow { font-size: 0.65rem; margin-left: 3px; }
+table.dash-table tbody tr:hover { background: var(--cream); }
+.dash-table-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; gap: 8px; flex-wrap: wrap; }
+.dash-export-btn {
+    font-size: 0.78rem; background: var(--gold); color: var(--forest); border: none; border-radius: 6px;
+    padding: 6px 12px; font-weight: 700; cursor: pointer; text-decoration: none; display: inline-block;
+}
+.dash-pagination { display: flex; gap: 8px; align-items: center; justify-content: flex-end; margin-top: 8px; font-size: 0.82rem; }
+.dash-pagination button { background: var(--mist); border: none; border-radius: 6px; padding: 5px 10px; cursor: pointer; }
+.dash-pagination button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ── Alerts strip ── */
+.dash-alerts { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+.dash-alert-pill {
+    background: #fff; border: 1px solid var(--mist); border-left: 4px solid var(--gold); border-radius: 8px;
+    padding: 10px 14px; font-size: 0.85rem; font-weight: 600; flex: 1; min-width: 200px;
+}
+.dash-alert-pill.warn { border-left-color: #a3311a; }
+.dash-alert-pill .count { font-size: 1.3rem; font-weight: 800; font-variant-numeric: tabular-nums; margin-right: 6px; }
+
+/* ── Loading / empty / error states ── */
+.dash-skeleton { background: linear-gradient(90deg, var(--mist) 25%, #f3f3ea 37%, var(--mist) 63%); background-size: 400% 100%; animation: dash-shimmer 1.4s ease infinite; border-radius: 8px; min-height: 60px; }
+@keyframes dash-shimmer { 0% { background-position: 100% 50%; } 100% { background-position: 0 50%; } }
+.dash-empty-state { text-align: center; color: var(--text-muted); font-size: 0.88rem; padding: 24px 12px; }
+.dash-error-state { text-align: center; color: #a3311a; font-size: 0.88rem; padding: 20px 12px; }
+.dash-error-state button { margin-top: 8px; background: var(--forest); color: #fff; border: none; border-radius: 7px; padding: 6px 14px; cursor: pointer; font-weight: 700; }
+
+@media (prefers-reduced-motion: reduce) {
+    .dash-skeleton { animation: none; }
+}
+
+/* ── Responsive (375px -> desktop) ── */
+@media (max-width: 640px) {
+    .dash-header { padding: 14px 12px; }
+    .dash-filterbar { position: static; padding: 12px; }
+    .dash-kpi-row { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+    .dash-grid { grid-template-columns: 1fr; }
+    .dash-tabs { overflow-x: auto; flex-wrap: nowrap; }
+}
+
+html { -webkit-text-size-adjust: 100%; }
+body, .dash-wrap { overflow-x: hidden; }
+
+/* ── Print ── */
+/* Only the currently active tab prints (not all six) -- tabs are
+   lazy-loaded, so an unvisited tab has nothing but a loading skeleton to
+   show anyway. Printing right after switching to the tab of interest is
+   the supported path -- the print header states which section + range. */
+@media print {
+    .dash-filterbar, .dash-tabs, .dash-header-links, .dash-view-as-table-btn,
+    .dash-export-btn, .dash-pagination, .dash-help, .dash-header {
+        display: none !important;
+    }
+    #dashPrintHeader { display: block !important; margin-bottom: 16px; }
+    body { background: #fff; }
+}
+#dashPrintHeader { display: none; }

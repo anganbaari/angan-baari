@@ -594,8 +594,11 @@
                 </div>
 
                 <div class="receipt-combined-row">
-                    <div class="logout-col">
+                    <div class="logout-col" style="flex-direction: column; gap: 4px;">
                         <button type="button" class="side-btn logout-btn" id="logoutBtn">Logout</button>
+                        {% if show_reports_link %}
+                        <a href="{% url 'dashboard' %}" class="side-btn logout-btn" style="text-decoration: none; display: flex; align-items: center; justify-content: center; font-size: 0.75rem;">Reports</a>
+                        {% endif %}
                     </div>
 
                     <div class="reminder-card">
