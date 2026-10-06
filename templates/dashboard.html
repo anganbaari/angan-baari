@@ -7,261 +7,429 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- Deliberately NOT a PWA page and NOT inside the /pos/ service
          worker's scope (that scope is /pos/ only -- see pos-sw.js) -- this
-         page is never cached and always needs a live connection. No
-         manifest link, no SW registration, nothing offline here. -->
+         page is never cached and always needs a live connection. -->
     <meta name="robots" content="noindex, nofollow">
-    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <meta name="theme-color" content="#0e1710">
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{% static 'style.css' %}">
-    <link rel="stylesheet" href="{% static 'css/dashboard.css' %}?v=1">
+    <link rel="stylesheet" href="{% static 'css/dashboard.css' %}?v=2">
 </head>
 <body class="dashboard-body">
     <div id="dashPrintHeader">
         <strong>Angan Baari — Reports</strong>
-        <div id="dashPrintRange" style="font-size:0.85rem;color:var(--text-muted);"></div>
+        <div id="dashPrintRange" style="font-size:0.85rem;"></div>
     </div>
 
-    <header class="dash-header">
-        <div>
-            <h1>Reports &amp; Dashboard</h1>
-            <div class="dash-sub">Angan Baari — staff only (owner/manager)</div>
-        </div>
-        <nav class="dash-header-links">
-            <a href="{% url 'pos' %}">&larr; Back to POS</a>
-            <a href="/admin/">Admin</a>
-        </nav>
-    </header>
+    <div class="dash-shell">
+        <div class="dash-sidebar-backdrop" id="sidebarBackdrop"></div>
 
-    <div class="dash-wrap">
-        <div id="dashConnError" class="dash-error-state" style="display:none;"></div>
+        <aside class="dash-sidebar" id="dashSidebar" aria-label="Report sections">
+            <div class="dash-brand">
+                <img class="logo" src="{% static 'images/logo-icon.png' %}" alt="">
+                <svg class="flag-svg" viewBox="0 0 60 92" aria-hidden="true" role="img">
+                    <polygon points="2,3 52,24 22,38 52,60 2,88" fill="#DC143C" stroke="#003893" stroke-width="5" stroke-linejoin="round"/>
+                    <g transform="translate(20,17)">
+                        <circle r="6" fill="#fff"/>
+                        <circle r="5.2" cx="2.6" fill="#DC143C"/>
+                        <g fill="#fff">
+                            <polygon points="0,-9 1.4,-6.2 -1.4,-6.2"/>
+                            <polygon points="-7.2,-4.2 -5.3,-3 -5.8,-5.6"/>
+                            <polygon points="-8.3,0 -6.3,1 -6.3,-1"/>
+                            <polygon points="-7.2,4.2 -5.8,5.6 -5.3,3"/>
+                        </g>
+                    </g>
+                    <g transform="translate(20,49)">
+                        <circle r="6" fill="#fff"/>
+                        <g fill="#fff">
+                            <polygon points="0,-9.5 1.3,-6.8 -1.3,-6.8"/>
+                            <polygon points="4.8,-8.1 4.6,-5.5 6.7,-7.1"/>
+                            <polygon points="8.1,-4.8 5.8,-3.9 7.3,-1.9"/>
+                            <polygon points="9.5,0 6.8,1.3 6.8,-1.3"/>
+                            <polygon points="8.1,4.8 7.3,2.6 5.8,3.9"/>
+                            <polygon points="4.8,8.1 6.7,7.1 4.6,5.5"/>
+                            <polygon points="0,9.5 -1.3,6.8 1.3,6.8"/>
+                            <polygon points="-4.8,8.1 -4.6,5.5 -6.7,7.1"/>
+                            <polygon points="-8.1,4.8 -5.8,3.9 -7.3,1.9"/>
+                            <polygon points="-9.5,0 -6.8,-1.3 -6.8,1.3"/>
+                            <polygon points="-8.1,-4.8 -7.3,-2.6 -5.8,-3.9"/>
+                            <polygon points="-4.8,-8.1 -6.7,-7.1 -4.6,-5.5"/>
+                        </g>
+                    </g>
+                </svg>
+                <div class="brand-text">
+                    <h1>Angan Baari</h1>
+                    <span>आँगन बारी</span>
+                </div>
+            </div>
 
-        <form class="dash-filterbar" id="filterBar" aria-label="Report filters">
-            <div class="dash-field dash-presets" role="group" aria-label="Date range presets">
-                <label>Quick range</label>
-                <div style="display:flex; flex-wrap:wrap; gap:6px;">
-                    <button type="button" class="dash-preset-btn" data-preset="today">Today</button>
-                    <button type="button" class="dash-preset-btn" data-preset="yesterday">Yesterday</button>
-                    <button type="button" class="dash-preset-btn" data-preset="last7">Last 7 days</button>
-                    <button type="button" class="dash-preset-btn active" data-preset="last30">Last 30 days</button>
-                    <button type="button" class="dash-preset-btn" data-preset="thismonth">This month</button>
-                    <button type="button" class="dash-preset-btn" data-preset="lastmonth">Last month</button>
-                </div>
-            </div>
-            <div class="dash-field">
-                <label for="startDate">Start</label>
-                <input type="date" id="startDate" name="start">
-            </div>
-            <div class="dash-field">
-                <label for="endDate">End</label>
-                <input type="date" id="endDate" name="end">
-            </div>
-            <div class="dash-field">
-                <label for="channelSelect">Channel</label>
-                <select id="channelSelect">
-                    <option value="all">All</option>
-                    <option value="pos">POS</option>
-                    <option value="online">Online</option>
-                </select>
-            </div>
-            <div class="dash-field">
-                <label for="granularitySelect">Granularity</label>
-                <select id="granularitySelect">
-                    <option value="day">Day</option>
-                    <option value="week">Week</option>
-                    <option value="month">Month</option>
-                </select>
-            </div>
-            <div class="dash-field">
-                <label for="compareToggle">&nbsp;</label>
-                <span class="dash-compare-toggle">
-                    <input type="checkbox" id="compareToggle">
-                    <label for="compareToggle">Compare to previous period</label>
-                </span>
-            </div>
-            <div class="dash-field">
-                <label>&nbsp;</label>
-                <button type="button" class="dash-refresh-btn" id="refreshBtn">Refresh</button>
-            </div>
-            <div class="dash-last-updated" id="lastUpdated"></div>
-            <div class="dash-filter-error" id="filterError" role="alert"></div>
-        </form>
+            <nav class="dash-nav" role="tablist" aria-label="Report sections">
+                <button class="dash-nav-item" role="tab" data-section="overview" aria-current="page">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+                    <span class="label">Overview</span>
+                </button>
+                <button class="dash-nav-item" role="tab" data-section="sales">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l5-6 4 4 7-9"/><path d="M14 6h5v5"/></svg>
+                    <span class="label">Sales</span>
+                </button>
+                <button class="dash-nav-item" role="tab" data-section="products">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/></svg>
+                    <span class="label">Products</span>
+                </button>
+                <button class="dash-nav-item" role="tab" data-section="credit">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="13" rx="2"/><path d="M2 10h20"/><path d="M6 15h4"/></svg>
+                    <span class="label">Credit (उधारो)</span>
+                </button>
+                <button class="dash-nav-item" role="tab" data-section="inventory">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7l9-4 9 4-9 4-9-4z"/><path d="M3 7v10l9 4 9-4V7"/><path d="M12 11v10"/></svg>
+                    <span class="label">Inventory</span>
+                </button>
+                <button class="dash-nav-item" role="tab" data-section="orders">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2 3h3l2.6 12.4a2 2 0 0 0 2 1.6h8a2 2 0 0 0 2-1.6L21 7H6"/></svg>
+                    <span class="label">Online Orders</span>
+                </button>
+                <button class="dash-nav-item" role="tab" data-section="alerts">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a6 6 0 0 0-6 6c0 5-2 6-2 7h16c0-1-2-2-2-7a6 6 0 0 0-6-6z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg>
+                    <span class="label">Alerts</span>
+                    <span class="pl-badge" id="alertsNavCount" style="display:none;"></span>
+                </button>
+                <button class="dash-nav-item disabled" type="button" disabled title="Needs a recorded cost price per product, which this project doesn't track yet.">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1v22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                    <span class="label">Profit &amp; Loss</span>
+                    <span class="pl-badge">needs cost data</span>
+                </button>
+            </nav>
 
-        <details class="dash-help">
-            <summary>How these numbers are calculated</summary>
-            <div class="dash-help-body">
-                <ul>
-                    <li><strong>Sales (revenue)</strong> is POS sales only, after discounts. Website orders have no stored price (a reorder intentionally re-prices at today's rate), so online orders are shown as a <strong>count</strong>, never blended into a Rs figure.</li>
-                    <li><strong>Cash collected</strong> = non-credit payment portions of POS sales + credit repayments received in the period. This is <em>not</em> the same as revenue — a credit sale is revenue immediately but cash only when repaid.</li>
-                    <li><strong>Credit given</strong> = the credit portion of POS sales in the period. <strong>Outstanding credit</strong> is a live snapshot (all-time), matching the Credit tab exactly — it isn't scoped to the filter date range.</li>
-                    <li><strong>Per-product / per-category revenue is an estimate</strong> ("est."), priced at today's rates — individual sale lines don't store historical prices. Quantity/weight breakdowns are exact.</li>
-                    <li><strong>Offer discounts are not tracked</strong> as a Rs amount (only that an offer was used); <strong>coupon discounts are exact</strong> (stored on the sale).</li>
-                    <li>No profit/margin figures anywhere — products have no recorded cost price.</li>
-                    <li>Dates use Nepal local time (Asia/Kathmandu). Dismissed/failed offline POS sales are never saved to the database (only a Telegram alert) — this dashboard reflects synced sales only.</li>
-                </ul>
+            <div class="dash-bsgrid">
+                <div class="dash-bsgrid-head">
+                    <button type="button" id="bsYearPrev" aria-label="Previous B.S. year">&lsaquo;</button>
+                    <span class="year-label" id="bsYearLabel">—</span>
+                    <button type="button" id="bsYearNext" aria-label="Next B.S. year">&rsaquo;</button>
+                </div>
+                <div class="dash-bsgrid-months" id="bsMonthGrid"></div>
             </div>
-        </details>
 
-        <div class="dash-alerts" id="alertsStrip"></div>
-
-        <div class="dash-tabs" role="tablist" aria-label="Report sections">
-            <button class="dash-tab" role="tab" id="tab-overview" aria-controls="panel-overview" aria-selected="true" data-tab="overview">Overview</button>
-            <button class="dash-tab" role="tab" id="tab-sales" aria-controls="panel-sales" aria-selected="false" data-tab="sales">Sales</button>
-            <button class="dash-tab" role="tab" id="tab-products" aria-controls="panel-products" aria-selected="false" data-tab="products">Products</button>
-            <button class="dash-tab" role="tab" id="tab-credit" aria-controls="panel-credit" aria-selected="false" data-tab="credit">Credit (उधारो)</button>
-            <button class="dash-tab" role="tab" id="tab-inventory" aria-controls="panel-inventory" aria-selected="false" data-tab="inventory">Inventory</button>
-            <button class="dash-tab" role="tab" id="tab-orders" aria-controls="panel-orders" aria-selected="false" data-tab="orders">Online Orders</button>
-        </div>
-
-        <div id="panel-overview" class="dash-tabpanel active" role="tabpanel" aria-labelledby="tab-overview">
-            <div class="dash-kpi-row" id="overviewKpis"><div class="dash-skeleton" style="height:90px;grid-column:1/-1;"></div></div>
-            <div class="dash-grid">
-                <div class="dash-card full-width">
-                    <h3>Sales over time</h3>
-                    <button type="button" class="dash-view-as-table-btn" data-chart="overviewTrendChart">View as table</button>
-                    <div class="dash-chart-wrap"><canvas id="overviewTrendChart" aria-label="Sales over time" role="img"></canvas></div>
-                    <div class="dash-table-scroll" id="overviewTrendTable" style="display:none;"></div>
-                </div>
-                <div class="dash-card">
-                    <h3>Payment mix</h3>
-                    <div class="dash-chart-wrap" style="height:220px;"><canvas id="paymentMixChart" aria-label="Payment method mix" role="img"></canvas></div>
-                </div>
-                <div class="dash-card">
-                    <h3>Channel split (by count)</h3>
-                    <div class="dash-chart-wrap" style="height:220px;"><canvas id="channelSplitChart" aria-label="Channel split" role="img"></canvas></div>
-                </div>
-                <div class="dash-card full-width">
-                    <h3>Top 5 products (by quantity)</h3>
-                    <div class="dash-chart-wrap"><canvas id="topProductsChart" aria-label="Top 5 products" role="img"></canvas></div>
-                </div>
+            <div class="dash-target-card" id="targetCard">
+                <div class="dash-skeleton" style="height:70px;"></div>
             </div>
-        </div>
 
-        <div id="panel-sales" class="dash-tabpanel" role="tabpanel" aria-labelledby="tab-sales">
-            <div class="dash-grid">
-                <div class="dash-card full-width">
-                    <h3>Revenue over time</h3>
-                    <div class="dash-chart-wrap"><canvas id="salesTrendChart" aria-label="Revenue over time" role="img"></canvas></div>
-                </div>
-                <div class="dash-card">
-                    <h3>Sales by hour of day</h3>
-                    <div class="dash-chart-wrap"><canvas id="salesByHourChart" aria-label="Sales by hour of day" role="img"></canvas></div>
-                </div>
-                <div class="dash-card">
-                    <h3>Sales by day of week</h3>
-                    <div class="dash-chart-wrap"><canvas id="salesByDowChart" aria-label="Sales by day of week" role="img"></canvas></div>
-                </div>
-                <div class="dash-card full-width">
-                    <div class="dash-table-toolbar">
-                        <h3 style="margin:0;">Recent sales</h3>
-                        <a class="dash-export-btn" id="exportSalesBtn" href="#">Export CSV</a>
+            <div class="dash-sidebar-footer">
+                <a href="/admin/">Admin</a>
+            </div>
+        </aside>
+
+        <div class="dash-main">
+            <div class="dash-mobile-bar">
+                <button type="button" id="sidebarToggle" aria-label="Open menu" aria-expanded="false">☰</button>
+                <strong style="font-family:var(--font-display);color:var(--dash-gold-light);">Reports</strong>
+            </div>
+
+            <header class="dash-topbar">
+                <div class="dash-topbar-row1">
+                    <h2 id="sectionTitle">Overview</h2>
+                    <div class="dash-topbar-meta">
+                        <span class="dash-today-chip" id="todayBsChip">आज —</span>
+                        <span id="lastUpdated">—</span>
                     </div>
-                    <div class="dash-table-scroll" id="recentSalesTable"></div>
-                    <div class="dash-pagination" id="recentSalesPager"></div>
                 </div>
-                <div class="dash-card full-width">
-                    <h3>Sales by operator</h3>
-                    <div class="dash-table-scroll" id="byOperatorTable"></div>
+                <div class="dash-controls">
+                    <select class="dash-select" id="presetSelect" aria-label="Date range preset">
+                        <option value="today">Today</option>
+                        <option value="yesterday">Yesterday</option>
+                        <option value="last7">Last 7 days</option>
+                        <option value="last30" selected>Last 30 days</option>
+                        <option value="thismonth">This month (BS)</option>
+                        <option value="lastmonth">Last month (BS)</option>
+                        <option value="thisbsyear">This BS year</option>
+                        <option value="fiscalyear">This fiscal year</option>
+                        <option value="custom">Custom range</option>
+                    </select>
+                    <div class="dash-segmented" role="group" aria-label="Channel" id="channelSeg">
+                        <button type="button" data-value="all" aria-pressed="true">All</button>
+                        <button type="button" data-value="pos" aria-pressed="false">POS</button>
+                        <button type="button" data-value="online" aria-pressed="false">Online</button>
+                    </div>
+                    <select class="dash-select" id="paymentTypeSelect" aria-label="Payment type">
+                        <option value="">Any payment</option>
+                        <option value="cash">Cash</option>
+                        <option value="other">Other digital</option>
+                        <option value="credit">Credit</option>
+                    </select>
+                    <select class="dash-select" id="customerTypeSelect" aria-label="Customer type">
+                        <option value="">Any customer</option>
+                        <option value="credit">Credit customers</option>
+                        <option value="walkin">Walk-in</option>
+                    </select>
+                    <select class="dash-select" id="operatorSelect" aria-label="Operator">
+                        <option value="">Any operator</option>
+                    </select>
+                    <div class="dash-segmented" role="group" aria-label="Granularity" id="granularitySeg">
+                        <button type="button" data-value="day" aria-pressed="true">Day</button>
+                        <button type="button" data-value="week" aria-pressed="false">Week</button>
+                        <button type="button" data-value="bs_month" aria-pressed="false">Month</button>
+                    </div>
+                    <label class="dash-icon-btn" style="cursor:pointer;">
+                        <input type="checkbox" id="compareToggle" style="margin-right:4px;"> Compare
+                    </label>
+                    <button type="button" class="dash-icon-btn primary" id="refreshBtn">Refresh</button>
+                    <button type="button" class="dash-icon-btn" id="printBtn">Print / PDF</button>
                 </div>
-            </div>
-        </div>
+                <div class="dash-bs-range-picker" id="bsRangePicker">
+                    <div class="grp">
+                        <label>Start</label>
+                        <select class="dash-select" id="bsStartDay"></select>
+                        <select class="dash-select" id="bsStartMonth"></select>
+                        <select class="dash-select" id="bsStartYear"></select>
+                    </div>
+                    <div class="grp">
+                        <label>End</label>
+                        <select class="dash-select" id="bsEndDay"></select>
+                        <select class="dash-select" id="bsEndMonth"></select>
+                        <select class="dash-select" id="bsEndYear"></select>
+                    </div>
+                    <button type="button" class="dash-icon-btn primary" id="applyCustomRangeBtn">Apply</button>
+                </div>
+                <div class="dash-filters-active" id="filtersActiveIndicator">
+                    <span id="filtersActiveText"></span>
+                    <button type="button" id="resetFiltersBtn">Reset</button>
+                </div>
+                <div class="dash-filter-error" id="filterError" role="alert"></div>
+            </header>
 
-        <div id="panel-products" class="dash-tabpanel" role="tabpanel" aria-labelledby="tab-products">
-            <div class="dash-grid">
-                <div class="dash-card full-width">
-                    <div class="dash-table-toolbar">
-                        <h3 style="margin:0;">Top products</h3>
-                        <select id="topProductsBySelect">
-                            <option value="revenue">By revenue (est.)</option>
-                            <option value="quantity">By quantity</option>
-                        </select>
-                    </div>
-                    <div class="dash-chart-wrap"><canvas id="productsTopChart" aria-label="Top products" role="img"></canvas></div>
-                </div>
-                <div class="dash-card">
-                    <h3>Sales by category (est. revenue)</h3>
-                    <div class="dash-chart-wrap"><canvas id="categoryChart" aria-label="Sales by category" role="img"></canvas></div>
-                </div>
-                <div class="dash-card">
-                    <h3>Slow movers (zero sales in period)</h3>
-                    <div class="dash-table-scroll" id="slowMoversTable"></div>
-                </div>
-                <div class="dash-card full-width">
-                    <div class="dash-table-toolbar">
-                        <h3 style="margin:0;">All products</h3>
-                        <a class="dash-export-btn" id="exportProductsBtn" href="#">Export CSV</a>
-                    </div>
-                    <div class="dash-table-scroll" id="productTable"></div>
-                </div>
-                <div class="dash-card full-width">
-                    <h3>Offers &amp; coupons performance</h3>
-                    <div class="dash-table-scroll" id="offersTable"></div>
-                </div>
-            </div>
-        </div>
+            <div class="dash-content">
+                <div id="dashConnError" class="dash-error-state" style="display:none;"></div>
 
-        <div id="panel-credit" class="dash-tabpanel" role="tabpanel" aria-labelledby="tab-credit">
-            <div class="dash-kpi-row" id="creditKpis"><div class="dash-skeleton" style="height:90px;grid-column:1/-1;"></div></div>
-            <div class="dash-grid">
-                <div class="dash-card">
-                    <h3>Ageing (oldest unpaid first)</h3>
-                    <div class="dash-chart-wrap"><canvas id="ageingChart" aria-label="Credit ageing buckets" role="img"></canvas></div>
-                </div>
-                <div class="dash-card">
-                    <h3>Credit given vs repaid over time</h3>
-                    <div class="dash-chart-wrap"><canvas id="creditTrendChart" aria-label="Credit given vs repaid" role="img"></canvas></div>
-                </div>
-                <div class="dash-card full-width">
-                    <div class="dash-table-toolbar">
-                        <h3 style="margin:0;">Customers with a balance</h3>
-                        <a class="dash-export-btn" id="exportCreditBtn" href="#">Export CSV</a>
-                    </div>
-                    <div class="dash-table-scroll" id="creditCustomersTable"></div>
-                </div>
-            </div>
-        </div>
+                <!-- ═══ OVERVIEW ═══ -->
+                <section class="dash-section active" id="section-overview" aria-labelledby="sectionTitle">
+                    <details class="dash-help">
+                        <summary>How these numbers are calculated</summary>
+                        <div class="dash-help-body" id="helpPanelBody"></div>
+                    </details>
 
-        <div id="panel-inventory" class="dash-tabpanel" role="tabpanel" aria-labelledby="tab-inventory">
-            <div class="dash-grid">
-                <div class="dash-card">
-                    <h3>Movements by type (period)</h3>
-                    <div class="dash-chart-wrap"><canvas id="movementsChart" aria-label="Movements by type" role="img"></canvas></div>
-                </div>
-                <div class="dash-card">
-                    <h3>Waste / loss (period)</h3>
-                    <div class="dash-table-scroll" id="wasteTable"></div>
-                </div>
-                <div class="dash-card full-width">
-                    <div class="dash-table-toolbar">
-                        <h3 style="margin:0;">Current stock</h3>
-                        <a class="dash-export-btn" id="exportInventoryBtn" href="#">Export CSV</a>
-                    </div>
-                    <div class="dash-table-scroll" id="stockTable"></div>
-                </div>
-            </div>
-        </div>
+                    <div class="dash-kpi-strip" id="ovKpiStrip"><div class="dash-skeleton" style="height:80px;grid-column:1/-1;"></div></div>
 
-        <div id="panel-orders" class="dash-tabpanel" role="tabpanel" aria-labelledby="tab-orders">
-            <div class="dash-grid">
-                <div class="dash-card">
-                    <h3>Orders by status</h3>
-                    <div class="dash-chart-wrap"><canvas id="ordersByStatusChart" aria-label="Orders by status" role="img"></canvas></div>
-                </div>
-                <div class="dash-card">
-                    <h3>Orders over time</h3>
-                    <div class="dash-chart-wrap"><canvas id="ordersOverTimeChart" aria-label="Orders over time" role="img"></canvas></div>
-                </div>
-                <div class="dash-card full-width">
-                    <div class="dash-table-toolbar">
-                        <h3 style="margin:0;">Recent orders</h3>
-                        <a class="dash-export-btn" id="exportOrdersBtn" href="#">Export CSV</a>
+                    <div class="dash-grid">
+                        <div class="dash-card c8">
+                            <h3>Sales over time <span class="sub" id="ovTrendPeak"></span></h3>
+                            <button type="button" class="dash-view-as-table-btn" data-chart="ovTrendChart">Table</button>
+                            <div class="dash-chart-wrap"><canvas id="ovTrendChart" aria-label="Sales over time" role="img"></canvas></div>
+                            <div class="dash-table-scroll" id="ovTrendTable" style="display:none;"></div>
+                        </div>
+                        <div class="dash-card c4">
+                            <h3>Payment mix</h3>
+                            <div class="dash-chart-wrap short"><canvas id="ovPaymentMixChart" aria-label="Payment mix" role="img"></canvas></div>
+                            <div id="ovPaymentMixLegend"></div>
+                        </div>
+
+                        <div class="dash-card c6">
+                            <h3>Top 5 products</h3>
+                            <div class="dash-chart-wrap"><canvas id="ovTopProductsChart" aria-label="Top 5 products" role="img"></canvas></div>
+                        </div>
+                        <div class="dash-card c3">
+                            <h3>Sales by hour</h3>
+                            <div class="dash-chart-wrap short"><canvas id="ovByHourChart" aria-label="Sales by hour of day" role="img"></canvas></div>
+                        </div>
+                        <div class="dash-card c3">
+                            <h3>Sales by weekday</h3>
+                            <div class="dash-chart-wrap short"><canvas id="ovByDowChart" aria-label="Sales by day of week" role="img"></canvas></div>
+                        </div>
+
+                        <div class="dash-card c8">
+                            <h3>Product comparison <span class="sub">vs previous period</span></h3>
+                            <div class="dash-table-scroll" id="ovProductCompareTable"></div>
+                        </div>
+                        <div class="dash-card c4">
+                            <h3>Category mix <span class="sub">(est.)</span></h3>
+                            <div class="dash-chart-wrap short"><canvas id="ovCategoryChart" aria-label="Category mix" role="img"></canvas></div>
+                            <div id="ovCategoryLegend"></div>
+                        </div>
+
+                        <div class="dash-card c4">
+                            <h3>Top operators</h3>
+                            <div id="ovStaffRanking"></div>
+                        </div>
+                        <div class="dash-card c4">
+                            <h3>Alerts <span class="sub" id="ovAlertsCount"></span></h3>
+                            <div id="ovAlertsPreview"></div>
+                        </div>
+                        <div class="dash-card c4">
+                            <h3>Projection</h3>
+                            <div id="ovRunRate"></div>
+                        </div>
+
+                        <div class="dash-card c12">
+                            <h3>Period at a glance</h3>
+                            <div class="dash-insight-strip" id="ovInsightStrip"></div>
+                        </div>
                     </div>
-                    <div class="dash-table-scroll" id="recentOrdersTable"></div>
-                    <div class="dash-pagination" id="recentOrdersPager"></div>
-                </div>
+                </section>
+
+                <!-- ═══ SALES ═══ -->
+                <section class="dash-section" id="section-sales">
+                    <div class="dash-grid">
+                        <div class="dash-card c12">
+                            <h3>Revenue over time</h3>
+                            <div class="dash-chart-wrap"><canvas id="salesTrendChart" aria-label="Revenue over time" role="img"></canvas></div>
+                        </div>
+                        <div class="dash-card c6">
+                            <h3>Sales by hour of day</h3>
+                            <div class="dash-chart-wrap"><canvas id="salesByHourChart" aria-label="Sales by hour of day" role="img"></canvas></div>
+                        </div>
+                        <div class="dash-card c6">
+                            <h3>Sales by day of week</h3>
+                            <div class="dash-chart-wrap"><canvas id="salesByDowChart" aria-label="Sales by day of week" role="img"></canvas></div>
+                        </div>
+                        <div class="dash-card c12">
+                            <div class="dash-table-toolbar">
+                                <h3 style="margin:0;">Recent sales</h3>
+                                <a class="dash-export-btn" id="exportSalesBtn" href="#">Export CSV</a>
+                            </div>
+                            <div class="dash-table-scroll" id="recentSalesTable"></div>
+                            <div class="dash-pagination" id="recentSalesPager"></div>
+                        </div>
+                        <div class="dash-card c12">
+                            <h3>Sales by operator</h3>
+                            <div class="dash-table-scroll" id="byOperatorTable"></div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ═══ PRODUCTS ═══ -->
+                <section class="dash-section" id="section-products">
+                    <div class="dash-grid">
+                        <div class="dash-card c12">
+                            <div class="dash-table-toolbar">
+                                <h3 style="margin:0;">Top products</h3>
+                                <div class="dash-segmented" role="group" aria-label="Rank by" id="topProductsBySeg">
+                                    <button type="button" data-value="revenue" aria-pressed="true">By revenue (est.)</button>
+                                    <button type="button" data-value="quantity" aria-pressed="false">By quantity</button>
+                                </div>
+                            </div>
+                            <div class="dash-chart-wrap"><canvas id="productsTopChart" aria-label="Top products" role="img"></canvas></div>
+                        </div>
+                        <div class="dash-card c6">
+                            <h3>Sales by category <span class="sub">(est.)</span></h3>
+                            <div class="dash-chart-wrap"><canvas id="categoryChart" aria-label="Sales by category" role="img"></canvas></div>
+                            <div id="categoryLegend"></div>
+                        </div>
+                        <div class="dash-card c6">
+                            <h3>Slow movers <span class="sub">(zero sales in period)</span></h3>
+                            <div class="dash-table-scroll" id="slowMoversTable"></div>
+                        </div>
+                        <div class="dash-card c12">
+                            <div class="dash-table-toolbar">
+                                <h3 style="margin:0;">All products</h3>
+                                <a class="dash-export-btn" id="exportProductsBtn" href="#">Export CSV</a>
+                            </div>
+                            <div class="dash-table-scroll" id="productTable"></div>
+                        </div>
+                        <div class="dash-card c12">
+                            <h3>Offers &amp; coupons performance</h3>
+                            <div class="dash-table-scroll" id="offersTable"></div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ═══ CREDIT ═══ -->
+                <section class="dash-section" id="section-credit">
+                    <div class="dash-kpi-strip" id="creditKpis"><div class="dash-skeleton" style="height:70px;grid-column:1/-1;"></div></div>
+                    <div class="dash-grid">
+                        <div class="dash-card c6">
+                            <h3>Ageing <span class="sub">oldest unpaid first</span></h3>
+                            <div class="dash-chart-wrap"><canvas id="ageingChart" aria-label="Credit ageing buckets" role="img"></canvas></div>
+                        </div>
+                        <div class="dash-card c6">
+                            <h3>Credit given vs repaid</h3>
+                            <div class="dash-chart-wrap"><canvas id="creditTrendChart" aria-label="Credit given vs repaid" role="img"></canvas></div>
+                        </div>
+                        <div class="dash-card c12">
+                            <div class="dash-table-toolbar">
+                                <h3 style="margin:0;">Customers with a balance</h3>
+                                <a class="dash-export-btn" id="exportCreditBtn" href="#">Export CSV</a>
+                            </div>
+                            <div class="dash-table-scroll" id="creditCustomersTable"></div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ═══ INVENTORY ═══ -->
+                <section class="dash-section" id="section-inventory">
+                    <div class="dash-grid">
+                        <div class="dash-card c6">
+                            <h3>Movements by type <span class="sub">split by unit</span></h3>
+                            <div class="dash-chart-wrap"><canvas id="movementsChart" aria-label="Movements by type" role="img"></canvas></div>
+                        </div>
+                        <div class="dash-card c6">
+                            <h3>Waste / loss</h3>
+                            <div class="dash-table-scroll" id="wasteTable"></div>
+                        </div>
+                        <div class="dash-card c12">
+                            <div class="dash-table-toolbar">
+                                <h3 style="margin:0;">Current stock</h3>
+                                <a class="dash-export-btn" id="exportInventoryBtn" href="#">Export CSV</a>
+                            </div>
+                            <div class="dash-table-scroll" id="stockTable"></div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ═══ ONLINE ORDERS ═══ -->
+                <section class="dash-section" id="section-orders">
+                    <div class="dash-grid">
+                        <div class="dash-card c4">
+                            <h3>Orders by status</h3>
+                            <div class="dash-chart-wrap short"><canvas id="ordersByStatusChart" aria-label="Orders by status" role="img"></canvas></div>
+                            <div id="ordersByStatusLegend"></div>
+                        </div>
+                        <div class="dash-card c4">
+                            <h3>Status funnel</h3>
+                            <div id="ordersFunnel"></div>
+                        </div>
+                        <div class="dash-card c4">
+                            <h3>Orders over time</h3>
+                            <div class="dash-chart-wrap"><canvas id="ordersOverTimeChart" aria-label="Orders over time" role="img"></canvas></div>
+                        </div>
+                        <div class="dash-card c12">
+                            <div class="dash-table-toolbar">
+                                <h3 style="margin:0;">Recent orders</h3>
+                                <a class="dash-export-btn" id="exportOrdersBtn" href="#">Export CSV</a>
+                            </div>
+                            <div class="dash-table-scroll" id="recentOrdersTable"></div>
+                            <div class="dash-pagination" id="recentOrdersPager"></div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ═══ ALERTS ═══ -->
+                <section class="dash-section" id="section-alerts">
+                    <div class="dash-grid">
+                        <div class="dash-card c6">
+                            <h3>Low stock</h3>
+                            <div id="alertsLowStock"></div>
+                        </div>
+                        <div class="dash-card c6">
+                            <h3>No sales in a while</h3>
+                            <div id="alertsNoSales"></div>
+                        </div>
+                        <div class="dash-card c6">
+                            <h3>Pending online orders</h3>
+                            <div id="alertsStaleOrders"></div>
+                        </div>
+                        <div class="dash-card c6">
+                            <h3>High credit balances</h3>
+                            <div id="alertsHighCredit"></div>
+                        </div>
+                        <div class="dash-card c12" id="alertsTargetMilestoneCard" style="display:none;">
+                            <h3>Target milestone</h3>
+                            <div id="alertsTargetMilestone"></div>
+                        </div>
+                    </div>
+                </section>
             </div>
         </div>
     </div>
 
     <script src="{% static 'vendor/chart.min.js' %}"></script>
-    <script src="{% static 'js/dashboard.js' %}?v=1"></script>
+    <script src="{% static 'js/bs-calendar.js' %}?v=1"></script>
+    <script src="{% static 'js/dashboard.js' %}?v=2"></script>
 </body>
 </html>
