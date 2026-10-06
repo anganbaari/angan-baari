@@ -1,9 +1,10 @@
 # Key Files
 
-- `shop/models.py` — `Category`, `Product`, `ProductVariant`, `NewsletterSubscriber`, `ContactMessage`, `ProductOrder`, `Review`, `Wishlist`, `Offer`, `BundleItem`, `Coupon`, `InventoryMovement`, `POSSale`
+- `shop/models.py` — `Category`, `Product`, `ProductVariant`, `NewsletterSubscriber`, `ContactMessage`, `ProductOrder`, `Review`, `Wishlist`, `Offer`, `BundleItem`, `Coupon`, `InventoryMovement`, `POSSale`, `RevenueTarget`
 - `shop/views.py` — all view logic: cart (session-based), save-for-later, wishlist, checkout, coupon/offer application, POS (`pos_view`, `pos_service_worker`), the staff Reports dashboard shell (`dashboard_view`, `_is_owner_or_manager()`), the shared `create_inventory_movements_from_snapshot()` and `create_pos_sale()` helpers
 - `shop/reports.py` — all Reports dashboard aggregation (read-only). See [[Reports-Dashboard]].
-- `templates/dashboard.html` + `static/css/dashboard.css` + `static/js/dashboard.js` — the Reports dashboard page (`/dashboard/`, staff owner/manager only). See [[Reports-Dashboard]].
+- `shop/bs_calendar.py` — Bikram Sambat ↔ A.D. conversion, the server-side source of truth (tested in `shop/tests_bs_calendar.py`). See [[Reports-Dashboard]] for why this exists alongside two other copies of the same data table.
+- `templates/dashboard.html` + `static/css/dashboard.css` + `static/js/dashboard.js` + `static/js/bs-calendar.js` — the Reports dashboard page (`/dashboard/`, staff owner/manager only, dark theme, B.S. dates only). See [[Reports-Dashboard]].
 - `static/vendor/chart.min.js` — Chart.js v4.4.1, vendored (not a CDN — see [[Frontend-Lessons]]), used only by the Reports dashboard.
 - `shop/admin.py` — Django admin customizations: custom newsletter-campaign compose form (`NewsletterAdmin`), computed stock display on `ProductAdmin`
 - `shop/emails.py` — all outbound email (Resend) + Telegram notifications

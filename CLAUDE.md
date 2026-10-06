@@ -626,29 +626,130 @@ customer lookup, offers/combos, and coupon gating.
 
 Staff-only, owner/manager role only (not every staff login) read-only
 reporting screen at `/dashboard/` — `templates/dashboard.html`, vanilla JS
-(`static/js/dashboard.js` + `static/css/dashboard.css`), Chart.js vendored
-at `static/vendor/chart.min.js` (not a CDN — see Frontend conventions
-below). All aggregation logic lives in `shop/reports.py`, which only ever
-**reads** `POSSale`/`ProductOrder`/`CreditTransaction`/`InventoryMovement`
-— nothing on this page can affect the POS, checkout, or the ledger.
-Deliberately outside `/pos/`'s service-worker scope: never cached, no
-offline mode, a fetch failure just shows a plain "needs a connection"
-message.
+(`static/js/dashboard.js` + `static/css/dashboard.css` + `static/js/
+bs-calendar.js`), Chart.js vendored at `static/vendor/chart.min.js` (not
+a CDN — see Frontend conventions below). All aggregation logic lives in
+`shop/reports.py`, which only ever **reads**
+`POSSale`/`ProductOrder`/`CreditTransaction`/`InventoryMovement`/
+`RevenueTarget` — nothing on this page can affect the POS, checkout, or
+the ledger. Deliberately outside `/pos/`'s service-worker scope: never
+cached, no offline mode, a fetch failure just shows a plain "needs a
+connection" message. Dark theme by default (brand tokens, not a copy of
+any reference dashboard's own colors); print switches to a light,
+ink-friendly theme automatically.
 
-**Permissions**: gated by a NEW `api.permissions.IsOwnerOrManager` (API
-side) and `shop.views._is_owner_or_manager()` (page-shell side) — both
-check `UserProfile.role in ('admin', 'manager')`, with a superuser bypass.
-This is the first real consumer of `UserProfile.role` anywhere in the
+**Layout (redesigned 2026-10-07)**: fixed left sidebar (brand/logo +
+inline-SVG Nepali flag, icon nav for 6 real sections + Alerts + a
+disabled "Profit & Loss" item, a B.S. year/month grid, a Revenue Target
+progress card, an Admin-only footer link — no "Back to POS" link here;
+the POS's own Logout-column "Reports" link to this page is untouched) and
+a top bar (date-range presets, channel/payment-type/customer-type/
+operator filters, granularity, compare toggle, Refresh, Print). Sections
+are client-side-routed via `location.hash` (`#sales`, `#products`, etc.)
+so refresh/back-button work, each lazy-loading its own endpoint on first
+visit. Overview is a dense grid of small widgets (KPI strip, trend +
+peak marker, payment mix, top products, product comparison vs previous
+period, category mix, a staff-ranking preview, an alerts preview, a
+run-rate projection, a 5-card insight strip); the other sections show
+full detail (tables, CSV exports) same as before.
+
+**Permissions**: gated by `api.permissions.IsOwnerOrManager` (API side)
+and `shop.views._is_owner_or_manager()` (page-shell side) — both check
+`UserProfile.role in ('admin', 'manager')`, with a superuser bypass. This
+is the first real consumer of `UserProfile.role` anywhere in the
 codebase; every other POS permission check only ever used `is_staff`.
+
+**Bikram Sambat (B.S.) only — no A.D. dates are shown anywhere on this
+page.** The API still takes/returns plain A.D. ISO dates internally
+(`?start=`/`?end=` query params, CSV date columns); conversion happens at
+the UI boundary. The underlying day-length data table (BS 2075–2099,
+sourced from `remotemerge/nepali-date-converter`) now exists in **three
+places** that must be kept in sync by hand (no shared import between
+Python and JS, and `templates/pos.html`'s own inline copy was
+deliberately left untouched rather than refactored, since it's working
+POS code outside this task's scope):
+
+1. `templates/pos.html`'s inline `NEPALI_CALENDAR_DATA` (original, AD→BS
+   only, powers the POS clock).
+2. `shop/bs_calendar.py` — the source of truth for anything the SERVER
+   needs (`ad_to_bs`/`bs_to_ad`/month-length/fiscal-year-start), fully
+   unit-tested (`shop/tests_bs_calendar.py`, 21 tests incl. month-boundary
+   cases). Used by `shop/reports.py` to bucket daily rows into B.S.
+   months (`granularity=bs_month` — see below) when the browser asks for
+   month-level granularity, since there's no way to express a B.S. month
+   boundary as a database-level `Trunc*`.
+3. `static/js/bs-calendar.js` — a client-side mirror for the date
+   picker's instant preset clicks (Today/This BS month/custom B.S.
+   date/etc.) without a server round trip. Carries no server-side
+   authority; every date it produces is sent to the existing API as a
+   plain A.D. ISO string.
+
+If the table ever needs extending past BS 2099, update all three.
+
+**`granularity` accepts `day`/`week`/`bs_month`** (the old plain `month`
+was removed — B.S.-only means A.D. month buckets no longer make sense).
+`bs_month` works by having the DB bucket by day (`TruncDate`) and then
+regrouping those rows in Python via `shop/reports.py`'s
+`_bucket_daily_rows_into_bs_months()`.
+
+**Sale-level filters** — `payment_type` (cash/other/credit),
+`customer_type` (credit/walkin), `operator` (staff id) — thread through
+`shop/reports.py`'s `pos_sales_qs()` via the `SaleFilters` dataclass, and
+apply to Overview/Sales/Products. They deliberately do **not** apply to
+Credit, Inventory, or Online Orders (each is already its own slice, or
+has no payment-method/operator concept at all) — every report view sets
+`filters_applicable: false` on its JSON response in that case, and the
+frontend shows a note rather than silently ignoring an active filter.
+`GET /api/v1/reports/filter-options/` lists operators who've actually
+rung up a sale, for the operator dropdown.
+
+**Alerts** — `GET /api/v1/reports/alerts/` (its own section, not
+date-range-scoped — every alert is a "right now" state). Thresholds are
+plain constants at the top of `shop/reports.py` (not admin-editable —
+intentionally simple): `ALERT_NO_SALES_DAYS` (14), `ALERT_
+NO_SALES_LOOKBACK_DAYS` (60), `ALERT_CREDIT_BALANCE_THRESHOLD` (Rs
+5,000), `ALERT_ORDER_PENDING_DAYS` (3), `ALERT_TARGET_MILESTONES`
+(50/75/100%). Never fabricates an alert — an empty category is an empty
+list, and the frontend shows "All clear" when every category is empty.
+
+**Revenue Target** — new `RevenueTarget` model (migration `0037`,
+**needs `migrate` on PythonAnywhere**), editable in Django admin with
+plain A.D. dates (the owner just picks whatever period they mean — a
+Nepali fiscal year, a calendar year — nothing about the admin form itself
+needs to be B.S.). Shown in the sidebar card and B.S.-formatted there.
+"Achieved" is POS-sales-only (same revenue rule as everywhere else), via
+`shop/reports.py`'s `get_target_progress()`/`get_active_target()` — if
+several `is_active=True` targets exist, whichever one's period actually
+contains today wins, else the most recently started one. `GET /api/v1/
+reports/target/` is not date-range-scoped either (the target's own
+period is what matters, not the dashboard's filter bar).
+
+**Profit & Loss** — a disabled sidebar nav item with a "needs cost data"
+label/tooltip, not a built feature. `Product` has no cost/purchase-price
+field anywhere in the schema; this stays disabled until that data exists.
+
+**Print — a real gotcha if you touch chart colors.** Chart.js draws
+directly to canvas pixels, so the print media query's CSS variable
+overrides (`static/css/dashboard.css`'s `@media print` block, which
+redefines every `--dash-*` token to light-theme values) have **no
+effect** on already-rendered chart text/gridlines. `static/js/
+dashboard.js`'s `setChartsPrintMode()` recolors every live Chart.js
+instance in place on `window.beforeprint`/`afterprint` (not a refetch —
+just mutates `chart.options` and calls `chart.update('none')`). Caught by
+screenshot-comparing print output before vs. after — the first version
+only fixed CSS-text contrast and left chart text pale-on-white and
+unreadable.
 
 **Endpoints**, all GET-only, session-authed, under `/api/v1/reports/`,
 sharing `start`/`end`/`channel` (all/pos/online)/`granularity`
-(day/week/month)/`compare` (true/false) query params:
-`summary` (Overview tab), `sales-trend` (Sales tab), `payments` (payment
-mix, also embedded in `summary`), `products` (Products tab), `credit`
-(Credit/उधारो tab), `inventory` (Inventory tab), `orders` (Online Orders
-tab). Most support `?export=csv` for their main table (UTF-8 BOM prefix
-so Excel renders Devanagari names correctly).
+(day/week/bs_month)/`compare` (true/false)/`payment_type`/`customer_type`/
+`operator` query params: `summary` (Overview), `sales-trend` (Sales),
+`payments` (payment mix, also embedded in `summary`), `products`
+(Products), `credit` (Credit/उधारो), `inventory` (Inventory), `orders`
+(Online Orders), `alerts` (Alerts — no filter-bar params), `target`
+(sidebar card — no filter-bar params), `filter-options` (operator
+dropdown). Most support `?export=csv` for their main table (UTF-8 BOM
+prefix so Excel renders Devanagari names correctly).
 
 **Metric definitions — these were explicit design decisions, not
 assumptions, confirmed during this feature's build before any code was
@@ -744,7 +845,7 @@ exactly this shape was caught by `QueryCountTests` in
 
 - `shop/models.py` — Category, Product, ProductVariant, NewsletterSubscriber,
   ContactMessage, ProductOrder, Review, Wishlist, Offer, BundleItem, Coupon,
-  InventoryMovement, POSSale
+  InventoryMovement, POSSale, RevenueTarget
 - `shop/views.py` — all view logic: cart (session-based), save-for-later,
   wishlist, checkout, coupon/offer application, POS (`pos_view`,
   `pos_service_worker`), the Reports dashboard shell (`dashboard_view`),
@@ -752,8 +853,13 @@ exactly this shape was caught by `QueryCountTests` in
   and `create_pos_sale()` helpers
 - `shop/reports.py` — all Reports dashboard aggregation logic (read-only —
   see the "Reports dashboard" section above)
+- `shop/bs_calendar.py` — Bikram Sambat ↔ A.D. conversion, the
+  server-side source of truth (tested in `shop/tests_bs_calendar.py`);
+  see "Reports dashboard" above for why this exists alongside
+  `static/js/bs-calendar.js` and `templates/pos.html`'s own inline copy
 - `templates/dashboard.html` / `static/js/dashboard.js` /
-  `static/css/dashboard.css` — the Reports dashboard page
+  `static/css/dashboard.css` / `static/js/bs-calendar.js` — the Reports
+  dashboard page
 - `shop/admin.py` — Django admin customizations, including a custom
   newsletter-campaign compose form (`NewsletterAdmin`) and computed stock
   display on `ProductAdmin`
