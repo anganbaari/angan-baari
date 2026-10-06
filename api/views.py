@@ -1,3 +1,5 @@
+import csv
+import io
 import secrets
 import uuid
 from datetime import timedelta
@@ -33,7 +35,9 @@ from shop.views import (
     POSSaleValidationError,
 )
 
-from .permissions import IsStaffUser
+from shop import reports as reports_lib
+
+from .permissions import IsOwnerOrManager, IsStaffUser
 from .serializers import (
     CategorySerializer,
     ChangePasswordSerializer,
@@ -1408,3 +1412,243 @@ class ChangePasswordView(APIView):
         user.save()
 
         return Response({'status': 'ok', 'message': 'Password changed successfully.'})
+
+
+# ─── REPORTS DASHBOARD (staff, owner/manager role only) ──────────────
+#
+# Read-only throughout: every view below is GET-only and every number
+# comes from shop/reports.py, which only ever reads POSSale/ProductOrder/
+# CreditTransaction/InventoryMovement -- nothing here can affect the POS,
+# checkout, or the inventory ledger. See shop/reports.py's module
+# docstring for the metric definitions (POS-only revenue, estimated
+# product/category revenue, no profit/margin) and CLAUDE.md's Reports
+# section for the endpoint-to-tab mapping.
+
+def _csv_response(rows, fieldnames, filename):
+    """CSV with a UTF-8 BOM prefix so Excel renders Devanagari/Nepali
+    names correctly instead of mangling them -- Excel's CSV importer
+    guesses encoding from a BOM, and silently assumes a legacy codepage
+    without one."""
+    from django.http import HttpResponse
+
+    buffer = io.StringIO()
+    buffer.write('﻿')
+    writer = csv.DictWriter(buffer, fieldnames=fieldnames, extrasaction='ignore')
+    writer.writeheader()
+    for row in rows:
+        writer.writerow(row)
+    response = HttpResponse(buffer.getvalue(), content_type='text/csv; charset=utf-8')
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    return response
+
+
+def _parse_page_params(request):
+    """(page, page_size) from query params, clamped/defaulted rather than
+    ever raising -- a malformed ?page=abc shouldn't 500, it should just
+    fall back to page 1."""
+    try:
+        page = max(1, int(request.query_params.get('page', 1)))
+    except (TypeError, ValueError):
+        page = 1
+    try:
+        page_size = min(max(1, int(request.query_params.get('page_size', 50))), 200)
+    except (TypeError, ValueError):
+        page_size = 50
+    return page, page_size
+
+
+class BaseReportView(APIView):
+    """Shared param parsing for every /api/v1/reports/* endpoint: start,
+    end, channel, granularity, compare -- all optional, all validated by
+    shop/reports.py (which raises ReportValidationError, translated here
+    into a 400 with a clear message, never a 500)."""
+
+    authentication_classes = [SessionAuthentication]
+    permission_classes = [IsOwnerOrManager]
+
+    def parse_params(self, request):
+        params = request.query_params
+        start_date, end_date = reports_lib.resolve_date_range(params.get('start'), params.get('end'))
+        channel = reports_lib.parse_channel(params.get('channel'))
+        granularity = reports_lib.parse_granularity(params.get('granularity'))
+        compare = params.get('compare') == 'true'
+        return start_date, end_date, channel, granularity, compare
+
+    def get(self, request, *args, **kwargs):
+        try:
+            start_date, end_date, channel, granularity, compare = self.parse_params(request)
+        except reports_lib.ReportValidationError as exc:
+            return Response({'status': 'error', 'message': exc.message}, status=400)
+        return self.build_response(request, start_date, end_date, channel, granularity, compare)
+
+
+class ReportSummaryView(BaseReportView):
+    """GET /api/v1/reports/summary/ -- the Overview tab: KPI cards (with
+    deltas when compare=true), alerts strip, top-5 products, channel
+    split, payment mix, and the sales-over-time series."""
+
+    def build_response(self, request, start_date, end_date, channel, granularity, compare):
+        data = reports_lib.get_summary(start_date, end_date, channel, compare, granularity=granularity)
+        data['range'] = {'start': start_date.isoformat(), 'end': end_date.isoformat()}
+        return Response(data)
+
+
+class ReportSalesTrendView(BaseReportView):
+    """GET /api/v1/reports/sales-trend/ -- the Sales tab: the trend line
+    (+ previous-period dashed line when compare=true), by-hour / by-
+    day-of-week bars, the paginated recent-sales table, and the
+    sales-by-operator table. ?export=csv on this endpoint exports the
+    recent-sales table (not the chart series)."""
+
+    def build_response(self, request, start_date, end_date, channel, granularity, compare):
+        trend = reports_lib.get_sales_trend(start_date, end_date, granularity, compare=compare)
+        by_operator = reports_lib.get_sales_by_operator(start_date, end_date)
+
+        if request.query_params.get('export') == 'csv':
+            page = 1
+            all_rows = []
+            while True:
+                chunk = reports_lib.get_recent_sales(start_date, end_date, page, 500)
+                for r in chunk['results']:
+                    all_rows.append({
+                        'sale_number': r['sale_number'], 'date_time': r['created_at'],
+                        'customer': r['customer'] or '', 'operator': r['operator'], 'total': r['total'],
+                        'payments': '; '.join(f"{p['method']}: {p['amount']}" for p in r['payments']),
+                    })
+                if page * 500 >= chunk['count']:
+                    break
+                page += 1
+            return _csv_response(
+                all_rows, ['sale_number', 'date_time', 'customer', 'operator', 'total', 'payments'],
+                'sales.csv',
+            )
+
+        page, page_size = _parse_page_params(request)
+        recent_sales = reports_lib.get_recent_sales(start_date, end_date, page, page_size)
+        return Response({
+            'trend': trend, 'by_operator': by_operator, 'recent_sales': recent_sales,
+            'range': {'start': start_date.isoformat(), 'end': end_date.isoformat()},
+        })
+
+
+class ReportPaymentsView(BaseReportView):
+    """GET /api/v1/reports/payments/ -- payment-method mix by amount,
+    used by the Overview doughnut (also embedded in /summary/, exposed
+    standalone for a drill-down or a dedicated chart elsewhere)."""
+
+    def build_response(self, request, start_date, end_date, channel, granularity, compare):
+        return Response({
+            'payment_mix': reports_lib.get_payment_mix(start_date, end_date),
+            'range': {'start': start_date.isoformat(), 'end': end_date.isoformat()},
+        })
+
+
+class ReportProductsView(BaseReportView):
+    """GET /api/v1/reports/products/ -- the Products tab: top products
+    (revenue-or-quantity via ?by=), category breakdown, the full product
+    table with trend, slow movers, and offers/coupons performance.
+    ?export=csv exports the full product table."""
+
+    def build_response(self, request, start_date, end_date, channel, granularity, compare):
+        if request.query_params.get('export') == 'csv':
+            rows = reports_lib.get_product_table(start_date, end_date, compare=False)
+            csv_rows = [
+                {
+                    'product': r['name'], 'qty': r['qty'], 'weight_kg': r['weight_kg'],
+                    'revenue_est': r['revenue_est'], 'share_pct': r['share_pct'],
+                }
+                for r in rows
+            ]
+            return _csv_response(
+                csv_rows, ['product', 'qty', 'weight_kg', 'revenue_est', 'share_pct'], 'products.csv',
+            )
+
+        by = request.query_params.get('by', 'revenue')
+        if by not in ('revenue', 'quantity'):
+            return Response({'status': 'error', 'message': "'by' must be 'revenue' or 'quantity'."}, status=400)
+        return Response({
+            'top_products': reports_lib.get_top_products(start_date, end_date, limit=10, by=by),
+            'category_breakdown': reports_lib.get_category_breakdown(start_date, end_date),
+            'product_table': reports_lib.get_product_table(start_date, end_date, compare=compare),
+            'slow_movers': reports_lib.get_slow_movers(start_date, end_date),
+            'offers_performance': reports_lib.get_offers_performance(start_date, end_date),
+            'range': {'start': start_date.isoformat(), 'end': end_date.isoformat()},
+        })
+
+
+class ReportCreditView(BaseReportView):
+    """GET /api/v1/reports/credit/ -- the Credit (उधारो) tab: KPI cards,
+    the given-vs-repaid trend, ageing buckets, and the sortable customer
+    table. ?export=csv exports the customer table. Customer names/phones
+    only ever appear here and in the Sales tab's recent-sales table, to
+    the same owner/manager-only audience this whole view is gated to."""
+
+    def build_response(self, request, start_date, end_date, channel, granularity, compare):
+        buckets, customers = reports_lib.get_credit_ageing_and_customers()
+
+        if request.query_params.get('export') == 'csv':
+            return _csv_response(
+                customers,
+                ['name', 'phone', 'balance', 'last_purchase', 'last_repayment', 'age_days', 'age_bucket'],
+                'credit_customers.csv',
+            )
+
+        return Response({
+            'kpis': reports_lib.get_credit_summary(start_date, end_date, compare),
+            'trend': reports_lib.get_credit_trend(start_date, end_date, granularity),
+            'ageing_buckets': buckets,
+            'customers': customers,
+            'range': {'start': start_date.isoformat(), 'end': end_date.isoformat()},
+        })
+
+
+class ReportInventoryView(BaseReportView):
+    """GET /api/v1/reports/inventory/ -- the Inventory tab: current
+    stock per product (fixed-weight shows "animals available", matching
+    the admin), the low-stock list, movements-by-type for the period, and
+    the waste/loss table. ?export=csv exports the current-stock table."""
+
+    def build_response(self, request, start_date, end_date, channel, granularity, compare):
+        stock_table = reports_lib.get_current_stock_table()
+
+        if request.query_params.get('export') == 'csv':
+            return _csv_response(
+                stock_table, ['name', 'pricing_mode', 'stock', 'unit', 'low_stock'], 'inventory.csv',
+            )
+
+        return Response({
+            'stock_table': stock_table,
+            'low_stock': [r for r in stock_table if r['low_stock']],
+            'movements_by_type': reports_lib.get_movements_by_type(start_date, end_date),
+            'waste': reports_lib.get_waste_table(start_date, end_date),
+            'range': {'start': start_date.isoformat(), 'end': end_date.isoformat()},
+        })
+
+
+class ReportOrdersView(BaseReportView):
+    """GET /api/v1/reports/orders/ -- the Online Orders tab: counts by
+    status, orders over time, and the paginated recent-orders table (each
+    row links to its admin change page client-side using its id).
+    ?export=csv exports the recent-orders table."""
+
+    def build_response(self, request, start_date, end_date, channel, granularity, compare):
+        if request.query_params.get('export') == 'csv':
+            page = 1
+            all_rows = []
+            while True:
+                chunk = reports_lib.get_recent_orders(start_date, end_date, page, 500)
+                all_rows.extend(chunk['results'])
+                if page * 500 >= chunk['count']:
+                    break
+                page += 1
+            return _csv_response(
+                all_rows, ['order_number', 'name', 'status', 'product_interest', 'ordered_at'], 'orders.csv',
+            )
+
+        page, page_size = _parse_page_params(request)
+        return Response({
+            'by_status': reports_lib.get_orders_by_status(start_date, end_date),
+            'over_time': reports_lib.get_orders_over_time(start_date, end_date, granularity),
+            'recent_orders': reports_lib.get_recent_orders(start_date, end_date, page, page_size),
+            'range': {'start': start_date.isoformat(), 'end': end_date.isoformat()},
+        })

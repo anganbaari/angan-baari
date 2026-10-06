@@ -42,4 +42,11 @@ urlpatterns = [
     path('wishlist/set-variant/', views.WishlistSetVariantView.as_view(), name='v1_wishlist_set_variant'),
     path('wishlist/move-to-cart/', views.WishlistMoveToCartView.as_view(), name='v1_wishlist_move_to_cart'),
     path('coupons/', views.CouponListView.as_view(), name='v1_coupon_list'),
+    path('reports/summary/', views.ReportSummaryView.as_view(), name='v1_report_summary'),
+    path('reports/sales-trend/', views.ReportSalesTrendView.as_view(), name='v1_report_sales_trend'),
+    path('reports/payments/', views.ReportPaymentsView.as_view(), name='v1_report_payments'),
+    path('reports/products/', views.ReportProductsView.as_view(), name='v1_report_products'),
+    path('reports/credit/', views.ReportCreditView.as_view(), name='v1_report_credit'),
+    path('reports/inventory/', views.ReportInventoryView.as_view(), name='v1_report_inventory'),
+    path('reports/orders/', views.ReportOrdersView.as_view(), name='v1_report_orders'),
 ]
