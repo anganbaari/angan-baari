@@ -37,17 +37,16 @@ body.dashboard-body {
 }
 
 body.dashboard-body { overflow-x: hidden; }
-.dash-shell { overflow-x: clip; }
 
 ::selection { background: rgba(201, 168, 76, 0.35); }
 
 /* ── Shell layout: fixed sidebar + scrollable main ── */
-.dash-shell { display: flex; min-height: 100vh; }
+.dash-shell { display: flex; height: 100vh; height: 100dvh; overflow: hidden; }
 
 .dash-sidebar {
     width: 248px; flex-shrink: 0; background: var(--dash-sidebar-bg);
     border-right: 1px solid var(--dash-border-soft);
-    display: flex; flex-direction: column; height: 100vh; position: sticky; top: 0;
+    display: flex; flex-direction: column; height: 100%;
     padding: 18px 14px; gap: 18px; overflow-y: auto;
 }
 
@@ -120,8 +119,8 @@ body.dashboard-body { overflow-x: hidden; }
 .dash-sidebar-footer a:hover { color: var(--dash-gold-light); }
 
 /* ── Main area ── */
-.dash-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.dash-mobile-bar { display: none; }
+.dash-main { flex: 1; min-width: 0; display: flex; flex-direction: column; height: 100%; overflow-y: auto; overflow-x: hidden; }
+.dash-main > * { flex-shrink: 0; }
 
 .dash-topbar { padding: 16px 22px; border-bottom: 1px solid var(--dash-border-soft); background: var(--dash-bg); position: sticky; top: 0; z-index: 30; }
 .dash-topbar-row1 { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
@@ -270,7 +269,7 @@ table.dash-table tbody tr:hover { background: rgba(255, 255, 255, 0.025); }
 }
 
 @media (max-width: 640px) {
-    .dash-sidebar { position: fixed; left: -260px; top: 0; width: 248px; z-index: 100; transition: left 0.25s ease-out; box-shadow: 0 0 40px rgba(0,0,0,0.5); }
+    .dash-sidebar { position: fixed; left: -260px; top: 0; bottom: 0; width: 248px; z-index: 100; transition: left 0.25s ease-out; box-shadow: 0 0 40px rgba(0,0,0,0.5); }
     .dash-sidebar.open { left: 0; }
     .dash-sidebar .brand-text, .dash-nav-item span.label, .dash-bsgrid, .dash-target-card, .dash-sidebar-footer span.label { display: block; }
     .dash-brand img.flag { display: inline-block; }
@@ -314,5 +313,6 @@ html { -webkit-text-size-adjust: 100%; }
     #dashPrintHeader { display: block !important; margin: 0 0 16px; color: var(--dash-text); }
     .dash-section { display: block !important; }
     .dash-section:not(.active) { display: none !important; }
+    .dash-shell, .dash-main { height: auto !important; overflow: visible !important; }
 }
 #dashPrintHeader { display: none; }
