@@ -9,7 +9,7 @@ from rest_framework import serializers
 
 from shop.models import (
     Category, Product, ProductVariant, InventoryMovement, POSSale, ProductOrder,
-    Wishlist, Coupon, Customer, CreditTransaction,
+    Wishlist, Coupon, Customer, CreditTransaction, CostEntry,
 )
 
 
@@ -115,6 +115,21 @@ class InventoryMovementReadSerializer(serializers.ModelSerializer):
 
     def get_signed_quantity(self, obj):
         return str(obj.signed_quantity())
+
+
+class CostEntryReadSerializer(serializers.ModelSerializer):
+    """Read-only v1 view onto the cost ledger synced from ABMS (see
+    shop.costs_views.CostSyncView, /api/costs/sync/, which is the write
+    path and is untouched here) — for the future P&L dashboard."""
+
+    class Meta:
+        model = CostEntry
+        fields = [
+            'id', 'abms_id', 'date', 'amount', 'entry_type', 'reversal_of',
+            'cost_centre', 'category', 'qty', 'unit', 'supplier', 'note',
+            'is_shared', 'allocation_rule', 'allocation_manual',
+            'entered_by_email', 'abms_created_at', 'received_at',
+        ]
 
 
 class POSSaleReadSerializer(serializers.ModelSerializer):

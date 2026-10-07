@@ -757,6 +757,115 @@ class InventoryMovement(models.Model):
         qs = cls.objects.filter(product=product, variant=variant)
         return sum((m.signed_quantity() for m in qs), Decimal('0'))
 
+
+class CostEntry(models.Model):
+    """A single line of the farm cost ledger, mirrored 1:1 from ABMS's
+    Firestore `costEntries` collection (one document per entry there too —
+    see that app's js/costs.js). This is the data foundation for the future
+    Django P&L feature; nothing here computes revenue or profit.
+
+    Append-only: a mistake already recorded in ABMS is corrected there with
+    a reversal document (negative amount, entry_type='reversal',
+    reversal_of=<original abms_id>), which syncs here as an ordinary new
+    row — this table is never edited or deleted from once a row lands,
+    enforced below in save()/delete() (stricter than InventoryMovement's
+    own real behavior, which has no such override — see CLAUDE.md)."""
+
+    ENTRY_TYPE_CHOICES = [('cost', 'Cost'), ('reversal', 'Reversal')]
+    ALLOCATION_RULE_CHOICES = [('equal', 'Equal split'), ('manual', 'Manual percentages')]
+
+    abms_id = models.CharField(
+        max_length=64, unique=True, db_index=True,
+        help_text="The ABMS Firestore document id (e.g. 'c_xxxxxxxx') — the idempotency "
+                   "key for syncing: the same id arriving twice is a no-op, never a duplicate row."
+    )
+    date = models.DateField(help_text='AD date of the cost, as recorded in ABMS.')
+    amount = models.DecimalField(
+        max_digits=12, decimal_places=2,
+        help_text='Signed: positive for an ordinary cost, negative for a reversal.'
+    )
+    entry_type = models.CharField(max_length=10, choices=ENTRY_TYPE_CHOICES, default='cost')
+    reversal_of = models.CharField(
+        max_length=64, blank=True,
+        help_text='abms_id of the original CostEntry this reverses. Only set when entry_type=reversal.'
+    )
+    cost_centre = models.CharField(
+        max_length=60, db_index=True,
+        help_text="e.g. 'crop:mango', 'tree:lychee', 'livestock:goat', 'livestock:chicken', "
+                   "'bees', 'vermi', 'water', 'shared'."
+    )
+    category = models.CharField(max_length=60)
+    qty = models.DecimalField(max_digits=12, decimal_places=3, null=True, blank=True)
+    unit = models.CharField(max_length=20, blank=True)
+    supplier = models.CharField(max_length=200, blank=True)
+    note = models.TextField(blank=True)
+    is_shared = models.BooleanField(default=False)
+    allocation_rule = models.CharField(max_length=10, choices=ALLOCATION_RULE_CHOICES, blank=True)
+    allocation_manual = models.JSONField(
+        null=True, blank=True,
+        help_text="{'crop:mango': 40, 'livestock:goat': 60} — only set when allocation_rule='manual'. Must sum to 100."
+    )
+    entered_by_email = models.CharField(max_length=254, blank=True)
+    abms_created_at = models.DateTimeField(
+        null=True, blank=True, help_text='When ABMS itself recorded this entry (its serverTimestamp).'
+    )
+    received_at = models.DateTimeField(auto_now_add=True, help_text='When this row was synced into Django.')
+
+    class Meta:
+        ordering = ['-date', '-received_at']
+        indexes = [
+            models.Index(fields=['date']),
+            models.Index(fields=['cost_centre', 'date']),
+        ]
+        verbose_name_plural = 'Cost entries'
+
+    def __str__(self):
+        sign = '+' if self.amount >= 0 else ''
+        return f"{sign}{self.amount} {self.category} ({self.cost_centre}) {self.date}"
+
+    def save(self, *args, **kwargs):
+        if self.pk and CostEntry.objects.filter(pk=self.pk).exists():
+            raise ValueError('CostEntry is append-only and cannot be updated once saved.')
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValueError('CostEntry is append-only and cannot be deleted.')
+
+
+class FarmAsset(models.Model):
+    """A piece of farm machinery/equipment/infrastructure, mirrored from
+    ABMS's Firestore `assets` collection. Unlike CostEntry this IS mutable —
+    ABMS lets an asset's status/disposed_date (and a few other fields) be
+    updated after creation, and the sync endpoint applies the same updates
+    here. Depreciation is shown read-only in both ABMS and this admin; the
+    real P&L calculation is a later feature, not built here."""
+
+    STATUS_CHOICES = [('active', 'Active'), ('disposed', 'Disposed')]
+
+    abms_id = models.CharField(max_length=64, unique=True, db_index=True)
+    name = models.CharField(max_length=200)
+    asset_category = models.CharField(max_length=60)
+    purchase_date = models.DateField()
+    cost = models.DecimalField(max_digits=12, decimal_places=2)
+    life_years = models.PositiveSmallIntegerField()
+    salvage_value = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    cost_centre = models.CharField(max_length=60)
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='active')
+    disposed_date = models.DateField(null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-purchase_date']
+
+    def __str__(self):
+        return f"{self.name} ({self.get_status_display()})"
+
+    def annual_depreciation(self):
+        """Straight-line — display only, same as ABMS. (cost - salvage) / life_years."""
+        from decimal import Decimal
+        return (self.cost - self.salvage_value) / Decimal(self.life_years)
+
+
 # Shared base for the two payment-method choice lists below: a single
 # POSSalePayment line is always one concrete method (+ 'credit'); a POSSale
 # itself additionally needs 'split' as a derived summary value for when a

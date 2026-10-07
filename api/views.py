@@ -12,7 +12,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from django.utils.dateparse import parse_datetime
+from django.utils.dateparse import parse_date, parse_datetime
 from rest_framework import generics, permissions, status
 from rest_framework.authentication import SessionAuthentication, TokenAuthentication
 from rest_framework.authtoken.models import Token
@@ -21,7 +21,7 @@ from rest_framework.views import APIView
 
 from shop.emails import send_order_cancelled_email, send_order_received_email, send_resend_email
 from shop.models import (
-    Category, CreditTransaction, Customer, InventoryMovement, POSSale, Product, ProductOrder,
+    Category, CostEntry, CreditTransaction, Customer, InventoryMovement, POSSale, Product, ProductOrder,
     UserProfile, Wishlist, get_live_coupons,
 )
 from shop.views import (
@@ -41,6 +41,7 @@ from .permissions import IsOwnerOrManager, IsStaffUser
 from .serializers import (
     CategorySerializer,
     ChangePasswordSerializer,
+    CostEntryReadSerializer,
     CouponSerializer,
     CouponValidateSerializer,
     CreditRepaySerializer,
@@ -137,6 +138,31 @@ class InventoryMovementListView(generics.ListAPIView):
             qs = qs.filter(movement_type=movement_type)
         if source:
             qs = qs.filter(source=source)
+        return qs
+
+
+class CostEntryListView(generics.ListAPIView):
+    """GET /api/v1/costs/ — staff-only, session-authed read view onto the
+    cost ledger synced from ABMS (shop.costs_views.CostSyncView,
+    /api/costs/sync/, token-authed, is the write path and untouched here).
+    Same permission style as InventoryMovementListView above. For the
+    future P&L dashboard."""
+
+    serializer_class = CostEntryReadSerializer
+    authentication_classes = [SessionAuthentication]
+    permission_classes = [IsStaffUser]
+
+    def get_queryset(self):
+        qs = CostEntry.objects.all().order_by('-date', '-received_at')
+        date_from = parse_date(self.request.query_params.get('from', ''))
+        date_to = parse_date(self.request.query_params.get('to', ''))
+        cost_centre = self.request.query_params.get('cost_centre')
+        if date_from:
+            qs = qs.filter(date__gte=date_from)
+        if date_to:
+            qs = qs.filter(date__lte=date_to)
+        if cost_centre:
+            qs = qs.filter(cost_centre=cost_centre)
         return qs
 
 

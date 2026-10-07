@@ -6,11 +6,14 @@ from django.contrib.auth.models import User
 from django.test import TestCase, Client
 from django.urls import reverse
 from django.utils import timezone
+from rest_framework import status
+from rest_framework.authtoken.models import Token
+from rest_framework.test import APIClient
 
 from .admin import UserProfileInlineForm
 from .models import (
-    BundleItem, Category, InventoryMovement, ContactMessage, NewsletterSubscriber, Offer,
-    Product, ProductVariant, UserProfile,
+    BundleItem, Category, CostEntry, FarmAsset, InventoryMovement, ContactMessage,
+    NewsletterSubscriber, Offer, Product, ProductVariant, UserProfile,
 )
 from .stock import get_stock_table_rows
 
@@ -535,3 +538,179 @@ class BundleItemReferenceWeightTests(TestCase):
         )
         bundle_item = BundleItem.objects.create(offer=self.offer, product=jar, quantity=Decimal('1'))
         self.assertIsNone(bundle_item.reference_weight)
+
+
+class CostSyncViewTests(TestCase):
+    """POST /api/costs/sync/ -- ABMS's costEntries/assets bridge. Same
+    token auth as /api/inventory/movements/ (DRF's global
+    TokenAuthentication + IsAuthenticated -- any user's valid token)."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user('abms-bridge', password='pw')
+        self.token = Token.objects.create(user=self.user)
+        self.url = reverse('api_costs_sync')
+
+    def auth(self):
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
+
+    def entry(self, **overrides):
+        base = {
+            'id': 'c_test1', 'date': '2026-09-20', 'amount': 2500, 'type': 'cost',
+            'costCentre': 'crop:mango', 'category': 'Feed',
+            'enteredBy': {'uid': 'u1', 'email': 'owner@example.com'},
+        }
+        base.update(overrides)
+        return base
+
+    def test_no_token_is_rejected(self):
+        response = self.client.post(self.url, {'entries': [], 'assets': []}, format='json')
+        self.assertIn(response.status_code, (status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN))
+
+    def test_wrong_token_is_rejected(self):
+        self.client.credentials(HTTP_AUTHORIZATION='Token not-a-real-token')
+        response = self.client.post(self.url, {'entries': [], 'assets': []}, format='json')
+        self.assertIn(response.status_code, (status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN))
+
+    def test_create_cost_entry(self):
+        self.auth()
+        response = self.client.post(self.url, {'entries': [self.entry()], 'assets': []}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['results'][0]['status'], 'created')
+        self.assertEqual(CostEntry.objects.count(), 1)
+        row = CostEntry.objects.get(abms_id='c_test1')
+        self.assertEqual(row.amount, Decimal('2500.00'))
+        self.assertEqual(row.cost_centre, 'crop:mango')
+        self.assertEqual(row.entered_by_email, 'owner@example.com')
+
+    def test_same_id_twice_is_duplicate_not_a_new_row(self):
+        self.auth()
+        self.client.post(self.url, {'entries': [self.entry()], 'assets': []}, format='json')
+        response = self.client.post(self.url, {'entries': [self.entry()], 'assets': []}, format='json')
+        self.assertEqual(response.data['results'][0]['status'], 'duplicate')
+        self.assertEqual(CostEntry.objects.count(), 1)
+
+    def test_same_id_different_amount_is_conflict_original_unchanged(self):
+        self.auth()
+        self.client.post(self.url, {'entries': [self.entry()], 'assets': []}, format='json')
+        response = self.client.post(
+            self.url, {'entries': [self.entry(amount=9999)], 'assets': []}, format='json',
+        )
+        self.assertEqual(response.data['results'][0]['status'], 'conflict')
+        self.assertEqual(CostEntry.objects.count(), 1)
+        self.assertEqual(CostEntry.objects.get(abms_id='c_test1').amount, Decimal('2500.00'))
+
+    def test_reversal_stored_with_negative_amount(self):
+        self.auth()
+        self.client.post(self.url, {'entries': [self.entry()], 'assets': []}, format='json')
+        reversal = self.entry(id='c_test1_rev', type='reversal', amount=-2500, reversalOf='c_test1')
+        response = self.client.post(self.url, {'entries': [reversal], 'assets': []}, format='json')
+        self.assertEqual(response.data['results'][0]['status'], 'created')
+        row = CostEntry.objects.get(abms_id='c_test1_rev')
+        self.assertEqual(row.amount, Decimal('-2500.00'))
+        self.assertEqual(row.entry_type, 'reversal')
+        self.assertEqual(row.reversal_of, 'c_test1')
+
+    def test_reversal_pointing_at_unknown_id_is_error(self):
+        self.auth()
+        reversal = self.entry(id='c_test_rev_orphan', type='reversal', amount=-500, reversalOf='c_does_not_exist')
+        response = self.client.post(self.url, {'entries': [reversal], 'assets': []}, format='json')
+        self.assertEqual(response.data['results'][0]['status'], 'error')
+        self.assertFalse(CostEntry.objects.filter(abms_id='c_test_rev_orphan').exists())
+
+    def test_manual_allocation_not_summing_to_100_is_error_others_still_saved(self):
+        self.auth()
+        bad = self.entry(
+            id='c_bad_alloc', isShared=True, allocationRule='manual',
+            allocationManual={'crop:mango': 50, 'livestock:goat': 40},  # sums to 90
+        )
+        good = self.entry(id='c_good')
+        response = self.client.post(self.url, {'entries': [bad, good], 'assets': []}, format='json')
+        results_by_id = {r['id']: r['status'] for r in response.data['results']}
+        self.assertEqual(results_by_id['c_bad_alloc'], 'error')
+        self.assertEqual(results_by_id['c_good'], 'created')
+        self.assertFalse(CostEntry.objects.filter(abms_id='c_bad_alloc').exists())
+        self.assertTrue(CostEntry.objects.filter(abms_id='c_good').exists())
+
+    def test_bad_cost_centre_errors_only_that_item(self):
+        self.auth()
+        bad = self.entry(id='c_bad_centre', costCentre='not-a-real-centre')
+        good = self.entry(id='c_good2')
+        response = self.client.post(self.url, {'entries': [bad, good], 'assets': []}, format='json')
+        results_by_id = {r['id']: r['status'] for r in response.data['results']}
+        self.assertEqual(results_by_id['c_bad_centre'], 'error')
+        self.assertEqual(results_by_id['c_good2'], 'created')
+
+    def asset(self, **overrides):
+        base = {
+            'id': 'a_test1', 'name': 'Water pump', 'assetCategory': 'Machine',
+            'purchaseDate': '2026-01-10', 'cost': 48000, 'lifeYears': 8,
+            'salvageValue': 0, 'costCentre': 'water', 'status': 'active',
+        }
+        base.update(overrides)
+        return base
+
+    def test_asset_create_then_update_status_to_disposed(self):
+        self.auth()
+        response = self.client.post(self.url, {'entries': [], 'assets': [self.asset()]}, format='json')
+        self.assertEqual(response.data['results'][0]['status'], 'created')
+        self.assertEqual(FarmAsset.objects.count(), 1)
+
+        disposed = self.asset(status='disposed', disposedDate='2026-10-01')
+        response = self.client.post(self.url, {'entries': [], 'assets': [disposed]}, format='json')
+        self.assertEqual(response.data['results'][0]['status'], 'updated')
+        self.assertEqual(FarmAsset.objects.count(), 1)
+        row = FarmAsset.objects.get(abms_id='a_test1')
+        self.assertEqual(row.status, 'disposed')
+        self.assertEqual(str(row.disposed_date), '2026-10-01')
+
+
+class CostEntryReadApiTests(TestCase):
+    """GET /api/v1/costs/ -- staff-only, session-authed."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.staff = User.objects.create_user('cashier', password='pw', is_staff=True)
+        self.shopper = User.objects.create_user('shopper', password='pw', is_staff=False)
+        CostEntry.objects.create(
+            abms_id='c_read1', date='2026-09-20', amount=Decimal('1000.00'),
+            entry_type='cost', cost_centre='crop:mango', category='Feed',
+        )
+        self.url = reverse('v1_cost_entry_list')
+
+    def test_anonymous_is_rejected(self):
+        response = self.client.get(self.url)
+        self.assertIn(response.status_code, (status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN))
+
+    def test_non_staff_is_forbidden(self):
+        self.client.login(username='shopper', password='pw')
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_staff_can_read(self):
+        self.client.login(username='cashier', password='pw')
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['count'], 1)
+        self.assertEqual(response.data['results'][0]['abms_id'], 'c_read1')
+
+
+class CostEntryAppendOnlyTests(TestCase):
+    """CostEntry cannot be edited or deleted via the ORM -- enforced in
+    save()/delete() themselves (CLAUDE.md note: stricter than
+    InventoryMovement, which has no such override)."""
+
+    def setUp(self):
+        self.entry = CostEntry.objects.create(
+            abms_id='c_immutable1', date='2026-09-20', amount=Decimal('500.00'),
+            entry_type='cost', cost_centre='bees', category='Other',
+        )
+
+    def test_cannot_update_existing_row(self):
+        self.entry.amount = Decimal('999.00')
+        with self.assertRaises(ValueError):
+            self.entry.save()
+
+    def test_cannot_delete(self):
+        with self.assertRaises(ValueError):
+            self.entry.delete()

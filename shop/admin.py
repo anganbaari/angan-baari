@@ -14,7 +14,7 @@ from .emails import send_newsletter_campaign
 from .models import InventoryMovement
 from .models import (
     Offer, Coupon, BundleItem, ProductVariant, ProductSellingUnit, InventoryMovement, POSSale, UserProfile,
-    BusinessSettings, CreditTransaction, Customer, POSSalePayment, RevenueTarget,
+    BusinessSettings, CreditTransaction, Customer, POSSalePayment, RevenueTarget, CostEntry, FarmAsset,
 )
 from .stock import get_stock_table_rows
 from .utils import format_money
@@ -472,6 +472,55 @@ class CreditTransactionAdmin(admin.ModelAdmin):
     date_hierarchy = 'created_at'
     ordering = ['-created_at']
     readonly_fields = ['customer', 'amount', 'transaction_type', 'related_pos_sale', 'recorded_by', 'created_at']
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(CostEntry)
+class CostEntryAdmin(admin.ModelAdmin):
+    """Synced from ABMS (see /api/costs/sync/) — viewable for reconciliation
+    only, same no-add/no-edit/no-delete treatment as CreditTransactionAdmin
+    above. The model's own save()/delete() overrides already enforce this
+    at the ORM level too; these permission overrides are what actually
+    hide the Add/Change/Delete buttons in the admin UI."""
+
+    list_display = ['date', 'amount', 'entry_type', 'cost_centre', 'category', 'is_shared', 'entered_by_email', 'received_at']
+    list_filter = ['entry_type', 'cost_centre', 'category', 'is_shared']
+    search_fields = ['abms_id', 'cost_centre', 'category', 'supplier', 'note', 'entered_by_email']
+    date_hierarchy = 'date'
+    ordering = ['-date', '-received_at']
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(FarmAsset)
+class FarmAssetAdmin(admin.ModelAdmin):
+    """Synced from ABMS (see /api/costs/sync/) — read-only list, no delete.
+    ABMS is the source of truth for assets; Django is a read mirror plus
+    sync target, not a second place to hand-edit them."""
+
+    list_display = ['name', 'asset_category', 'cost_centre', 'purchase_date', 'cost', 'annual_depreciation_display', 'status', 'disposed_date']
+    list_filter = ['asset_category', 'cost_centre', 'status']
+    search_fields = ['abms_id', 'name', 'cost_centre']
+    ordering = ['-purchase_date']
+
+    def annual_depreciation_display(self, obj):
+        return format_money(obj.annual_depreciation())
+    annual_depreciation_display.short_description = 'Annual depreciation'
 
     def has_add_permission(self, request):
         return False
