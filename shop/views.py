@@ -654,7 +654,7 @@ def create_inventory_movements_from_snapshot(cart_snapshot, movement_type, sourc
     return created
 
 
-def create_pos_sale_lines(sale, cart_snapshot, line_totals, movements_by_index):
+def create_pos_sale_lines(sale, cart_snapshot, line_totals, movements_by_index, list_line_totals=None):
     """Writes one POSSaleLine per cart line for a just-created POS sale.
     Called from inside create_pos_sale()'s own transaction.atomic() block,
     right after create_inventory_movements_from_snapshot() creates the
@@ -669,7 +669,8 @@ def create_pos_sale_lines(sale, cart_snapshot, line_totals, movements_by_index):
     quantity/unit_cost come from the InventoryMovement actually created
     for that cart index, never recomputed separately — a line with no
     matching movement (a genuinely zero-quantity line) gets quantity=0,
-    unit_cost=None rather than guessing."""
+    unit_cost=None rather than guessing. list_line_totals is only ever
+    non-None for a wholesale sale (see POSSaleLine.list_line_total)."""
     from decimal import Decimal
     from .models import POSSaleLine
 
@@ -681,6 +682,7 @@ def create_pos_sale_lines(sale, cart_snapshot, line_totals, movements_by_index):
             variant_id=line.get('variant_id'),
             quantity=movement.quantity if movement else Decimal('0'),
             line_total=line_totals[index],
+            list_line_total=(list_line_totals[index] if list_line_totals else None),
             unit_cost=movement.unit_cost if movement else None,
         )
 
@@ -975,7 +977,8 @@ def resolve_pos_combo_lines(cart):
 
 
 def create_pos_sale(*, client_sale_id, cart, payments, operator_user, customer=None,
-                     source='pos', note_prefix='POS sale', coupon_code=None):
+                     source='pos', note_prefix='POS sale', coupon_code=None,
+                     is_wholesale=False, wholesale_authorized=False):
     """Called by POSSaleView.post() (api/views.py) — the sole entry point
     for completing a POS sale since templates/pos.html's completeSaleBtn
     switched to POST /api/v1/sales/ (POS-PWA Phase 1); the earlier plain-
@@ -1017,6 +1020,15 @@ def create_pos_sale(*, client_sale_id, cart, payments, operator_user, customer=N
 
     Returns (sale, created) — created is False on the idempotent-replay
     path, so callers that distinguish 200 vs 201 (the API path) still can.
+
+    is_wholesale (bulk sale to a named buyer, manual per-line prices, no
+    coupons/offers/combos) is authorized by wholesale_authorized, which the
+    CALLER computes from request.user (_is_owner_or_manager()) -- this
+    function has no request object of its own, but still owns the actual
+    enforcement (defaults to False, i.e. fails closed) so it can never be
+    bypassed by a caller that forgets to pass it. A non-owner/manager
+    sending is_wholesale=True gets a 403 before any pricing happens, so a
+    price_override can never produce a discount for them. See CLAUDE.md.
     """
     from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
     from django.core.exceptions import ValidationError
@@ -1046,6 +1058,22 @@ def create_pos_sale(*, client_sale_id, cart, payments, operator_user, customer=N
     if has_credit_line and not customer:
         raise POSSaleValidationError('A customer is required for a credit payment.')
 
+    is_wholesale = bool(is_wholesale)
+    if is_wholesale:
+        if not wholesale_authorized:
+            # A distinct reason tag, not just status=403 -- pos.html's
+            # completeSaleBtn handler already treats EVERY plain 403 as
+            # "idle-locked mid-checkout, show the PIN screen again"
+            # (get_pos_operator() raises that exact same shape for "no PIN
+            # unlock yet"), so this needs its own signal to show the real
+            # rejection message instead of being swallowed into that.
+            raise POSSaleValidationError(
+                'Wholesale sales require an owner/manager account.', status=403,
+                reason='wholesale_unauthorized',
+            )
+        if not customer:
+            raise POSSaleValidationError('A buyer is required for a wholesale sale.')
+
     settings_row = BusinessSettings.get_solo()
 
     # POS Phase D: offers. A combo group's lines are priced entirely by
@@ -1054,12 +1082,21 @@ def create_pos_sale(*, client_sale_id, cart, payments, operator_user, customer=N
     # discounted via resolve_pos_offer_discount(). Either way, stock
     # validation/deduction for every line stays completely ordinary — offers
     # only ever override the money, never the product/variant/unit logic.
-    combo_line_prices = resolve_pos_combo_lines(cart)
+    # Skipped entirely for wholesale (not just left unapplied) -- it
+    # validates every combo group against the offer's live BundleItem set
+    # and RAISES if stale, which must never block an otherwise-fine
+    # wholesale sale that happens to carry a leftover combo_instance_id.
+    combo_line_prices = {} if is_wholesale else resolve_pos_combo_lines(cart)
 
     total = Decimal('0')
     # Separate from `total` -- a coupon only ever discounts lines that
     # AREN'T already offer/combo-discounted (see resolve_pos_coupon() call
-    # below), so this only accumulates plain, undiscounted lines.
+    # below), so this only accumulates plain, undiscounted lines. Every
+    # wholesale line is excluded too (no coupons on a wholesale sale) --
+    # this alone is enough to make coupon_eligible_subtotal <= 0 always
+    # true for a wholesale sale, which routes it through the existing
+    # "nothing eligible" branch below: a coupon code sent anyway is simply
+    # ignored, discount_amount stays 0, nothing is rejected.
     coupon_eligible_subtotal = Decimal('0')
     taxable_value = Decimal('0')
     exempt_value = Decimal('0')
@@ -1068,6 +1105,10 @@ def create_pos_sale(*, client_sale_id, cart, payments, operator_user, customer=N
     # the sale-level coupon discount below, captured here (not re-derived
     # later) for POSSaleLine.line_total.
     line_totals = []
+    # Same index alignment, only ever populated for a wholesale sale (see
+    # POSSaleLine.list_line_total's own docstring) -- the catalogue price
+    # this line would have cost, captured BEFORE any price_override.
+    list_line_totals = []
     try:
         for index, line in enumerate(cart):
             product = Product.objects.get(id=line.get('product_id'), is_available=True)
@@ -1081,37 +1122,65 @@ def create_pos_sale(*, client_sale_id, cart, payments, operator_user, customer=N
             # A combo line's price is fixed by resolve_pos_combo_lines() --
             # offer_id is still recorded on it (set alongside combo_instance_id
             # by the POS screen) but never re-applied as a separate discount.
-            is_single_offer_line = bool(offer_id) and not combo_instance_id
+            # Both are forced off for a wholesale line regardless of what's
+            # sent -- "no automatic offers/combos apply" to a wholesale sale.
+            is_single_offer_line = bool(offer_id) and not combo_instance_id and not is_wholesale
 
+            price_override = None
+            if is_wholesale and line.get('price_override') is not None:
+                try:
+                    price_override = Decimal(str(line['price_override']))
+                except (InvalidOperation, TypeError, ValueError):
+                    raise POSSaleValidationError(f'{product.name}: invalid price override.')
+                if price_override < 0:
+                    raise POSSaleValidationError(f'{product.name}: price override cannot be negative.')
+
+            list_line_total = None
             if product.pricing_mode == 'fixed_weight':
                 variant = product.variants.filter(id=variant_id, is_available=True).first() if variant_id else None
                 if not variant:
                     raise POSSaleValidationError(f'{product.name}: that animal is no longer available.')
-                line_total = variant.total_price()
-                if is_single_offer_line:
-                    line_total = resolve_pos_offer_discount(offer_id, product, line_total)
+                list_line_total = variant.total_price()
+                if is_wholesale:
+                    line_total = price_override if price_override is not None else list_line_total
+                else:
+                    line_total = list_line_total
+                    if is_single_offer_line:
+                        line_total = resolve_pos_offer_discount(offer_id, product, line_total)
             elif product.pricing_mode == 'variable_weight':
-                unit_price = Decimal(str(product.price))
-                if is_single_offer_line:
-                    unit_price = resolve_pos_offer_discount(offer_id, product, unit_price)
-                line_total = unit_price * Decimal(str(weight or 0))
+                catalogue_unit_price = Decimal(str(product.price))
+                list_line_total = catalogue_unit_price * Decimal(str(weight or 0))
+                if is_wholesale:
+                    effective_unit_price = price_override if price_override is not None else catalogue_unit_price
+                    line_total = effective_unit_price * Decimal(str(weight or 0))
+                else:
+                    unit_price = catalogue_unit_price
+                    if is_single_offer_line:
+                        unit_price = resolve_pos_offer_discount(offer_id, product, unit_price)
+                    line_total = unit_price * Decimal(str(weight or 0))
             else:
                 if unit_id:
                     unit = product.selling_units.filter(id=unit_id, is_available=True).first()
                     if not unit:
                         raise POSSaleValidationError(f'{product.name}: that selling unit is no longer available.')
-                    unit_price = unit.price
+                    catalogue_unit_price = unit.price
                 else:
-                    unit_price = Decimal(str(product.price))
-                if is_single_offer_line:
-                    unit_price = resolve_pos_offer_discount(offer_id, product, unit_price)
-                line_total = unit_price * qty
+                    catalogue_unit_price = Decimal(str(product.price))
+                list_line_total = catalogue_unit_price * qty
+                if is_wholesale:
+                    effective_unit_price = price_override if price_override is not None else catalogue_unit_price
+                    line_total = effective_unit_price * qty
+                else:
+                    unit_price = catalogue_unit_price
+                    if is_single_offer_line:
+                        unit_price = resolve_pos_offer_discount(offer_id, product, unit_price)
+                    line_total = unit_price * qty
 
-            if combo_instance_id:
+            if combo_instance_id and not is_wholesale:
                 line_total = combo_line_prices[index]
 
             total += line_total
-            if not offer_id and not combo_instance_id:
+            if not is_wholesale and not offer_id and not combo_instance_id:
                 coupon_eligible_subtotal += line_total
             if settings_row.is_vat_enabled and product.is_taxable:
                 taxable_value += line_total
@@ -1125,6 +1194,7 @@ def create_pos_sale(*, client_sale_id, cart, payments, operator_user, customer=N
                 'offer_id': offer_id, 'combo_instance_id': combo_instance_id,
             })
             line_totals.append(line_total)
+            list_line_totals.append(list_line_total if is_wholesale else None)
     except (Product.DoesNotExist, InvalidOperation, TypeError, ValueError):
         raise POSSaleValidationError('One of the items in this cart is no longer valid.')
 
@@ -1207,6 +1277,7 @@ def create_pos_sale(*, client_sale_id, cart, payments, operator_user, customer=N
                 coupon=coupon_obj,
                 discount_amount=discount_amount,
                 round_off_amount=round_off_amount,
+                is_wholesale=is_wholesale,
             )
             if coupon_obj:
                 coupon_obj.used_count += 1
@@ -1228,7 +1299,7 @@ def create_pos_sale(*, client_sale_id, cart, payments, operator_user, customer=N
                 related_pos_sale=sale, note=f"{note_prefix} {sale.sale_number}",
                 strict=True,
             )
-            create_pos_sale_lines(sale, cart_snapshot, line_totals, movements_by_index)
+            create_pos_sale_lines(sale, cart_snapshot, line_totals, movements_by_index, list_line_totals)
     except ValidationError as e:
         message = '; '.join(e.messages) if hasattr(e, 'messages') else str(e)
         raise POSSaleValidationError(f'Not enough stock: {message}', status=409)
@@ -1362,6 +1433,11 @@ def pos_view(request):
         'is_vat_enabled': vat_settings.is_vat_enabled,
         'vat_rate': VAT_RATE,
         'show_reports_link': _is_owner_or_manager(request.user),
+        # Same check, reused for the Wholesale toggle's visibility — see
+        # CLAUDE.md: wholesale sales must use the SAME owner/manager gate
+        # as the Reports dashboard, enforced again server-side in
+        # create_pos_sale() (this is only ever a UI convenience).
+        'is_owner_or_manager': _is_owner_or_manager(request.user),
     })
 
 

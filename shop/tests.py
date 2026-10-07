@@ -14,10 +14,10 @@ from rest_framework.test import APIClient
 
 from .admin import UserProfileInlineForm
 from .models import (
-    BundleItem, Category, CostEntry, FarmAsset, InventoryMovement, ContactMessage,
-    NewsletterSubscriber, Offer, POSSale, Product, ProductVariant, PurchaseBatch, UserProfile,
+    BundleItem, Category, CostEntry, CreditTransaction, Customer, FarmAsset, InventoryMovement,
+    ContactMessage, NewsletterSubscriber, Offer, POSSale, Product, ProductVariant, PurchaseBatch, UserProfile,
 )
-from .views import create_pos_sale
+from .views import create_pos_sale, POSSaleValidationError
 from .stock import get_stock_table_rows
 
 
@@ -937,3 +937,183 @@ class POSSaleLineCreationTests(TestCase):
         create_pos_sale(client_sale_id=client_sale_id, cart=cart, payments=payments, operator_user=self.operator)
         sale = POSSale.objects.get(client_sale_id=client_sale_id)
         self.assertEqual(sale.lines.count(), 1)
+
+
+class WholesaleSaleTests(TestCase):
+    """create_pos_sale(is_wholesale=True, ...) -- bulk sales to a named
+    buyer at manual per-line prices. wholesale_authorized is computed by
+    the CALLER from request.user (see api/views.py's POSSaleView.post())
+    -- these direct-call tests pass it explicitly; the 403-from-a-real-
+    HTTP-request path is covered separately in api.tests.WholesaleSaleApiTests."""
+
+    def setUp(self):
+        self.category = Category.objects.create(name='Wholesale Test', order=1)
+        self.operator = User.objects.create_user('wholesaleop', password='pw', is_staff=True)
+        self.customer = Customer.objects.create(name='Big Trader', phone='9800000000', address='Butwal')
+
+        self.sourced_product = Product.objects.create(
+            name='Wholesale Apple', slug='wholesale-apple-test', category=self.category, description='test',
+            price=Decimal('400.00'), pricing_mode='variable_weight', weight_step=Decimal('0.50'),
+            origin='sourced',
+        )
+        PurchaseBatch.objects.create(
+            product=self.sourced_product, purchase_date='2026-01-01', quantity=Decimal('100'), unit_price=Decimal('250'),
+        )  # avg landed cost 250, stock 100
+
+        self.goat = Product.objects.create(
+            name='Wholesale Goat', slug='wholesale-goat-test', category=self.category, description='test',
+            price=Decimal('1000.00'), pricing_mode='fixed_weight', origin='farm',
+        )
+        self.goat_variant = ProductVariant.objects.create(product=self.goat, weight=Decimal('20.00'))
+        InventoryMovement.objects.create(
+            product=self.goat, variant=self.goat_variant, movement_type='harvest', source='admin', quantity=Decimal('1'),
+        )
+
+    def test_wholesale_sale_uses_override_and_records_list_line_total(self):
+        sale, created = create_pos_sale(
+            client_sale_id=str(uuid.uuid4()),
+            cart=[{'product_id': self.sourced_product.id, 'qty': 1, 'weight': '10.00', 'price_override': '300'}],
+            payments=[{'method': 'cash', 'amount': '3000.00'}],
+            operator_user=self.operator, customer=self.customer,
+            is_wholesale=True, wholesale_authorized=True,
+        )
+        self.assertTrue(created)
+        self.assertTrue(sale.is_wholesale)
+        self.assertEqual(sale.total_amount, Decimal('3000.00'))  # 10kg * 300 override
+        line = sale.lines.get()
+        self.assertEqual(line.line_total, Decimal('3000.00'))
+        self.assertEqual(line.list_line_total, Decimal('4000.00'))  # 10kg * 400 catalogue
+        self.assertEqual(line.unit_cost, Decimal('250.0000'))
+
+    def test_non_privileged_wholesale_rejected_403_no_sale_no_movement(self):
+        stock_before = InventoryMovement.current_stock(self.sourced_product)
+        with self.assertRaises(POSSaleValidationError) as cm:
+            create_pos_sale(
+                client_sale_id=str(uuid.uuid4()),
+                cart=[{'product_id': self.sourced_product.id, 'qty': 1, 'weight': '10.00', 'price_override': '1'}],
+                payments=[{'method': 'cash', 'amount': '10.00'}],
+                operator_user=self.operator, customer=self.customer,
+                is_wholesale=True, wholesale_authorized=False,
+            )
+        self.assertEqual(cm.exception.status, 403)
+        self.assertEqual(cm.exception.reason, 'wholesale_unauthorized')
+        self.assertEqual(InventoryMovement.current_stock(self.sourced_product), stock_before)
+        self.assertFalse(POSSale.objects.filter(is_wholesale=True).exists())
+
+    def test_wholesale_without_customer_rejected_400(self):
+        with self.assertRaises(POSSaleValidationError) as cm:
+            create_pos_sale(
+                client_sale_id=str(uuid.uuid4()),
+                cart=[{'product_id': self.sourced_product.id, 'qty': 1, 'weight': '10.00'}],
+                payments=[{'method': 'cash', 'amount': '4000.00'}],
+                operator_user=self.operator, customer=None,
+                is_wholesale=True, wholesale_authorized=True,
+            )
+        self.assertEqual(cm.exception.status, 400)
+        self.assertFalse(POSSale.objects.filter(is_wholesale=True).exists())
+
+    def test_wholesale_coupon_code_ignored_discount_zero(self):
+        sale, created = create_pos_sale(
+            client_sale_id=str(uuid.uuid4()),
+            cart=[{'product_id': self.sourced_product.id, 'qty': 1, 'weight': '10.00', 'price_override': '300'}],
+            payments=[{'method': 'cash', 'amount': '3000.00'}],
+            operator_user=self.operator, customer=self.customer,
+            coupon_code='TOTALLYFAKECODE',
+            is_wholesale=True, wholesale_authorized=True,
+        )
+        self.assertEqual(sale.discount_amount, Decimal('0'))
+        self.assertIsNone(sale.coupon)
+
+    def test_wholesale_on_credit_creates_credit_transaction(self):
+        sale, created = create_pos_sale(
+            client_sale_id=str(uuid.uuid4()),
+            cart=[{'product_id': self.sourced_product.id, 'qty': 1, 'weight': '10.00', 'price_override': '300'}],
+            payments=[{'method': 'credit', 'amount': '3000.00'}],
+            operator_user=self.operator, customer=self.customer,
+            is_wholesale=True, wholesale_authorized=True,
+        )
+        txn = CreditTransaction.objects.get(related_pos_sale=sale)
+        self.assertEqual(txn.amount, Decimal('3000.00'))
+        self.assertEqual(txn.transaction_type, 'credit_sale')
+        self.assertEqual(txn.customer, self.customer)
+
+    def test_price_override_ignored_on_retail_sale(self):
+        sale, created = create_pos_sale(
+            client_sale_id=str(uuid.uuid4()),
+            cart=[{'product_id': self.sourced_product.id, 'qty': 1, 'weight': '10.00', 'price_override': '1'}],
+            payments=[{'method': 'cash', 'amount': '4000.00'}],
+            operator_user=self.operator,
+            # is_wholesale omitted -> defaults False; a non-wholesale sale needs no customer.
+        )
+        self.assertFalse(sale.is_wholesale)
+        self.assertEqual(sale.total_amount, Decimal('4000.00'))  # catalogue price -- override ignored
+        line = sale.lines.get()
+        self.assertEqual(line.line_total, Decimal('4000.00'))
+        self.assertIsNone(line.list_line_total)
+
+    def test_fixed_weight_animal_wholesale_with_override_total(self):
+        sale, created = create_pos_sale(
+            client_sale_id=str(uuid.uuid4()),
+            cart=[{'product_id': self.goat.id, 'qty': 1, 'variant_id': self.goat_variant.id, 'price_override': '15000'}],
+            payments=[{'method': 'cash', 'amount': '15000.00'}],
+            operator_user=self.operator, customer=self.customer,
+            is_wholesale=True, wholesale_authorized=True,
+        )
+        self.assertEqual(sale.total_amount, Decimal('15000.00'))
+        line = sale.lines.get()
+        self.assertEqual(line.line_total, Decimal('15000.00'))
+        self.assertEqual(line.list_line_total, self.goat_variant.total_price())
+
+    def test_stock_insufficient_wholesale_sale_fails_like_retail(self):
+        with self.assertRaises(POSSaleValidationError) as cm:
+            create_pos_sale(
+                client_sale_id=str(uuid.uuid4()),
+                cart=[{'product_id': self.sourced_product.id, 'qty': 1, 'weight': '9999.00', 'price_override': '300'}],
+                payments=[{'method': 'cash', 'amount': '2999700.00'}],
+                operator_user=self.operator, customer=self.customer,
+                is_wholesale=True, wholesale_authorized=True,
+            )
+        self.assertEqual(cm.exception.status, 409)
+        self.assertFalse(POSSale.objects.filter(is_wholesale=True).exists())
+
+    def test_idempotent_resubmission_no_duplicates(self):
+        client_sale_id = str(uuid.uuid4())
+        cart = [{'product_id': self.sourced_product.id, 'qty': 1, 'weight': '10.00', 'price_override': '300'}]
+        payments = [{'method': 'cash', 'amount': '3000.00'}]
+        first, created1 = create_pos_sale(
+            client_sale_id=client_sale_id, cart=cart, payments=payments, operator_user=self.operator,
+            customer=self.customer, is_wholesale=True, wholesale_authorized=True,
+        )
+        second, created2 = create_pos_sale(
+            client_sale_id=client_sale_id, cart=cart, payments=payments, operator_user=self.operator,
+            customer=self.customer, is_wholesale=True, wholesale_authorized=True,
+        )
+        self.assertTrue(created1)
+        self.assertFalse(created2)
+        self.assertEqual(first.id, second.id)
+        self.assertEqual(POSSale.objects.filter(client_sale_id=client_sale_id).count(), 1)
+        self.assertEqual(first.lines.count(), 1)
+
+
+class PosWholesaleToggleVisibilityTests(TestCase):
+    """pos_view() renders the Wholesale toggle only for the SAME
+    owner/manager check create_pos_sale() enforces server-side -- the
+    toggle's own visibility is just a UI convenience, not the real
+    authorization boundary, but it must still never be shown to someone
+    who can't actually use it."""
+
+    def test_cashier_does_not_see_wholesale_toggle(self):
+        user = User.objects.create_user('tmpl_cashier', password='pw', is_staff=True)
+        UserProfile.objects.create(user=user, role='cashier')
+        self.client.login(username='tmpl_cashier', password='pw')
+        response = self.client.get('/pos/')
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn('id="wholesaleToggleBtn"', response.content.decode())
+
+    def test_owner_sees_wholesale_toggle(self):
+        user = User.objects.create_user('tmpl_owner', password='pw', is_staff=True)
+        UserProfile.objects.create(user=user, role='admin')
+        self.client.login(username='tmpl_owner', password='pw')
+        response = self.client.get('/pos/')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('id="wholesaleToggleBtn"', response.content.decode())

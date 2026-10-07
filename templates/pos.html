@@ -568,6 +568,7 @@
         <div class="pos-content">
             <!-- Receipt view -->
             <div id="receiptView">
+                <div id="wholesaleBanner" style="display:none;background:#f0a500;color:#1a1a1a;font-weight:800;text-align:center;letter-spacing:0.05em;padding:7px;border-radius:7px;margin-bottom:8px;">WHOLESALE MODE</div>
                 <div class="receipt-table-row">
                     <div class="receipt-table-wrap">
                         <table class="receipt-table">
@@ -598,6 +599,9 @@
                         <button type="button" class="side-btn logout-btn" id="logoutBtn">Logout</button>
                         {% if show_reports_link %}
                         <a href="{% url 'dashboard' %}" class="side-btn logout-btn" style="text-decoration: none; display: flex; align-items: center; justify-content: center; font-size: 0.75rem;">Reports</a>
+                        {% endif %}
+                        {% if is_owner_or_manager %}
+                        <button type="button" class="side-btn logout-btn" id="wholesaleToggleBtn" style="font-size: 0.75rem;">Wholesale</button>
                         {% endif %}
                     </div>
 
@@ -747,7 +751,7 @@
         <div class="pay-remaining" id="payRemaining">Remaining: Rs. 0</div>
 
         <div class="credit-section" id="creditSection" style="display:none;">
-            <div style="font-weight:700;font-size:0.85rem;color:var(--forest);margin-bottom:8px;">Credit customer</div>
+            <div id="creditSectionLabel" style="font-weight:700;font-size:0.85rem;color:var(--forest);margin-bottom:8px;">Credit customer</div>
             <input type="text" id="customerPhoneInput" placeholder="Customer phone number" inputmode="numeric">
             <button type="button" class="side-btn payment-btn-main" style="width:100%;margin-bottom:10px;" id="lookupCustomerBtn">Look up</button>
             <div id="customerResults"></div>
@@ -796,7 +800,14 @@
         const VAT_RATE = {{ vat_rate }};
 
         let activeCategory = CATEGORIES[0] || null;
-        let cart = []; // { product_id, name, pricing_mode, qty, weight, variant_id, unit_id, unit_name, offer_id, combo_instance_id, detail, unit_price, line_total, is_taxable }
+        let cart = []; // { product_id, name, pricing_mode, qty, weight, variant_id, unit_id, unit_name, offer_id, combo_instance_id, detail, unit_price, line_total, is_taxable, price_override, list_line_total }
+        // Wholesale mode: bulk sale to a named buyer, manual per-line
+        // prices, no coupons/offers/combos. Toggle only ever rendered for
+        // an owner/manager account (is_owner_or_manager, server-side
+        // context) -- create_pos_sale() independently re-checks this from
+        // request.user regardless, so this flag is a UI convenience only,
+        // never the actual authorization.
+        let wholesaleMode = false;
         let currentView = 'receipt'; // 'receipt' | 'shopping' | 'stock' | 'repay'
         let stockData = []; // [{product_id, name, current_stock, low_stock_threshold, is_low, restock_method, last_restocked_at, is_available}] — see loadStockData()
         let isUnlocked = false;
@@ -2302,7 +2313,7 @@
                             <button type="button" class="row-remove" data-i="${start + i}" title="Remove"><i class="fas fa-times"></i></button>
                         </div>
                     </td>
-                    <td>Rs. ${formatMoney(line.unit_price)}</td>
+                    <td class="${wholesaleMode ? 'price-cell' : ''}" ${wholesaleMode ? `data-i="${start + i}" title="Tap to set wholesale price"` : ''}>Rs. ${formatMoney(line.unit_price)}${wholesaleMode ? ' <i class="fas fa-pen qty-edit-icon"></i>' : ''}</td>
                     <td class="qty-cell" data-i="${start + i}" title="Tap to change">${qtyCellDisplay(line)} <i class="fas fa-pen qty-edit-icon"></i></td>
                     <td>Rs. ${formatMoney(line.line_total)}</td>
                     <td>Rs. ${formatMoney(lineTax(line))}</td>
@@ -2318,6 +2329,11 @@
             body.querySelectorAll('.qty-cell').forEach(cell => {
                 cell.addEventListener('click', () => editCartLine(parseInt(cell.dataset.i)));
             });
+            if (wholesaleMode) {
+                body.querySelectorAll('.price-cell').forEach(cell => {
+                    cell.addEventListener('click', (e) => { e.stopPropagation(); openPriceOverrideModal(parseInt(cell.dataset.i)); });
+                });
+            }
 
             document.getElementById('pageIndicator').innerHTML = `${receiptPage + 1}<span>/</span>${totalPages}`;
             document.getElementById('pagePrevBtn').disabled = receiptPage === 0;
@@ -2407,10 +2423,14 @@
             remainingEl.classList.toggle('settled', remaining === 0);
 
             const creditAmount = parseFloat(payments.credit) || 0;
-            document.getElementById('creditSection').style.display = creditAmount > 0 ? '' : 'none';
-            if (creditAmount <= 0) selectedCustomer = null;
+            // A wholesale sale needs a buyer regardless of payment method --
+            // the same section (and the same selectedCustomer variable) a
+            // credit sale already uses is shown/required here too, rather
+            // than building a second, separate buyer picker.
+            document.getElementById('creditSection').style.display = (creditAmount > 0 || wholesaleMode) ? '' : 'none';
+            if (creditAmount <= 0 && !wholesaleMode) selectedCustomer = null;
 
-            const needsCustomer = creditAmount > 0 && !selectedCustomer;
+            const needsCustomer = (creditAmount > 0 || wholesaleMode) && !selectedCustomer;
             document.getElementById('completeSaleBtn').disabled = remaining !== 0 || needsCustomer;
         }
 
@@ -2429,6 +2449,98 @@
             document.getElementById('paymentPanel').classList.remove('active');
             document.getElementById('paymentBackdrop').classList.remove('active');
         }
+
+        // ══════════════════════════════════════════════════════════════
+        // Wholesale mode — bulk sale to a named buyer, manual per-line
+        // prices, no coupons/offers/combos. The toggle button itself is
+        // only ever rendered for an owner/manager account (see
+        // is_owner_or_manager in the template context); create_pos_sale()
+        // re-checks this independently from request.user, so this is a UI
+        // convenience, never the real authorization boundary.
+        // ══════════════════════════════════════════════════════════════
+        const wholesaleToggleBtn = document.getElementById('wholesaleToggleBtn');
+        if (wholesaleToggleBtn) {
+            wholesaleToggleBtn.addEventListener('click', () => {
+                if (cart.length > 0) {
+                    if (!confirm('Switching wholesale mode will clear your cart. Continue?')) return;
+                    cart = [];
+                    receiptPage = 0;
+                }
+                wholesaleMode = !wholesaleMode;
+                applyWholesaleModeUI();
+                renderReceipt();
+                updateCartIndicator();
+            });
+        }
+
+        function applyWholesaleModeUI() {
+            document.getElementById('wholesaleBanner').style.display = wholesaleMode ? '' : 'none';
+            if (wholesaleToggleBtn) wholesaleToggleBtn.classList.toggle('active', wholesaleMode);
+            const couponRow = document.querySelector('.coupon-row');
+            if (couponRow) couponRow.style.display = wholesaleMode ? 'none' : '';
+            const offersCol = document.querySelector('.offers-col');
+            if (offersCol) offersCol.style.display = wholesaleMode ? 'none' : '';
+            const creditLabel = document.getElementById('creditSectionLabel');
+            if (creditLabel) creditLabel.textContent = wholesaleMode ? 'Buyer (required for wholesale)' : 'Credit customer';
+            if (wholesaleMode) clearCoupon(true);
+            updatePaymentSummary();
+        }
+
+        // Tapping a cart line's price cell in wholesale mode opens this --
+        // reuses the shared #itemModal/#itemModalBody container the same
+        // way openVariantModal() does (plain injected HTML, not the
+        // keypad), rather than reworking openWeightModal()/openQtyModal()/
+        // addToCart() themselves, which stay completely untouched so
+        // retail add-to-cart behavior is genuinely unaffected.
+        function openPriceOverrideModal(index) {
+            const line = cart[index];
+            if (!line || line.combo_instance_id) return;
+            const body = document.getElementById('itemModalBody');
+            body.classList.remove('keypad-mode', 'offers-mode');
+            const rateLabel = line.pricing_mode === 'fixed_weight' ? 'Total price for this animal'
+                : line.pricing_mode === 'variable_weight' ? `Price per ${line.weight_unit_label || 'kg'}`
+                : 'Price per piece';
+            const catalogueTotal = line.list_line_total != null ? line.list_line_total : line.line_total;
+            const current = line.price_override != null ? line.price_override : line.unit_price;
+            body.innerHTML = `
+                <h3>${line.name} — wholesale price</h3>
+                <p style="font-size:0.82rem;color:var(--text-muted);margin:4px 0 10px;">${rateLabel}. Catalogue price for this line: Rs. ${formatMoney(catalogueTotal)}</p>
+                <input type="text" id="priceOverrideInput" inputmode="decimal" value="${current}"
+                       style="width:100%;padding:10px;border:1.5px solid var(--mist);border-radius:8px;font-family:inherit;font-size:1rem;margin-bottom:12px;">
+                <div class="item-modal-actions">
+                    <button type="button" class="btn-cancel" id="priceOverrideCancel">Cancel</button>
+                    <button type="button" class="btn-confirm" id="priceOverrideConfirm">Set price</button>
+                </div>`;
+            document.getElementById('priceOverrideCancel').addEventListener('click', closeItemModal);
+            document.getElementById('priceOverrideConfirm').addEventListener('click', () => {
+                const price = parseFloat(document.getElementById('priceOverrideInput').value);
+                if (isNaN(price) || price < 0) { showToast('Enter a valid price'); return; }
+                applyPriceOverrideToLine(line, price);
+                renderReceipt();
+                updateCartIndicator();
+                closeItemModal();
+            });
+            document.getElementById('itemModal').classList.add('active');
+        }
+
+        function applyPriceOverrideToLine(line, price) {
+            // Captured ONCE, before the first override -- re-editing the
+            // price a second time must still compare against the real
+            // catalogue price, not a previous override.
+            if (line.list_line_total == null) line.list_line_total = line.line_total;
+            line.price_override = price;
+            if (line.pricing_mode === 'fixed_weight') {
+                line.unit_price = price;
+                line.line_total = price;
+            } else if (line.pricing_mode === 'variable_weight') {
+                line.unit_price = price;
+                line.line_total = round2(price * (line.weight || 0));
+            } else {
+                line.unit_price = price;
+                line.line_total = round2(price * (line.qty || 0));
+            }
+        }
+
         // ══════════════════════════════════════════════════════════════
         // Coupon (POS Phase C) — validated live against /api/v1/pos/coupon/
         // validate/ (resolve_pos_coupon() in shop/views.py) so staff sees
@@ -2641,20 +2753,41 @@
 
             const payload = {
                 client_sale_id: clientSaleId,
-                cart: cart.map(l => ({
-                    product_id: l.product_id, qty: l.qty, weight: l.weight || null, variant_id: l.variant_id || null,
-                    unit_id: l.unit_id || null, offer_id: l.offer_id || null, combo_instance_id: l.combo_instance_id || null,
-                })),
+                // price_override is deliberately only ever added to a
+                // line's payload when wholesaleMode is on -- a retail
+                // payload's cart lines must stay byte-for-byte the same
+                // shape as before, no new key appearing at all.
+                cart: cart.map(l => {
+                    const cartLine = {
+                        product_id: l.product_id, qty: l.qty, weight: l.weight || null, variant_id: l.variant_id || null,
+                        unit_id: l.unit_id || null, offer_id: l.offer_id || null, combo_instance_id: l.combo_instance_id || null,
+                    };
+                    if (wholesaleMode && l.price_override != null) cartLine.price_override = l.price_override;
+                    return cartLine;
+                }),
                 payments: paymentsPayload,
             };
             if (selectedCustomer) payload.customer_id = selectedCustomer.id;
             if (appliedCoupon) payload.coupon_code = appliedCoupon.code;
+            if (wholesaleMode) payload.is_wholesale = true;
 
             try {
                 const response = await apiFetch('/api/v1/sales/', {
                     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
                 });
                 const data = await response.json().catch(() => ({}));
+                // A rejected wholesale sale (non-owner/manager account) is
+                // also a plain 403 -- carries its own `reason` tag so it
+                // isn't swallowed into the generic idle-lock handling right
+                // below, which treats every OTHER 403 as "show the PIN
+                // screen again" (get_pos_operator() raises that exact same
+                // shape for "no PIN unlock yet").
+                if (response.status === 403 && data.reason === 'wholesale_unauthorized') {
+                    showToast(data.message || 'Wholesale sales require an owner/manager account.');
+                    btn.disabled = false;
+                    btn.textContent = originalText;
+                    return;
+                }
                 if (response.status === 401 || response.status === 403) {
                     // Idle-locked mid-checkout (403, Phase A PIN lock) or the
                     // underlying Django session itself has expired (401,
@@ -2671,7 +2804,10 @@
                     return;
                 }
                 if (data.status === 'ok') {
-                    showToast(`Sale ${data.sale_number} — Rs. ${data.total} recorded`);
+                    const wholesaleLabel = wholesaleMode
+                        ? ` — WHOLESALE${selectedCustomer ? ' (' + selectedCustomer.name + ')' : ''}`
+                        : '';
+                    showToast(`Sale ${data.sale_number} — Rs. ${data.total} recorded${wholesaleLabel}`);
                     resetPostSaleState();
                 } else {
                     // A real validation/stock error (400/409) -- either

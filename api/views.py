@@ -33,6 +33,7 @@ from shop.views import (
     resolve_combo_reference_price,
     resolve_pos_coupon,
     POSSaleValidationError,
+    _is_owner_or_manager,
 )
 
 from shop import reports as reports_lib
@@ -204,6 +205,14 @@ class POSSaleView(generics.ListAPIView):
                 customer=customer,
                 note_prefix='POS sale (API)',
                 coupon_code=data.get('coupon_code'),
+                is_wholesale=data.get('is_wholesale', False),
+                # Deliberately request.user, not operator_user: wholesale
+                # authorization is the terminal's own Django login (same
+                # check the Reports dashboard gates on), independent of
+                # which PIN-identified operator is ringing up this specific
+                # sale. create_pos_sale() itself still enforces this (fails
+                # closed if omitted) — this is just where it's computed.
+                wholesale_authorized=_is_owner_or_manager(request.user),
             )
         except POSSaleValidationError as e:
             # `reason` lets the offline queue (static/js/pos-offline-queue.js)

@@ -176,6 +176,12 @@ class POSSaleCreateSerializer(serializers.Serializer):
     payments = serializers.ListField(child=serializers.DictField(), allow_empty=False)
     coupon_code = serializers.CharField(max_length=30, required=False, allow_null=True, allow_blank=True)
     queued_operator_id = serializers.IntegerField(required=False, allow_null=True)
+    # Wholesale mode — each cart line's own price_override lives inside the
+    # loose `cart` dicts above (create_pos_sale() reads it per line), same
+    # as every other per-line field. Authorization (owner/manager only) is
+    # NOT validated here — it depends on request.user, which this
+    # input-shape-only serializer has no access to; see POSSaleView.post().
+    is_wholesale = serializers.BooleanField(required=False, default=False)
 
 
 class PosUnlockSerializer(serializers.Serializer):

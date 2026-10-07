@@ -1148,6 +1148,11 @@ class POSSale(models.Model):
                    'e.g. -0.37 if a Rs. 222.37 total was rounded down to Rs. 222. Always between '
                    '-0.99 and +0.99.'
     )
+    is_wholesale = models.BooleanField(
+        default=False, db_index=True,
+        help_text='A bulk sale to a named buyer at manually-set per-line prices -- no coupons, '
+                   'no automatic offers/combos. See create_pos_sale() in shop/views.py.'
+    )
 
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -1206,6 +1211,13 @@ class POSSaleLine(models.Model):
         help_text="In the product's own base unit — same meaning as InventoryMovement.quantity for this line."
     )
     line_total = models.DecimalField(max_digits=12, decimal_places=2)
+    list_line_total = models.DecimalField(
+        max_digits=12, decimal_places=2, null=True, blank=True,
+        help_text='What this line would have cost at the normal catalogue price -- only ever '
+                   'set on a wholesale sale (POSSale.is_wholesale), where it can legitimately '
+                   'differ from line_total (the actual amount charged). Null on every retail '
+                   'line, since there line_total already IS the catalogue-derived price.'
+    )
     unit_cost = models.DecimalField(max_digits=12, decimal_places=4, null=True, blank=True)
 
     class Meta:

@@ -449,7 +449,7 @@ class POSSaleLineInline(admin.TabularInline):
 
     model = POSSaleLine
     extra = 0
-    readonly_fields = ['product', 'variant', 'quantity', 'line_total', 'unit_cost']
+    readonly_fields = ['product', 'variant', 'quantity', 'line_total', 'list_line_total', 'unit_cost']
     can_delete = False
 
     def has_add_permission(self, request, obj=None):
@@ -458,14 +458,14 @@ class POSSaleLineInline(admin.TabularInline):
 
 @admin.register(POSSale)
 class POSSaleAdmin(admin.ModelAdmin):
-    list_display = ['sale_number', 'cashier', 'customer', 'payment_method', 'coupon', 'discount_amount', 'round_off_amount', 'total_amount', 'created_at']
-    list_filter = ['payment_method', 'cashier', 'coupon', 'created_at']
+    list_display = ['sale_number', 'cashier', 'customer', 'payment_method', 'is_wholesale', 'coupon', 'discount_amount', 'round_off_amount', 'total_amount', 'created_at']
+    list_filter = ['payment_method', 'is_wholesale', 'cashier', 'coupon', 'created_at']
     search_fields = ['sale_number']
     date_hierarchy = 'created_at'
     ordering = ['-created_at']
     inlines = [POSSalePaymentInline, POSSaleLineInline]
     readonly_fields = [
-        'sale_number', 'cashier', 'customer', 'payment_method', 'cart_snapshot', 'total_amount',
+        'sale_number', 'cashier', 'customer', 'payment_method', 'is_wholesale', 'cart_snapshot', 'total_amount',
         'client_sale_id', 'taxable_value', 'exempt_value', 'vat_amount', 'coupon', 'discount_amount',
         'round_off_amount', 'created_at',
     ]

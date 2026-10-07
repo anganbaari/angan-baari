@@ -51,7 +51,11 @@ var POS_QUEUE_STORE = 'queuedSales';
 // step with its new report-dismissed call). A device that cold-starts
 // offline on an old v3 shell would otherwise keep running pos.html/
 // pos-offline-queue.js from before any of this existed.
-var POS_SHELL_CACHE = 'pos-shell-v4';
+// v4 -> v5: templates/pos.html changed structurally again (Wholesale
+// toggle/banner, the price-override modal, the reused buyer picker) --
+// same reasoning, a device cold-starting offline on the old v4 shell
+// would otherwise keep running pos.html from before wholesale mode existed.
+var POS_SHELL_CACHE = 'pos-shell-v5';
 var POS_META_STORE = 'meta';
 var POS_OFFLINE_PIN_STORE = 'offlineOperators';
 var POS_CREDIT_CUSTOMER_STORE = 'creditCustomers';

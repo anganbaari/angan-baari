@@ -505,6 +505,68 @@ class POSSaleLineApiTests(ApiTestBase):
         self.assertEqual(lines[0].unit_cost, Decimal('400.0000'))
 
 
+class WholesaleSaleApiTests(ApiTestBase):
+    """POST /api/v1/sales/ with is_wholesale -- confirms the real HTTP path
+    (authorization computed from request.user, see POSSaleView.post())
+    behaves the same as the direct create_pos_sale() coverage in
+    shop.tests.WholesaleSaleTests."""
+
+    def setUp(self):
+        super().setUp()
+        self.owner = User.objects.create_user('owner', password='pw', is_staff=True)
+        self.owner_pin = '7634'
+        self.owner_profile = UserProfile.objects.create(user=self.owner, role='admin')
+        self.owner_profile.set_pin(self.owner_pin)
+        self.owner_profile.save()
+        self.buyer = Customer.objects.create(name='Big Trader', phone='9811111111', address='Butwal')
+
+    def test_owner_can_complete_wholesale_sale_with_override(self):
+        self.client.login(username='owner', password='pw')
+        self.unlock_terminal(pin=self.owner_pin)
+        payload = {
+            'client_sale_id': str(uuid.uuid4()),
+            'payments': [{'method': 'cash', 'amount': '500.00'}],
+            'cart': [{'product_id': self.jar.id, 'qty': 2, 'price_override': '250'}],
+            'customer_id': self.buyer.id,
+            'is_wholesale': True,
+        }
+        response = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        sale = POSSale.objects.get(sale_number=response.data['sale_number'])
+        self.assertTrue(sale.is_wholesale)
+        self.assertEqual(sale.total_amount, Decimal('500.00'))
+        self.assertEqual(sale.customer_id, self.buyer.id)
+
+    def test_non_owner_wholesale_rejected_403_no_sale(self):
+        self.client.login(username='cashier', password='pw')
+        self.unlock_terminal()
+        payload = {
+            'client_sale_id': str(uuid.uuid4()),
+            'payments': [{'method': 'cash', 'amount': '1.00'}],
+            'cart': [{'product_id': self.jar.id, 'qty': 1, 'price_override': '1'}],
+            'customer_id': self.buyer.id,
+            'is_wholesale': True,
+        }
+        response = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN, response.data)
+        self.assertFalse(POSSale.objects.filter(is_wholesale=True).exists())
+
+    def test_retail_sale_from_owner_account_is_unaffected(self):
+        """Being an owner doesn't change anything about an ordinary sale --
+        is_wholesale defaults false, price_override is simply never sent."""
+        self.client.login(username='owner', password='pw')
+        self.unlock_terminal(pin=self.owner_pin)
+        payload = {
+            'client_sale_id': str(uuid.uuid4()),
+            'payments': [{'method': 'cash', 'amount': '250.00'}],
+            'cart': [{'product_id': self.jar.id, 'qty': 1}],
+        }
+        response = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        sale = POSSale.objects.get(sale_number=response.data['sale_number'])
+        self.assertFalse(sale.is_wholesale)
+
+
 class POSVatApiTests(ApiTestBase):
     """POS Phase B — VAT scaffolding. Dormant by default (BusinessSettings.
     is_vat_enabled=False), regardless of any product's is_taxable flag."""
