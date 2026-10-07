@@ -12,7 +12,7 @@
     <meta name="theme-color" content="#0e1710">
     <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{% static 'style.css' %}">
-    <link rel="stylesheet" href="{% static 'css/dashboard.css' %}?v=7">
+    <link rel="stylesheet" href="{% static 'css/dashboard.css' %}?v=8">
 </head>
 <body class="dashboard-body">
     <div id="dashPrintHeader">
@@ -89,13 +89,12 @@
         </aside>
 
         <div class="dash-main">
-            <div class="dash-mobile-bar">
-                <button type="button" id="sidebarToggle" aria-label="Open menu" aria-expanded="false">☰</button>
-                <strong style="font-family:var(--font-display);color:var(--dash-gold-light);">Reports</strong>
-            </div>
-
             <header class="dash-topbar">
                 <div class="dash-topbar-row1">
+                    <div class="dash-topbar-left">
+                        <button type="button" id="sidebarToggle" class="dash-menu-btn" aria-label="Open menu" aria-expanded="false">☰</button>
+                        <strong class="dash-topbar-brand">Reports</strong>
+                    </div>
                     <h2 id="sectionTitle">Overview</h2>
                     <div class="dash-topbar-meta">
                         <span class="dash-today-chip" id="todayBsChip">आज —</span>
