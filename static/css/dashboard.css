@@ -36,7 +36,8 @@ body.dashboard-body {
     -webkit-font-smoothing: antialiased;
 }
 
-body.dashboard-body, .dash-shell { overflow-x: hidden; }
+body.dashboard-body { overflow-x: hidden; }
+.dash-shell { overflow-x: clip; }
 
 ::selection { background: rgba(201, 168, 76, 0.35); }
 
