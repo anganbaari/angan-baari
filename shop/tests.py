@@ -1,8 +1,10 @@
+import uuid
 from datetime import timedelta
 from decimal import Decimal
 from unittest.mock import patch
 
 from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError
 from django.test import TestCase, Client
 from django.urls import reverse
 from django.utils import timezone
@@ -13,8 +15,9 @@ from rest_framework.test import APIClient
 from .admin import UserProfileInlineForm
 from .models import (
     BundleItem, Category, CostEntry, FarmAsset, InventoryMovement, ContactMessage,
-    NewsletterSubscriber, Offer, Product, ProductVariant, UserProfile,
+    NewsletterSubscriber, Offer, POSSale, Product, ProductVariant, PurchaseBatch, UserProfile,
 )
+from .views import create_pos_sale
 from .stock import get_stock_table_rows
 
 
@@ -714,3 +717,223 @@ class CostEntryAppendOnlyTests(TestCase):
     def test_cannot_delete(self):
         with self.assertRaises(ValueError):
             self.entry.delete()
+
+
+class WeightedAverageCostTests(TestCase):
+    """InventoryMovement.weighted_average_cost() -- moving-average costing
+    for outsourced (origin='sourced') products only. Numbers throughout
+    are chosen so every division is exact, so assertions can compare
+    against a plain hand-computed Decimal without quantize noise."""
+
+    def setUp(self):
+        self.category = Category.objects.create(name='Sourced Fruit', order=1)
+        self.apple = Product.objects.create(
+            name='Apple', slug='apple-wac-test', category=self.category, description='test',
+            price=Decimal('400.00'), pricing_mode='variable_weight', weight_step=Decimal('0.50'),
+            origin='sourced',
+        )
+
+    def make_batch(self, quantity, unit_price, transport=0, other=0, purchase_date='2026-01-01'):
+        return PurchaseBatch.objects.create(
+            product=self.apple, purchase_date=purchase_date, quantity=Decimal(str(quantity)),
+            unit_price=Decimal(str(unit_price)), transport_cost=Decimal(str(transport)),
+            other_direct_cost=Decimal(str(other)),
+        )
+
+    def test_first_batch_landed_cost(self):
+        batch = self.make_batch(10, 200, transport=300, other=100)
+        self.assertEqual(batch.landed_total, Decimal('2400.00'))
+        self.assertEqual(batch.landed_unit_cost, Decimal('240.0000'))
+        self.assertEqual(InventoryMovement.current_stock(self.apple), Decimal('10'))
+        self.assertEqual(InventoryMovement.weighted_average_cost(self.apple), Decimal('240.0000'))
+
+    def test_second_batch_averages(self):
+        self.make_batch(10, 200, transport=300, other=100)  # landed total 2400
+        self.make_batch(10, 220, transport=0, other=0)       # landed total 2200
+        self.assertEqual(InventoryMovement.weighted_average_cost(self.apple), Decimal('230.0000'))  # (2400+2200)/20
+
+    def test_sale_gets_current_average_and_average_stays_put(self):
+        self.make_batch(10, 200, transport=300, other=100)
+        self.make_batch(10, 220, transport=0, other=0)  # avg 230, stock 20
+        movement = InventoryMovement.objects.create(
+            product=self.apple, movement_type='sale', source='pos', quantity=Decimal('5'),
+        )
+        self.assertEqual(movement.unit_cost, Decimal('230.0000'))
+        self.assertEqual(InventoryMovement.current_stock(self.apple), Decimal('15'))
+        self.assertEqual(InventoryMovement.weighted_average_cost(self.apple), Decimal('230.0000'))
+
+    def test_waste_gets_unit_cost_too(self):
+        self.make_batch(10, 200, transport=300, other=100)
+        self.make_batch(10, 220, transport=0, other=0)
+        InventoryMovement.objects.create(product=self.apple, movement_type='sale', source='pos', quantity=Decimal('5'))
+        waste = InventoryMovement.objects.create(
+            product=self.apple, movement_type='waste', source='admin', quantity=Decimal('2'),
+        )
+        self.assertEqual(waste.unit_cost, Decimal('230.0000'))
+
+    def test_third_batch_after_sales_changes_average_correctly(self):
+        self.make_batch(10, 200, transport=300, other=100)  # value 2400, qty 10
+        self.make_batch(10, 220, transport=0, other=0)       # value +2200, qty +10 -> 4600/20 = 230
+        InventoryMovement.objects.create(product=self.apple, movement_type='sale', source='pos', quantity=Decimal('5'))     # -5*230=1150
+        InventoryMovement.objects.create(product=self.apple, movement_type='waste', source='admin', quantity=Decimal('2'))  # -2*230=460
+        self.make_batch(13, 300, transport=0, other=0)  # +13*300=3900
+        # value: 2400+2200-1150-460+3900 = 6890 ; qty: 10+10-5-2+13 = 26 ; 6890/26 = 265 exactly
+        self.assertEqual(InventoryMovement.weighted_average_cost(self.apple), Decimal('265'))
+
+    def test_falls_back_to_last_purchase_cost_once_stock_exhausted(self):
+        self.make_batch(10, 200, transport=300, other=100)  # avg 240, stock 10
+        InventoryMovement.objects.create(product=self.apple, movement_type='sale', source='pos', quantity=Decimal('10'))
+        self.assertEqual(InventoryMovement.current_stock(self.apple), Decimal('0'))
+        self.assertEqual(InventoryMovement.weighted_average_cost(self.apple), Decimal('240.0000'))
+
+        # Buying again resumes a correct moving average from here.
+        batch2 = self.make_batch(5, 300, transport=0, other=0)
+        self.assertEqual(batch2.landed_unit_cost, Decimal('300.0000'))
+        self.assertEqual(InventoryMovement.weighted_average_cost(self.apple), Decimal('300.0000'))
+
+    def test_no_purchase_ever_recorded_returns_none(self):
+        self.assertIsNone(InventoryMovement.weighted_average_cost(self.apple))
+
+    def test_farm_product_movement_keeps_unit_cost_none(self):
+        farm_product = Product.objects.create(
+            name='Farm Mango', slug='farm-mango-wac-test', category=self.category, description='test',
+            price=Decimal('300.00'), pricing_mode='variable_weight', weight_step=Decimal('0.50'), origin='farm',
+        )
+        movement = InventoryMovement.objects.create(
+            product=farm_product, movement_type='sale', source='pos', quantity=Decimal('2'),
+        )
+        self.assertIsNone(movement.unit_cost)
+
+
+class PurchaseBatchTests(TestCase):
+    def setUp(self):
+        self.admin_user = User.objects.create_superuser('siteadmin', 'admin@example.com', 'pw')
+        self.client = Client()
+        self.client.login(username='siteadmin', password='pw')
+        self.category = Category.objects.create(name='Sourced Void Test', order=1)
+        self.kiwi = Product.objects.create(
+            name='Kiwi', slug='kiwi-void-test', category=self.category, description='test',
+            price=Decimal('500.00'), pricing_mode='variable_weight', weight_step=Decimal('0.50'),
+            origin='sourced',
+        )
+
+    def void_via_admin(self, batch_ids):
+        url = reverse('admin:shop_purchasebatch_changelist')
+        return self.client.post(url, {'action': 'void_selected_batches', '_selected_action': batch_ids}, follow=True)
+
+    def test_clean_rejects_farm_origin_product(self):
+        farm_product = Product.objects.create(
+            name='Farm Thing', slug='farm-thing-batch-test', category=self.category, description='test',
+            price=Decimal('100.00'), pricing_mode='fixed_quantity', origin='farm',
+        )
+        batch = PurchaseBatch(product=farm_product, purchase_date='2026-01-01', quantity=Decimal('5'), unit_price=Decimal('10'))
+        with self.assertRaises(ValidationError):
+            batch.full_clean()
+
+    def test_batch_creates_linked_purchase_movement(self):
+        batch = PurchaseBatch.objects.create(
+            product=self.kiwi, purchase_date='2026-01-01', quantity=Decimal('10'), unit_price=Decimal('200'),
+        )
+        self.assertIsNotNone(batch.movement)
+        self.assertEqual(batch.movement.movement_type, 'purchase')
+        self.assertEqual(batch.movement.unit_cost, Decimal('200.0000'))
+        self.assertEqual(batch.movement.note, f'Purchase batch #{batch.pk}')
+
+    def test_batch_cannot_be_edited(self):
+        batch = PurchaseBatch.objects.create(
+            product=self.kiwi, purchase_date='2026-01-01', quantity=Decimal('10'), unit_price=Decimal('200'),
+        )
+        batch.supplier = 'Changed'
+        with self.assertRaises(ValueError):
+            batch.save()
+
+    def test_batch_cannot_be_deleted(self):
+        batch = PurchaseBatch.objects.create(
+            product=self.kiwi, purchase_date='2026-01-01', quantity=Decimal('10'), unit_price=Decimal('200'),
+        )
+        with self.assertRaises(ValueError):
+            batch.delete()
+
+    def test_void_restores_pre_batch_stock_and_average(self):
+        PurchaseBatch.objects.create(product=self.kiwi, purchase_date='2026-01-01', quantity=Decimal('10'), unit_price=Decimal('200'))
+        batch2 = PurchaseBatch.objects.create(product=self.kiwi, purchase_date='2026-01-02', quantity=Decimal('10'), unit_price=Decimal('300'))
+        self.assertEqual(InventoryMovement.weighted_average_cost(self.kiwi), Decimal('250.0000'))  # (2000+3000)/20
+
+        self.void_via_admin([batch2.pk])
+
+        batch2.refresh_from_db()
+        self.assertTrue(batch2.is_void)
+        self.assertIsNotNone(batch2.voided_at)
+        self.assertEqual(InventoryMovement.current_stock(self.kiwi), Decimal('10'))
+        self.assertEqual(InventoryMovement.weighted_average_cost(self.kiwi), Decimal('200.0000'))
+
+    def test_void_refused_when_stock_too_low(self):
+        batch1 = PurchaseBatch.objects.create(product=self.kiwi, purchase_date='2026-01-01', quantity=Decimal('10'), unit_price=Decimal('200'))
+        InventoryMovement.objects.create(product=self.kiwi, movement_type='sale', source='pos', quantity=Decimal('7'))
+        self.assertEqual(InventoryMovement.current_stock(self.kiwi), Decimal('3'))
+
+        self.void_via_admin([batch1.pk])
+
+        batch1.refresh_from_db()
+        self.assertFalse(batch1.is_void)
+        self.assertEqual(InventoryMovement.current_stock(self.kiwi), Decimal('3'))
+
+
+class POSSaleLineCreationTests(TestCase):
+    """create_pos_sale() (shop/views.py) -- the sole implementation behind
+    both the old removed pos_create_sale() wrapper and POSSaleView.post()
+    (api/views.py), see that function's own docstring."""
+
+    def setUp(self):
+        self.category = Category.objects.create(name='Sale Line Test', order=1)
+        self.operator = User.objects.create_user('lineop', password='pw', is_staff=True)
+        self.sourced_product = Product.objects.create(
+            name='Grapes', slug='grapes-line-test', category=self.category, description='test',
+            price=Decimal('400.00'), pricing_mode='variable_weight', weight_step=Decimal('0.50'),
+            origin='sourced',
+        )
+        PurchaseBatch.objects.create(
+            product=self.sourced_product, purchase_date='2026-01-01', quantity=Decimal('20'), unit_price=Decimal('250'),
+        )  # landed/avg cost 250, stock 20
+        self.farm_product = Product.objects.create(
+            name='Farm Papaya', slug='farm-papaya-line-test', category=self.category, description='test',
+            price=Decimal('150.00'), pricing_mode='fixed_quantity', origin='farm',
+        )
+        InventoryMovement.objects.create(product=self.farm_product, movement_type='harvest', source='admin', quantity=Decimal('50'))
+
+    def test_sale_creates_lines_with_correct_totals_and_unit_cost(self):
+        sale, created = create_pos_sale(
+            client_sale_id=str(uuid.uuid4()),
+            cart=[
+                {'product_id': self.sourced_product.id, 'qty': 1, 'weight': '2.00'},  # 2kg @ 400 = 800
+                {'product_id': self.farm_product.id, 'qty': 3},                        # 3 @ 150 = 450
+            ],
+            payments=[{'method': 'cash', 'amount': '1250.00'}],
+            operator_user=self.operator,
+        )
+        self.assertTrue(created)
+        lines = list(sale.lines.all())
+        self.assertEqual(len(lines), 2)
+
+        sourced_line = next(l for l in lines if l.product_id == self.sourced_product.id)
+        self.assertEqual(sourced_line.quantity, Decimal('2.00'))
+        self.assertEqual(sourced_line.line_total, Decimal('800.00'))
+        self.assertEqual(sourced_line.unit_cost, Decimal('250.0000'))
+
+        farm_line = next(l for l in lines if l.product_id == self.farm_product.id)
+        self.assertEqual(farm_line.quantity, Decimal('3'))
+        self.assertEqual(farm_line.line_total, Decimal('450.00'))
+        self.assertIsNone(farm_line.unit_cost)
+
+        # No coupon/VAT in this sale, so total_amount matches the plain
+        # pre-discount subtotal directly.
+        self.assertEqual(sum((l.line_total for l in lines), Decimal('0')), sale.total_amount)
+
+    def test_idempotent_resubmission_creates_no_duplicate_lines(self):
+        client_sale_id = str(uuid.uuid4())
+        cart = [{'product_id': self.farm_product.id, 'qty': 2}]
+        payments = [{'method': 'cash', 'amount': '300.00'}]
+        create_pos_sale(client_sale_id=client_sale_id, cart=cart, payments=payments, operator_user=self.operator)
+        create_pos_sale(client_sale_id=client_sale_id, cart=cart, payments=payments, operator_user=self.operator)
+        sale = POSSale.objects.get(client_sale_id=client_sale_id)
+        self.assertEqual(sale.lines.count(), 1)

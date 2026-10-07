@@ -594,12 +594,18 @@ def create_inventory_movements_from_snapshot(cart_snapshot, movement_type, sourc
     promised to anyone yet, so blocking it here (and letting the cashier
     handle it face to face) is more correct than silently allowing an
     oversell the way we accept for an already-placed online order.
+
+    Returns {cart_snapshot index: the InventoryMovement actually created}
+    — a genuinely zero-quantity line (skipped, see "if quantity <= 0"
+    below) or one that raised under strict=False just has no entry.
+    Existing callers that don't use this return value are unaffected.
     """
     from decimal import Decimal
     from .models import Product, InventoryMovement
+    created = {}
     if not cart_snapshot:
-        return
-    for line in cart_snapshot:
+        return created
+    for index, line in enumerate(cart_snapshot):
         try:
             product = Product.objects.get(id=line.get('product_id'))
             qty = int(line.get('qty', 0) or 0)
@@ -640,10 +646,43 @@ def create_inventory_movements_from_snapshot(cart_snapshot, movement_type, sourc
             if strict:
                 movement.full_clean()
             movement.save()
+            created[index] = movement
         except Exception:
             if strict:
                 raise
             continue
+    return created
+
+
+def create_pos_sale_lines(sale, cart_snapshot, line_totals, movements_by_index):
+    """Writes one POSSaleLine per cart line for a just-created POS sale.
+    Called from inside create_pos_sale()'s own transaction.atomic() block,
+    right after create_inventory_movements_from_snapshot() creates the
+    matching InventoryMovement rows for the same cart_snapshot — kept as
+    its own small function (per the brief) even though create_pos_sale()
+    is currently its only caller: POSSaleView.post() (api/views.py) is a
+    thin wrapper around create_pos_sale(), not a second implementation
+    (the old pos_create_sale()/the-two-callers situation this was meant to
+    guard against was already consolidated in POS-PWA Phase 1 — see
+    create_pos_sale()'s own docstring).
+
+    quantity/unit_cost come from the InventoryMovement actually created
+    for that cart index, never recomputed separately — a line with no
+    matching movement (a genuinely zero-quantity line) gets quantity=0,
+    unit_cost=None rather than guessing."""
+    from decimal import Decimal
+    from .models import POSSaleLine
+
+    for index, line in enumerate(cart_snapshot):
+        movement = movements_by_index.get(index)
+        POSSaleLine.objects.create(
+            sale=sale,
+            product_id=line['product_id'],
+            variant_id=line.get('variant_id'),
+            quantity=movement.quantity if movement else Decimal('0'),
+            line_total=line_totals[index],
+            unit_cost=movement.unit_cost if movement else None,
+        )
 
 
 class POSSaleValidationError(Exception):
@@ -1025,6 +1064,10 @@ def create_pos_sale(*, client_sale_id, cart, payments, operator_user, customer=N
     taxable_value = Decimal('0')
     exempt_value = Decimal('0')
     cart_snapshot = []
+    # Index-aligned with cart_snapshot -- each line's gross amount BEFORE
+    # the sale-level coupon discount below, captured here (not re-derived
+    # later) for POSSaleLine.line_total.
+    line_totals = []
     try:
         for index, line in enumerate(cart):
             product = Product.objects.get(id=line.get('product_id'), is_available=True)
@@ -1081,6 +1124,7 @@ def create_pos_sale(*, client_sale_id, cart, payments, operator_user, customer=N
                 'unit_name': unit.get_name_display() if unit else None,
                 'offer_id': offer_id, 'combo_instance_id': combo_instance_id,
             })
+            line_totals.append(line_total)
     except (Product.DoesNotExist, InvalidOperation, TypeError, ValueError):
         raise POSSaleValidationError('One of the items in this cart is no longer valid.')
 
@@ -1179,11 +1223,12 @@ def create_pos_sale(*, client_sale_id, cart, payments, operator_user, customer=N
                         related_pos_sale=sale,
                         recorded_by=operator_user,
                     )
-            create_inventory_movements_from_snapshot(
+            movements_by_index = create_inventory_movements_from_snapshot(
                 cart_snapshot, 'sale', source=source,
                 related_pos_sale=sale, note=f"{note_prefix} {sale.sale_number}",
                 strict=True,
             )
+            create_pos_sale_lines(sale, cart_snapshot, line_totals, movements_by_index)
     except ValidationError as e:
         message = '; '.join(e.messages) if hasattr(e, 'messages') else str(e)
         raise POSSaleValidationError(f'Not enough stock: {message}', status=409)

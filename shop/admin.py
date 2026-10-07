@@ -15,6 +15,7 @@ from .models import InventoryMovement
 from .models import (
     Offer, Coupon, BundleItem, ProductVariant, ProductSellingUnit, InventoryMovement, POSSale, UserProfile,
     BusinessSettings, CreditTransaction, Customer, POSSalePayment, RevenueTarget, CostEntry, FarmAsset,
+    PurchaseBatch, POSSaleLine,
 )
 from .stock import get_stock_table_rows
 from .utils import format_money
@@ -342,13 +343,13 @@ class CouponAdmin(admin.ModelAdmin):
 
 @admin.register(InventoryMovement)
 class InventoryMovementAdmin(admin.ModelAdmin):
-    list_display = ['created_at', 'product', 'variant', 'movement_type', 'change_display', 'source', 'related_order']
+    list_display = ['created_at', 'product', 'variant', 'movement_type', 'change_display', 'unit_cost', 'source', 'related_order']
     list_filter = ['movement_type', 'source', 'created_at']
     search_fields = ['product__name', 'note', 'related_order__order_number']
     autocomplete_fields = ['product']
     date_hierarchy = 'created_at'
     ordering = ['-created_at']
-    readonly_fields = ['created_at']
+    readonly_fields = ['created_at', 'unit_cost']
     list_select_related = ['product', 'variant', 'related_order']
 
     def change_display(self, obj):
@@ -356,10 +357,99 @@ class InventoryMovementAdmin(admin.ModelAdmin):
         return f'{sign}{obj.quantity}'
     change_display.short_description = 'Change'
 
+
+class PurchaseBatchAdminForm(forms.ModelForm):
+    class Meta:
+        model = PurchaseBatch
+        fields = ['product', 'purchase_date', 'supplier', 'quantity', 'unit_price', 'transport_cost', 'other_direct_cost', 'note']
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Outsourced products only -- a farm-grown product is costed
+        # through ABMS cost centres instead (PurchaseBatch.clean() backs
+        # this up server-side; this is just so the dropdown itself never
+        # offers a wrong choice in the first place).
+        self.fields['product'].queryset = Product.objects.filter(origin='sourced')
+
+
+@admin.register(PurchaseBatch)
+class PurchaseBatchAdmin(admin.ModelAdmin):
+    """Add-only ledger: no change, no delete (PurchaseBatch.save()/
+    delete() both raise on an existing row anyway -- these permission
+    overrides are what actually hide the Change/Delete buttons). Void a
+    mistaken batch with the "Void selected batches" action instead."""
+
+    form = PurchaseBatchAdminForm
+    list_display = [
+        'purchase_date', 'product', 'supplier', 'quantity', 'unit_price',
+        'transport_cost', 'landed_unit_cost', 'landed_total', 'is_void',
+    ]
+    list_filter = ['is_void', 'product']
+    search_fields = ['product__name', 'supplier', 'note']
+    date_hierarchy = 'purchase_date'
+    ordering = ['-purchase_date', '-id']
+    readonly_fields = ['landed_total', 'landed_unit_cost', 'movement', 'is_void', 'voided_at', 'created_by', 'created_at']
+    actions = ['void_selected_batches']
+
+    def save_model(self, request, obj, form, change):
+        obj.created_by = request.user
+        super().save_model(request, obj, form, change)
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    @admin.action(description='Void selected batches')
+    def void_selected_batches(self, request, queryset):
+        from django.db import transaction
+        from django.utils import timezone
+
+        voided, skipped = 0, []
+        for batch in queryset.filter(is_void=False):
+            current_stock = InventoryMovement.current_stock(batch.product)
+            if current_stock < batch.quantity:
+                skipped.append(
+                    f'{batch} -- only {current_stock} in stock, needs {batch.quantity} to void'
+                )
+                continue
+            with transaction.atomic():
+                InventoryMovement.objects.create(
+                    product=batch.product, movement_type='adjustment_remove', source='admin',
+                    quantity=batch.quantity, unit_cost=batch.landed_unit_cost,
+                    note=f'Void of purchase batch #{batch.pk}',
+                )
+                # Bypasses PurchaseBatch.save()'s append-only guard on
+                # purpose -- a plain queryset update never calls save().
+                PurchaseBatch.objects.filter(pk=batch.pk).update(is_void=True, voided_at=timezone.now())
+            voided += 1
+
+        if voided:
+            self.message_user(request, f'{voided} batch(es) voided.')
+        if skipped:
+            self.message_user(
+                request, 'Could not void (not enough stock left): ' + '; '.join(skipped), level=messages.WARNING,
+            )
+
+
 class POSSalePaymentInline(admin.TabularInline):
     model = POSSalePayment
     extra = 0
     readonly_fields = ['method', 'amount']
+    can_delete = False
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+
+class POSSaleLineInline(admin.TabularInline):
+    """Read-only -- written by create_pos_sale() itself, see POSSaleLine's
+    own docstring. Existing sales predating this model have no lines."""
+
+    model = POSSaleLine
+    extra = 0
+    readonly_fields = ['product', 'variant', 'quantity', 'line_total', 'unit_cost']
     can_delete = False
 
     def has_add_permission(self, request, obj=None):
@@ -373,7 +463,7 @@ class POSSaleAdmin(admin.ModelAdmin):
     search_fields = ['sale_number']
     date_hierarchy = 'created_at'
     ordering = ['-created_at']
-    inlines = [POSSalePaymentInline]
+    inlines = [POSSalePaymentInline, POSSaleLineInline]
     readonly_fields = [
         'sale_number', 'cashier', 'customer', 'payment_method', 'cart_snapshot', 'total_amount',
         'client_sale_id', 'taxable_value', 'exempt_value', 'vat_amount', 'coupon', 'discount_amount',

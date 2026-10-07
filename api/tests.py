@@ -14,7 +14,7 @@ from rest_framework.test import APIClient
 
 from shop.models import (
     BundleItem, BusinessSettings, Category, Coupon, CreditTransaction, Customer, InventoryMovement,
-    Offer, POSSale, POSSalePayment, Product, ProductOrder, ProductVariant, UserProfile, Wishlist,
+    Offer, POSSale, POSSalePayment, Product, ProductOrder, ProductVariant, PurchaseBatch, UserProfile, Wishlist,
 )
 
 
@@ -465,6 +465,44 @@ class POSSaleApiTests(ApiTestBase):
         self.assertEqual(old_sale.payment_method, 'esewa')
         self.assertEqual(old_sale.get_payment_method_display(), 'eSewa')
         self.assertEqual(old_sale.payments.count(), 0)
+
+
+class POSSaleLineApiTests(ApiTestBase):
+    """POST /api/v1/sales/ -- the only entry point for a POS sale (see
+    POSSaleView's own docstring: it's a thin wrapper around
+    create_pos_sale(), shop/views.py, which is what actually writes
+    POSSaleLine rows) -- confirms the full request path produces them
+    with a real unit_cost for an outsourced product, same as the
+    shop.tests.POSSaleLineCreationTests direct-call coverage."""
+
+    def setUp(self):
+        super().setUp()
+        self.sourced = Product.objects.create(
+            name='Dragon Fruit', slug='dragon-fruit-api-test', category=self.category,
+            description='test', price=Decimal('600.00'), pricing_mode='fixed_quantity',
+            origin='sourced',
+        )
+        PurchaseBatch.objects.create(
+            product=self.sourced, purchase_date='2026-01-01', quantity=Decimal('10'), unit_price=Decimal('400'),
+        )  # avg cost 400, stock 10
+
+    def test_api_sale_creates_lines_with_unit_cost_for_sourced_product(self):
+        self.client.login(username='cashier', password='pw')
+        self.unlock_terminal()
+        payload = {
+            'client_sale_id': str(uuid.uuid4()),
+            'payments': [{'method': 'cash', 'amount': '600.00'}],
+            'cart': [{'product_id': self.sourced.id, 'qty': 1}],
+        }
+        response = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+
+        sale = POSSale.objects.get(sale_number=response.data['sale_number'])
+        lines = list(sale.lines.all())
+        self.assertEqual(len(lines), 1)
+        self.assertEqual(lines[0].product_id, self.sourced.id)
+        self.assertEqual(lines[0].line_total, Decimal('600.00'))
+        self.assertEqual(lines[0].unit_cost, Decimal('400.0000'))
 
 
 class POSVatApiTests(ApiTestBase):

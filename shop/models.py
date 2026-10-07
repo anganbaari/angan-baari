@@ -695,6 +695,15 @@ class InventoryMovement(models.Model):
         max_length=300, blank=True,
         help_text='e.g. "rain damage", "sold to walk-in customer at farm shop"'
     )
+    unit_cost = models.DecimalField(
+        max_digits=12, decimal_places=4, null=True, blank=True,
+        help_text="Landed cost per product unit for THIS movement — only ever set for "
+                   "origin='sourced' products (see PurchaseBatch). Auto-filled on first "
+                   "save from weighted_average_cost() for sale/waste/adjustment_remove "
+                   "rows when not explicitly provided; a purchase row sets it explicitly "
+                   "(its own landed unit cost). Always null for farm-grown products — "
+                   "those are costed through ABMS cost centres instead."
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -756,6 +765,149 @@ class InventoryMovement(models.Model):
         from decimal import Decimal
         qs = cls.objects.filter(product=product, variant=variant)
         return sum((m.signed_quantity() for m in qs), Decimal('0'))
+
+    @classmethod
+    def weighted_average_cost(cls, product):
+        """Moving-average landed cost for an origin='sourced' product,
+        derived fresh from the ledger every call — never stored as a
+        running number anywhere. Only rows that already HAVE a unit_cost
+        count at all (so a harvest/adjustment_add/return row with no
+        unit_cost set — the normal case for those types — simply doesn't
+        skew the average either way):
+
+          value_in / qty_in   -- unit_cost-bearing rows whose movement_type
+                                  is in INCREASE_TYPES (purchases, and any
+                                  return that happens to carry a unit_cost)
+          value_out / qty_out -- every other unit_cost-bearing row (sale,
+                                  waste, adjustment_remove — including a
+                                  void's compensating adjustment_remove)
+
+        stock_qty = qty_in - qty_out; if stock_qty > 0, the average is
+        stock_value / stock_qty. If stock_qty is 0 or negative (nothing
+        left, or the ledger is otherwise exhausted), there's no current
+        average to blend into — fall back to the most recent purchase
+        row's own unit_cost, or None if this product has never been
+        purchased at all.
+
+        Returns a Decimal, or None if there's nothing to base a cost on."""
+        from decimal import Decimal
+        from django.db.models import Sum, Q, F, DecimalField
+
+        rows = cls.objects.filter(product=product, unit_cost__isnull=False)
+        increase = cls.INCREASE_TYPES
+        line_value = F('quantity') * F('unit_cost')
+        agg = rows.aggregate(
+            value_in=Sum(line_value, filter=Q(movement_type__in=increase), output_field=DecimalField(max_digits=16, decimal_places=4)),
+            value_out=Sum(line_value, filter=~Q(movement_type__in=increase), output_field=DecimalField(max_digits=16, decimal_places=4)),
+            qty_in=Sum('quantity', filter=Q(movement_type__in=increase)),
+            qty_out=Sum('quantity', filter=~Q(movement_type__in=increase)),
+        )
+        value_in = agg['value_in'] or Decimal('0')
+        value_out = agg['value_out'] or Decimal('0')
+        qty_in = agg['qty_in'] or Decimal('0')
+        qty_out = agg['qty_out'] or Decimal('0')
+
+        stock_value = value_in - value_out
+        stock_qty = qty_in - qty_out
+        if stock_qty > 0:
+            return stock_value / stock_qty
+
+        last_purchase = rows.filter(movement_type='purchase').order_by('-created_at', '-id').first()
+        return last_purchase.unit_cost if last_purchase else None
+
+    def save(self, *args, **kwargs):
+        # Only on a movement's FIRST save, and only when the caller hasn't
+        # already set unit_cost explicitly (a PurchaseBatch always does —
+        # its own landed unit cost, which must never be overwritten by
+        # this). Farm-grown products are costed through ABMS cost centres
+        # instead (see CLAUDE.md) and must never get a unit_cost here.
+        if self.pk is None and self.unit_cost is None and self.product_id:
+            if self.product.origin == 'sourced' and self.movement_type in ('sale', 'waste', 'adjustment_remove'):
+                self.unit_cost = InventoryMovement.weighted_average_cost(self.product)
+        super().save(*args, **kwargs)
+
+
+class PurchaseBatch(models.Model):
+    """One purchase of an outsourced (origin='sourced') product from a
+    supplier — the cost basis InventoryMovement.weighted_average_cost()
+    blends into the moving average. Farm-grown products are costed
+    through ABMS cost centres instead (see CLAUDE.md) — never create one
+    of these for an origin='farm' product; clean() enforces that.
+
+    Append-only like InventoryMovement itself: a mistake is corrected via
+    the "Void selected batches" admin action (a compensating
+    adjustment_remove movement, see PurchaseBatchAdmin), never by editing
+    or deleting this row — save()/delete() both raise once a row exists,
+    EXCEPT the void action itself, which deliberately bypasses save() via
+    a plain queryset .update() so it can still flip is_void/voided_at."""
+
+    product = models.ForeignKey('Product', on_delete=models.PROTECT, related_name='purchase_batches')
+    purchase_date = models.DateField()
+    supplier = models.CharField(max_length=200, blank=True)
+    quantity = models.DecimalField(max_digits=10, decimal_places=2)
+    unit_price = models.DecimalField(max_digits=10, decimal_places=2)
+    transport_cost = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    other_direct_cost = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    note = models.CharField(max_length=300, blank=True)
+    landed_total = models.DecimalField(max_digits=12, decimal_places=2, editable=False)
+    landed_unit_cost = models.DecimalField(max_digits=12, decimal_places=4, editable=False)
+    movement = models.OneToOneField(
+        'InventoryMovement', null=True, blank=True, on_delete=models.PROTECT, related_name='purchase_batch',
+    )
+    is_void = models.BooleanField(default=False)
+    voided_at = models.DateTimeField(null=True, blank=True)
+    created_by = models.ForeignKey('auth.User', null=True, blank=True, on_delete=models.SET_NULL)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-purchase_date', '-id']
+
+    def __str__(self):
+        return f"Batch #{self.pk or '?'} — {self.product.name}: {self.quantity} @ Rs {self.unit_price}"
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        if self.product_id and self.product.origin != 'sourced':
+            raise ValidationError({
+                'product': "Purchase batches are only for outsourced products (origin='sourced') "
+                           "— farm-grown products are costed through ABMS cost centres instead."
+            })
+        if self.quantity is not None and self.quantity <= 0:
+            raise ValidationError({'quantity': 'Quantity must be greater than 0.'})
+        if self.unit_price is not None and self.unit_price < 0:
+            raise ValidationError({'unit_price': 'Unit price cannot be negative.'})
+
+    def save(self, *args, **kwargs):
+        from decimal import Decimal
+        from django.db import transaction
+
+        is_new = self.pk is None
+        if not is_new:
+            raise ValueError(
+                'PurchaseBatch is append-only and cannot be edited once saved — '
+                'use the "Void selected batches" admin action instead.'
+            )
+
+        self.landed_total = (
+            self.quantity * self.unit_price + (self.transport_cost or 0) + (self.other_direct_cost or 0)
+        ).quantize(Decimal('0.01'))
+        self.landed_unit_cost = (self.landed_total / self.quantity).quantize(Decimal('0.0001'))
+
+        with transaction.atomic():
+            # Two saves, both part of this one creation call (not a later
+            # edit): the first INSERT gets us a real pk to reference in the
+            # movement's note and in the OneToOne link itself.
+            super().save(*args, **kwargs)
+            movement = InventoryMovement.objects.create(
+                product=self.product, movement_type='purchase', source='admin',
+                quantity=self.quantity, unit_cost=self.landed_unit_cost,
+                note=f'Purchase batch #{self.pk}',
+            )
+            self.movement = movement
+            super().save(update_fields=['movement'])
+
+    def delete(self, *args, **kwargs):
+        raise ValueError('PurchaseBatch cannot be deleted — use the "Void selected batches" admin action instead.')
 
 
 class CostEntry(models.Model):
@@ -1029,6 +1181,38 @@ class POSSalePayment(models.Model):
 
     def __str__(self):
         return f"{self.sale.sale_number} — {self.get_method_display()} Rs. {self.amount}"
+
+
+class POSSaleLine(models.Model):
+    """One line of a completed POS sale — written going forward only from
+    create_pos_sale() (shop/views.py), inside the same transaction.atomic()
+    as the sale itself. Existing POSSale rows are NOT backfilled; a sale
+    created before this model existed simply has no lines (see CLAUDE.md).
+
+    line_total is the gross line amount BEFORE the sale-level coupon
+    discount (POSSale.discount_amount) — i.e. this line's own contribution
+    to create_pos_sale()'s pre-discount `total`, not a share of the final
+    discounted/VAT'd/rounded POSSale.total_amount. unit_cost mirrors the
+    InventoryMovement this line produced: null for a farm-origin product
+    (not costed here — see ABMS cost centres), set for a sourced one."""
+
+    sale = models.ForeignKey(POSSale, on_delete=models.CASCADE, related_name='lines')
+    product = models.ForeignKey('Product', on_delete=models.PROTECT, related_name='pos_sale_lines')
+    variant = models.ForeignKey(
+        'ProductVariant', null=True, blank=True, on_delete=models.SET_NULL, related_name='pos_sale_lines',
+    )
+    quantity = models.DecimalField(
+        max_digits=10, decimal_places=3,
+        help_text="In the product's own base unit — same meaning as InventoryMovement.quantity for this line."
+    )
+    line_total = models.DecimalField(max_digits=12, decimal_places=2)
+    unit_cost = models.DecimalField(max_digits=12, decimal_places=4, null=True, blank=True)
+
+    class Meta:
+        ordering = ['id']
+
+    def __str__(self):
+        return f"{self.sale.sale_number} — {self.product.name} x{self.quantity}"
 
 
 class CreditTransaction(models.Model):
