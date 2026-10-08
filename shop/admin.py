@@ -15,7 +15,7 @@ from .models import InventoryMovement
 from .models import (
     Offer, Coupon, BundleItem, ProductVariant, ProductSellingUnit, InventoryMovement, POSSale, UserProfile,
     BusinessSettings, CreditTransaction, Customer, POSSalePayment, RevenueTarget, CostEntry, FarmAsset,
-    PurchaseBatch, POSSaleLine, CostCentreProduct,
+    PurchaseBatch, POSSaleLine, CostCentreProduct, CropBatch,
 )
 from .stock import get_stock_table_rows
 from .utils import format_money
@@ -629,6 +629,28 @@ class FarmAssetAdmin(admin.ModelAdmin):
     def annual_depreciation_display(self, obj):
         return format_money(obj.annual_depreciation())
     annual_depreciation_display.short_description = 'Annual depreciation'
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(CropBatch)
+class CropBatchAdmin(admin.ModelAdmin):
+    """Synced from ABMS (see CropBatchSyncView, shop/costs_views.py) --
+    read-only list, same no-add/no-edit/no-delete treatment as
+    CostEntryAdmin/FarmAssetAdmin above. ABMS creates and closes batches;
+    Django is a read mirror plus sync target."""
+
+    list_display = ['code', 'name', 'cost_centre', 'product', 'status', 'start_date', 'end_date']
+    list_filter = ['status', 'cost_centre']
+    search_fields = ['code', 'abms_id', 'name', 'cost_centre']
+    ordering = ['-start_date', 'code']
 
     def has_add_permission(self, request):
         return False

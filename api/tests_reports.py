@@ -36,6 +36,7 @@ REPORT_ENDPOINTS = [
     'v1_report_summary', 'v1_report_sales_trend', 'v1_report_payments',
     'v1_report_products', 'v1_report_credit', 'v1_report_inventory', 'v1_report_orders',
     'v1_report_target', 'v1_report_filter_options', 'v1_report_alerts', 'v1_report_pl',
+    'v1_report_batch_list',
 ]
 
 
@@ -835,3 +836,43 @@ class ReportPLViewTests(ReportsTestBase):
             self.assertEqual(csv_row['cost_centre'], json_row['cost_centre'])
             self.assertEqual(Decimal(csv_row['revenue']), Decimal(str(json_row['revenue'])))
             self.assertEqual(Decimal(csv_row['profit']), Decimal(str(json_row['profit'])))
+
+
+class ReportBatchViewTests(ReportsTestBase):
+    """GET /api/v1/reports/batches/ and /api/v1/reports/batches/<code>/ --
+    permissions and the unknown-code 404. The underlying FIFO/cost math is
+    covered in depth by shop.tests_crop_batches.BuildBatchReportTests."""
+
+    def setUp(self):
+        super().setUp()
+        from shop.models import CropBatch
+        self.batch = CropBatch.objects.create(
+            code='reports-batch-1', abms_id='rb1', cost_centre='crop:reportsfruit',
+            start_date=date(2026, 1, 1), status='open',
+        )
+
+    def test_detail_requires_owner_or_manager(self):
+        url = reverse('v1_report_batch_detail', args=[self.batch.code])
+        response = self.client.get(url)
+        self.assertIn(response.status_code, (401, 403))
+
+        self.client.login(username='cashier', password='pw')
+        self.assertEqual(self.client.get(url).status_code, 403)
+
+    def test_detail_allowed_for_owner(self):
+        self.client.login(username='owner1', password='pw')
+        response = self.client.get(reverse('v1_report_batch_detail', args=[self.batch.code]))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['batch']['code'], self.batch.code)
+
+    def test_unknown_code_is_404(self):
+        self.client.login(username='owner1', password='pw')
+        response = self.client.get(reverse('v1_report_batch_detail', args=['no-such-batch']))
+        self.assertEqual(response.status_code, 404)
+
+    def test_list_includes_the_batch(self):
+        self.client.login(username='owner1', password='pw')
+        response = self.client.get(reverse('v1_report_batch_list'))
+        self.assertEqual(response.status_code, 200)
+        codes = [b['code'] for b in response.data['batches']]
+        self.assertIn('reports-batch-1', codes)

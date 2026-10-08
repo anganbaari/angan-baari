@@ -36,6 +36,7 @@ from shop.views import (
     _is_owner_or_manager,
 )
 
+from shop import batch_report
 from shop import bs_calendar
 from shop import pl_report
 from shop import reports as reports_lib
@@ -1893,5 +1894,69 @@ class ReportPLView(APIView):
                 ['cost_centre', 'revenue', 'direct_cost', 'allocated_shared_cost', 'depreciation', 'profit', 'margin_pct'],
                 'profit_and_loss.csv',
             )
+
+        return Response(_decimalize(data))
+
+
+# ─── Season/batch costing ("By batch" view inside the Profit & Loss tab) ──
+
+BATCH_LIST_CSV_FIELDS = ['code', 'name', 'status', 'total_cost', 'harvested_kg', 'cost_per_kg', 'revenue', 'profit_to_date']
+BATCH_DETAIL_CSV_FIELDS = [
+    'category', 'amount', 'harvested_kg', 'cost_per_kg', 'sold_kg', 'waste_kg', 'remaining_kg',
+    'revenue', 'cost_of_sold', 'waste_loss', 'remaining_value', 'profit_to_date',
+]
+
+
+class ReportBatchListView(APIView):
+    """GET /api/v1/reports/batches/ -- the "By batch" list inside the
+    Profit & Loss tab. Same owner/manager gate as ReportPLView; not
+    date-range-scoped at all (a batch's own lifecycle is what matters,
+    same reasoning as ReportTargetView elsewhere in this file)."""
+
+    authentication_classes = [SessionAuthentication]
+    permission_classes = [IsOwnerOrManager]
+
+    def get(self, request, *args, **kwargs):
+        rows = batch_report.list_batches()
+
+        if request.query_params.get('export') == 'csv':
+            return _csv_response(rows, BATCH_LIST_CSV_FIELDS, 'batches.csv')
+
+        return Response({'batches': _decimalize(rows)})
+
+
+class ReportBatchDetailView(APIView):
+    """GET /api/v1/reports/batches/<code>/ -- the full single-batch
+    report (shop/batch_report.py's build_batch_report()). ?export=csv
+    exports the cost-by-category breakdown with the headline numbers
+    repeated on every row, so a spreadsheet opens to one flat table
+    rather than two."""
+
+    authentication_classes = [SessionAuthentication]
+    permission_classes = [IsOwnerOrManager]
+
+    def get(self, request, code, *args, **kwargs):
+        try:
+            data = batch_report.build_batch_report(code)
+        except batch_report.BatchReportError as exc:
+            return Response({'status': 'error', 'message': exc.message}, status=exc.status)
+
+        if request.query_params.get('export') == 'csv':
+            rows = [
+                {
+                    'category': cat, 'amount': amt, 'harvested_kg': data['harvested_kg'],
+                    'cost_per_kg': data['cost_per_kg'] if data['cost_per_kg'] is not None else '',
+                    'sold_kg': data['sold_kg'] if data['sold_kg'] is not None else '',
+                    'waste_kg': data['waste_kg'] if data['waste_kg'] is not None else '',
+                    'remaining_kg': data['remaining_kg'] if data['remaining_kg'] is not None else '',
+                    'revenue': data['revenue'] if data['revenue'] is not None else '',
+                    'cost_of_sold': data['cost_of_sold'] if data['cost_of_sold'] is not None else '',
+                    'waste_loss': data['waste_loss'] if data['waste_loss'] is not None else '',
+                    'remaining_value': data['remaining_value'] if data['remaining_value'] is not None else '',
+                    'profit_to_date': data['profit_to_date'] if data['profit_to_date'] is not None else '',
+                }
+                for cat, amt in (data['cost']['by_category'].items() or [('', data['cost']['total'])])
+            ]
+            return _csv_response(rows, BATCH_DETAIL_CSV_FIELDS, f'batch_{code}.csv')
 
         return Response(_decimalize(data))

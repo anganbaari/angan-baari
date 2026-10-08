@@ -6,7 +6,7 @@ from django.utils.dateparse import parse_date, parse_datetime
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import CostEntry, FarmAsset
+from .models import CostEntry, CostCentreProduct, CropBatch, FarmAsset, Product
 
 MAX_ENTRIES = 200
 MAX_ASSETS = 50
@@ -17,6 +17,107 @@ FIXED_COST_CENTRES = {'livestock:goat', 'livestock:chicken', 'bees', 'vermi', 'w
 
 def _valid_cost_centre(value):
     return bool(value) and bool(COST_CENTRE_RE.match(value) or value in FIXED_COST_CENTRES)
+
+
+BATCH_ALLOWED_KEYS = {'id', 'code', 'name', 'costCentre', 'startDate', 'endDate', 'status', 'notes'}
+
+
+class CropBatchSyncView(APIView):
+    """POST /api/costs/batches/sync/ -- ABMS pushes one crop batch document
+    here (create, rename, or close it). Same token auth + CORS as
+    CostSyncView below -- see that class's own docstring for why neither
+    view declares its own authentication_classes/permission_classes.
+
+    Idempotent by abms_id, upserting a single batch per call (unlike
+    CostSyncView's bulk entries/assets arrays -- ABMS only ever has one
+    batch event to report at a time: create one, rename one, or close one).
+
+    code is treated as immutable once a batch is first created: every
+    CostEntry/InventoryMovement row referencing this batch does so by the
+    literal code string, not by this row's pk or abms_id, so letting ABMS
+    rename the code later would silently orphan every row already synced
+    under the old one. ABMS can still rename the human-readable `name`
+    freely -- "rename" in this feature's brief means that field, not code.
+
+    product is NEVER taken from the request -- ABMS has no reason to know
+    a Django product id. It's resolved automatically from CostCentreProduct:
+    if exactly one product maps to this cost_centre, that becomes the
+    batch's product; zero or multiple matches leave it null (CropBatch.
+    product is nullable for exactly this reason). Re-resolved on every
+    sync call, so mapping a product later (or remapping it) is reflected
+    on the batch's next sync without ABMS needing to do anything."""
+
+    def post(self, request):
+        body = request.data
+        if not isinstance(body, dict):
+            return Response({'detail': 'Request body must be a JSON object.'}, status=400)
+
+        unknown = set(body.keys()) - BATCH_ALLOWED_KEYS
+        if unknown:
+            return Response({'detail': f'Unknown field(s): {sorted(unknown)}.'}, status=400)
+
+        abms_id = body.get('id')
+        if not abms_id:
+            return Response({'detail': 'Missing id.'}, status=400)
+
+        code = (body.get('code') or '').strip()
+        if not code:
+            return Response({'detail': 'Missing code.'}, status=400)
+
+        cost_centre = body.get('costCentre')
+        if not _valid_cost_centre(cost_centre):
+            return Response({'detail': f'Invalid costCentre: {cost_centre!r}'}, status=400)
+
+        start_date_str = body.get('startDate')
+        start_date = parse_date(start_date_str) if isinstance(start_date_str, str) else None
+        if not start_date:
+            return Response({'detail': f'Invalid or missing startDate: {start_date_str!r}'}, status=400)
+
+        end_date_str = body.get('endDate')
+        end_date = parse_date(end_date_str) if isinstance(end_date_str, str) else None
+        if end_date_str and not end_date:
+            return Response({'detail': f'Invalid endDate: {end_date_str!r}'}, status=400)
+
+        status_val = body.get('status') or 'open'
+        if status_val not in ('open', 'closed'):
+            return Response({'detail': f'Invalid status: {status_val!r}'}, status=400)
+
+        name = (body.get('name') or '').strip()
+        notes = body.get('notes') or ''
+
+        with transaction.atomic():
+            existing = CropBatch.objects.filter(abms_id=abms_id).first()
+            if existing:
+                if existing.code != code:
+                    return Response({
+                        'detail': f'code cannot be changed once set (this batch is {existing.code!r}) '
+                                   '-- create a new batch instead.',
+                    }, status=400)
+                existing.name = name
+                existing.cost_centre = cost_centre
+                existing.product = self._resolve_product(cost_centre)
+                existing.start_date = start_date
+                existing.end_date = end_date
+                existing.status = status_val
+                existing.notes = notes
+                existing.save()
+                return Response({'code': existing.code, 'status': 'updated'})
+
+            if CropBatch.objects.filter(code=code).exists():
+                return Response({'detail': f'code {code!r} is already used by another batch.'}, status=400)
+
+            batch = CropBatch.objects.create(
+                abms_id=abms_id, code=code, name=name, cost_centre=cost_centre,
+                product=self._resolve_product(cost_centre),
+                start_date=start_date, end_date=end_date, status=status_val, notes=notes,
+            )
+            return Response({'code': batch.code, 'status': 'created'}, status=201)
+
+    def _resolve_product(self, cost_centre):
+        matches = list(CostCentreProduct.objects.filter(cost_centre=cost_centre).values_list('product_id', flat=True))
+        if len(matches) == 1:
+            return Product.objects.get(pk=matches[0])
+        return None
 
 
 def _parse_decimal(value):
@@ -116,6 +217,21 @@ class CostSyncView(APIView):
         if not _valid_cost_centre(cost_centre):
             return {'id': abms_id, 'kind': 'entry', 'status': 'error', 'detail': f"Invalid costCentre: {cost_centre!r}"}
 
+        # Season/batch costing (shop/batch_report.py) -- optional, blank
+        # means an ordinary unbatched cost. Soft per-item statuses, same
+        # pattern as every other check in this method (CostSyncView's own
+        # response contract is one 200 with a per-item result/count no
+        # matter how many individual entries fail -- changing that just
+        # for this one check would be a surprising, inconsistent carve-out).
+        batch_code = raw.get('batchCode') or ''
+        batch = None
+        if batch_code:
+            batch = CropBatch.objects.filter(code=batch_code).first()
+            if not batch:
+                return {'id': abms_id, 'kind': 'entry', 'status': 'batch_not_found', 'detail': f'Unknown batch_code: {batch_code!r}'}
+            if batch.status == 'closed':
+                return {'id': abms_id, 'kind': 'entry', 'status': 'batch_closed', 'detail': f'Batch {batch_code!r} is closed.'}
+
         allocation_manual = raw.get('allocationManual')
         if allocation_manual is not None:
             if not isinstance(allocation_manual, dict) or not allocation_manual:
@@ -156,6 +272,7 @@ class CostSyncView(APIView):
                 existing.amount == amount
                 and existing.date == date_val
                 and existing.cost_centre == cost_centre
+                and existing.batch_code == batch_code
             )
             if unchanged:
                 return {'id': abms_id, 'kind': 'entry', 'status': 'duplicate', 'detail': 'Already synced, unchanged.'}
@@ -171,6 +288,7 @@ class CostSyncView(APIView):
             entry_type=entry_type,
             reversal_of=reversal_of,
             cost_centre=cost_centre,
+            batch_code=batch_code,
             category=raw.get('category') or '',
             qty=qty,
             unit=raw.get('unit') or '',

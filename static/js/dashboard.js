@@ -1100,6 +1100,86 @@ async function loadPl() {
     }
 }
 
+// ── Profit & Loss: "By batch" view (season/batch costing) ──────────────
+//
+// A second, independent lens inside the same P&L tab -- not date-range-
+// scoped at all (a batch's own lifecycle is what matters, not the
+// topbar's period), so switching into this view doesn't touch state.start/
+// state.end or re-trigger loadAll(). Loaded once, on first switch into it.
+
+let plBatchListLoaded = false;
+
+function switchPlView(view) {
+    document.getElementById('plMonthlyView').style.display = view === 'monthly' ? '' : 'none';
+    document.getElementById('plBatchView').style.display = view === 'batch' ? '' : 'none';
+    if (view === 'batch' && !plBatchListLoaded) {
+        plBatchListLoaded = true;
+        loadBatchList();
+    }
+}
+
+async function loadBatchList() {
+    document.getElementById('plBatchListTable').innerHTML = skeletonHtml(3);
+    let data;
+    try {
+        data = await fetchJSON('/api/v1/reports/batches/');
+    } catch (e) {
+        document.getElementById('plBatchListTable').innerHTML = errorStateHtml(e.message, 'loadBatchList');
+        return;
+    }
+    renderTable('plBatchListTable', [
+        { key: 'code', label: 'Code', render: (r) => `<a href="#" class="pl-batch-link" data-batch-code="${escapeHtml(r.code)}">${escapeHtml(r.code)}</a>` },
+        { key: 'name', label: 'Name' },
+        { key: 'status', label: 'Status' },
+        { key: 'total_cost', label: 'Total cost', num: true, render: (r) => formatRs(r.total_cost) },
+        { key: 'harvested_kg', label: 'Harvested (kg)', num: true, render: (r) => formatNum(r.harvested_kg) },
+        { key: 'cost_per_kg', label: 'Cost/kg', num: true, render: (r) => r.cost_per_kg == null ? '—' : formatRs(r.cost_per_kg) },
+        { key: 'revenue', label: 'Revenue', num: true, render: (r) => formatRs(r.revenue) },
+        { key: 'profit_to_date', label: 'Profit to date', num: true, render: (r) => r.profit_to_date == null ? '—' : formatRs(r.profit_to_date) },
+    ], data.batches, { emptyMessage: 'No crop batches yet -- these come from ABMS.' });
+}
+
+async function loadBatchDetail(code) {
+    const card = document.getElementById('plBatchDetailCard');
+    card.style.display = 'block';
+    document.getElementById('plBatchDetailTitle').textContent = code;
+    document.getElementById('exportBatchDetailBtn').href = `/api/v1/reports/batches/${encodeURIComponent(code)}/?export=csv`;
+    document.getElementById('plBatchDetailKpis').innerHTML = skeletonHtml(1, 70);
+    document.getElementById('plBatchDetailTable').innerHTML = skeletonHtml(2);
+    document.getElementById('plBatchDetailNotes').innerHTML = '';
+    card.scrollIntoView({ behavior: REDUCED_MOTION ? 'auto' : 'smooth', block: 'nearest' });
+
+    let data;
+    try {
+        data = await fetchJSON(`/api/v1/reports/batches/${encodeURIComponent(code)}/`);
+    } catch (e) {
+        document.getElementById('plBatchDetailTable').innerHTML = emptyStateHtml(e.message);
+        return;
+    }
+
+    document.getElementById('plBatchDetailTitle').textContent =
+        `${data.batch.name || data.batch.code} (${data.batch.code}) — ${data.batch.status}`;
+
+    const kpi = (label, value) => `<div class="dash-kpi-tile"><div class="label">${escapeHtml(label)}</div><div class="value">${value == null ? '—' : formatRs(value)}</div></div>`;
+    document.getElementById('plBatchDetailKpis').innerHTML = [
+        `<div class="dash-kpi-tile"><div class="label">Harvested (kg)</div><div class="value">${formatNum(data.harvested_kg)}</div></div>`,
+        kpi('Total cost', data.cost.total),
+        kpi('Cost / kg', data.cost_per_kg),
+        kpi('Revenue', data.revenue),
+        kpi('Profit to date', data.profit_to_date),
+        kpi('Break-even price', data.break_even_price),
+    ].join('');
+
+    const catRows = Object.entries(data.cost.by_category).map(([category, amount]) => ({ category, amount }));
+    renderTable('plBatchDetailTable', [
+        { key: 'category', label: 'Category' },
+        { key: 'amount', label: 'Amount', num: true, render: (r) => formatRs(r.amount) },
+    ], catRows, { emptyMessage: 'No costs recorded for this batch yet.' });
+
+    document.getElementById('plBatchDetailNotes').innerHTML = (data.notes || [])
+        .map((n) => `<p class="dash-note">${escapeHtml(n)}</p>`).join('');
+}
+
 // ── Filter options (operator dropdown) ─────────────────────────────────
 
 async function loadFilterOptions() {
@@ -1135,6 +1215,16 @@ function initControls() {
     wireSegmented('topProductsBySeg', null, () => {
         topProductsBy = document.querySelector('#topProductsBySeg button[aria-pressed="true"]').dataset.value;
         refreshTopProductsChart();
+    });
+    wireSegmented('plViewSeg', null, () => {
+        switchPlView(document.querySelector('#plViewSeg button[aria-pressed="true"]').dataset.value);
+    });
+    // Event delegation (not a per-row listener) so re-sorting plBatchListTable
+    // (renderTable() fully redraws its <tbody> on every sort click) never
+    // loses the click handler on a batch's code link.
+    document.getElementById('plBatchListTable').addEventListener('click', (e) => {
+        const link = e.target.closest('.pl-batch-link');
+        if (link) { e.preventDefault(); loadBatchDetail(link.dataset.batchCode); }
     });
 
     document.getElementById('paymentTypeSelect').addEventListener('change', (e) => { state.payment_type = e.target.value; loadAll(); });

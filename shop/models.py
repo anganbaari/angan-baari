@@ -720,6 +720,15 @@ class InventoryMovement(models.Model):
                    "(its own landed unit cost). Always null for farm-grown products — "
                    "those are costed through ABMS cost centres instead."
     )
+    batch_code = models.CharField(
+        max_length=40, blank=True, db_index=True,
+        help_text="CropBatch.code this movement belongs to -- only ever meaningful for "
+                   "movement_type='harvest' (see shop/batch_report.py). Blank means either "
+                   "this isn't a harvest, or it's harvest stock that predates batch tracking "
+                   "for this crop ('unbatched' stock, consumed first in the batch report's "
+                   "FIFO attribution). Loose CharField, not a CropBatch FK, same reasoning as "
+                   "CostEntry.reversal_of above -- ABMS is the source of truth for the code."
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -967,6 +976,13 @@ class CostEntry(models.Model):
     unit = models.CharField(max_length=20, blank=True)
     supplier = models.CharField(max_length=200, blank=True)
     note = models.TextField(blank=True)
+    batch_code = models.CharField(
+        max_length=40, blank=True, db_index=True,
+        help_text='CropBatch.code this cost belongs to, for season/batch costing '
+                   '(see shop/batch_report.py) -- blank means "unbatched" (the normal '
+                   'case for a monthly/shared cost with no single crop batch). Loose '
+                   'CharField, not a FK, same reasoning as reversal_of above.'
+    )
     is_shared = models.BooleanField(default=False)
     allocation_rule = models.CharField(max_length=10, choices=ALLOCATION_RULE_CHOICES, blank=True)
     allocation_manual = models.JSONField(
@@ -1058,6 +1074,54 @@ class CostCentreProduct(models.Model):
 
     def __str__(self):
         return f"{self.cost_centre} -> {self.product.name}"
+
+
+class CropBatch(models.Model):
+    """One growing season/batch of a farm crop, mirrored from ABMS (the
+    'batches' side of the same ABMS app that owns CostEntry/FarmAsset) --
+    ABMS creates and closes these; Django only ever receives them (see
+    shop/costs_views.py's CropBatchSyncView). Unlike CostEntry, this is
+    mutable (ABMS can rename it or flip it open->closed), which is why
+    this table isn't append-only the way CostEntry is.
+
+    code is the stable, human-meaningful identifier other rows reference
+    (CostEntry.batch_code, InventoryMovement.batch_code are loose
+    CharFields pointing at THIS code, not at abms_id or this row's pk) --
+    treated as immutable once set, specifically so an ABMS-side rename
+    can never orphan every cost/harvest row already tagged with the old
+    code. ABMS can still rename the batch's NAME freely; see
+    CropBatchSyncView's own docstring for the exact upsert rules.
+
+    product is resolved automatically at sync time from CostCentreProduct
+    (see CropBatchSyncView) rather than requiring ABMS to know a Django
+    product id -- stays null when that mapping is missing or ambiguous.
+    Read-only in Django admin (ABMS owns the data) -- see CropBatchAdmin."""
+
+    BATCH_STATUS_CHOICES = [('open', 'Open'), ('closed', 'Closed')]
+
+    code = models.CharField(max_length=40, unique=True)
+    abms_id = models.CharField(max_length=64, unique=True, null=True, blank=True)
+    name = models.CharField(max_length=200, blank=True)
+    cost_centre = models.CharField(
+        max_length=60, db_index=True,
+        help_text="Same key format as CostCentreProduct.cost_centre, e.g. 'crop:tomato'.",
+    )
+    product = models.ForeignKey(
+        'Product', null=True, blank=True, on_delete=models.SET_NULL, related_name='crop_batches',
+    )
+    start_date = models.DateField()
+    end_date = models.DateField(null=True, blank=True)
+    status = models.CharField(max_length=10, choices=BATCH_STATUS_CHOICES, default='open')
+    notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-start_date', 'code']
+        verbose_name = 'Crop batch'
+
+    def __str__(self):
+        return f"{self.code} ({self.get_status_display()})"
 
 
 # Shared base for the two payment-method choice lists below: a single

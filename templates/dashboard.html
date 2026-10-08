@@ -397,43 +397,71 @@
 
                 <!-- ═══ PROFIT & LOSS ═══ -->
                 <section class="dash-section" id="section-pl">
-                    <div class="dash-kpi-strip" id="plKpis"><div class="dash-skeleton" style="height:70px;grid-column:1/-1;"></div></div>
-                    <div class="dash-grid">
-                        <div class="dash-card c12">
-                            <h3>P&amp;L statement <span class="sub">POS sales only -- see the note below the cost-centre table</span></h3>
-                            <div class="dash-table-scroll" id="plStatementTable"></div>
-                        </div>
-                        <div class="dash-card c7">
-                            <div class="dash-table-toolbar">
-                                <h3 style="margin:0;">By cost centre</h3>
-                                <a class="dash-export-btn" id="exportPlBtn" href="#">Export CSV</a>
+                    <div class="dash-segmented" role="group" aria-label="Profit & Loss view" id="plViewSeg" style="margin-bottom:14px;">
+                        <button type="button" data-value="monthly" aria-pressed="true">Monthly</button>
+                        <button type="button" data-value="batch" aria-pressed="false">By batch</button>
+                    </div>
+
+                    <div id="plMonthlyView">
+                        <div class="dash-kpi-strip" id="plKpis"><div class="dash-skeleton" style="height:70px;grid-column:1/-1;"></div></div>
+                        <div class="dash-grid">
+                            <div class="dash-card c12">
+                                <h3>P&amp;L statement <span class="sub">POS sales only -- see the note below the cost-centre table</span></h3>
+                                <div class="dash-table-scroll" id="plStatementTable"></div>
                             </div>
-                            <div class="dash-table-scroll" id="plCentreTable"></div>
-                            <p class="dash-note">Rows come from Admin &rarr; Cost Centre Products. Map each product to its
-                                ABMS cost-centre key (<code>crop:&lt;slug&gt;</code>, <code>tree:&lt;slug&gt;</code>,
-                                <code>livestock:goat</code>, <code>livestock:chicken</code>, <code>bees</code>,
-                                <code>vermi</code>, <code>water</code>, or <code>shared</code>) to have its sales show
-                                up here -- an unmapped farm product's revenue is counted in the total above but won't
-                                appear in any centre's row.</p>
+                            <div class="dash-card c7">
+                                <div class="dash-table-toolbar">
+                                    <h3 style="margin:0;">By cost centre</h3>
+                                    <a class="dash-export-btn" id="exportPlBtn" href="#">Export CSV</a>
+                                </div>
+                                <div class="dash-table-scroll" id="plCentreTable"></div>
+                                <p class="dash-note">Rows come from Admin &rarr; Cost Centre Products. Map each product to its
+                                    ABMS cost-centre key (<code>crop:&lt;slug&gt;</code>, <code>tree:&lt;slug&gt;</code>,
+                                    <code>livestock:goat</code>, <code>livestock:chicken</code>, <code>bees</code>,
+                                    <code>vermi</code>, <code>water</code>, or <code>shared</code>) to have its sales show
+                                    up here -- an unmapped farm product's revenue is counted in the total above but won't
+                                    appear in any centre's row.</p>
+                            </div>
+                            <div class="dash-card c5">
+                                <h3>Revenue vs. costs by centre</h3>
+                                <div class="dash-chart-wrap"><canvas id="plCentreChart" aria-label="Revenue vs costs by cost centre" role="img"></canvas></div>
+                            </div>
+                            <div class="dash-card c6">
+                                <h3>Wastage detail</h3>
+                                <div class="dash-table-scroll" id="plWastageTable"></div>
+                            </div>
+                            <div class="dash-card c6">
+                                <h3>Cash vs. credit</h3>
+                                <div id="plCashCredit"></div>
+                                <p class="dash-note">Cash collected = non-credit POS payments this period + credit
+                                    repayments received this period. Credit outstanding is a live, all-time balance, not
+                                    scoped to this date range -- same figures as the Credit tab.</p>
+                            </div>
+                            <div class="dash-card c12">
+                                <h3>Data quality</h3>
+                                <div id="plDataQuality"></div>
+                            </div>
                         </div>
-                        <div class="dash-card c5">
-                            <h3>Revenue vs. costs by centre</h3>
-                            <div class="dash-chart-wrap"><canvas id="plCentreChart" aria-label="Revenue vs costs by cost centre" role="img"></canvas></div>
-                        </div>
-                        <div class="dash-card c6">
-                            <h3>Wastage detail</h3>
-                            <div class="dash-table-scroll" id="plWastageTable"></div>
-                        </div>
-                        <div class="dash-card c6">
-                            <h3>Cash vs. credit</h3>
-                            <div id="plCashCredit"></div>
-                            <p class="dash-note">Cash collected = non-credit POS payments this period + credit
-                                repayments received this period. Credit outstanding is a live, all-time balance, not
-                                scoped to this date range -- same figures as the Credit tab.</p>
-                        </div>
-                        <div class="dash-card c12">
-                            <h3>Data quality</h3>
-                            <div id="plDataQuality"></div>
+                    </div>
+
+                    <div id="plBatchView" style="display:none;">
+                        <div class="dash-grid">
+                            <div class="dash-card c12">
+                                <div class="dash-table-toolbar">
+                                    <h3 style="margin:0;">Crop batches <span class="sub">not scoped to the date range above -- a batch's own lifecycle is what matters</span></h3>
+                                    <a class="dash-export-btn" id="exportBatchListBtn" href="/api/v1/reports/batches/?export=csv">Export CSV</a>
+                                </div>
+                                <div class="dash-table-scroll" id="plBatchListTable"></div>
+                            </div>
+                            <div class="dash-card c12" id="plBatchDetailCard" style="display:none;">
+                                <div class="dash-table-toolbar">
+                                    <h3 style="margin:0;" id="plBatchDetailTitle">Batch</h3>
+                                    <a class="dash-export-btn" id="exportBatchDetailBtn" href="#">Export CSV</a>
+                                </div>
+                                <div class="dash-kpi-strip" id="plBatchDetailKpis"></div>
+                                <div class="dash-table-scroll" id="plBatchDetailTable"></div>
+                                <div id="plBatchDetailNotes"></div>
+                            </div>
                         </div>
                     </div>
                 </section>
@@ -443,6 +471,6 @@
 
     <script src="{% static 'vendor/chart.min.js' %}"></script>
     <script src="{% static 'js/bs-calendar.js' %}?v=1"></script>
-    <script src="{% static 'js/dashboard.js' %}?v=3"></script>
+    <script src="{% static 'js/dashboard.js' %}?v=4"></script>
 </body>
 </html>

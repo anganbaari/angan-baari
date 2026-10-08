@@ -54,4 +54,6 @@ urlpatterns = [
     path('reports/target/', views.ReportTargetView.as_view(), name='v1_report_target'),
     path('reports/filter-options/', views.ReportFilterOptionsView.as_view(), name='v1_report_filter_options'),
     path('reports/pl/', views.ReportPLView.as_view(), name='v1_report_pl'),
+    path('reports/batches/', views.ReportBatchListView.as_view(), name='v1_report_batch_list'),
+    path('reports/batches/<str:code>/', views.ReportBatchDetailView.as_view(), name='v1_report_batch_detail'),
 ]
