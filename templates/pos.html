@@ -601,7 +601,7 @@
                         <a href="{% url 'dashboard' %}" class="side-btn logout-btn" style="text-decoration: none; display: flex; align-items: center; justify-content: center; font-size: 0.75rem;">Reports</a>
                         {% endif %}
                         {% if is_owner_or_manager %}
-                        <button type="button" class="side-btn logout-btn" id="wholesaleToggleBtn" style="font-size: 0.75rem;">Wholesale</button>
+                        <button type="button" class="side-btn logout-btn" id="wholesaleToggleBtn" style="font-size: 0.75rem;" title="Switch to wholesale mode" aria-label="Switch to wholesale mode">Wholesale</button>
                         {% endif %}
                     </div>
 
@@ -2472,10 +2472,19 @@
                 updateCartIndicator();
             });
         }
+        applyWholesaleModeUI(); // set the button's initial label/title on page load
 
         function applyWholesaleModeUI() {
             document.getElementById('wholesaleBanner').style.display = wholesaleMode ? '' : 'none';
-            if (wholesaleToggleBtn) wholesaleToggleBtn.classList.toggle('active', wholesaleMode);
+            if (wholesaleToggleBtn) {
+                // Button always names the mode you'd switch TO, not the
+                // mode you're currently in.
+                wholesaleToggleBtn.textContent = wholesaleMode ? 'Retail' : 'Wholesale';
+                const label = wholesaleMode ? 'Switch to retail mode' : 'Switch to wholesale mode';
+                wholesaleToggleBtn.title = label;
+                wholesaleToggleBtn.setAttribute('aria-label', label);
+                wholesaleToggleBtn.classList.toggle('active', wholesaleMode);
+            }
             const couponRow = document.querySelector('.coupon-row');
             if (couponRow) couponRow.style.display = wholesaleMode ? 'none' : '';
             const offersCol = document.querySelector('.offers-col');
@@ -2869,6 +2878,10 @@
             selectedCustomer = null;
             document.getElementById('selectedCustomerLabel').style.display = 'none';
             closePaymentPanel();
+            // wholesaleMode itself carries over sale-to-sale (not reset
+            // here) -- this just re-asserts the toggle's label/title, per
+            // the explicit "update after a sale completes" requirement.
+            applyWholesaleModeUI();
             renderReceipt();
             updateCartIndicator();
             showReceiptView();

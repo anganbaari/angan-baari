@@ -20,7 +20,7 @@ class ProductSitemap(Sitemap):
     protocol = 'https'
 
     def items(self):
-        return Product.objects.filter(is_available=True)
+        return Product.objects.public().filter(is_available=True)
 
     def lastmod(self, obj):
         return obj.created_at

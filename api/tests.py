@@ -2678,3 +2678,52 @@ class ProfileUpdateApiTests(ProfileApiTestBase):
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('new_password2', response.data)
+
+
+class HiddenProductApiTests(ApiTestBase):
+    """Product.hide_from_website on the public v1 API -- same contract as
+    the Django site (shop.tests.HiddenProductPublicVisibilityTests)."""
+
+    def setUp(self):
+        super().setUp()
+        self.hidden = Product.objects.create(
+            name='HiddenApiCrop', slug='hidden-api-crop-test', category=self.category,
+            description='test', price=Decimal('250.00'), pricing_mode='fixed_quantity',
+            is_available=True, origin='farm', hide_from_website=True,
+        )
+
+    def test_hidden_product_absent_from_api_product_list(self):
+        response = self.client.get(reverse('v1_product_list'))
+        names = {p['name'] for p in response.data['results']}
+        self.assertNotIn('HiddenApiCrop', names)
+        self.assertIn('Mango', names)  # self.fruit, still public
+
+    def test_hidden_product_api_detail_404(self):
+        response = self.client.get(reverse('v1_product_detail', args=[self.hidden.id]))
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_hidden_product_api_detail_by_slug_404(self):
+        response = self.client.get(reverse('v1_product_detail_by_slug', args=[self.hidden.slug]))
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_visible_product_api_detail_still_works(self):
+        response = self.client.get(reverse('v1_product_detail', args=[self.fruit.id]))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_order_create_with_only_hidden_product_rejected_creates_nothing(self):
+        order_count_before = ProductOrder.objects.count()
+        movement_count_before = InventoryMovement.objects.count()
+        response = self.client.post(reverse('v1_order_create'), {
+            'name': 'Test Buyer', 'email': 'buyer@example.com',
+            'cart': [{'product_id': self.hidden.id, 'qty': 1}],
+        }, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
+        self.assertEqual(ProductOrder.objects.count(), order_count_before)
+        self.assertEqual(InventoryMovement.objects.count(), movement_count_before)
+
+    def test_order_create_with_visible_product_still_works(self):
+        response = self.client.post(reverse('v1_order_create'), {
+            'name': 'Test Buyer', 'email': 'buyer@example.com',
+            'cart': [{'product_id': self.jar.id, 'qty': 1}],
+        }, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)

@@ -82,7 +82,7 @@ class ProductListView(generics.ListAPIView):
     permission_classes = [permissions.AllowAny]
 
     def get_queryset(self):
-        qs = Product.objects.select_related('category').prefetch_related('variants').order_by('name')
+        qs = Product.objects.public().select_related('category').prefetch_related('variants').order_by('name')
         category_id = self.request.query_params.get('category')
         if category_id:
             qs = qs.filter(category_id=category_id)
@@ -90,7 +90,7 @@ class ProductListView(generics.ListAPIView):
 
 
 class ProductDetailView(generics.RetrieveAPIView):
-    queryset = Product.objects.select_related('category').prefetch_related('variants')
+    queryset = Product.objects.public().select_related('category').prefetch_related('variants')
     serializer_class = ProductSerializer
     authentication_classes = []
     permission_classes = [permissions.AllowAny]
@@ -102,7 +102,7 @@ class ProductDetailBySlugView(generics.RetrieveAPIView):
     looks products up. Additive alongside ProductDetailView (by id) —
     neither replaces the other."""
 
-    queryset = Product.objects.select_related('category').prefetch_related('variants')
+    queryset = Product.objects.public().select_related('category').prefetch_related('variants')
     serializer_class = ProductSerializer
     authentication_classes = []
     permission_classes = [permissions.AllowAny]
@@ -897,7 +897,7 @@ class OrderCreateView(APIView):
         cart_snapshot = []
         for line in data['cart']:
             try:
-                product = Product.objects.get(id=line.get('product_id'), is_available=True)
+                product = Product.objects.public().get(id=line.get('product_id'), is_available=True)
             except (Product.DoesNotExist, TypeError, ValueError):
                 continue
 
@@ -1233,7 +1233,7 @@ class OrderReorderView(APIView):
 
         for line in order.cart_snapshot:
             try:
-                product = Product.objects.get(id=line.get('product_id'), is_available=True)
+                product = Product.objects.public().get(id=line.get('product_id'), is_available=True)
             except (Product.DoesNotExist, TypeError, ValueError):
                 skipped_count += 1
                 continue

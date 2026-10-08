@@ -15,7 +15,7 @@ from .emails import (
 
 def home(request):
     from .models import Product
-    featured_products = Product.objects.filter(
+    featured_products = Product.objects.public().filter(
         is_available=True
     ).exclude(main_image='').order_by('?')[:6]
     return render(request, 'index.html', {'featured_products': featured_products})
@@ -140,7 +140,7 @@ def reorder(request, order_id):
     for line in order.cart_snapshot:
         product_id = line.get('product_id')
         try:
-            product = Product.objects.get(id=product_id, is_available=True)
+            product = Product.objects.public().get(id=product_id, is_available=True)
         except Product.DoesNotExist:
             skipped_count += 1
             continue
@@ -309,8 +309,8 @@ def error_500(request):
 
 def product_detail(request, slug):
     from .models import Product
-    product = get_object_or_404(Product, slug=slug)
-    related_products = Product.objects.filter(
+    product = get_object_or_404(Product.objects.public(), slug=slug)
+    related_products = Product.objects.public().filter(
         category=product.category
     ).exclude(id=product.id)[:3]
     reviews = product.reviews.filter(is_approved=True)
@@ -338,7 +338,7 @@ def product_detail(request, slug):
 
 def submit_review(request, slug):
     from .models import Product
-    product = get_object_or_404(Product, slug=slug)
+    product = get_object_or_404(Product.objects.public(), slug=slug)
     if request.method == 'POST':
         name = request.POST.get('name', '').strip()
         rating = request.POST.get('rating', '').strip()
@@ -412,7 +412,15 @@ def wishlist_move_to_cart(request, product_id):
     most shopping wishlists behave. For fixed_weight products, uses whichever
     variant was picked (or currently selected in the dropdown)."""
     from .models import Product
-    product = get_object_or_404(Product, id=product_id)
+    try:
+        product = Product.objects.public().get(id=product_id)
+    except Product.DoesNotExist:
+        # Wishlist entry is left alone -- only the move-to-cart is refused,
+        # same reasoning as every other cart-add path: hidden products
+        # don't get silently skipped the way a genuinely deleted one would.
+        if is_ajax(request):
+            return JsonResponse({'status': 'error', 'message': 'This product is not available.'}, status=404)
+        return redirect('cart')
 
     line_key, weight_str, qty_to_add, fixed_total = resolve_cart_line(request, product)
     mode = product.pricing_mode
@@ -1522,7 +1530,12 @@ def is_ajax(request):
 
 def add_to_cart(request, product_id):
     from .models import Product
-    product = get_object_or_404(Product, id=product_id)
+    try:
+        product = Product.objects.public().get(id=product_id)
+    except Product.DoesNotExist:
+        if is_ajax(request):
+            return JsonResponse({'status': 'error', 'message': 'This product is not available.'}, status=404)
+        return redirect(request.META.get('HTTP_REFERER', '/shop/'))
     cart = get_cart(request)
 
     line_key, weight_str, qty_to_add, fixed_total = resolve_cart_line(request, product)
@@ -1688,14 +1701,21 @@ def toggle_save_for_later(request, key):
     line from the cart, e.g. '14_1.50') — parse_line_key() handles both."""
     from .models import Product
     product_id, weight_str = parse_line_key(key)
-    product = get_object_or_404(Product, id=product_id)
     cart = get_cart(request)
     saved = get_saved(request)
 
     if key in saved:
+        # Un-saving is always allowed, even if the product has since been
+        # hidden -- only SAVING a new (or now-hidden) one is refused below.
         del saved[key]
         is_saved = False
     else:
+        try:
+            product = Product.objects.public().get(id=product_id)
+        except Product.DoesNotExist:
+            if is_ajax(request):
+                return JsonResponse({'status': 'error', 'message': 'This product is not available.'}, status=404)
+            return redirect(request.META.get('HTTP_REFERER', '/shop/'))
         existing_cart_item = cart.get(key) if isinstance(cart.get(key), dict) else {}
         if key in cart:
             del cart[key]
@@ -1766,6 +1786,11 @@ def cart_view(request):
     cart = get_cart(request)
     saved = get_saved(request)
 
+    # Same reasoning as checkout()'s own cleanup -- a product can be
+    # hidden after it was added to a cart that's been sitting open.
+    hidden_ids = set(Product.objects.filter(hide_from_website=True).values_list('id', flat=True))
+    dropped_hidden = False
+
     items = []
     total = 0
     cleaned_a_bad_line = False
@@ -1776,11 +1801,18 @@ def cart_view(request):
             del cart[line_key]
             cleaned_a_bad_line = True
             continue
+        if item.get('product_id') in hidden_ids:
+            del cart[line_key]
+            cleaned_a_bad_line = True
+            dropped_hidden = True
+            continue
         subtotal = line_subtotal(item)
         total += subtotal
         items.append({**item, 'id': line_key, 'subtotal': subtotal})
     if cleaned_a_bad_line:
         save_cart(request, cart)
+    if dropped_hidden:
+        messages.warning(request, 'One or more items in your cart are no longer available and have been removed.')
 
     saved_items = [{**item, 'id': key} for key, item in saved.items()]
 
@@ -1792,7 +1824,7 @@ def cart_view(request):
         pid, _weight = parse_line_key(key)
         if pid.isdigit():
             excluded_ids.add(int(pid))
-    all_products = list(Product.objects.filter(is_available=True).exclude(id__in=excluded_ids))
+    all_products = list(Product.objects.public().filter(is_available=True).exclude(id__in=excluded_ids))
     recommended_products = random.sample(all_products, min(6, len(all_products)))
 
     wishlist_items = []
@@ -1816,6 +1848,14 @@ def checkout(request):
     if not cart:
         return redirect('shop')
 
+    # A product can become hidden (hide_from_website) after it was added
+    # to a session cart that's been sitting open for a while -- checked
+    # here, not just at add-to-cart time, so a stale line can never
+    # become an order line or a stock movement. One bulk query, not one
+    # per line.
+    hidden_ids = set(Product.objects.filter(hide_from_website=True).values_list('id', flat=True))
+    dropped_hidden = False
+
     items = []
     subtotal = 0
     has_offer_items = False
@@ -1825,6 +1865,11 @@ def checkout(request):
             del cart[line_key]
             cleaned_a_bad_line = True
             continue
+        if item.get('product_id') in hidden_ids:
+            del cart[line_key]
+            cleaned_a_bad_line = True
+            dropped_hidden = True
+            continue
         item_subtotal = line_subtotal(item)
         subtotal += item_subtotal
         if item.get('is_offer'):
@@ -1832,6 +1877,8 @@ def checkout(request):
         items.append({**item, 'id': line_key, 'subtotal': item_subtotal})
     if cleaned_a_bad_line:
         save_cart(request, cart)
+    if dropped_hidden:
+        messages.warning(request, 'One or more items in your cart are no longer available and have been removed.')
 
     # ── Coupon handling ──────────────────────────────────────
     # Coupon can arrive via ?coupon=CODE (Apply button) or the hidden
@@ -1951,11 +1998,11 @@ def shop(request):
         return ids
 
     def get_count(cat):
-        return Product.objects.filter(category__id__in=get_all_ids(cat)).count()
+        return Product.objects.public().filter(category__id__in=get_all_ids(cat)).count()
 
     cat_id = request.GET.get('cat')
     selected_category = None
-    products = Product.objects.all().order_by('name')
+    products = Product.objects.public().order_by('name')
 
     if cat_id:
         try:
@@ -1972,7 +2019,7 @@ def shop(request):
     for cat in main_categories:
         subs = []
         for sub in cat.subcategories.all():
-            subsubs = [{'obj': ss, 'count': ss.products.count()}
+            subsubs = [{'obj': ss, 'count': Product.objects.public().filter(category=ss).count()}
                        for ss in sub.subcategories.all()]
             subs.append({'obj': sub, 'count': get_count(sub), 'children': subsubs})
         cat_tree.append({'obj': cat, 'count': get_count(cat), 'children': subs})
@@ -2015,7 +2062,7 @@ def shop(request):
         'products': products,
         'cat_tree': cat_tree,
         'selected_category': selected_category,
-        'total_count': Product.objects.count(),
+        'total_count': Product.objects.public().count(),
         'saved_ids': saved_ids,
         'wishlist_ids': wishlist_ids,
         'has_active_offers': has_active_offers,
@@ -2041,7 +2088,13 @@ def offers(request):
 
     discount_offers = []
     for offer in live_offers:
+        # get_products() itself must stay unfiltered -- the POS (both
+        # retail and wholesale) reuses it via resolve_pos_offer_discount()
+        # and must keep applying offers to hidden products normally.
+        # This public-facing page is the one place that needs to hide them.
         for product in offer.get_products():
+            if product.hide_from_website:
+                continue
             if not product.price or product.price <= 0:
                 continue
             offer_price = offer.discounted_price(product.price)
@@ -2066,6 +2119,11 @@ def offers(request):
     for offer in combo_offers:
         bundle_items = list(offer.bundle_items.select_related('product').all())
         if not bundle_items:
+            continue
+        # A combo's items are fixed as a set -- can't drop just the hidden
+        # one, so the whole deal is skipped on this public page if any of
+        # its products are hidden (the POS's own combo pricing is untouched).
+        if any(bi.product.hide_from_website for bi in bundle_items):
             continue
 
         original_total = offer.get_bundle_natural_total()
@@ -2106,7 +2164,12 @@ def add_to_cart_offer(request, product_id):
         return redirect(f"{reverse('login')}?next={reverse('offers')}")
 
     from .models import Product
-    product = get_object_or_404(Product, id=product_id)
+    try:
+        product = Product.objects.public().get(id=product_id)
+    except Product.DoesNotExist:
+        if is_ajax(request):
+            return JsonResponse({'status': 'error', 'message': 'This product is not available.'}, status=404)
+        return redirect('offers')
     cart = get_cart(request)
 
     line_key, weight_str, qty_to_add, fixed_total = resolve_cart_line(request, product)

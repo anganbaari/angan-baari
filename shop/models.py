@@ -89,6 +89,15 @@ class Category(models.Model):
         return self.parent is None
 
 
+class ProductQuerySet(models.QuerySet):
+    def public(self):
+        """Every Product query the public website or public API makes
+        must go through this (see CLAUDE.md) -- POS, admin, and
+        inventory/ABMS code deliberately never call it, since a hidden
+        product must still be fully sellable/trackable everywhere else."""
+        return self.filter(hide_from_website=False)
+
+
 class Product(models.Model):
     name = models.CharField(max_length=200)
     slug = models.SlugField(unique=True)
@@ -104,6 +113,11 @@ class Product(models.Model):
     season = models.CharField(max_length=100, blank=True)
     farming_method = models.CharField(max_length=200, blank=True)
     is_available = models.BooleanField(default=True)
+    hide_from_website = models.BooleanField(
+        default=False, db_index=True,
+        help_text='Hide from the public website and public API. Still available in the '
+                   'POS, admin and inventory. Use for crops sold only wholesale or at the farm.'
+    )
     is_taxable = models.BooleanField(
         default=False,
         help_text='VAT scaffolding — dormant until BusinessSettings.is_vat_enabled is '
@@ -186,6 +200,8 @@ class Product(models.Model):
         help_text='Unit shown next to the weight/quantity stepper for "Variable weight" products, '
                    'e.g. "kg" for fruit, "dozen" for banana. The price field is always per ONE of this unit.'
     )
+
+    objects = ProductQuerySet.as_manager()
 
     def __str__(self):
         return self.name

@@ -55,7 +55,11 @@ var POS_QUEUE_STORE = 'queuedSales';
 // toggle/banner, the price-override modal, the reused buyer picker) --
 // same reasoning, a device cold-starting offline on the old v4 shell
 // would otherwise keep running pos.html from before wholesale mode existed.
-var POS_SHELL_CACHE = 'pos-shell-v5';
+// v5 -> v6: the Wholesale toggle button's label itself changed (now shows
+// the mode you'd switch TO, not the one you're in) -- an installed POS
+// app cold-starting offline on the old v5 shell would otherwise keep
+// showing the old always-"Wholesale" label.
+var POS_SHELL_CACHE = 'pos-shell-v6';
 var POS_META_STORE = 'meta';
 var POS_OFFLINE_PIN_STORE = 'offlineOperators';
 var POS_CREDIT_CUSTOMER_STORE = 'creditCustomers';

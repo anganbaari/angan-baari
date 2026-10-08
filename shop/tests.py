@@ -1117,3 +1117,156 @@ class PosWholesaleToggleVisibilityTests(TestCase):
         response = self.client.get('/pos/')
         self.assertEqual(response.status_code, 200)
         self.assertIn('id="wholesaleToggleBtn"', response.content.decode())
+
+
+class HiddenProductPublicVisibilityTests(TestCase):
+    """Product.hide_from_website -- a hidden product must be invisible to
+    the public website (but fully usable in the POS/admin/inventory)."""
+
+    def setUp(self):
+        self.category = Category.objects.create(name='Hidden Test Category', order=1)
+        self.visible = Product.objects.create(
+            name='VisibleFarmMango', slug='visible-farm-mango-test', category=self.category,
+            description='test', price=Decimal('300.00'), pricing_mode='fixed_quantity',
+            is_available=True, origin='farm',
+        )
+        self.hidden = Product.objects.create(
+            name='HiddenWholesaleCrop', slug='hidden-wholesale-crop-test', category=self.category,
+            description='test', price=Decimal('500.00'), pricing_mode='fixed_quantity',
+            is_available=True, origin='farm', hide_from_website=True,
+        )
+
+    def test_hidden_product_absent_from_shop_listing(self):
+        response = self.client.get(reverse('shop'))
+        content = response.content.decode()
+        self.assertIn('VisibleFarmMango', content)
+        self.assertNotIn('HiddenWholesaleCrop', content)
+
+    def test_hidden_product_absent_from_category_page(self):
+        response = self.client.get(reverse('shop'), {'cat': self.category.id})
+        content = response.content.decode()
+        self.assertIn('VisibleFarmMango', content)
+        self.assertNotIn('HiddenWholesaleCrop', content)
+
+    def test_hidden_product_excluded_from_category_count(self):
+        response = self.client.get(reverse('shop'))
+        # Only the visible product should count toward this category's total.
+        self.assertEqual(
+            Product.objects.public().filter(category=self.category).count(), 1,
+        )
+
+    def test_hidden_product_absent_from_home_featured(self):
+        self.visible.main_image = 'products/visible.jpg'
+        self.visible.save()
+        self.hidden.main_image = 'products/hidden.jpg'
+        self.hidden.save()
+        response = self.client.get(reverse('home'))
+        content = response.content.decode()
+        self.assertNotIn('HiddenWholesaleCrop', content)
+
+    def test_hidden_product_detail_page_404s(self):
+        response = self.client.get(reverse('product_detail', kwargs={'slug': self.hidden.slug}))
+        self.assertEqual(response.status_code, 404)
+
+    def test_visible_product_detail_page_still_works(self):
+        response = self.client.get(reverse('product_detail', kwargs={'slug': self.visible.slug}))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('VisibleFarmMango', response.content.decode())
+
+    def test_hidden_product_absent_from_sitemap(self):
+        from shop.sitemaps import ProductSitemap
+        items = ProductSitemap().items()
+        self.assertIn(self.visible, items)
+        self.assertNotIn(self.hidden, items)
+
+    def test_anonymous_cart_add_of_hidden_product_rejected(self):
+        response = self.client.post(
+            reverse('add_to_cart', args=[self.hidden.id]),
+            {'qty': 1}, HTTP_X_REQUESTED_WITH='XMLHttpRequest',
+        )
+        self.assertEqual(response.status_code, 404)
+        session = self.client.session
+        self.assertEqual(session.get('cart', {}), {})
+
+    def test_anonymous_cart_add_of_visible_product_still_works(self):
+        response = self.client.post(
+            reverse('add_to_cart', args=[self.visible.id]),
+            {'qty': 1}, HTTP_X_REQUESTED_WITH='XMLHttpRequest',
+        )
+        self.assertEqual(response.status_code, 200)
+        session = self.client.session
+        self.assertEqual(len(session.get('cart', {})), 1)
+
+
+class HiddenProductPosAndAbmsTests(TestCase):
+    """hide_from_website must have zero effect on the POS, admin or
+    inventory/ABMS paths -- a hidden product has to appear and sell
+    normally everywhere staff actually work."""
+
+    def setUp(self):
+        self.category = Category.objects.create(name='Hidden POS Test', order=1)
+        self.hidden = Product.objects.create(
+            name='HiddenPosCrop', slug='hidden-pos-crop-test', category=self.category,
+            description='test', price=Decimal('200.00'), pricing_mode='fixed_quantity',
+            is_available=True, origin='farm', hide_from_website=True,
+        )
+        InventoryMovement.objects.create(
+            product=self.hidden, movement_type='harvest', source='admin', quantity=Decimal('50'),
+        )
+        self.operator = User.objects.create_user('hiddenposop', password='pw', is_staff=True)
+        self.customer = Customer.objects.create(name='Wholesale Buyer', phone='9800011122', address='Butwal')
+
+    def test_pos_product_list_includes_hidden_product(self):
+        owner = User.objects.create_user('hiddenposowner', password='pw', is_staff=True)
+        UserProfile.objects.create(user=owner, role='admin')
+        self.client.login(username='hiddenposowner', password='pw')
+        response = self.client.get('/pos/')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('HiddenPosCrop', response.content.decode())
+
+    def test_pos_retail_sale_of_hidden_product_succeeds(self):
+        sale, created = create_pos_sale(
+            client_sale_id=str(uuid.uuid4()),
+            cart=[{'product_id': self.hidden.id, 'qty': 2}],
+            payments=[{'method': 'cash', 'amount': '400.00'}],
+            operator_user=self.operator,
+        )
+        self.assertTrue(created)
+        self.assertEqual(sale.total_amount, Decimal('400.00'))
+        self.assertTrue(InventoryMovement.objects.filter(
+            product=self.hidden, movement_type='sale', related_pos_sale=sale,
+        ).exists())
+        self.assertEqual(sale.lines.get().product_id, self.hidden.id)
+
+    def test_pos_wholesale_sale_of_hidden_product_succeeds(self):
+        sale, created = create_pos_sale(
+            client_sale_id=str(uuid.uuid4()),
+            cart=[{'product_id': self.hidden.id, 'qty': 2, 'price_override': '150'}],
+            payments=[{'method': 'cash', 'amount': '300.00'}],
+            operator_user=self.operator, customer=self.customer,
+            is_wholesale=True, wholesale_authorized=True,
+        )
+        self.assertTrue(created)
+        self.assertTrue(sale.is_wholesale)
+        self.assertEqual(sale.total_amount, Decimal('300.00'))
+        self.assertTrue(InventoryMovement.objects.filter(
+            product=self.hidden, movement_type='sale', related_pos_sale=sale,
+        ).exists())
+        line = sale.lines.get()
+        self.assertEqual(line.line_total, Decimal('300.00'))
+        self.assertEqual(line.list_line_total, Decimal('400.00'))  # 2 @ catalogue 200
+
+    def test_abms_endpoint_can_post_harvest_for_hidden_product(self):
+        abms_user = User.objects.create_user('abmsbridge', password='pw')
+        token = Token.objects.create(user=abms_user)
+        client = APIClient()
+        client.credentials(HTTP_AUTHORIZATION=f'Token {token.key}')
+        response = client.post(
+            reverse('api_inventory_movement_create'),
+            {'product': self.hidden.id, 'movement_type': 'harvest', 'source': 'abms', 'quantity': '10'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(
+            InventoryMovement.current_stock(self.hidden), Decimal('60'),  # 50 from setUp + 10 just posted
+        )

@@ -60,9 +60,9 @@ class ProductSellingUnitInline(admin.TabularInline):
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
     list_display = ['name', 'category', 'price', 'price_unit', 'pricing_mode',
-                     'weight_step', 'is_available', 'is_taxable', 'season', 'current_stock_display',
-                     'stock_alert_display', 'origin']
-    list_filter = ['category', 'is_available', 'is_taxable', 'pricing_mode', 'origin']
+                     'weight_step', 'is_available', 'hide_from_website', 'is_taxable', 'season',
+                     'current_stock_display', 'stock_alert_display', 'origin']
+    list_filter = ['category', 'is_available', 'hide_from_website', 'is_taxable', 'pricing_mode', 'origin']
     list_editable = ['is_available', 'price', 'price_unit', 'origin']
     prepopulated_fields = {'slug': ('name',)}
     search_fields = ['name']
@@ -120,7 +120,12 @@ class ProductAdmin(admin.ModelAdmin):
             'fields': ('main_image', 'image2', 'image3', 'image4', 'season', 'farming_method', 'whatsapp_message')
         }),
         ('Availability', {
-            'fields': ('is_available', 'origin')
+            'fields': ('is_available', 'hide_from_website', 'origin'),
+            'description': (
+                'hide_from_website hides this product from the public website and public API '
+                'only — it still appears and sells normally in the POS, admin and inventory. '
+                'Use this for crops sold only wholesale or at the farm, never on the online shop.'
+            ),
         }),
         ('Tax (VAT)', {
             'fields': ('is_taxable',),
