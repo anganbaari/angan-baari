@@ -2,7 +2,7 @@ import csv
 import io
 import secrets
 import uuid
-from datetime import timedelta
+from datetime import date, timedelta
 from decimal import Decimal, InvalidOperation
 
 from django.conf import settings
@@ -36,6 +36,8 @@ from shop.views import (
     _is_owner_or_manager,
 )
 
+from shop import bs_calendar
+from shop import pl_report
 from shop import reports as reports_lib
 
 from .permissions import IsOwnerOrManager, IsStaffUser
@@ -1767,3 +1769,129 @@ class ReportFilterOptionsView(APIView):
             name = f"{o['cashier__first_name']} {o['cashier__last_name']}".strip() or o['cashier__username']
             seen[o['cashier_id']] = {'id': o['cashier_id'], 'name': name}
         return Response({'operators': sorted(seen.values(), key=lambda r: r['name'])})
+
+
+def _decimalize(value):
+    """Recursively turns every Decimal in a dict/list/tuple structure into
+    a float, and every date into its ISO string -- the one place
+    pl_report.py's Decimal-only output crosses the JSON boundary, same
+    "float only at serialization, never before" convention shop/reports.py
+    itself already uses (e.g. ReportSummaryView's delta_info())."""
+    if isinstance(value, Decimal):
+        return float(value)
+    if isinstance(value, date):
+        return value.isoformat()
+    if isinstance(value, dict):
+        return {k: _decimalize(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_decimalize(v) for v in value]
+    return value
+
+
+class ReportPLView(APIView):
+    """GET /api/v1/reports/pl/ -- the Profit & Loss tab. Owner/manager
+    only, same gate as every other Reports endpoint. Unlike BaseReportView's
+    subclasses, this is B.S.-period-shaped, not channel/granularity/
+    compare/filters-shaped -- P&L is POS-only and always covers every
+    channel, so none of those params apply here.
+
+    Accepts exactly one of:
+      - ?from=YYYY-MM-DD&to=YYYY-MM-DD        -- a plain A.D. custom range
+      - ?bs_year=YYYY&bs_month=M               -- one B.S. month
+      - ?bs_year=YYYY (bs_month omitted)       -- the full B.S. calendar year
+      - ?fiscal_year=YYYY                      -- the B.S. fiscal year
+                                                   starting Shrawan of that year
+    Plus optional ?export=csv (the by-cost-centre table). NOT ?format=csv --
+    DRF's content negotiation reserves the 'format' query param for itself
+    (DefaultContentNegotiation.filter_renderers() raises Http404 before this
+    view's own get() even runs if it's given a format it has no renderer
+    for), so this endpoint follows the exact same ?export=csv convention
+    every other CSV-exporting view in this file already uses, instead of
+    the plain ?format=csv a first draft of this endpoint tried.
+
+    Defaults to the current B.S. month when nothing is given (same
+    "today"-relative default spirit as resolve_date_range() elsewhere in
+    this module, just expressed in B.S. since this endpoint has no A.D.
+    concept at all on the dashboard side).
+
+    build_pl() itself only ever reads POSSale/POSSaleLine/
+    InventoryMovement/CostEntry/FarmAsset/CostCentreProduct -- see its own
+    module docstring. Nothing here writes anything."""
+
+    authentication_classes = [SessionAuthentication]
+    permission_classes = [IsOwnerOrManager]
+
+    def _resolve_range(self, params):
+        if params.get('from') or params.get('to'):
+            if not params.get('from') or not params.get('to'):
+                raise reports_lib.ReportValidationError("Both 'from' and 'to' are required together.")
+            try:
+                date_from = date.fromisoformat(params['from'])
+                date_to = date.fromisoformat(params['to'])
+            except ValueError:
+                raise reports_lib.ReportValidationError("'from'/'to' must be dates in YYYY-MM-DD format.")
+            if date_from > date_to:
+                raise reports_lib.ReportValidationError("'from' must not be after 'to'.")
+            return date_from, date_to
+
+        if params.get('fiscal_year'):
+            try:
+                fy = int(params['fiscal_year'])
+            except ValueError:
+                raise reports_lib.ReportValidationError("'fiscal_year' must be a whole B.S. year, e.g. 2083.")
+            try:
+                date_from = bs_calendar.bs_month_start_ad(fy, bs_calendar.SHRAWAN_MONTH)
+                end_year, end_month = bs_calendar.bs_add_months(fy, bs_calendar.SHRAWAN_MONTH, 11)
+                date_to = bs_calendar.bs_month_end_ad(end_year, end_month)
+            except bs_calendar.BSDateOutOfRangeError as exc:
+                raise reports_lib.ReportValidationError(str(exc))
+            return date_from, date_to
+
+        if params.get('bs_year'):
+            try:
+                bs_year = int(params['bs_year'])
+                bs_month = int(params['bs_month']) if params.get('bs_month') else None
+            except ValueError:
+                raise reports_lib.ReportValidationError("'bs_year'/'bs_month' must be whole numbers.")
+            try:
+                if bs_month:
+                    date_from = bs_calendar.bs_month_start_ad(bs_year, bs_month)
+                    date_to = bs_calendar.bs_month_end_ad(bs_year, bs_month)
+                else:
+                    date_from = bs_calendar.bs_month_start_ad(bs_year, 1)
+                    date_to = bs_calendar.bs_month_end_ad(bs_year, 12)
+            except (bs_calendar.BSDateOutOfRangeError, ValueError) as exc:
+                raise reports_lib.ReportValidationError(str(exc))
+            return date_from, date_to
+
+        try:
+            bs_year, bs_month, _ = bs_calendar.ad_to_bs(reports_lib.local_today())
+            return bs_calendar.bs_month_start_ad(bs_year, bs_month), reports_lib.local_today()
+        except bs_calendar.BSDateOutOfRangeError as exc:
+            raise reports_lib.ReportValidationError(str(exc))
+
+    def get(self, request, *args, **kwargs):
+        try:
+            date_from, date_to = self._resolve_range(request.query_params)
+        except reports_lib.ReportValidationError as exc:
+            return Response({'status': 'error', 'message': exc.message}, status=400)
+
+        data = pl_report.build_pl(date_from, date_to)
+
+        if request.query_params.get('export') == 'csv':
+            rows = [
+                {
+                    'cost_centre': r['cost_centre'], 'revenue': r['revenue'],
+                    'direct_cost': r['direct_cost'], 'allocated_shared_cost': r['allocated_shared_cost'],
+                    'depreciation': r['depreciation'], 'profit': r['profit'],
+                    'margin_pct': r['margin_pct'] if r['margin_pct'] is not None else '',
+                }
+                for r in data['farm_cost_centres']
+            ]
+            return _csv_response(
+                rows,
+                ['cost_centre', 'revenue', 'direct_cost', 'allocated_shared_cost', 'depreciation', 'profit', 'margin_pct'],
+                'profit_and_loss.csv',
+            )
+
+        return Response(_decimalize(data))

@@ -1034,6 +1034,32 @@ class FarmAsset(models.Model):
         return (self.cost - self.salvage_value) / Decimal(self.life_years)
 
 
+class CostCentreProduct(models.Model):
+    """Which products' POS sales belong to an ABMS cost centre, for the
+    Profit & Loss report (shop/pl_report.py) -- e.g. cost_centre
+    'crop:mango' maps to the Mango product, 'livestock:goat' maps to every
+    goat product. Pure configuration (an admin builds this list once and
+    adjusts it occasionally), not a ledger -- ordinary add/change/delete,
+    unlike CostEntry/PurchaseBatch/POSSaleLine elsewhere in this file.
+
+    cost_centre uses the exact same key format ABMS writes to CostEntry/
+    FarmAsset.cost_centre: 'crop:<slug>', 'tree:<slug>', 'livestock:goat',
+    'livestock:chicken', 'bees', 'vermi', 'water', 'shared' -- see
+    CLAUDE.md's ABMS section. Not validated against a fixed choice list
+    here, since ABMS can grow new crop/tree slugs over time without a
+    Django deploy."""
+
+    cost_centre = models.CharField(max_length=60, db_index=True)
+    product = models.ForeignKey('Product', on_delete=models.CASCADE, related_name='cost_centres')
+
+    class Meta:
+        unique_together = [('cost_centre', 'product')]
+        ordering = ['cost_centre', 'product__name']
+
+    def __str__(self):
+        return f"{self.cost_centre} -> {self.product.name}"
+
+
 # Shared base for the two payment-method choice lists below: a single
 # POSSalePayment line is always one concrete method (+ 'credit'); a POSSale
 # itself additionally needs 'split' as a derived summary value for when a

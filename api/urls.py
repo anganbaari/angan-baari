@@ -53,4 +53,5 @@ urlpatterns = [
     path('reports/alerts/', views.ReportAlertsView.as_view(), name='v1_report_alerts'),
     path('reports/target/', views.ReportTargetView.as_view(), name='v1_report_target'),
     path('reports/filter-options/', views.ReportFilterOptionsView.as_view(), name='v1_report_filter_options'),
+    path('reports/pl/', views.ReportPLView.as_view(), name='v1_report_pl'),
 ]

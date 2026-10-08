@@ -313,11 +313,12 @@ function showConnError(message) {
 
 const SECTION_TITLES = {
     overview: 'Overview', sales: 'Sales', products: 'Products', credit: 'Credit (उधारो)',
-    inventory: 'Inventory', orders: 'Online Orders', alerts: 'Alerts',
+    inventory: 'Inventory', orders: 'Online Orders', alerts: 'Alerts', pl: 'Profit & Loss',
 };
 const SECTION_LOADERS = {
     overview: loadOverview, sales: loadSales, products: loadProducts,
     credit: loadCredit, inventory: loadInventory, orders: loadOrders, alerts: loadAlertsSection,
+    pl: loadPl,
 };
 
 function loadSection(section, force) {
@@ -983,6 +984,119 @@ async function loadAlertsSection() {
     if (allClear) {
         document.querySelectorAll('#section-alerts .dash-card').forEach((c) => { if (c.id !== 'alertsTargetMilestoneCard') c.style.display = 'none'; });
         document.querySelector('#section-alerts .dash-grid').insertAdjacentHTML('afterbegin', `<div class="dash-card c12"><div class="dash-alert-clear"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><br>All clear — nothing needs attention.</div></div>`);
+    }
+}
+
+// ── Profit & Loss section ───────────────────────────────────────────────
+//
+// Unlike every other tab, this one is POS-only (no channel/payment_type/
+// customer_type/operator concept at all -- see shop/pl_report.py's module
+// docstring) and the API takes from/to, not start/end. It still reuses
+// the SAME global B.S.-aware date range the topbar already resolves
+// (state.start/state.end), rather than building a second period picker,
+// since the existing preset dropdown (this BS month / this BS year /
+// fiscal year / custom) already covers every period shape this report
+// needs.
+
+function plParams(extra) {
+    const p = new URLSearchParams({ from: state.start, to: state.end });
+    if (extra) Object.keys(extra).forEach((k) => p.set(k, extra[k]));
+    return p.toString();
+}
+
+function plStatementRow(label, value, opts) {
+    opts = opts || {};
+    const labelHtml = opts.strong ? `<strong>${escapeHtml(label)}</strong>` : escapeHtml(label);
+    const valueHtml = opts.strong ? `<strong>${formatRs(value)}</strong>` : formatRs(value);
+    return `<tr class="${opts.indent ? 'pl-indent' : ''}"><td>${labelHtml}</td><td class="num">${valueHtml}</td></tr>`;
+}
+
+const PL_DQ_LABELS = {
+    website_orders_excluded: 'Website orders excluded (no stored price)',
+    sales_without_line_data: 'Older POS sales with no line-item detail',
+    sourced_lines_no_cost: 'Sourced sale lines missing a cost',
+    waste_no_cost: 'Waste movements missing a cost',
+    unmapped_cost_centre_entries: 'Farm cost entries with an unmapped cost centre',
+    farm_products_no_mapping: 'Farm products never mapped to a cost centre',
+    shared_allocation_fallback: 'Shared costs/depreciation that fell back to "unallocated"',
+    dangling_reversals: 'Reversal entries with no matching original',
+};
+
+async function loadPl() {
+    document.getElementById('plKpis').innerHTML = skeletonHtml(1, 70);
+    document.getElementById('exportPlBtn').href = `/api/v1/reports/pl/?${plParams({ export: 'csv' })}`;
+    const data = await fetchJSON(`/api/v1/reports/pl/?${plParams()}`);
+
+    document.getElementById('plKpis').innerHTML = [
+        ['Net profit', data.net_profit], ['Total revenue', data.revenue.total],
+        ['Cost of sales', data.cost_of_sales], ['Wastage loss', data.wastage_loss],
+        ['Farm costs', data.farm_costs_total.total], ['Depreciation', data.depreciation.total],
+    ].map(([label, value]) => `<div class="dash-kpi-tile"><div class="label">${escapeHtml(label)}</div><div class="value">${formatRs(value)}</div></div>`).join('');
+
+    document.getElementById('plStatementTable').innerHTML = `<table class="dash-table">
+        <tbody>
+            ${plStatementRow('Revenue -- retail', data.revenue.retail, { indent: true })}
+            ${plStatementRow('Revenue -- wholesale', data.revenue.wholesale, { indent: true })}
+            ${plStatementRow('Total revenue (POS only)', data.revenue.total, { strong: true })}
+            ${plStatementRow('Less: cost of sales (sourced products)', data.cost_of_sales)}
+            ${plStatementRow('Less: wastage loss', data.wastage_loss)}
+            ${plStatementRow('Less: stock count adjustments', data.stock_adjustments)}
+            ${plStatementRow('Gross profit on sourced products', data.gross_profit_sourced, { strong: true })}
+            ${plStatementRow('Less: farm costs -- direct', data.farm_costs_total.direct, { indent: true })}
+            ${plStatementRow('Less: farm costs -- shared, allocated', data.farm_costs_total.shared_allocated, { indent: true })}
+            ${plStatementRow('Less: farm costs -- unallocated', data.farm_costs_total.unallocated_overhead, { indent: true })}
+            ${plStatementRow('Less: depreciation', data.depreciation.total)}
+            ${plStatementRow('Net profit', data.net_profit, { strong: true })}
+        </tbody>
+    </table>`;
+
+    const centres = data.farm_cost_centres;
+    renderTable('plCentreTable', [
+        { key: 'cost_centre', label: 'Cost centre' },
+        { key: 'revenue', label: 'Revenue', num: true, render: (r) => formatRs(r.revenue) },
+        { key: 'direct_cost', label: 'Direct cost', num: true, render: (r) => formatRs(r.direct_cost) },
+        { key: 'allocated_shared_cost', label: 'Shared cost', num: true, render: (r) => formatRs(r.allocated_shared_cost) },
+        { key: 'depreciation', label: 'Depreciation', num: true, render: (r) => formatRs(r.depreciation) },
+        { key: 'profit', label: 'Profit', num: true, render: (r) => formatRs(r.profit) },
+        { key: 'margin_pct', label: 'Margin', num: true, render: (r) => r.margin_pct == null ? '—' : `${r.margin_pct}%` },
+    ], centres, { emptyMessage: 'No cost-centre activity this period -- map products in Admin → Cost Centre Products.' });
+
+    if (centres.length) {
+        makeChart('plCentreChart', {
+            type: 'bar',
+            data: {
+                labels: centres.map((c) => c.cost_centre),
+                datasets: [
+                    { label: 'Revenue', data: centres.map((c) => c.revenue), backgroundColor: PALETTE[1] },
+                    { label: 'Direct cost', data: centres.map((c) => c.direct_cost), backgroundColor: PALETTE[3] },
+                    { label: 'Shared cost', data: centres.map((c) => c.allocated_shared_cost), backgroundColor: PALETTE[0] },
+                    { label: 'Depreciation', data: centres.map((c) => c.depreciation), backgroundColor: PALETTE[4] },
+                ],
+            },
+            options: { plugins: { legend: { display: true, position: 'bottom' } } },
+        });
+    } else {
+        destroyChart('plCentreChart');
+    }
+
+    renderTable('plWastageTable', [
+        { key: 'product', label: 'Product' },
+        { key: 'quantity', label: 'Quantity', num: true, render: (r) => formatNum(r.quantity) },
+        { key: 'value', label: 'Value', num: true, render: (r) => formatRs(r.value) },
+    ], data.wastage_detail, { emptyMessage: 'No waste recorded this period.' });
+
+    document.getElementById('plCashCredit').innerHTML = [
+        ['Cash collected', data.cash_vs_credit.cash_collected], ['Credit given this period', data.cash_vs_credit.credit_given],
+        ['Credit outstanding (all-time)', data.cash_vs_credit.credit_outstanding_now],
+    ].map(([label, value]) => `<div class="dash-kpi-tile"><div class="label">${escapeHtml(label)}</div><div class="value">${formatRs(value)}</div></div>`).join('');
+
+    const dq = data.data_quality;
+    document.getElementById('plNavBadge').style.display = dq.has_issues ? 'inline-block' : 'none';
+    if (!dq.has_issues) {
+        document.getElementById('plDataQuality').innerHTML = `<div class="dash-alert-clear"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><br>No data-quality gaps found for this period.</div>`;
+    } else {
+        const rows = Object.keys(PL_DQ_LABELS).filter((key) => dq[key] > 0).map((key) => `<tr><td>${escapeHtml(PL_DQ_LABELS[key])}</td><td class="num">${formatNum(dq[key])}</td></tr>`).join('');
+        document.getElementById('plDataQuality').innerHTML = `<table class="dash-table"><tbody>${rows}</tbody></table>`;
     }
 }
 

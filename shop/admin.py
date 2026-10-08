@@ -15,7 +15,7 @@ from .models import InventoryMovement
 from .models import (
     Offer, Coupon, BundleItem, ProductVariant, ProductSellingUnit, InventoryMovement, POSSale, UserProfile,
     BusinessSettings, CreditTransaction, Customer, POSSalePayment, RevenueTarget, CostEntry, FarmAsset,
-    PurchaseBatch, POSSaleLine,
+    PurchaseBatch, POSSaleLine, CostCentreProduct,
 )
 from .stock import get_stock_table_rows
 from .utils import format_money
@@ -375,6 +375,19 @@ class PurchaseBatchAdminForm(forms.ModelForm):
         # this up server-side; this is just so the dropdown itself never
         # offers a wrong choice in the first place).
         self.fields['product'].queryset = Product.objects.filter(origin='sourced')
+
+
+@admin.register(CostCentreProduct)
+class CostCentreProductAdmin(admin.ModelAdmin):
+    """Plain configuration, not a ledger -- ordinary add/change/delete.
+    Maps an ABMS cost centre to the product(s) whose POS sales count as
+    that centre's revenue in the Profit & Loss report (shop/pl_report.py)."""
+
+    list_display = ['cost_centre', 'product']
+    list_filter = ['cost_centre']
+    search_fields = ['cost_centre', 'product__name']
+    autocomplete_fields = ['product']
+    ordering = ['cost_centre', 'product__name']
 
 
 @admin.register(PurchaseBatch)

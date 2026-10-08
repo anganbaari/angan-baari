@@ -12,7 +12,7 @@
     <meta name="theme-color" content="#0e1710">
     <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{% static 'style.css' %}">
-    <link rel="stylesheet" href="{% static 'css/dashboard.css' %}?v=8">
+    <link rel="stylesheet" href="{% static 'css/dashboard.css' %}?v=9">
 </head>
 <body class="dashboard-body">
     <div id="dashPrintHeader">
@@ -63,10 +63,10 @@
                     <span class="label">Alerts</span>
                     <span class="pl-badge" id="alertsNavCount" style="display:none;"></span>
                 </button>
-                <button class="dash-nav-item disabled" type="button" disabled title="Needs a recorded cost price per product, which this project doesn't track yet.">
+                <button class="dash-nav-item" role="tab" data-section="pl">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1v22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
                     <span class="label">Profit &amp; Loss</span>
-                    <span class="pl-badge">needs cost data</span>
+                    <span class="pl-badge" id="plNavBadge" style="display:none;">data gaps</span>
                 </button>
             </nav>
 
@@ -394,12 +394,55 @@
                         </div>
                     </div>
                 </section>
+
+                <!-- ═══ PROFIT & LOSS ═══ -->
+                <section class="dash-section" id="section-pl">
+                    <div class="dash-kpi-strip" id="plKpis"><div class="dash-skeleton" style="height:70px;grid-column:1/-1;"></div></div>
+                    <div class="dash-grid">
+                        <div class="dash-card c12">
+                            <h3>P&amp;L statement <span class="sub">POS sales only -- see the note below the cost-centre table</span></h3>
+                            <div class="dash-table-scroll" id="plStatementTable"></div>
+                        </div>
+                        <div class="dash-card c7">
+                            <div class="dash-table-toolbar">
+                                <h3 style="margin:0;">By cost centre</h3>
+                                <a class="dash-export-btn" id="exportPlBtn" href="#">Export CSV</a>
+                            </div>
+                            <div class="dash-table-scroll" id="plCentreTable"></div>
+                            <p class="dash-note">Rows come from Admin &rarr; Cost Centre Products. Map each product to its
+                                ABMS cost-centre key (<code>crop:&lt;slug&gt;</code>, <code>tree:&lt;slug&gt;</code>,
+                                <code>livestock:goat</code>, <code>livestock:chicken</code>, <code>bees</code>,
+                                <code>vermi</code>, <code>water</code>, or <code>shared</code>) to have its sales show
+                                up here -- an unmapped farm product's revenue is counted in the total above but won't
+                                appear in any centre's row.</p>
+                        </div>
+                        <div class="dash-card c5">
+                            <h3>Revenue vs. costs by centre</h3>
+                            <div class="dash-chart-wrap"><canvas id="plCentreChart" aria-label="Revenue vs costs by cost centre" role="img"></canvas></div>
+                        </div>
+                        <div class="dash-card c6">
+                            <h3>Wastage detail</h3>
+                            <div class="dash-table-scroll" id="plWastageTable"></div>
+                        </div>
+                        <div class="dash-card c6">
+                            <h3>Cash vs. credit</h3>
+                            <div id="plCashCredit"></div>
+                            <p class="dash-note">Cash collected = non-credit POS payments this period + credit
+                                repayments received this period. Credit outstanding is a live, all-time balance, not
+                                scoped to this date range -- same figures as the Credit tab.</p>
+                        </div>
+                        <div class="dash-card c12">
+                            <h3>Data quality</h3>
+                            <div id="plDataQuality"></div>
+                        </div>
+                    </div>
+                </section>
             </div>
         </div>
     </div>
 
     <script src="{% static 'vendor/chart.min.js' %}"></script>
     <script src="{% static 'js/bs-calendar.js' %}?v=1"></script>
-    <script src="{% static 'js/dashboard.js' %}?v=2"></script>
+    <script src="{% static 'js/dashboard.js' %}?v=3"></script>
 </body>
 </html>

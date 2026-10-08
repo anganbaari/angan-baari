@@ -24,17 +24,18 @@ from django.utils import timezone as djtz
 from rest_framework import status
 
 from shop.models import (
-    Category, CreditTransaction, Customer, InventoryMovement, POSSale, POSSalePayment, Product,
-    RevenueTarget, UserProfile,
+    Category, CostCentreProduct, CreditTransaction, Customer, InventoryMovement, POSSale, POSSalePayment,
+    Product, RevenueTarget, UserProfile,
 )
 from shop.reports import LOCAL_TZ, delta_info, local_range_to_utc, resolve_date_range, ReportValidationError
+from shop.views import create_pos_sale
 
 from .tests import ApiTestBase
 
 REPORT_ENDPOINTS = [
     'v1_report_summary', 'v1_report_sales_trend', 'v1_report_payments',
     'v1_report_products', 'v1_report_credit', 'v1_report_inventory', 'v1_report_orders',
-    'v1_report_target', 'v1_report_filter_options', 'v1_report_alerts',
+    'v1_report_target', 'v1_report_filter_options', 'v1_report_alerts', 'v1_report_pl',
 ]
 
 
@@ -756,3 +757,81 @@ class MovementsByUnitTests(ReportsTestBase):
         self.assertEqual(harvest_rows.get('kg'), 25.0)   # 20.00 (setUp) + 5.00
         self.assertEqual(harvest_rows.get('pcs'), 15.0)  # 10 (setUp) + 5
         self.assertEqual(harvest_rows.get('animals'), 1.0)  # setUp's goat, untouched by this test
+
+
+class ReportPLViewTests(ReportsTestBase):
+    """GET /api/v1/reports/pl/ -- param parsing (plain from/to, bs_year/
+    bs_month, fiscal_year, and the no-params default) and the CSV export.
+    The underlying build_pl() math itself is covered in depth by
+    shop.tests_pl_report -- these tests only exercise the view layer
+    (param resolution, status codes, CSV-matches-JSON)."""
+
+    def test_plain_from_to_range(self):
+        self.client.login(username='owner1', password='pw')
+        response = self.client.get(reverse('v1_report_pl'), {'from': '2026-08-17', 'to': '2026-09-16'})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['period'], {'from': '2026-08-17', 'to': '2026-09-16'})
+
+    def test_from_without_to_is_400(self):
+        self.client.login(username='owner1', password='pw')
+        response = self.client.get(reverse('v1_report_pl'), {'from': '2026-08-17'})
+        self.assertEqual(response.status_code, 400)
+
+    def test_from_after_to_is_400(self):
+        self.client.login(username='owner1', password='pw')
+        response = self.client.get(reverse('v1_report_pl'), {'from': '2026-09-16', 'to': '2026-08-17'})
+        self.assertEqual(response.status_code, 400)
+
+    def test_bs_year_and_month_resolves_to_known_ad_range(self):
+        # BS 2083 Bhadra (month 5) = 2026-08-17..2026-09-16, confirmed
+        # directly against shop/bs_calendar.py.
+        self.client.login(username='owner1', password='pw')
+        response = self.client.get(reverse('v1_report_pl'), {'bs_year': '2083', 'bs_month': '5'})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['period'], {'from': '2026-08-17', 'to': '2026-09-16'})
+
+    def test_bs_year_alone_is_full_bs_calendar_year(self):
+        self.client.login(username='owner1', password='pw')
+        response = self.client.get(reverse('v1_report_pl'), {'bs_year': '2083'})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['period']['from'], '2026-04-14')  # BS 2083-01-01
+
+    def test_fiscal_year_spans_shrawan_to_ashar(self):
+        self.client.login(username='owner1', password='pw')
+        response = self.client.get(reverse('v1_report_pl'), {'fiscal_year': '2082'})
+        self.assertEqual(response.status_code, 200)
+        # BS 2082-04-01 (Shrawan 1) through the day before BS 2083-04-01.
+        self.assertEqual(response.data['period']['from'], '2025-07-17')
+
+    def test_no_params_defaults_to_current_bs_month(self):
+        self.client.login(username='owner1', password='pw')
+        response = self.client.get(reverse('v1_report_pl'))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('period', response.data)
+
+    def test_csv_export_totals_match_json(self):
+        CostCentreProduct.objects.create(cost_centre='crop:mango', product=self.fruit)
+        sale, _ = create_pos_sale(
+            client_sale_id=str(uuid.uuid4()), cart=[{'product_id': self.fruit.id, 'qty': 1, 'weight': '2.00'}],
+            payments=[{'method': 'cash', 'amount': '600.00'}], operator_user=self.staff,
+        )
+        POSSale.objects.filter(id=sale.id).update(
+            created_at=djtz.make_aware(datetime(2026, 8, 20, 12, 0, 0), ZoneInfo('Asia/Kathmandu')),
+        )
+        self.client.login(username='owner1', password='pw')
+        json_response = self.client.get(reverse('v1_report_pl'), {'from': '2026-08-17', 'to': '2026-09-16'})
+        self.assertEqual(json_response.status_code, 200)
+
+        csv_response = self.client.get(
+            reverse('v1_report_pl'), {'from': '2026-08-17', 'to': '2026-09-16', 'export': 'csv'},
+        )
+        self.assertEqual(csv_response.status_code, 200)
+        self.assertEqual(csv_response['Content-Type'], 'text/csv; charset=utf-8')
+        content = csv_response.content.decode('utf-8-sig')
+        reader = csv.DictReader(io.StringIO(content))
+        csv_rows = list(reader)
+        self.assertEqual(len(csv_rows), len(json_response.data['farm_cost_centres']))
+        for json_row, csv_row in zip(json_response.data['farm_cost_centres'], csv_rows):
+            self.assertEqual(csv_row['cost_centre'], json_row['cost_centre'])
+            self.assertEqual(Decimal(csv_row['revenue']), Decimal(str(json_row['revenue'])))
+            self.assertEqual(Decimal(csv_row['profit']), Decimal(str(json_row['profit'])))
