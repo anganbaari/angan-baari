@@ -265,33 +265,108 @@ table.dash-table tr.pl-indent td:first-child { padding-left: 22px; color: var(--
     .dash-target-bar-fill { transition: none; }
 }
 
-/* ── Responsive ── */
+/* ── Responsive ──
+   Single consolidated breakpoint for "sidebar becomes an off-canvas
+   drawer" at <=1024px (covers both tested tablet widths, 768/820, and
+   the 1024px boundary itself) -- replaces the old two-tier design
+   (a permanent 72px icon-only rail <=1024px, full off-canvas only
+   <=640px), which left tablet widths with a rail that permanently ate
+   72px of an already-narrow viewport with no way to hide it (the menu
+   button only appeared <=640px). >=1025px (1280/1440, "laptop") keeps
+   the original full 248px sidebar, untouched. */
 @media (max-width: 1024px) {
-    .dash-sidebar { width: 72px; padding: 14px 8px; }
-    .dash-brand .brand-text, .dash-brand img.flag, .dash-nav-item span.label, .dash-bsgrid, .dash-target-card, .dash-sidebar-footer span.label { display: none; }
-    .dash-nav-item { justify-content: center; }
+    .dash-sidebar {
+        position: fixed; left: -260px; top: 0; bottom: 0; width: 248px; z-index: 100;
+        transition: left 0.25s ease-out; box-shadow: 0 0 40px rgba(0, 0, 0, 0.5);
+    }
+    .dash-sidebar.open { left: 0; }
+    .dash-sidebar-backdrop { display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5); z-index: 90; }
+    .dash-sidebar-backdrop.open { display: block; }
+    .dash-menu-btn { display: inline-block; }
+    .dash-topbar-row1 { grid-template-columns: auto 1fr auto; }
+    .dash-topbar-brand, #lastUpdated { display: none; }
     .dash-card.c3, .dash-card.c4 { grid-column: span 6; }
     .dash-card.c8 { grid-column: span 12; }
+    .dash-kpi-strip { grid-template-columns: repeat(2, 1fr); }
 }
 
-@media (max-width: 640px) {
-    .dash-sidebar { position: fixed; left: -260px; top: 0; bottom: 0; width: 248px; z-index: 100; transition: left 0.25s ease-out; box-shadow: 0 0 40px rgba(0,0,0,0.5); }
-    .dash-sidebar.open { left: 0; }
-    .dash-sidebar .brand-text, .dash-nav-item span.label, .dash-bsgrid, .dash-target-card, .dash-sidebar-footer span.label { display: block; }
-    .dash-brand img.flag { display: inline-block; }
-    .dash-sidebar { width: 248px; }
-    .dash-mobile-bar { display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-bottom: 1px solid var(--dash-border-soft); position: sticky; top: 0; background: var(--dash-bg); z-index: 40; }
-    .dash-mobile-bar button { background: var(--dash-card-bg); border: 1px solid var(--dash-border-soft); color: var(--dash-text); border-radius: 8px; padding: 6px 10px; cursor: pointer; }
-    .dash-sidebar-backdrop { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 90; }
-    .dash-sidebar-backdrop.open { display: block; }
+@media (max-width: 600px) {
     .dash-topbar { padding: 12px 14px; }
     .dash-content { padding: 14px 14px 50px; }
     .dash-card, .dash-card.c3, .dash-card.c4, .dash-card.c6, .dash-card.c8 { grid-column: span 12; }
-    .dash-kpi-strip { grid-template-columns: repeat(2, 1fr); }
-    .dash-menu-btn { display: inline-block; }
-    .dash-topbar-row1 { grid-template-columns: auto 1fr auto; }
+    .dash-kpi-strip { grid-template-columns: 1fr; }
     .dash-topbar h2 { font-size: 1.05rem; }
-    .dash-topbar-brand, #lastUpdated { display: none; }
+}
+
+/* Every flex/grid child that holds text needs a chance to shrink and
+   wrap instead of forcing its siblings wider than the viewport. */
+.dash-topbar-left, .dash-topbar-meta, .dash-rank-info, .dash-brand .brand-text,
+.dash-kpi-tile, .dash-insight-card, .dash-nav-item span.label {
+    min-width: 0;
+}
+.dash-brand .brand-text h1, .dash-kpi-tile .value, .dash-rank-name {
+    overflow-wrap: anywhere;
+}
+
+/* "Prefer stacked rows/cards where a table has more than 4 columns" on
+   mobile -- pure CSS (no data-label JS change needed): each table's
+   column order is fixed and known, so the label text is hardcoded per
+   nth-of-type position rather than read from an attribute. Scoped to
+   the two specific wide tables named in the brief (8 and 7 columns);
+   every other table in this dashboard keeps its existing
+   .dash-table-scroll horizontal-scroll wrapper instead -- see the
+   session report for why this wasn't extended to every table. */
+@media (max-width: 640px) {
+    #plBatchListTable table.dash-table,
+    #plCentreTable table.dash-table {
+        display: block;
+    }
+    #plBatchListTable table.dash-table thead,
+    #plCentreTable table.dash-table thead {
+        display: none;
+    }
+    #plBatchListTable table.dash-table tbody,
+    #plCentreTable table.dash-table tbody {
+        display: block;
+    }
+    #plBatchListTable table.dash-table tr,
+    #plCentreTable table.dash-table tr {
+        display: block;
+        border: 1px solid var(--dash-border-soft);
+        border-radius: 8px;
+        padding: 6px 0;
+        margin-bottom: 8px;
+    }
+    #plBatchListTable table.dash-table td,
+    #plCentreTable table.dash-table td {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+        white-space: normal;
+        overflow-wrap: anywhere;
+        border-bottom: none;
+    }
+    #plBatchListTable table.dash-table td::before,
+    #plCentreTable table.dash-table td::before {
+        font-weight: 700;
+        color: var(--dash-text-muted);
+        flex-shrink: 0;
+    }
+    #plBatchListTable table.dash-table td:nth-of-type(1)::before { content: "Code"; }
+    #plBatchListTable table.dash-table td:nth-of-type(2)::before { content: "Name"; }
+    #plBatchListTable table.dash-table td:nth-of-type(3)::before { content: "Status"; }
+    #plBatchListTable table.dash-table td:nth-of-type(4)::before { content: "Total cost"; }
+    #plBatchListTable table.dash-table td:nth-of-type(5)::before { content: "Harvested (kg)"; }
+    #plBatchListTable table.dash-table td:nth-of-type(6)::before { content: "Cost/kg"; }
+    #plBatchListTable table.dash-table td:nth-of-type(7)::before { content: "Revenue"; }
+    #plBatchListTable table.dash-table td:nth-of-type(8)::before { content: "Profit to date"; }
+    #plCentreTable table.dash-table td:nth-of-type(1)::before { content: "Cost centre"; }
+    #plCentreTable table.dash-table td:nth-of-type(2)::before { content: "Revenue"; }
+    #plCentreTable table.dash-table td:nth-of-type(3)::before { content: "Direct cost"; }
+    #plCentreTable table.dash-table td:nth-of-type(4)::before { content: "Shared cost"; }
+    #plCentreTable table.dash-table td:nth-of-type(5)::before { content: "Depreciation"; }
+    #plCentreTable table.dash-table td:nth-of-type(6)::before { content: "Profit"; }
+    #plCentreTable table.dash-table td:nth-of-type(7)::before { content: "Margin"; }
 }
 
 html { -webkit-text-size-adjust: 100%; }

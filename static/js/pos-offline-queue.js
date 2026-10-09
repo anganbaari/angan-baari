@@ -64,7 +64,12 @@ var POS_QUEUE_STORE = 'queuedSales';
 // old v6 shell would otherwise never show it, and PRODUCTS wouldn't carry
 // cost_per_kg at all since that's baked into the server-rendered payload
 // at page-load time, not fetched separately.
-var POS_SHELL_CACHE = 'pos-shell-v7';
+// v7 -> v8: the mobile/tablet responsive pass (new <=1024px CSS, the
+// cart-line name/detail/note restructure in renderReceipt()) -- an
+// installed POS app cold-starting offline on the old v7 shell would
+// otherwise keep showing the pre-responsive layout and the old 3-line
+// cart-line markup.
+var POS_SHELL_CACHE = 'pos-shell-v8';
 var POS_META_STORE = 'meta';
 var POS_OFFLINE_PIN_STORE = 'offlineOperators';
 var POS_CREDIT_CUSTOMER_STORE = 'creditCustomers';

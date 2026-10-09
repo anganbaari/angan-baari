@@ -1264,6 +1264,21 @@ function initTodayChip() {
     document.getElementById('todayBsChip').textContent = 'आज ' + BsCalendar.formatBs(bs);
 }
 
+// Chart.js's own responsive:true (default) already redraws on most size
+// changes via its internal ResizeObserver, but a chart created while its
+// section wasn't the active tab, or a sidebar-breakpoint change that
+// resizes .dash-main without the canvas's own box technically changing in
+// the same paint, can leave a chart sized for a stale layout. A single
+// debounced listener on every live chart (window.__charts, populated by
+// makeChart()) is cheap insurance and needs no new per-chart wiring.
+let dashResizeTimer = null;
+window.addEventListener('resize', () => {
+    clearTimeout(dashResizeTimer);
+    dashResizeTimer = setTimeout(() => {
+        Object.values(window.__charts || {}).forEach((chart) => chart.resize());
+    }, 150);
+});
+
 document.addEventListener('DOMContentLoaded', () => {
     initTodayChip();
     initNav();

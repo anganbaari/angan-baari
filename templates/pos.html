@@ -103,35 +103,49 @@
 
         /* ── Receipt view ── */
         #receiptView { display: flex; flex-direction: column; flex: 1; min-height: 0; }
-        /* Fixed 7-rows-per-page table -- no internal scroll, ever. Extra
-           items spill onto additional pages, flipped via the pager
-           alongside the table (matches the mockup's "1/1" page indicator).
-           This is a real <table> for markup/semantics, but laid out as a
-           CSS Grid: native table row-height is only ever a *minimum* (a
-           2-line product name silently grows the row and overflow:hidden
-           on a <td> does nothing to stop that), whereas grid's `1fr` row
-           tracks are authoritative -- the header takes its natural height
-           and the remaining space splits into exactly 7 equal, truly fixed
-           rows that clip rather than grow. thead/tbody/tr get
-           display:contents so th/td become direct grid items in DOM order. */
+        /* Up to 7 rows per page, same paging behaviour as before, but rows
+           are no longer forced to an equal 1fr share that clips overflow --
+           minmax(max(44px, min-content), 1fr) means every row is STILL at
+           least 44px (touch target) and still stretches via 1fr to fill
+           leftover space the normal way when a row's content is short, but
+           a row whose content genuinely needs more (a long product name +
+           its detail line + the below-direct-cost note -- see
+           lineBelowCostNote()/renderReceipt()) grows to fit instead of
+           clipping. .receipt-table-wrap gained overflow-y:auto (was
+           overflow:hidden) so the rare case of several tall rows at once
+           scrolls instead of being cut off below the fold. This is a real
+           <table> for markup/semantics, laid out as a CSS Grid; thead/
+           tbody/tr get display:contents so th/td become direct grid items
+           in DOM order. */
         .receipt-table-row { display: flex; gap: 8px; flex: 1; min-height: 0; }
-        .receipt-table-wrap { flex: 1; min-height: 0; overflow: hidden; }
+        .receipt-table-wrap { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; }
         .receipt-table {
             display: grid; grid-template-columns: 6% 34% 15% 13% 17% 15%;
-            grid-template-rows: auto repeat(7, 1fr);
+            grid-template-rows: auto repeat(7, minmax(max(44px, min-content), 1fr));
             width: 100%; height: 100%; background: var(--pos-bg); border: 2px solid var(--pos-border-dark);
         }
         .receipt-table thead, .receipt-table tbody, .receipt-table tr { display: contents; }
         .receipt-table th, .receipt-table td {
             display: flex; align-items: center; justify-content: center;
             border: 1px solid var(--pos-border-dark); padding: 6px 10px; font-size: 0.95rem; font-weight: 700;
-            text-align: center; color: var(--pos-text-black); line-height: 1.15; box-sizing: border-box; overflow: hidden;
+            text-align: center; color: var(--pos-text-black); line-height: 1.15; box-sizing: border-box;
         }
         .receipt-table th { background: var(--pos-bg); font-weight: 800; font-family: 'Noto Sans Devanagari', 'DM Sans', sans-serif; }
         .receipt-table td.name-cell { justify-content: flex-start; text-align: left; }
-        .name-cell-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; width: 100%; height: 100%; overflow: hidden; }
-        .name-cell-row > div { overflow: hidden; min-width: 0; }
-        .name-cell-row > div > *, .receipt-table td.name-cell { overflow: hidden; }
+        .name-cell-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; width: 100%; min-height: 100%; }
+        .name-cell-row > div.name-cell-text { min-width: 0; flex: 1; }
+        .cart-line-name { overflow-wrap: anywhere; }
+        /* Detail ("1.000kg") and the amber below-direct-cost note share one
+           line, note to the right -- wraps under the detail instead of
+           clipping if the row is too narrow for both. */
+        .cart-line-detail-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; margin-top: 1px; }
+        .cart-line-detail { font-size: 0.88rem; color: var(--text-muted); }
+        .cart-line-note {
+            font-size: 11px; font-weight: 700; color: var(--pos-enter-orange); overflow-wrap: anywhere;
+        }
+        @media (max-width: 480px) {
+            .cart-line-note { font-size: 10px; }
+        }
         .receipt-table .row-remove {
             background: #fdecea; border: 1.5px solid #c0392b; color: #c0392b; cursor: pointer;
             width: 20px; height: 20px; border-radius: 50%; font-size: 0.62rem; line-height: 1;
@@ -277,7 +291,7 @@
            (the name column's own header cell) needs the highest z-index so
            it stays above both the plain sticky header row and the plain
            sticky name cells it overlaps. */
-        .stock-table-wrap { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; border: 2px solid var(--pos-border-dark); border-radius: 6px; }
+        .stock-table-wrap { flex: 1; min-height: 0; overflow-y: auto; overflow-x: auto; border: 2px solid var(--pos-border-dark); border-radius: 6px; }
         .stock-table { width: 100%; border-collapse: collapse; background: var(--pos-bg); }
         .stock-table th, .stock-table td {
             padding: 8px 12px; font-size: 0.9rem; text-align: center; border-bottom: 1px solid var(--pos-border-dark);
@@ -348,7 +362,8 @@
         .lock-bar {
             display: flex; align-items: center; gap: 10px; border-radius: 14px;
             box-shadow: 0 10px 34px rgba(0,0,0,0.35); border: 2px solid var(--pos-lock-stroke);
-            background: var(--pos-lock-bar-bg); padding: 14px 16px; width: min(46vw, 560px);
+            background: var(--pos-lock-bar-bg); padding: 14px 16px; width: min(90vw, 560px);
+            max-height: 90dvh; overflow-y: auto; box-sizing: border-box;
         }
         .lock-bar-label {
             display: flex; align-items: center; gap: 7px; background: var(--pos-lock-pill); color: #fff;
@@ -378,9 +393,12 @@
         .pos-body.locked, .pos-header-right.locked-disabled { pointer-events: none; }
 
         /* ── Shared modal (weight stepper / variant picker) ── */
-        #itemModal { display: none; position: fixed; inset: 0; z-index: 400; background: rgba(26,47,30,0.45); align-items: center; justify-content: center; }
+        #itemModal { display: none; position: fixed; inset: 0; z-index: 400; background: rgba(26,47,30,0.45); align-items: center; justify-content: center; padding: 16px; }
         #itemModal.active { display: flex; }
-        .item-modal-card { background: var(--white); border-radius: 16px; padding: 24px; width: 100%; max-width: 360px; }
+        .item-modal-card {
+            background: var(--white); border-radius: 16px; padding: 24px; width: 100%; max-width: 360px;
+            max-height: 90vh; max-height: 90dvh; overflow-y: auto; box-sizing: border-box;
+        }
         .item-modal-card h3 { margin: 0 0 16px; font-family: 'Cormorant Garamond', serif; color: var(--forest); font-size: 1.25rem; text-align: center; }
         .item-modal-price { text-align: center; font-size: 1rem; font-weight: 700; color: var(--moss); margin-bottom: 16px; }
         .variant-option {
@@ -459,8 +477,8 @@
         #paymentBackdrop { display: none; position: fixed; inset: 0; background: rgba(26,47,30,0.35); z-index: 300; }
         #paymentBackdrop.active { display: block; }
         #paymentPanel {
-            position: fixed; top: 0; right: -420px; width: 400px; max-width: 92vw; height: 100vh; background: var(--white);
-            box-shadow: -6px 0 24px rgba(0,0,0,0.15); z-index: 310; transition: right 0.25s; padding: 22px;
+            position: fixed; top: 0; right: -420px; width: 400px; max-width: 92vw; height: 100vh; height: 100dvh; background: var(--white);
+            box-shadow: -6px 0 24px rgba(0,0,0,0.15); z-index: 310; transition: right 0.25s; padding: 22px; box-sizing: border-box;
             overflow-y: auto;
         }
         #paymentPanel.active { right: 0; }
@@ -495,6 +513,119 @@
             opacity: 0; pointer-events: none; transition: opacity 0.25s, transform 0.25s; z-index: 900;
         }
         #posToast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+        /* ── Mobile & tablet (<=1024px) ──
+           This page has no width-based layout below this point otherwise --
+           it's a fixed kiosk design (note the html/body overflow:hidden up
+           top). Below 1024px the header and the receipt view's combined
+           button/reminder/tax row (each a row of several fixed-width
+           columns: 90+110+100+130+110px before the flexible reminder-card
+           and tax-box even get a share) both exceed the viewport with no
+           wrap, so they clip or run off-screen -- this is the bulk of what
+           "boxes run off the screen" meant in practice. >=1025px (1280/
+           1440, "laptop") is completely untouched by this block; it keeps
+           exactly the original kiosk layout. The shopping (product grid)
+           and receipt (cart) screens are already two separate,
+           mutually-exclusive full-screen views (showShoppingView()/
+           showReceiptView(), toggled by tapping a category or the
+           "N items · Rs X" chip) -- that's the "product grid and cart
+           stack" requirement already satisfied by the existing
+           architecture; nothing new was needed for that specifically. */
+        @media (max-width: 1024px) {
+            .pos-header { flex-wrap: wrap; padding: 8px 14px; gap: 10px; }
+            .pos-clock { min-width: 72px; padding: 4px 9px; }
+            .pos-clock .pos-time { font-size: 1rem; }
+            .pos-brand img.logo { width: 36px; height: 36px; }
+            .pos-brand .brand-text h1 { font-size: 1.5rem; }
+            .pos-brand .brand-text span { font-size: 0.68rem; }
+            .pos-brand img.flag { width: 26px; }
+            .pos-header-divider { display: none; }
+            .pos-header-right { flex: 1 1 100%; justify-content: flex-start; text-align: left; gap: 10px; }
+            .pos-operator { min-width: 0; font-size: 1rem; }
+
+            .pos-content { padding: 6px 12px; }
+            .cat-row { padding: 6px 12px 8px; gap: 8px; }
+
+            /* The name column's 34% share was sized for the kiosk's wide
+               laptop table; on a narrow phone a long product name was
+               wrapping character-by-character ("Extr-a", "Heirl-oom") even
+               though overflow-wrap:anywhere only breaks mid-word when a
+               single word can't fit its own line at all -- the column was
+               genuinely that narrow once the row-number and row-remove
+               button columns took their share. Qty/price/total/tax are
+               all short values (numbers, "Rs X", "N.NNNkg") that don't
+               need their laptop-width share nearly as much, so this
+               reclaims room from them for the name column specifically. */
+            .receipt-table { grid-template-columns: 6% 46% 12% 11% 13% 12%; }
+
+            /* Safety net: if the combined row's wrapped/stacked content
+               still doesn't fit a short mobile viewport alongside the
+               cart table, the view scrolls instead of silently clipping
+               at the bottom (html/body are overflow:hidden globally).
+               .receipt-table-wrap's own overflow-y:auto (see its rule
+               above) still handles the common case on its own. */
+            #receiptView { overflow-y: auto; }
+
+            /* The combined row's five fixed-width button columns plus the
+               reminder card and tax box can no longer all sit in one
+               un-wrapped line -- let them wrap instead of clipping. Each
+               column keeps a sane minimum width via flex-basis so buttons
+               stay tappable, but no longer insists on its exact
+               kiosk-width pixel value.
+
+               Found by testing: simply letting this row wrap, with
+               nothing else changed, grows it so tall (5+ stacked button
+               groups plus the reminder card plus the full tax box) that
+               it squeezes .receipt-table-row -- the actual cart -- down
+               to 0 height, since that row only has flex:1 of whatever's
+               left after this flex-shrink:0 row takes what it wants. Two
+               changes fix that together: .receipt-table-row gets an
+               explicit min-height so the cart itself can never be
+               squeezed away, and `order` puts the tax box + Pay button
+               FIRST in this row (right after the cart, before Logout/
+               reminder/Low-Stock/Repay/Offers) so "the total and the Pay
+               button stay reachable without scrolling" even though the
+               rest of this row may now need a scroll to reach. */
+            .receipt-table-row { min-height: 230px; }
+            .receipt-combined-row { flex-wrap: wrap; }
+            .tax-box { order: 1; flex: 1 1 100%; min-width: 0; }
+            .payment-col { order: 2; width: auto; flex: 1 1 100%; }
+            .logout-col, .stock-col, .repay-col, .offers-col {
+                order: 3; width: auto; flex: 1 1 45%; min-width: 90px;
+            }
+            .reminder-card { order: 4; flex: 1 1 100%; min-width: 0; }
+
+            .shop-search-wrap { min-width: 0; }
+
+            /* iOS zooms the whole page on focusing any input/select/textarea
+               with a computed font-size under 16px -- every one of these
+               was set below that threshold for the kiosk's tighter laptop
+               layout; bump them back up only in this mobile/tablet band so
+               the laptop look is unaffected. */
+            .shop-search-wrap input, .tax-box .coupon-row input, .lock-bar input,
+            .repay-search-input, #repayAmountInput, .pay-method-row input,
+            .new-customer-form input, .restock-origin-row input {
+                font-size: 16px;
+            }
+
+            /* Same 44px minimum the existing (hover:none)and(pointer:coarse)
+               query already guarantees on real touch devices, applied by
+               WIDTH here too -- a desktop browser window narrowed to a
+               mobile/tablet size (exactly how this was verified) has a
+               mouse pointer, not a touch one, so that query alone wouldn't
+               catch it, but the small-screen tap-target need is the same
+               either way. */
+            .side-btn, .cat-card, .row-remove, .qty-cell, .pager-btn,
+            #lockEnterBtn, #completeSaleBtn, #openPaymentBtn, #openRepayBtn {
+                min-height: 44px;
+            }
+            .row-remove { min-width: 32px; min-height: 32px; }
+        }
+
+        @media (max-width: 480px) {
+            .pos-brand .brand-text span { display: none; }
+            .pos-clock { min-width: 0; }
+        }
 
         /* ── Tablet landscape: shorter viewport heights need every row of
            chrome (header, category row, combined row, table rows) to give
@@ -2343,7 +2474,13 @@
                     <td>${start + i + 1}</td>
                     <td class="name-cell">
                         <div class="name-cell-row">
-                            <div>${line.name}<br><span style="font-size:0.88rem;color:var(--text-muted);">${line.detail}</span>${belowCostNote ? `<br><span style="font-size:0.82rem;color:var(--pos-enter-orange);font-weight:700;">⚠ ${belowCostNote}</span>` : ''}</div>
+                            <div class="name-cell-text">
+                                <div class="cart-line-name">${line.name}</div>
+                                <div class="cart-line-detail-row">
+                                    <span class="cart-line-detail">${line.detail}</span>
+                                    ${belowCostNote ? `<span class="cart-line-note" title="${belowCostNote}">⚠ ${belowCostNote}</span>` : ''}
+                                </div>
+                            </div>
                             <button type="button" class="row-remove" data-i="${start + i}" title="Remove"><i class="fas fa-times"></i></button>
                         </div>
                     </td>
