@@ -259,3 +259,25 @@ def list_batches():
             'revenue': report['revenue'], 'profit_to_date': report['profit_to_date'],
         })
     return rows
+
+
+def next_batch_cost_per_kg(product):
+    """The cost_per_kg of the oldest CropBatch (open or closed) for this
+    product that still has unsold stock -- i.e. whichever batch
+    _fifo_simulate() would actually draw from next. None when this
+    product has no batch at all, every batch is fully consumed, or the
+    next batch in line has 0 harvested_kg (cost_per_kg undefined).
+
+    Used by the POS's below-direct-cost warning (templates/pos.html, via
+    shop/views.py's pos_view) -- deliberately calls build_batch_report()
+    rather than re-deriving cost_per_kg a second way, so there is only
+    ever one place that formula lives."""
+    pool_order = _fifo_pool_order(product)
+    batch_codes = [code for code in pool_order if code]  # drop '' (unbatched stock)
+    if not batch_codes:
+        return None
+    pools, _, _, _ = _fifo_simulate(product, pool_order)
+    for code in batch_codes:  # already start_date-ordered by _fifo_pool_order
+        if pools.get(code, ZERO) > 0:
+            return build_batch_report(code)['cost_per_kg']
+    return None

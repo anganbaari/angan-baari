@@ -59,7 +59,12 @@ var POS_QUEUE_STORE = 'queuedSales';
 // the mode you'd switch TO, not the one you're in) -- an installed POS
 // app cold-starting offline on the old v5 shell would otherwise keep
 // showing the old always-"Wholesale" label.
-var POS_SHELL_CACHE = 'pos-shell-v6';
+// v6 -> v7: the below-direct-cost warning (pos.html's lineBelowCostNote(),
+// renderReceipt()) -- an installed POS app cold-starting offline on the
+// old v6 shell would otherwise never show it, and PRODUCTS wouldn't carry
+// cost_per_kg at all since that's baked into the server-rendered payload
+// at page-load time, not fetched separately.
+var POS_SHELL_CACHE = 'pos-shell-v7';
 var POS_META_STORE = 'meta';
 var POS_OFFLINE_PIN_STORE = 'offlineOperators';
 var POS_CREDIT_CUSTOMER_STORE = 'creditCustomers';

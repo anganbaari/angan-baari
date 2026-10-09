@@ -192,10 +192,20 @@ function renderBsGrid() {
 }
 
 function highlightBsGridForCurrentRange() {
-    if (!state.start) return;
-    const startBs = BsCalendar.adToBs(new Date(state.start + 'T00:00:00Z'));
+    // Highlights by the range's END, not its start -- every preset that
+    // means "up to now" (today/last7/last30/thismonth/thisbsyear/
+    // fiscalyear) sets end to today, so this lands on the same B.S. month
+    // the header chip shows. Highlighting by start instead (the original
+    // bug) means last30's start (today minus 29 days) lands in the
+    // PREVIOUS B.S. month on most days of the month, which is what made
+    // the sidebar disagree with the always-correct header chip. A
+    // same-month range (lastmonth, or clicking a month in this very grid)
+    // has start and end in the same B.S. month either way, so this is
+    // unchanged for those.
+    if (!state.end) return;
+    const endBs = BsCalendar.adToBs(new Date(state.end + 'T00:00:00Z'));
     document.querySelectorAll('.dash-bsgrid-month').forEach((btn) => {
-        btn.classList.toggle('active', startBs.year === bsGridYear && parseInt(btn.dataset.month, 10) === startBs.month);
+        btn.classList.toggle('active', endBs.year === bsGridYear && parseInt(btn.dataset.month, 10) === endBs.month);
     });
 }
 

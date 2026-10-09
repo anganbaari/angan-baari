@@ -2180,6 +2180,38 @@
             return line.line_total * VAT_RATE;
         }
 
+        // Below-direct-cost warning (season/batch costing, shop/batch_report.py).
+        // WARNING ONLY -- never blocks or alters a sale, never sent to the
+        // server (the sale payload is completely unchanged by this).
+        //
+        // Only ever compares for a 'variable_weight' line whose product's
+        // weight_unit_label is literally "kg" -- that is the ONE pricing
+        // shape where unit_price is unambiguously already "Rs per kg" with
+        // no conversion needed (see Product.weight_unit_label's own
+        // help_text: "The price field is always per ONE of this unit").
+        // Every other shape is skipped, deliberately, rather than guessed at:
+        //   - fixed_weight (goat/chicken): priced as one whole animal, no
+        //     per-kg rate exists to compare against at all.
+        //   - fixed_quantity (jars/pieces/dozens): price is per PIECE, not
+        //     per kg -- price_unit is a free-text display label only (e.g.
+        //     "per 250 gram") and was never meant to be parsed back into a
+        //     real weight, so this is not treated as a safe conversion.
+        //   - variable_weight with a non-kg weight_unit_label (e.g. banana
+        //     sold "per dozen"): line.weight is dozens, not kilograms, so
+        //     line.unit_price is Rs per dozen, not Rs per kg.
+        // Works identically for a wholesale price_override -- that's still
+        // just line.unit_price, recomputed by applyPriceOverrideToLine()
+        // and re-rendered through this same function on every cart change.
+        function lineBelowCostNote(line) {
+            if (line.pricing_mode !== 'variable_weight') return null;
+            const product = PRODUCTS.find(p => p.id === line.product_id);
+            if (!product || product.cost_per_kg == null) return null;
+            if ((product.weight_unit_label || 'kg').trim().toLowerCase() !== 'kg') return null;
+            const costPerKg = parseFloat(product.cost_per_kg);
+            if (!isFinite(costPerKg) || line.unit_price >= costPerKg) return null;
+            return `Below direct cost: Rs ${formatMoney(line.unit_price)}/kg vs cost Rs ${formatMoney(costPerKg)}/kg`;
+        }
+
         function round2(n) {
             return Math.round(n * 100) / 100;
         }
@@ -2304,12 +2336,14 @@
             const start = receiptPage * RECEIPT_PAGE_SIZE;
             const pageLines = cart.slice(start, start + RECEIPT_PAGE_SIZE);
 
-            let rowsHtml = pageLines.map((line, i) => `
+            let rowsHtml = pageLines.map((line, i) => {
+                const belowCostNote = lineBelowCostNote(line);
+                return `
                 <tr>
                     <td>${start + i + 1}</td>
                     <td class="name-cell">
                         <div class="name-cell-row">
-                            <div>${line.name}<br><span style="font-size:0.88rem;color:var(--text-muted);">${line.detail}</span></div>
+                            <div>${line.name}<br><span style="font-size:0.88rem;color:var(--text-muted);">${line.detail}</span>${belowCostNote ? `<br><span style="font-size:0.82rem;color:var(--pos-enter-orange);font-weight:700;">⚠ ${belowCostNote}</span>` : ''}</div>
                             <button type="button" class="row-remove" data-i="${start + i}" title="Remove"><i class="fas fa-times"></i></button>
                         </div>
                     </td>
@@ -2317,8 +2351,8 @@
                     <td class="qty-cell" data-i="${start + i}" title="Tap to change">${qtyCellDisplay(line)} <i class="fas fa-pen qty-edit-icon"></i></td>
                     <td>Rs. ${formatMoney(line.line_total)}</td>
                     <td>Rs. ${formatMoney(lineTax(line))}</td>
-                </tr>`
-            ).join('');
+                </tr>`;
+            }).join('');
             for (let i = pageLines.length; i < RECEIPT_PAGE_SIZE; i++) {
                 rowsHtml += '<tr class="receipt-blank-row"><td></td><td></td><td></td><td></td><td></td><td></td></tr>';
             }

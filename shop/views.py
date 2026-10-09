@@ -1358,7 +1358,8 @@ def pos_view(request):
     """The shop POS screen. Staff-only (Django's own is_staff flag — same
     login as admin, no separate token/auth system needed)."""
     import json
-    from .models import BusinessSettings, Category, Product, POSSale
+    from . import batch_report
+    from .models import BusinessSettings, Category, CropBatch, Product, POSSale
 
     def top_level_category(category):
         # The POS category row shows broad groups (Fruits, Vegetables, ...),
@@ -1369,8 +1370,15 @@ def pos_view(request):
         return category
 
     products = Product.objects.filter(is_available=True).select_related('category', 'category__parent')
+    # Below-direct-cost warning (season/batch costing) -- staff-only, see
+    # pos_view's own return value below. One query up front for which
+    # products even have a CropBatch at all, so the FIFO walk in
+    # batch_report.next_batch_cost_per_kg() only ever runs for those,
+    # not for every product on the screen.
+    products_with_batches = set(CropBatch.objects.values_list('product_id', flat=True).distinct())
     products_data = []
     for p in products:
+        cost_per_kg = batch_report.next_batch_cost_per_kg(p) if p.id in products_with_batches else None
         entry = {
             'id': p.id,
             'name': p.name,
@@ -1387,6 +1395,14 @@ def pos_view(request):
             # taxable/exempt split for a live tax-box preview while
             # shopping, before any POSSale row exists to read it from.
             'is_taxable': p.is_taxable,
+            # Season/batch costing's below-direct-cost warning -- staff-
+            # only (this whole view is @staff_member_required), never
+            # added to the public shop/offers pages or the public API
+            # (api/serializers.py's ProductSerializer has no such field).
+            # None whenever this product has no batch, or the batch FIFO
+            # would draw from next has 0 harvested_kg -- see
+            # batch_report.next_batch_cost_per_kg()'s own docstring.
+            'cost_per_kg': str(cost_per_kg) if cost_per_kg is not None else None,
         }
         if p.pricing_mode == 'fixed_weight':
             entry['variants'] = [

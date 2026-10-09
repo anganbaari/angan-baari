@@ -18,7 +18,7 @@ from rest_framework import status
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
 
-from .batch_report import BatchReportError, build_batch_report, list_batches
+from .batch_report import BatchReportError, build_batch_report, list_batches, next_batch_cost_per_kg
 from .models import (
     Category, CostCentreProduct, CostEntry, CropBatch, InventoryMovement, POSSale, Product, ProductVariant,
 )
@@ -523,3 +523,137 @@ class BuildBatchReportTests(TestCase):
         rows = list_batches()
         self.assertEqual(len(rows), 1)
         self.assertEqual(set(rows[0]), {'code', 'name', 'status', 'total_cost', 'harvested_kg', 'cost_per_kg', 'revenue', 'profit_to_date'})
+
+
+class NextBatchCostPerKgTests(TestCase):
+    """shop/batch_report.py's next_batch_cost_per_kg() -- the POS's
+    below-direct-cost warning reads this per product. Null cases, and
+    picking the correct batch across a FIFO transition, are the two
+    things the brief asked to be tested explicitly."""
+
+    def setUp(self):
+        self.category = Category.objects.create(name='Next Batch Cost Test', order=1)
+        self.operator = User.objects.create_user('nextcostop', password='pw')
+
+    def test_no_batch_at_all_is_null(self):
+        product = Product.objects.create(
+            name='No Batch Product', slug='no-batch-product', category=self.category, description='t',
+            price=Decimal('100'), pricing_mode='variable_weight', origin='farm',
+        )
+        self.assertIsNone(next_batch_cost_per_kg(product))
+
+    def test_batch_exists_but_zero_harvest_is_null(self):
+        product = Product.objects.create(
+            name='Zero Harvest Product', slug='zero-harvest-product', category=self.category, description='t',
+            price=Decimal('100'), pricing_mode='variable_weight', origin='farm',
+        )
+        CropBatch.objects.create(code='zh-1', abms_id='zh1', cost_centre='crop:zeroharvest', product=product, start_date=date(2026, 1, 1))
+        CostEntry.objects.create(abms_id='zhc1', date=date(2026, 1, 1), amount=Decimal('500'), cost_centre='crop:zeroharvest', category='seeds', batch_code='zh-1')
+        # No harvest movement at all -- the batch exists but has 0 harvested_kg,
+        # so pools['zh-1'] never rises above 0 and next_batch_cost_per_kg
+        # correctly finds no batch with unsold stock to report a rate for.
+        self.assertIsNone(next_batch_cost_per_kg(product))
+
+    def test_fifo_picks_the_batch_still_holding_stock(self):
+        product = Product.objects.create(
+            name='FIFO Cost Product', slug='fifo-cost-product', category=self.category, description='t',
+            price=Decimal('100'), pricing_mode='variable_weight', weight_step=Decimal('0.5'), origin='farm',
+        )
+        CropBatch.objects.create(code='fcp-a', abms_id='fcpa1', cost_centre='crop:fifocost', product=product, start_date=date(2026, 1, 1))
+        CropBatch.objects.create(code='fcp-b', abms_id='fcpb1', cost_centre='crop:fifocost', product=product, start_date=date(2026, 2, 1))
+        CostEntry.objects.create(abms_id='fcpac1', date=date(2026, 1, 1), amount=Decimal('5000'), cost_centre='crop:fifocost', category='fert', batch_code='fcp-a')
+        CostEntry.objects.create(abms_id='fcpbc1', date=date(2026, 2, 1), amount=Decimal('9000'), cost_centre='crop:fifocost', category='fert', batch_code='fcp-b')
+
+        m1 = InventoryMovement.objects.create(product=product, movement_type='harvest', source='admin', quantity=Decimal('100'), batch_code='fcp-a')
+        InventoryMovement.objects.filter(id=m1.id).update(created_at=djtz.make_aware(djtz.datetime(2026, 1, 2, 8, 0, 0)))
+        m2 = InventoryMovement.objects.create(product=product, movement_type='harvest', source='admin', quantity=Decimal('100'), batch_code='fcp-b')
+        InventoryMovement.objects.filter(id=m2.id).update(created_at=djtz.make_aware(djtz.datetime(2026, 2, 2, 8, 0, 0)))
+
+        self.assertEqual(next_batch_cost_per_kg(product), Decimal('50.00'))  # 5000/100, batch A still has stock
+
+        sale, _ = create_pos_sale(
+            client_sale_id=str(uuid.uuid4()), cart=[{'product_id': product.id, 'qty': 1, 'weight': '100.00'}],
+            payments=[{'method': 'cash', 'amount': '10000.00'}], operator_user=self.operator,
+        )
+        POSSale.objects.filter(id=sale.id).update(created_at=djtz.make_aware(djtz.datetime(2026, 1, 10, 8, 0, 0)))
+
+        self.assertEqual(next_batch_cost_per_kg(product), Decimal('90.00'))  # 9000/100, batch A now fully sold
+
+
+class PosViewCostPerKgTests(TestCase):
+    """pos_view's embedded PRODUCTS payload -- cost_per_kg present/null
+    correctly, and never present on the public product endpoints."""
+
+    def setUp(self):
+        self.category = Category.objects.create(name='Pos View Cost Test', order=1)
+        self.staff = User.objects.create_user('poscostviewstaff', password='pw', is_staff=True)
+        self.client.login(username='poscostviewstaff', password='pw')
+
+    def _products_payload(self):
+        import json
+        response = self.client.get(reverse('pos'))
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode('utf-8')
+        marker = 'id="posProductsData"'
+        start = content.index(marker)
+        json_start = content.index('>', start) + 1
+        json_end = content.index('</script>', json_start)
+        return json.loads(content[json_start:json_end])
+
+    def test_product_with_no_batch_has_null_cost_per_kg(self):
+        Product.objects.create(
+            name='No Batch Pos Product', slug='no-batch-pos-product', category=self.category, description='t',
+            price=Decimal('100'), pricing_mode='variable_weight', origin='farm', is_available=True,
+        )
+        products = self._products_payload()
+        entry = next(p for p in products if p['name'] == 'No Batch Pos Product')
+        self.assertIsNone(entry['cost_per_kg'])
+
+    def test_product_with_fifo_eligible_batch_has_matching_cost_per_kg(self):
+        product = Product.objects.create(
+            name='Fifo Pos Product', slug='fifo-pos-product', category=self.category, description='t',
+            price=Decimal('100'), pricing_mode='variable_weight', origin='farm', is_available=True,
+        )
+        CropBatch.objects.create(code='fpp-1', abms_id='fpp1', cost_centre='crop:fifopos', product=product, start_date=date(2026, 1, 1))
+        CostEntry.objects.create(abms_id='fppc1', date=date(2026, 1, 1), amount=Decimal('5000'), cost_centre='crop:fifopos', category='fert', batch_code='fpp-1')
+        InventoryMovement.objects.create(product=product, movement_type='harvest', source='admin', quantity=Decimal('100'), batch_code='fpp-1')
+
+        products = self._products_payload()
+        entry = next(p for p in products if p['name'] == 'Fifo Pos Product')
+        self.assertEqual(entry['cost_per_kg'], '50.00')
+
+    def test_cost_per_kg_absent_from_public_product_list_endpoint(self):
+        product = Product.objects.create(
+            name='Public Endpoint Product', slug='public-endpoint-product', category=self.category, description='t',
+            price=Decimal('100'), pricing_mode='variable_weight', origin='farm', is_available=True,
+        )
+        CropBatch.objects.create(code='pep-1', abms_id='pep1', cost_centre='crop:publicendpoint', product=product, start_date=date(2026, 1, 1))
+        CostEntry.objects.create(abms_id='pepc1', date=date(2026, 1, 1), amount=Decimal('5000'), cost_centre='crop:publicendpoint', category='fert', batch_code='pep-1')
+        InventoryMovement.objects.create(product=product, movement_type='harvest', source='admin', quantity=Decimal('100'), batch_code='pep-1')
+
+        response = self.client.get(reverse('v1_product_list'))
+        self.assertEqual(response.status_code, 200)
+        entry = next(p for p in response.data['results'] if p['name'] == 'Public Endpoint Product')
+        self.assertNotIn('cost_per_kg', entry)
+
+        detail_response = self.client.get(reverse('v1_product_detail', args=[product.id]))
+        self.assertNotIn('cost_per_kg', detail_response.data)
+
+    def test_pos_sale_flow_is_unaffected(self):
+        # No batch/cost data involved at all -- confirms Task B's changes
+        # (pos_view, templates/pos.html, batch_report.py) don't touch the
+        # sale-creation path in any way. The sale payload itself (what
+        # templates/pos.html's completeSaleBtn sends) was never changed --
+        # this exercises the same server-side entry point it posts to.
+        product = Product.objects.create(
+            name='Sale Flow Product', slug='sale-flow-product', category=self.category, description='t',
+            price=Decimal('200'), pricing_mode='fixed_quantity', origin='farm', is_available=True,
+        )
+        InventoryMovement.objects.create(product=product, movement_type='harvest', source='admin', quantity=Decimal('10'))
+        sale, created = create_pos_sale(
+            client_sale_id=str(uuid.uuid4()), cart=[{'product_id': product.id, 'qty': 2}],
+            payments=[{'method': 'cash', 'amount': '400.00'}], operator_user=self.staff,
+        )
+        self.assertTrue(created)
+        self.assertEqual(sale.total_amount, Decimal('400.00'))
+        self.assertEqual(sale.lines.get().quantity, Decimal('2'))
