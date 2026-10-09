@@ -514,6 +514,80 @@ class BuildBatchReportTests(TestCase):
         self.assertEqual(report_b['remaining_kg'], Decimal('80.000'))
         self.assertEqual(report_b['revenue'], Decimal('2000.00'))  # 20kg@100
 
+    def test_adjustment_remove_consumes_fifo_stock_like_waste(self):
+        # The exact scenario from the brief: harvest 10, sale 1, then an
+        # adjustment_remove of 9 -- the batch should show 0 unsold, not 9
+        # (which is what it showed before this fix, since adjustment_remove
+        # wasn't consumed by the FIFO walk at all).
+        tomato = Product.objects.create(
+            name='Adj Tomato', slug='adj-tomato-formal', category=self.category, description='t',
+            price=Decimal('100'), pricing_mode='variable_weight', weight_step=Decimal('0.5'), origin='farm',
+        )
+        CropBatch.objects.create(code='adjr-1', abms_id='adjr1', cost_centre='crop:tomato', product=tomato, start_date=date(2026, 1, 1))
+        CostEntry.objects.create(abms_id='adjrc1', date=date(2026, 1, 1), amount=Decimal('500.00'), cost_centre='crop:tomato', category='fert', batch_code='adjr-1')
+        InventoryMovement.objects.create(product=tomato, movement_type='harvest', source='admin', quantity=Decimal('10'), batch_code='adjr-1')
+
+        sale, _ = create_pos_sale(
+            client_sale_id=str(uuid.uuid4()), cart=[{'product_id': tomato.id, 'qty': 1, 'weight': '1.00'}],
+            payments=[{'method': 'cash', 'amount': '100.00'}], operator_user=self.operator,
+        )
+        InventoryMovement.objects.create(product=tomato, movement_type='adjustment_remove', source='admin', quantity=Decimal('9'))
+
+        report = build_batch_report('adjr-1')
+        self.assertEqual(report['sold_kg'], Decimal('1.000'))
+        self.assertEqual(report['waste_kg'], Decimal('9.000'))  # the adjustment_remove, folded into waste
+        self.assertEqual(report['remaining_kg'], Decimal('0.000'))
+        # cost_per_kg = 500/10 = 50 -- the removed 9kg is a real loss at that rate.
+        self.assertEqual(report['waste_loss'], Decimal('450.00'))
+        self.assertEqual(report['remaining_value'], Decimal('0.00'))
+        self.assertEqual(report['cost_of_sold'], Decimal('50.00'))
+        self.assertEqual(report['profit_to_date'], Decimal('-400.00'))  # 100 revenue - 50 cost_of_sold - 450 waste_loss
+
+    def test_next_batch_cost_per_kg_skips_batch_emptied_by_adjustment(self):
+        tomato = Product.objects.create(
+            name='Adj Skip Tomato', slug='adj-skip-tomato', category=self.category, description='t',
+            price=Decimal('100'), pricing_mode='variable_weight', weight_step=Decimal('0.5'), origin='farm',
+        )
+        CropBatch.objects.create(code='adjs-a', abms_id='adjsa1', cost_centre='crop:tomato', product=tomato, start_date=date(2026, 1, 1))
+        CropBatch.objects.create(code='adjs-b', abms_id='adjsb1', cost_centre='crop:tomato', product=tomato, start_date=date(2026, 2, 1))
+        CostEntry.objects.create(abms_id='adjsac1', date=date(2026, 1, 1), amount=Decimal('500'), cost_centre='crop:tomato', category='fert', batch_code='adjs-a')
+        CostEntry.objects.create(abms_id='adjsbc1', date=date(2026, 2, 1), amount=Decimal('900'), cost_centre='crop:tomato', category='fert', batch_code='adjs-b')
+
+        m1 = InventoryMovement.objects.create(product=tomato, movement_type='harvest', source='admin', quantity=Decimal('10'), batch_code='adjs-a')
+        InventoryMovement.objects.filter(id=m1.id).update(created_at=djtz.make_aware(djtz.datetime(2026, 1, 2, 8, 0, 0)))
+        m2 = InventoryMovement.objects.create(product=tomato, movement_type='harvest', source='admin', quantity=Decimal('10'), batch_code='adjs-b')
+        InventoryMovement.objects.filter(id=m2.id).update(created_at=djtz.make_aware(djtz.datetime(2026, 2, 2, 8, 0, 0)))
+
+        self.assertEqual(next_batch_cost_per_kg(tomato), Decimal('50.00'))  # batch A still has stock
+
+        sale, _ = create_pos_sale(
+            client_sale_id=str(uuid.uuid4()), cart=[{'product_id': tomato.id, 'qty': 1, 'weight': '1.00'}],
+            payments=[{'method': 'cash', 'amount': '100.00'}], operator_user=self.operator,
+        )
+        InventoryMovement.objects.create(product=tomato, movement_type='adjustment_remove', source='admin', quantity=Decimal('9'))
+
+        # batch A is now fully emptied (1 sold + 9 adjusted away = all 10kg) --
+        # next_batch_cost_per_kg must skip it and report batch B's rate.
+        self.assertEqual(next_batch_cost_per_kg(tomato), Decimal('90.00'))
+
+    def test_no_adjustments_gives_unchanged_numbers(self):
+        # Same build_batch_report() scenario as test_cost_per_kg_arithmetic,
+        # with zero adjustment_remove movements -- confirms adding
+        # 'adjustment_remove' to CONSUMING_TYPES doesn't change anything
+        # for a batch that never has one.
+        tomato = Product.objects.create(
+            name='No Adj Tomato', slug='no-adj-tomato', category=self.category, description='t',
+            price=Decimal('100'), pricing_mode='variable_weight', origin='farm',
+        )
+        CropBatch.objects.create(code='noadj-1', abms_id='noadj1', cost_centre='crop:tomato', product=tomato, start_date=date(2026, 1, 1))
+        CostEntry.objects.create(abms_id='noadjc1', date=date(2026, 1, 5), amount=Decimal('9800.00'), cost_centre='crop:tomato', category='fertilizer', batch_code='noadj-1')
+        InventoryMovement.objects.create(product=tomato, movement_type='harvest', source='admin', quantity=Decimal('200'), batch_code='noadj-1')
+        report = build_batch_report('noadj-1')
+        self.assertEqual(report['cost_per_kg'], Decimal('49.00'))
+        self.assertEqual(report['sold_kg'], Decimal('0'))
+        self.assertEqual(report['waste_kg'], Decimal('0'))
+        self.assertEqual(report['remaining_kg'], Decimal('200'))
+
     def test_list_batches_includes_summary_fields(self):
         tomato = Product.objects.create(
             name='List Tomato', slug='list-tomato', category=self.category, description='t',

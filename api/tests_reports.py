@@ -876,3 +876,44 @@ class ReportBatchViewTests(ReportsTestBase):
         self.assertEqual(response.status_code, 200)
         codes = [b['code'] for b in response.data['batches']]
         self.assertIn('reports-batch-1', codes)
+
+    def test_csv_export_matches_json_including_adjustment_remove_loss(self):
+        from shop.models import CostEntry, CropBatch, InventoryMovement, Product
+        from shop.views import create_pos_sale
+
+        product = Product.objects.create(
+            name='Batch CSV Tomato', slug='batch-csv-tomato', category=self.category, description='t',
+            price=Decimal('100'), pricing_mode='variable_weight', weight_step=Decimal('0.5'), origin='farm',
+        )
+        batch = CropBatch.objects.create(
+            code='csv-adjr-1', abms_id='csvadjr1', cost_centre='crop:batchcsvtomato',
+            product=product, start_date=date(2026, 1, 1), status='open',
+        )
+        CostEntry.objects.create(
+            abms_id='csvadjrc1', date=date(2026, 1, 1), amount=Decimal('500.00'),
+            cost_centre='crop:batchcsvtomato', category='fert', batch_code='csv-adjr-1',
+        )
+        InventoryMovement.objects.create(
+            product=product, movement_type='harvest', source='admin', quantity=Decimal('10'), batch_code='csv-adjr-1',
+        )
+        create_pos_sale(
+            client_sale_id=str(uuid.uuid4()), cart=[{'product_id': product.id, 'qty': 1, 'weight': '1.00'}],
+            payments=[{'method': 'cash', 'amount': '100.00'}], operator_user=self.staff,
+        )
+        InventoryMovement.objects.create(product=product, movement_type='adjustment_remove', source='admin', quantity=Decimal('9'))
+
+        self.client.login(username='owner1', password='pw')
+        json_response = self.client.get(reverse('v1_report_batch_detail', args=[batch.code]))
+        self.assertEqual(json_response.status_code, 200)
+        self.assertEqual(json_response.data['waste_kg'], 9.0)
+        self.assertEqual(json_response.data['waste_loss'], 450.0)
+
+        csv_response = self.client.get(reverse('v1_report_batch_detail', args=[batch.code]), {'export': 'csv'})
+        self.assertEqual(csv_response.status_code, 200)
+        content = csv_response.content.decode('utf-8-sig')
+        reader = csv.DictReader(io.StringIO(content))
+        rows = list(reader)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(Decimal(rows[0]['waste_kg']), Decimal(str(json_response.data['waste_kg'])))
+        self.assertEqual(Decimal(rows[0]['waste_loss']), Decimal(str(json_response.data['waste_loss'])))
+        self.assertEqual(Decimal(rows[0]['profit_to_date']), Decimal(str(json_response.data['profit_to_date'])))

@@ -22,13 +22,23 @@ its return value, and the Monthly P&L tab for the fuller picture.
 THE FIFO ASSUMPTION (brief's own wording, repeated here since it drives
 every sold_kg/waste_kg/revenue number below): for this batch's product,
 every CropBatch sharing that product is ordered by start_date; every
-'sale' and 'waste' InventoryMovement for that product (in chronological
-order) consumes stock from the OLDEST pool that still has any -- harvest
-stock with no batch_code at all (pre-dating batch tracking for this crop)
-is one single pool, always consumed before any real batch. This is a
-MODELLED attribution recomputed fresh on every call -- it is never stored
-on any row, and a product with no batch mapped at all skips this section
-entirely (see 'product' in the returned 'batch' dict).
+'sale', 'waste', and 'adjustment_remove' InventoryMovement for that
+product (in chronological order) consumes stock from the OLDEST pool
+that still has any -- harvest stock with no batch_code at all (pre-dating
+batch tracking for this crop) is one single pool, always consumed before
+any real batch. This is a MODELLED attribution recomputed fresh on every
+call -- it is never stored on any row, and a product with no batch
+mapped at all skips this section entirely (see 'product' in the returned
+'batch' dict).
+
+'adjustment_remove' (a stock count correction, e.g. spoilage found during
+a recount, or a counting error) is folded into the SAME waste_kg/
+waste_loss figures 'waste' movements produce, not a separate field -- a
+kg removed this way is a real loss at that batch's own cost_per_kg, same
+as waste, just discovered a different way. It contributes zero revenue,
+exactly like waste. 'adjustment_add' and 'return' (the two INCREASE-type
+counterparts) are deliberately NOT given symmetrical handling here --
+see next_batch_cost_per_kg()'s own note on why.
 
 Revenue for a sold quantity uses POSSaleLine.line_total scaled by the
 sale's own coupon discount (post-discount, excl. VAT) -- the exact same
@@ -51,7 +61,13 @@ from .reports import ZERO
 from .models import CostEntry, CropBatch, InventoryMovement
 
 CENT = Decimal('0.01')
-CONSUMING_TYPES = ('sale', 'waste')
+# 'adjustment_remove' (a stock-count correction) reduces real stock exactly
+# like 'waste' does, so it must consume from the FIFO pools too -- without
+# it here, a batch could show unsold kg that was actually already removed
+# from stock by an adjustment, and next_batch_cost_per_kg() could then pick
+# a stale, already-emptied batch. See this module's own docstring for why
+# 'adjustment_add'/'return' are NOT given the symmetrical treatment.
+CONSUMING_TYPES = ('sale', 'waste', 'adjustment_remove')
 
 
 class BatchReportError(Exception):
@@ -111,10 +127,12 @@ def _fifo_pool_order(product):
 
 
 def _fifo_simulate(product, pool_order):
-    """Walks every harvest/sale/waste InventoryMovement for `product` in
-    chronological order, maintaining a running stock balance per pool
-    (pool key = batch_code, '' for unbatched). Returns four {pool_key:
-    Decimal} dicts: remaining balance, kg sold, kg wasted, revenue."""
+    """Walks every harvest/sale/waste/adjustment_remove InventoryMovement
+    for `product` in chronological order, maintaining a running stock
+    balance per pool (pool key = batch_code, '' for unbatched). Returns
+    four {pool_key: Decimal} dicts: remaining balance, kg sold, kg
+    wasted (waste + adjustment_remove, folded together -- see
+    CONSUMING_TYPES above), revenue."""
     pools = {code: ZERO for code in pool_order}
     sold_by_pool = {code: ZERO for code in pool_order}
     waste_by_pool = {code: ZERO for code in pool_order}
@@ -148,7 +166,7 @@ def _fifo_simulate(product, pool_order):
             if m.movement_type == 'sale':
                 sold_by_pool[pool_key] += take
                 revenue_by_pool[pool_key] += take * rate
-            else:
+            else:  # 'waste' or 'adjustment_remove' -- same loss treatment, no revenue either way
                 waste_by_pool[pool_key] += take
         # Any `remaining` left over here means this product's ledger has
         # somehow sold/wasted more than was ever harvested -- shouldn't be
@@ -187,6 +205,9 @@ def build_batch_report(code):
         "first, then each of this product's batches in order of its own start_date. "
         "Website-channel sales consume stock but contribute no revenue (ProductOrder has "
         "no stored price, same exclusion as the Monthly P&L).",
+        "waste_kg/waste_loss include stock-count removals (movement_type=adjustment_remove) "
+        "as well as actual waste -- a kg removed by a stock correction is a real loss at "
+        "this batch's cost_per_kg, not a vanished cost, so it's counted the same way.",
     ]
 
     sold_kg = waste_kg = remaining_kg = revenue = None
@@ -271,7 +292,18 @@ def next_batch_cost_per_kg(product):
     Used by the POS's below-direct-cost warning (templates/pos.html, via
     shop/views.py's pos_view) -- deliberately calls build_batch_report()
     rather than re-deriving cost_per_kg a second way, so there is only
-    ever one place that formula lives."""
+    ever one place that formula lives. Correctly skips a batch whose
+    stock was fully removed by adjustment_remove movements, not just by
+    sale/waste, since pools[code] here comes from the same _fifo_simulate()
+    that now consumes adjustment_remove too (see CONSUMING_TYPES).
+
+    NOT given symmetrical treatment: 'adjustment_add' and 'return' (the
+    two INCREASE-type counterparts of adjustment_remove/waste). Both
+    would need a batch_code to say which pool the stock credit belongs
+    to, and neither carries one (unlike harvest, which always does) --
+    there is no principled way to guess which batch a found-during-recount
+    kg, or a returned sale, should be credited back to. Left unhandled
+    rather than guessed at; flagged here rather than silently ignored."""
     pool_order = _fifo_pool_order(product)
     batch_codes = [code for code in pool_order if code]  # drop '' (unbatched stock)
     if not batch_codes:
