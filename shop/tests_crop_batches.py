@@ -10,6 +10,7 @@ from datetime import date
 from decimal import Decimal
 
 from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone as djtz
@@ -255,6 +256,110 @@ class InventoryMovementBatchCodeTests(TestCase):
             'quantity': '1', 'batch_code': 'tomato-2026-01',
         }, format='json')
         self.assertEqual(response.status_code, 400)
+
+    # ── 4A: product becomes optional when batch_code resolves it ────────
+
+    def test_product_omitted_with_batch_is_resolved_from_batch_product(self):
+        response = self.client.post(self.url, {
+            'movement_type': 'harvest', 'source': 'abms', 'quantity': '50', 'batch_code': 'tomato-2026-01',
+        }, format='json')
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(InventoryMovement.objects.get(id=response.data['id']).product_id, self.tomato.id)
+
+    def test_batch_with_no_mapped_product_is_400_with_specific_message(self):
+        unmapped_batch = CropBatch.objects.create(
+            code='unmapped-2026-01', abms_id='b2', cost_centre='crop:unmapped', start_date=date(2026, 1, 1),
+        )
+        response = self.client.post(self.url, {
+            'movement_type': 'harvest', 'source': 'abms', 'quantity': '50', 'batch_code': unmapped_batch.code,
+        }, format='json')
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('No product is mapped to cost centre crop:unmapped', str(response.data))
+        self.assertIn('Admin > Cost centre products', str(response.data))
+        self.assertFalse(InventoryMovement.objects.exists())
+
+    def test_batch_with_no_mapped_product_is_400_even_when_product_is_given(self):
+        # batch.product is the one source of truth here -- a caller-supplied
+        # product can't substitute for a missing CostCentreProduct mapping.
+        unmapped_batch = CropBatch.objects.create(
+            code='unmapped-2026-02', abms_id='b3', cost_centre='crop:unmapped2', start_date=date(2026, 1, 1),
+        )
+        response = self.client.post(self.url, {
+            'product': self.tomato.id, 'movement_type': 'harvest', 'source': 'abms',
+            'quantity': '50', 'batch_code': unmapped_batch.code,
+        }, format='json')
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(InventoryMovement.objects.exists())
+
+    def test_no_batch_code_still_requires_product(self):
+        response = self.client.post(self.url, {
+            'movement_type': 'harvest', 'source': 'abms', 'quantity': '50',
+        }, format='json')
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('product', response.data)
+        self.assertFalse(InventoryMovement.objects.exists())
+
+    def test_no_batch_code_with_product_is_unchanged(self):
+        response = self.client.post(self.url, {
+            'product': self.tomato.id, 'movement_type': 'harvest', 'source': 'abms', 'quantity': '50',
+        }, format='json')
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(InventoryMovement.objects.get(id=response.data['id']).batch_code, '')
+
+
+class CostCentreProductSlugValidatorTests(TestCase):
+    def setUp(self):
+        self.category = Category.objects.create(name='Slug Validator Test', order=1)
+        self.product = Product.objects.create(
+            name='Slug Test Product', slug='slug-test-product', category=self.category, description='t',
+            price=Decimal('1'), pricing_mode='fixed_quantity', origin='farm',
+        )
+
+    def test_accepts_valid_slug_form(self):
+        row = CostCentreProduct(cost_centre='crop:bottle-gourd', product=self.product)
+        row.full_clean()  # must not raise
+
+    def test_rejects_spaces(self):
+        row = CostCentreProduct(cost_centre='crop:local tomato', product=self.product)
+        with self.assertRaises(DjangoValidationError):
+            row.full_clean()
+
+    def test_rejects_capitals(self):
+        row = CostCentreProduct(cost_centre='crop:Green chili', product=self.product)
+        with self.assertRaises(DjangoValidationError):
+            row.full_clean()
+
+
+class CheckCostCentreKeysCommandTests(TestCase):
+    """Read-only management command -- just confirms it finds what it's
+    supposed to find and writes nothing to the database."""
+
+    def setUp(self):
+        self.category = Category.objects.create(name='Command Test', order=1)
+        self.product = Product.objects.create(
+            name='Command Test Product', slug='command-test-product', category=self.category, description='t',
+            price=Decimal('1'), pricing_mode='fixed_quantity', origin='farm',
+        )
+
+    def run_command(self):
+        import io
+        from django.core.management import call_command
+        out = io.StringIO()
+        call_command('check_cost_centre_keys', stdout=out)
+        return out.getvalue()
+
+    def test_reports_non_slug_mapping_and_unmapped_centres(self):
+        CostCentreProduct.objects.create(cost_centre='water', product=self.product)  # legacy, pre-dates the validator
+        CostEntry.objects.create(abms_id='cmdtest1', date=date(2026, 1, 1), amount=Decimal('10'), cost_centre='crop:never_mapped')
+        before_count = CostCentreProduct.objects.count()
+        output = self.run_command()
+        self.assertIn("'water'", output)
+        self.assertIn("'crop:never_mapped'", output)
+        self.assertEqual(CostCentreProduct.objects.count(), before_count)  # read-only
+
+    def test_clean_state_reports_none(self):
+        output = self.run_command()
+        self.assertIn('(none)', output)
 
 
 class BuildBatchReportTests(TestCase):

@@ -1,7 +1,7 @@
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 from rest_framework.exceptions import APIException
-from .models import CropBatch, InventoryMovement
+from .models import CropBatch, InventoryMovement, Product
 
 # Movements created through this API must declare which app is writing them.
 # 'admin' and 'website' movements are created elsewhere (Django admin, and
@@ -22,6 +22,12 @@ class BatchClosedError(APIException):
 
 
 class InventoryMovementSerializer(serializers.ModelSerializer):
+    # Declared explicitly (not left to ModelSerializer's auto-generation)
+    # so it can be made optional ONLY when batch_code resolves it instead --
+    # see validate() below, which puts the "actually required unless a
+    # batch_code supplies it" rule back in by hand.
+    product = serializers.PrimaryKeyRelatedField(queryset=Product.objects.all(), required=False, allow_null=True)
+
     class Meta:
         model = InventoryMovement
         fields = ['id', 'product', 'variant', 'movement_type', 'source',
@@ -43,6 +49,8 @@ class InventoryMovementSerializer(serializers.ModelSerializer):
         clean() automatically — skipping this step would mean the API
         bypasses the exact protections that Django admin gets for free."""
         batch_code = data.get('batch_code') or ''
+        product = data.get('product')
+
         if batch_code:
             if data.get('movement_type') != 'harvest':
                 raise serializers.ValidationError(
@@ -53,11 +61,29 @@ class InventoryMovementSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError({'batch_code': f'Unknown batch_code: {batch_code!r}'})
             if batch.status == 'closed':
                 raise BatchClosedError(f'Batch {batch_code!r} is closed.')
-            product = data.get('product')
-            if batch.product_id and product and batch.product_id != product.id:
+
+            # batch.product is the one source of truth for "which product
+            # does this cost centre's harvest belong to" -- checked before
+            # looking at whatever `product` the request itself supplied,
+            # since there's otherwise no way to confirm a supplied product
+            # actually belongs to this batch's cost centre at all.
+            if not batch.product_id:
+                raise serializers.ValidationError({
+                    'batch_code': f'No product is mapped to cost centre {batch.cost_centre}. '
+                                   'Add it in Admin > Cost centre products.',
+                })
+            if product and product.id != batch.product_id:
                 raise serializers.ValidationError(
                     {'batch_code': "This harvest's product does not match the batch's own product."}
                 )
+            if not product:
+                # ABMS doesn't need to know a Django product id for a
+                # batched harvest -- the batch's own product resolves it,
+                # same reasoning as CropBatchSyncView's own product
+                # auto-resolution (shop/costs_views.py).
+                data['product'] = batch.product
+        elif not product:
+            raise serializers.ValidationError({'product': ['This field is required.']})
 
         instance = InventoryMovement(**data)
         try:

@@ -1,4 +1,12 @@
+from django.core.validators import RegexValidator
 from django.db import models
+
+COST_CENTRE_SLUG_VALIDATOR = RegexValidator(
+    regex=r'^[a-z0-9]+:[a-z0-9]+(-[a-z0-9]+)*$',
+    message='Must be slug form, e.g. "crop:bottle-gourd" -- lowercase letters/digits, a colon, '
+            'then lowercase letters/digits with single hyphens between words. No spaces or capitals '
+            '(ABMS builds these keys with slugify, which collapses any run of other characters to one hyphen).',
+)
 import uuid
 from .imagekit_storage import ImageKitStorage
 
@@ -1065,7 +1073,12 @@ class CostCentreProduct(models.Model):
     here, since ABMS can grow new crop/tree slugs over time without a
     Django deploy."""
 
-    cost_centre = models.CharField(max_length=60, db_index=True)
+    cost_centre = models.CharField(
+        max_length=60, db_index=True, validators=[COST_CENTRE_SLUG_VALIDATOR],
+        help_text='Slug form only, e.g. crop:bottle-gourd -- lowercase, hyphen-separated, one colon. '
+                   'Only enforced on save/admin-edit, not retroactively: an existing row written before '
+                   'this validator existed is left alone until it is next edited.',
+    )
     product = models.ForeignKey('Product', on_delete=models.CASCADE, related_name='cost_centres')
 
     class Meta:
