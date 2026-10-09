@@ -46,9 +46,58 @@ class CropBatchSyncViewTests(TestCase):
         base.update(overrides)
         return base
 
+    def snake_payload(self, **overrides):
+        # This is what the actually-deployed ABMS client really sends --
+        # the production bug this field-aliasing fixes was a real 400
+        # against exactly this shape (see CropBatchSyncView's docstring).
+        base = {
+            'abms_id': 'b_test1', 'code': 'tomato-2026-01', 'name': 'Tomato Jan batch',
+            'cost_centre': 'crop:tomato', 'start_date': '2026-01-01', 'status': 'open',
+        }
+        base.update(overrides)
+        return base
+
     def test_no_token_is_rejected(self):
         response = self.client.post(self.url, self.payload(), format='json')
         self.assertIn(response.status_code, (status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN))
+
+    def test_snake_case_payload_creates_a_batch(self):
+        self.auth()
+        response = self.client.post(self.url, self.snake_payload(), format='json')
+        self.assertEqual(response.status_code, 201, response.data)
+        batch = CropBatch.objects.get(abms_id='b_test1')
+        self.assertEqual(batch.code, 'tomato-2026-01')
+        self.assertEqual(batch.cost_centre, 'crop:tomato')
+        self.assertEqual(batch.start_date, date(2026, 1, 1))
+        self.assertEqual(batch.status, 'open')
+
+    def test_camel_case_payload_still_works(self):
+        self.auth()
+        response = self.client.post(self.url, self.payload(), format='json')
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertTrue(CropBatch.objects.filter(abms_id='b_test1', code='tomato-2026-01').exists())
+
+    def test_conflicting_duplicate_spellings_is_400(self):
+        self.auth()
+        response = self.client.post(self.url, self.snake_payload(costCentre='crop:different'), format='json')
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(CropBatch.objects.exists())
+
+    def test_same_value_duplicate_spellings_is_allowed(self):
+        self.auth()
+        response = self.client.post(self.url, self.snake_payload(costCentre='crop:tomato'), format='json')
+        self.assertEqual(response.status_code, 201, response.data)
+
+    def test_resync_with_snake_case_updates_name_and_status(self):
+        self.auth()
+        self.client.post(self.url, self.snake_payload(), format='json')
+        response = self.client.post(self.url, self.snake_payload(
+            name='Tomato Jan batch (renamed)', status='closed',
+        ), format='json')
+        self.assertEqual(response.status_code, 200, response.data)
+        batch = CropBatch.objects.get(abms_id='b_test1')
+        self.assertEqual(batch.name, 'Tomato Jan batch (renamed)')
+        self.assertEqual(batch.status, 'closed')
 
     def test_create_batch(self):
         self.auth()

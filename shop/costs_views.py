@@ -19,7 +19,50 @@ def _valid_cost_centre(value):
     return bool(value) and bool(COST_CENTRE_RE.match(value) or value in FIXED_COST_CENTRES)
 
 
-BATCH_ALLOWED_KEYS = {'id', 'code', 'name', 'costCentre', 'startDate', 'endDate', 'status', 'notes'}
+# Every spelling ABMS might reasonably send for each field, keyed by the
+# canonical (snake_case) name this view uses internally from here on.
+# 'id'/'code'/'name'/'status'/'notes' are single words -- snake_case and
+# camelCase coincide, so there's nothing to alias for them. The deployed
+# ABMS client turned out to send plain snake_case throughout (abms_id,
+# cost_centre, start_date) -- not just a casing difference on 'id': ABMS
+# never sends a bare 'id' at all, only 'abms_id'/'abmsId' -- while this
+# view's first draft only ever recognized 'id' and camelCase for the
+# others, hence production's "Unknown field(s)" 400. Both spellings of
+# any field this view might later grow are accepted the same way.
+BATCH_FIELD_ALIASES = {
+    'id': ('id', 'abms_id', 'abmsId'),
+    'code': ('code',),
+    'name': ('name',),
+    'cost_centre': ('cost_centre', 'costCentre'),
+    'start_date': ('start_date', 'startDate'),
+    'end_date': ('end_date', 'endDate'),
+    'status': ('status',),
+    'notes': ('notes',),
+}
+BATCH_ALLOWED_KEYS = {alias for aliases in BATCH_FIELD_ALIASES.values() for alias in aliases}
+
+
+def _normalize_batch_payload(body):
+    """(normalized_dict, error_message). normalized_dict uses the
+    canonical snake_case keys from BATCH_FIELD_ALIASES above, regardless
+    of which spelling(s) the request actually used. error_message is None
+    on success; on failure normalized_dict is None and error_message is
+    the exact detail string CropBatchSyncView.post() should 400 with."""
+    unknown = set(body.keys()) - BATCH_ALLOWED_KEYS
+    if unknown:
+        return None, f'Unknown field(s): {sorted(unknown)}.'
+
+    normalized = {}
+    for canonical, aliases in BATCH_FIELD_ALIASES.items():
+        present = [(alias, body[alias]) for alias in aliases if alias in body]
+        if not present:
+            continue
+        distinct_values = {value for _, value in present}
+        if len(distinct_values) > 1:
+            sent_as = ', '.join(alias for alias, _ in present)
+            return None, f'{canonical} was sent as more than one field ({sent_as}) with different values.'
+        normalized[canonical] = present[0][1]
+    return normalized, None
 
 
 class CropBatchSyncView(APIView):
@@ -45,45 +88,49 @@ class CropBatchSyncView(APIView):
     batch's product; zero or multiple matches leave it null (CropBatch.
     product is nullable for exactly this reason). Re-resolved on every
     sync call, so mapping a product later (or remapping it) is reflected
-    on the batch's next sync without ABMS needing to do anything."""
+    on the batch's next sync without ABMS needing to do anything.
+
+    Accepts either spelling of every multi-word field (see
+    BATCH_FIELD_ALIASES/_normalize_batch_payload above) -- ABMS's actual
+    deployed client sends snake_case throughout."""
 
     def post(self, request):
         body = request.data
         if not isinstance(body, dict):
             return Response({'detail': 'Request body must be a JSON object.'}, status=400)
 
-        unknown = set(body.keys()) - BATCH_ALLOWED_KEYS
-        if unknown:
-            return Response({'detail': f'Unknown field(s): {sorted(unknown)}.'}, status=400)
+        normalized, error = _normalize_batch_payload(body)
+        if error:
+            return Response({'detail': error}, status=400)
 
-        abms_id = body.get('id')
+        abms_id = normalized.get('id')
         if not abms_id:
             return Response({'detail': 'Missing id.'}, status=400)
 
-        code = (body.get('code') or '').strip()
+        code = (normalized.get('code') or '').strip()
         if not code:
             return Response({'detail': 'Missing code.'}, status=400)
 
-        cost_centre = body.get('costCentre')
+        cost_centre = normalized.get('cost_centre')
         if not _valid_cost_centre(cost_centre):
-            return Response({'detail': f'Invalid costCentre: {cost_centre!r}'}, status=400)
+            return Response({'detail': f'Invalid cost_centre: {cost_centre!r}'}, status=400)
 
-        start_date_str = body.get('startDate')
+        start_date_str = normalized.get('start_date')
         start_date = parse_date(start_date_str) if isinstance(start_date_str, str) else None
         if not start_date:
-            return Response({'detail': f'Invalid or missing startDate: {start_date_str!r}'}, status=400)
+            return Response({'detail': f'Invalid or missing start_date: {start_date_str!r}'}, status=400)
 
-        end_date_str = body.get('endDate')
+        end_date_str = normalized.get('end_date')
         end_date = parse_date(end_date_str) if isinstance(end_date_str, str) else None
         if end_date_str and not end_date:
-            return Response({'detail': f'Invalid endDate: {end_date_str!r}'}, status=400)
+            return Response({'detail': f'Invalid end_date: {end_date_str!r}'}, status=400)
 
-        status_val = body.get('status') or 'open'
+        status_val = normalized.get('status') or 'open'
         if status_val not in ('open', 'closed'):
             return Response({'detail': f'Invalid status: {status_val!r}'}, status=400)
 
-        name = (body.get('name') or '').strip()
-        notes = body.get('notes') or ''
+        name = (normalized.get('name') or '').strip()
+        notes = normalized.get('notes') or ''
 
         with transaction.atomic():
             existing = CropBatch.objects.filter(abms_id=abms_id).first()
