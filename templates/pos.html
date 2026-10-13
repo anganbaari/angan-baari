@@ -162,6 +162,8 @@
         .name-cell-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; width: 100%; min-height: 100%; }
         .name-cell-row > div.name-cell-text { min-width: 0; flex: 1; }
         .cart-line-name { overflow-wrap: anywhere; }
+        .receipt-coupon-row td { background: #fdf3f3; }
+        .receipt-coupon-row .cart-line-name { color: #b23b3b; font-weight: 800; }
         /* Detail ("1.000kg") and the amber below-direct-cost note share one
            line, note to the right -- wraps under the detail instead of
            clipping if the row is too narrow for both. */
@@ -813,11 +815,8 @@
                 </div>
 
                 <div class="receipt-combined-row">
-                    <div class="logout-col" style="flex-direction: column; gap: 4px;">
+                    <div class="logout-col" style="flex-direction: column; justify-content: center;">
                         <button type="button" class="side-btn logout-btn" id="logoutBtn">Logout</button>
-                        {% if is_owner_or_manager %}
-                        <button type="button" class="side-btn logout-btn" id="wholesaleToggleBtn" style="font-size: 0.75rem;" title="Switch to wholesale mode" aria-label="Switch to wholesale mode">Wholesale</button>
-                        {% endif %}
                     </div>
 
                     <div class="reminder-card">
@@ -1023,6 +1022,12 @@
         const LIVE_COUPONS = JSON.parse(document.getElementById('posCouponsData').textContent);
         const IS_VAT_ENABLED = {{ is_vat_enabled|yesno:"true,false" }};
         const VAT_RATE = {{ vat_rate }};
+        // Same gate the old bottom-left Wholesale/Retail button was
+        // server-rendered under (the is_owner_or_manager context var) --
+        // now that the header RETAIL/WHOLESALE label is the only mode
+        // control, it reads this directly instead of checking whether
+        // that button exists.
+        const IS_OWNER_OR_MANAGER = {{ is_owner_or_manager|yesno:"true,false" }};
 
         let activeCategory = CATEGORIES[0] || null;
         let cart = []; // { product_id, name, pricing_mode, qty, weight, variant_id, unit_id, unit_name, offer_id, combo_instance_id, detail, unit_price, line_total, is_taxable, price_override, list_line_total }
@@ -2543,7 +2548,15 @@
         function clearCoupon(silent) {
             if (!appliedCoupon) return;
             appliedCoupon = null;
-            renderCouponRow();
+            // A full recompute, not just renderCouponRow() -- the coupon's
+            // row in the cart table, the discount line, the page count, and
+            // the grand total all have to go back to their no-coupon state
+            // together. renderReceipt() already calls updateCouponUI() ->
+            // renderCouponRow() internally, so this one call covers all of
+            // it in one consistent pass (this was the actual bug: removing
+            // a coupon used to only repaint the little coupon-row widget,
+            // leaving the totals box showing the discounted price).
+            renderReceipt();
             if (!silent) showToast('Coupon removed');
         }
 
@@ -2571,7 +2584,19 @@
                 });
                 const data = await response.json().catch(() => ({}));
                 if (data.status === 'ok') {
-                    appliedCoupon = { code: data.code, discount_amount: parseFloat(data.discount_amount), subtotalAtApply: subtotal };
+                    // LIVE_COUPONS only has an entry when the applied code was
+                    // one of the listed ones (not the "Type a code" fallback) --
+                    // description is cosmetic (the coupon row's label), so an
+                    // unlisted code just shows its bare code with no parenthetical.
+                    const listed = LIVE_COUPONS.find(c => c.code === data.code);
+                    appliedCoupon = {
+                        code: data.code, discount_amount: parseFloat(data.discount_amount), subtotalAtApply: subtotal,
+                        description: listed ? listed.description : '',
+                    };
+                    // The coupon renders as the last row of the cart table (see
+                    // renderReceipt()) -- jump to the page it lands on, same
+                    // convention as adding a new product (see onProductTap()).
+                    receiptPage = Math.ceil((cart.length + 1) / RECEIPT_PAGE_SIZE) - 1;
                     showToast(`Coupon ${data.code} applied — Rs. ${data.discount_amount} off`);
                     renderReceipt();
                 } else {
@@ -2668,39 +2693,88 @@
 
         function renderReceipt() {
             const body = document.getElementById('receiptBody');
-            const totalPages = Math.max(1, Math.ceil(cart.length / RECEIPT_PAGE_SIZE));
+
+            // A coupon was validated against a specific subtotal -- if the
+            // cart has since changed (item added/removed/qty edited), that
+            // discount may no longer be valid (e.g. min_order_amount), so
+            // drop it rather than show a total the server would reject.
+            // Cleared directly (not via clearCoupon()) since this render
+            // pass is about to recompute everything from scratch anyway --
+            // going through clearCoupon() here would just trigger a second,
+            // redundant renderReceipt() call.
+            if (appliedCoupon && Math.round(appliedCoupon.subtotalAtApply * 100) !== Math.round(couponEligibleSubtotal() * 100)) {
+                appliedCoupon = null;
+            }
+
+            const totals = computeTotals();
+
+            // The applied coupon is shown as one extra row at the end of the
+            // cart table, not a separate widget floating outside it -- it
+            // shares the SAME pagination as the product rows, so N products
+            // + a coupon is N+1 rows for paging purposes. Rows 0..cart.
+            // length-1 are products in cart order; row cart.length (only
+            // present when a coupon is applied) is the one coupon row.
+            const rowCount = cart.length + (appliedCoupon ? 1 : 0);
+            const totalPages = Math.max(1, Math.ceil(rowCount / RECEIPT_PAGE_SIZE));
             receiptPage = Math.min(receiptPage, totalPages - 1);
             const start = receiptPage * RECEIPT_PAGE_SIZE;
-            const pageLines = cart.slice(start, start + RECEIPT_PAGE_SIZE);
+            const end = Math.min(start + RECEIPT_PAGE_SIZE, rowCount);
 
-            let rowsHtml = pageLines.map((line, i) => {
-                const belowCostNote = lineBelowCostNote(line);
-                return `
-                <tr>
-                    <td>${start + i + 1}</td>
-                    <td class="name-cell">
-                        <div class="name-cell-row">
-                            <div class="name-cell-text">
-                                <div class="cart-line-name">${line.name}</div>
-                                <div class="cart-line-detail-row">
-                                    <span class="cart-line-detail">${line.detail}</span>
-                                    ${belowCostNote ? `<span class="cart-line-note" title="${belowCostNote}">⚠ ${belowCostNote}</span>` : ''}
+            let rowsHtml = '';
+            for (let i = start; i < end; i++) {
+                if (i < cart.length) {
+                    const line = cart[i];
+                    const belowCostNote = lineBelowCostNote(line);
+                    rowsHtml += `
+                    <tr>
+                        <td>${i + 1}</td>
+                        <td class="name-cell">
+                            <div class="name-cell-row">
+                                <div class="name-cell-text">
+                                    <div class="cart-line-name">${line.name}</div>
+                                    <div class="cart-line-detail-row">
+                                        <span class="cart-line-detail">${line.detail}</span>
+                                        ${belowCostNote ? `<span class="cart-line-note" title="${belowCostNote}">⚠ ${belowCostNote}</span>` : ''}
+                                    </div>
                                 </div>
+                                <button type="button" class="row-remove" data-i="${i}" title="Remove"><i class="fas fa-times"></i></button>
                             </div>
-                            <button type="button" class="row-remove" data-i="${start + i}" title="Remove"><i class="fas fa-times"></i></button>
-                        </div>
-                    </td>
-                    <td class="${wholesaleMode ? 'price-cell' : ''}" ${wholesaleMode ? `data-i="${start + i}" title="Tap to set wholesale price"` : ''}>Rs. ${formatMoney(line.unit_price)}${wholesaleMode ? ' <i class="fas fa-pen qty-edit-icon"></i>' : ''}</td>
-                    <td class="qty-cell" data-i="${start + i}" title="Tap to change">${qtyCellDisplay(line)} <i class="fas fa-pen qty-edit-icon"></i></td>
-                    <td>Rs. ${formatMoney(line.line_total)}</td>
-                    <td>Rs. ${formatMoney(lineTax(line))}</td>
-                </tr>`;
-            }).join('');
-            for (let i = pageLines.length; i < RECEIPT_PAGE_SIZE; i++) {
+                        </td>
+                        <td class="${wholesaleMode ? 'price-cell' : ''}" ${wholesaleMode ? `data-i="${i}" title="Tap to set wholesale price"` : ''}>Rs. ${formatMoney(line.unit_price)}${wholesaleMode ? ' <i class="fas fa-pen qty-edit-icon"></i>' : ''}</td>
+                        <td class="qty-cell" data-i="${i}" title="Tap to change">${qtyCellDisplay(line)} <i class="fas fa-pen qty-edit-icon"></i></td>
+                        <td>Rs. ${formatMoney(line.line_total)}</td>
+                        <td>Rs. ${formatMoney(lineTax(line))}</td>
+                    </tr>`;
+                } else {
+                    // The one coupon row -- not editable like a product line
+                    // (no data-i, so it's excluded from the qty-cell/price-cell
+                    // wiring below), but shares the same remove-button look;
+                    // its own listener is wired separately, straight to
+                    // clearCoupon(), not removeFromCart().
+                    const label = `COUPON: ${appliedCoupon.code}` + (appliedCoupon.description ? ` (${appliedCoupon.description})` : '');
+                    rowsHtml += `
+                    <tr class="receipt-coupon-row">
+                        <td>${i + 1}</td>
+                        <td class="name-cell">
+                            <div class="name-cell-row">
+                                <div class="name-cell-text">
+                                    <div class="cart-line-name" title="${label}">${label}</div>
+                                </div>
+                                <button type="button" class="row-remove" id="couponRowRemoveBtn" title="Remove coupon"><i class="fas fa-times"></i></button>
+                            </div>
+                        </td>
+                        <td>-</td>
+                        <td>-</td>
+                        <td>-Rs. ${formatMoney(totals.discount)}</td>
+                        <td>-</td>
+                    </tr>`;
+                }
+            }
+            for (let i = end - start; i < RECEIPT_PAGE_SIZE; i++) {
                 rowsHtml += '<tr class="receipt-blank-row"><td></td><td></td><td></td><td></td><td></td><td></td></tr>';
             }
             body.innerHTML = rowsHtml;
-            body.querySelectorAll('.row-remove').forEach(b => {
+            body.querySelectorAll('.row-remove[data-i]').forEach(b => {
                 b.addEventListener('click', (e) => { e.stopPropagation(); removeFromCart(parseInt(b.dataset.i)); });
             });
             body.querySelectorAll('.qty-cell').forEach(cell => {
@@ -2711,20 +2785,13 @@
                     cell.addEventListener('click', (e) => { e.stopPropagation(); openPriceOverrideModal(parseInt(cell.dataset.i)); });
                 });
             }
+            const couponRemoveBtn = document.getElementById('couponRowRemoveBtn');
+            if (couponRemoveBtn) couponRemoveBtn.addEventListener('click', (e) => { e.stopPropagation(); clearCoupon(); });
 
             document.getElementById('pageIndicator').innerHTML = `${receiptPage + 1}<span>/</span>${totalPages}`;
             document.getElementById('pagePrevBtn').disabled = receiptPage === 0;
             document.getElementById('pageNextBtn').disabled = receiptPage >= totalPages - 1;
 
-            // A coupon was validated against a specific subtotal -- if the
-            // cart has since changed (item added/removed/qty edited), that
-            // discount may no longer be valid (e.g. min_order_amount), so
-            // drop it rather than show a total the server would reject.
-            if (appliedCoupon && Math.round(appliedCoupon.subtotalAtApply * 100) !== Math.round(couponEligibleSubtotal() * 100)) {
-                clearCoupon();
-            }
-
-            const totals = computeTotals();
             document.getElementById('cartTotal').textContent = 'Rs. ' + formatMoney(totals.grandTotal);
             document.getElementById('taxVat').textContent = 'Rs. ' + formatMoney(totals.vatAmount);
             document.getElementById('taxTaxable').textContent = 'Rs. ' + formatMoney(totals.taxableValue);
@@ -2829,20 +2896,16 @@
 
         // ══════════════════════════════════════════════════════════════
         // Wholesale mode — bulk sale to a named buyer, manual per-line
-        // prices, no coupons/offers/combos. The toggle button itself is
-        // only ever rendered for an owner/manager account (see
+        // prices, no coupons/offers/combos. The header RETAIL/WHOLESALE
+        // label is the only control that switches it; it's tappable only
+        // for an owner/manager account (IS_OWNER_OR_MANAGER, same gate the
+        // old bottom-left button was server-rendered under -- see
         // is_owner_or_manager in the template context); create_pos_sale()
         // re-checks this independently from request.user, so this is a UI
         // convenience, never the real authorization boundary.
         // ══════════════════════════════════════════════════════════════
-        const wholesaleToggleBtn = document.getElementById('wholesaleToggleBtn');
         const headerModeLabel = document.getElementById('headerModeLabel');
 
-        // Single source of truth for entering/leaving wholesale mode --
-        // both the bottom-left button and the header's RETAIL/WHOLESALE
-        // label call this SAME function, so they can never disagree with
-        // each other (applyWholesaleModeUI() below is what actually
-        // repaints both from the one wholesaleMode variable).
         function toggleWholesaleMode() {
             if (cart.length > 0) {
                 if (!confirm('Switching wholesale mode will clear your cart. Continue?')) return;
@@ -2854,38 +2917,26 @@
             renderReceipt();
             updateCartIndicator();
         }
-        if (wholesaleToggleBtn) wholesaleToggleBtn.addEventListener('click', toggleWholesaleMode);
-        // The header label is only ever tappable for the same owner/manager
-        // account the bottom-left button itself is rendered for -- for
-        // anyone else it's a plain, disabled, display-only indicator of
-        // whatever mode an owner/manager already put this shared till into.
         if (headerModeLabel) {
-            if (wholesaleToggleBtn) {
+            if (IS_OWNER_OR_MANAGER) {
                 headerModeLabel.addEventListener('click', toggleWholesaleMode);
             } else {
+                // Anyone else sees plain, disabled, display-only text --
+                // whatever mode an owner/manager already put this shared
+                // till into, same as the old button being absent entirely.
                 headerModeLabel.disabled = true;
             }
         }
-        applyWholesaleModeUI(); // set the button's/label's initial state on page load
+        applyWholesaleModeUI(); // set the label's initial state on page load
 
         function applyWholesaleModeUI() {
             document.getElementById('wholesaleBanner').style.display = wholesaleMode ? '' : 'none';
-            const label = wholesaleMode ? 'Switch to retail mode' : 'Switch to wholesale mode';
-            if (wholesaleToggleBtn) {
-                // Button always names the mode you'd switch TO, not the
-                // mode you're currently in.
-                wholesaleToggleBtn.textContent = wholesaleMode ? 'Retail' : 'Wholesale';
-                wholesaleToggleBtn.title = label;
-                wholesaleToggleBtn.setAttribute('aria-label', label);
-                wholesaleToggleBtn.classList.toggle('active', wholesaleMode);
-            }
             if (headerModeLabel) {
-                // The header label names the mode you're currently IN, the
-                // opposite convention from the button above -- it's read as
-                // a status indicator first, a toggle second.
                 headerModeLabel.textContent = wholesaleMode ? 'WHOLESALE' : 'RETAIL';
                 headerModeLabel.classList.toggle('wholesale', wholesaleMode);
-                headerModeLabel.title = wholesaleToggleBtn ? label : 'Wholesale mode';
+                headerModeLabel.title = IS_OWNER_OR_MANAGER
+                    ? (wholesaleMode ? 'Switch to retail mode' : 'Switch to wholesale mode')
+                    : 'Wholesale mode';
             }
             const couponRow = document.querySelector('.coupon-row');
             if (couponRow) couponRow.style.display = wholesaleMode ? 'none' : '';

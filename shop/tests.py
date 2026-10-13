@@ -1097,28 +1097,34 @@ class WholesaleSaleTests(TestCase):
         self.assertEqual(first.lines.count(), 1)
 
 
-class PosWholesaleToggleVisibilityTests(TestCase):
-    """pos_view() renders the Wholesale toggle only for the SAME
-    owner/manager check create_pos_sale() enforces server-side -- the
-    toggle's own visibility is just a UI convenience, not the real
-    authorization boundary, but it must still never be shown to someone
-    who can't actually use it."""
+class PosHeaderModeLabelGatingTests(TestCase):
+    """The old bottom-left Wholesale/Retail button was deleted -- the
+    header's RETAIL/WHOLESALE label is now the only control that switches
+    modes, gated client-side by IS_OWNER_OR_MANAGER (embedded in pos_view()'s
+    own JS payload), the SAME owner/manager check create_pos_sale() enforces
+    server-side. That gate is a UI convenience, never the real authorization
+    boundary, but it must still never let someone who can't actually use
+    wholesale mode tap their way into it."""
 
-    def test_cashier_does_not_see_wholesale_toggle(self):
+    def test_cashier_cannot_toggle_wholesale(self):
         user = User.objects.create_user('tmpl_cashier', password='pw', is_staff=True)
         UserProfile.objects.create(user=user, role='cashier')
         self.client.login(username='tmpl_cashier', password='pw')
         response = self.client.get('/pos/')
         self.assertEqual(response.status_code, 200)
-        self.assertNotIn('id="wholesaleToggleBtn"', response.content.decode())
+        content = response.content.decode()
+        self.assertNotIn('id="wholesaleToggleBtn"', content)  # the old button no longer exists at all
+        self.assertIn('const IS_OWNER_OR_MANAGER = false;', content)
 
-    def test_owner_sees_wholesale_toggle(self):
+    def test_owner_can_toggle_wholesale(self):
         user = User.objects.create_user('tmpl_owner', password='pw', is_staff=True)
         UserProfile.objects.create(user=user, role='admin')
         self.client.login(username='tmpl_owner', password='pw')
         response = self.client.get('/pos/')
         self.assertEqual(response.status_code, 200)
-        self.assertIn('id="wholesaleToggleBtn"', response.content.decode())
+        content = response.content.decode()
+        self.assertNotIn('id="wholesaleToggleBtn"', content)
+        self.assertIn('const IS_OWNER_OR_MANAGER = true;', content)
 
 
 class PosCouponPickerDataTests(TestCase):

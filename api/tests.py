@@ -748,6 +748,41 @@ class POSCouponApiTests(ApiTestBase):
         self.percent_coupon.refresh_from_db()
         self.assertEqual(self.percent_coupon.used_count, 1)
 
+    def test_sale_without_coupon_code_leaves_used_count_unchanged(self):
+        payload = {
+            'client_sale_id': str(uuid.uuid4()),
+            'payments': [{'method': 'cash', 'amount': '250.00'}],
+            'cart': [{'product_id': self.jar.id, 'qty': 1}],
+        }
+        response = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+
+        self.percent_coupon.refresh_from_db()
+        self.fixed_coupon.refresh_from_db()
+        self.assertEqual(self.percent_coupon.used_count, 0)
+        self.assertEqual(self.fixed_coupon.used_count, 0)
+
+    def test_total_for_same_cart_with_and_without_coupon(self):
+        cart = [{'product_id': self.jar.id, 'qty': 2}]  # 2 x Rs. 250 = Rs. 500
+
+        without = self.client.post(reverse('v1_sale_list_create'), {
+            'client_sale_id': str(uuid.uuid4()),
+            'payments': [{'method': 'cash', 'amount': '500.00'}],
+            'cart': cart,
+        }, format='json')
+        self.assertEqual(without.status_code, status.HTTP_201_CREATED, without.data)
+        self.assertEqual(Decimal(without.data['total']), Decimal('500.00'))
+
+        with_coupon = self.client.post(reverse('v1_sale_list_create'), {
+            'client_sale_id': str(uuid.uuid4()),
+            'coupon_code': 'dashain25',
+            'payments': [{'method': 'cash', 'amount': '375.00'}],  # 500 - 25% = 375
+            'cart': cart,
+        }, format='json')
+        self.assertEqual(with_coupon.status_code, status.HTTP_201_CREATED, with_coupon.data)
+        self.assertEqual(Decimal(with_coupon.data['total']), Decimal('375.00'))
+        self.assertEqual(Decimal(without.data['total']) - Decimal(with_coupon.data['total']), Decimal('125.00'))
+
     def test_sale_with_fixed_coupon_and_payments_matching_pre_discount_total_is_rejected(self):
         payload = {
             'client_sale_id': str(uuid.uuid4()),

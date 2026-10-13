@@ -69,7 +69,7 @@ var POS_QUEUE_STORE = 'queuedSales';
 // installed POS app cold-starting offline on the old v7 shell would
 // otherwise keep showing the pre-responsive layout and the old 3-line
 // cart-line markup.
-var POS_SHELL_CACHE = 'pos-shell-v9';
+var POS_SHELL_CACHE = 'pos-shell-v10';
 var POS_META_STORE = 'meta';
 var POS_OFFLINE_PIN_STORE = 'offlineOperators';
 var POS_CREDIT_CUSTOMER_STORE = 'creditCustomers';
