@@ -416,11 +416,52 @@ function doughnutLegendHtml(labels, values, formatter) {
 
 function destroyChart(canvasId) { if (window.__charts && window.__charts[canvasId]) window.__charts[canvasId].destroy(); }
 
+// Shows "no data" for a chart WITHOUT removing its <canvas> from the DOM.
+// The old pattern every chart's empty branch used to follow --
+// `document.getElementById(canvasId).closest('.dash-chart-wrap').innerHTML
+// = emptyStateHtml()` -- replaced the canvas itself with the message, so a
+// LATER render call (switching Compare/granularity/date range back to data
+// that exists) looked the canvas up again, got null, and threw trying to
+// call .closest() on it. That exception aborted whatever function was
+// running it, and in renderOverview() specifically, every later step in
+// that same render pass that hadn't run yet (see safeRender() below).
+// Hiding the canvas instead and inserting a sibling message keeps it
+// addressable by id forever, so a later call with real data finds it the
+// normal way via makeChart() -> clearChartEmptyState() (below), no special
+// recreation step needed.
+function setChartEmptyState(canvasId, message) {
+    destroyChart(canvasId);
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return; // already missing for some unrelated reason -- nothing to show the message in
+    canvas.style.display = 'none';
+    const wrap = canvas.parentElement;
+    let empty = wrap.querySelector(':scope > .dash-empty-state');
+    if (!empty) {
+        empty = document.createElement('div');
+        empty.className = 'dash-empty-state';
+        wrap.appendChild(empty);
+    }
+    empty.textContent = message || 'Nothing here for this date range.';
+}
+
+// Reverses setChartEmptyState() -- called from makeChart() itself so every
+// successful chart render clears a leftover empty-state message
+// automatically, with nothing for each individual render function to
+// remember to do.
+function clearChartEmptyState(canvasId) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    canvas.style.display = '';
+    const empty = canvas.parentElement.querySelector(':scope > .dash-empty-state');
+    if (empty) empty.remove();
+}
+
 function makeChart(canvasId, config) {
     window.__charts = window.__charts || {};
     destroyChart(canvasId);
     const canvas = document.getElementById(canvasId);
     if (!canvas) return null;
+    clearChartEmptyState(canvasId);
     config.options = config.options || {};
     config.options.maintainAspectRatio = false;
     if (REDUCED_MOTION) config.options.animation = false;
@@ -590,30 +631,47 @@ function renderHelpPanel() {
         </ul>`;
 }
 
-function renderOverview(data) {
-    const k = data.kpis;
-    document.getElementById('ovKpiStrip').innerHTML = [
-        kpiCard('Total sales (POS)', k.total_sales).html,
-        kpiCard('Transactions', k.transactions, (v) => formatNum(v)).html,
-        kpiCard('AOV', k.aov).html,
-        kpiCard('Cash collected', k.cash_collected).html,
-        kpiCard('Credit given', k.credit_given).html,
-        kpiCard('Repayments', k.repayments).html,
-        kpiCard('Outstanding credit', k.outstanding_credit).html,
-        kpiCard('Units / weight sold', { current: k.units_count.current, previous: null, delta_pct: null, direction: null },
-            () => `${formatNum(k.units_count.current)} / ${formatNum(k.weight_kg.current, 2)}kg`).html,
-    ].join('');
+// Runs one Overview render step in isolation -- a throw in one chart/
+// widget (a malformed response shape, a DOM lookup that doesn't match
+// this build, etc.) logs to the console and moves on, instead of aborting
+// every step still queued after it in renderOverview() below. Each step
+// already renders from its own slice of `data` and touches its own DOM
+// region, so skipping a failed one leaves everything else exactly as
+// capable of rendering correctly as if it had run first.
+function safeRenderStep(name, fn) {
+    try {
+        fn();
+    } catch (e) {
+        console.error(`[dashboard] Overview render step "${name}" failed:`, e);
+    }
+}
 
-    renderTrendWithPeak(data.sales_over_time);
-    renderPaymentMixOverview(data.payment_mix);
-    renderTopProductsOverview(data.top_products);
-    renderOverviewMiniBars(data.by_hour, data.by_day_of_week);
-    renderCategoryOverview(data.category_mix);
-    renderStaffRanking(data.staff_ranking);
-    renderAlertsPreview(data.alerts);
-    renderRunRate(data.run_rate);
-    renderInsightStrip(data.insight_strip);
-    renderProductComparison(data.product_comparison);
+function renderOverview(data) {
+    safeRenderStep('kpiStrip', () => {
+        const k = data.kpis;
+        document.getElementById('ovKpiStrip').innerHTML = [
+            kpiCard('Total sales (POS)', k.total_sales).html,
+            kpiCard('Transactions', k.transactions, (v) => formatNum(v)).html,
+            kpiCard('AOV', k.aov).html,
+            kpiCard('Cash collected', k.cash_collected).html,
+            kpiCard('Credit given', k.credit_given).html,
+            kpiCard('Repayments', k.repayments).html,
+            kpiCard('Outstanding credit', k.outstanding_credit).html,
+            kpiCard('Units / weight sold', { current: k.units_count.current, previous: null, delta_pct: null, direction: null },
+                () => `${formatNum(k.units_count.current)} / ${formatNum(k.weight_kg.current, 2)}kg`).html,
+        ].join('');
+    });
+
+    safeRenderStep('salesTrend', () => renderTrendWithPeak(data.sales_over_time));
+    safeRenderStep('paymentMix', () => renderPaymentMixOverview(data.payment_mix));
+    safeRenderStep('topProducts', () => renderTopProductsOverview(data.top_products));
+    safeRenderStep('miniBars', () => renderOverviewMiniBars(data.by_hour, data.by_day_of_week));
+    safeRenderStep('categoryMix', () => renderCategoryOverview(data.category_mix));
+    safeRenderStep('staffRanking', () => renderStaffRanking(data.staff_ranking));
+    safeRenderStep('alertsPreview', () => renderAlertsPreview(data.alerts));
+    safeRenderStep('runRate', () => renderRunRate(data.run_rate));
+    safeRenderStep('insightStrip', () => renderInsightStrip(data.insight_strip));
+    safeRenderStep('productComparison', () => renderProductComparison(data.product_comparison));
 }
 
 // ── Sales-over-time trend charts (Overview's "Sales over time" and the
@@ -663,34 +721,13 @@ function cumulativeUpToToday(rows) {
     return out;
 }
 
-// The chart-wrap div is always the next sibling of the mode-seg div
-// ("ovTrendModeSeg" -> "ovTrendChart", "salesTrendModeSeg" ->
-// "salesTrendChart") -- a stable path to find it that doesn't depend on
-// the canvas itself still existing, unlike .closest() from the canvas.
-function chartWrapFor(canvasId) {
-    return document.getElementById(canvasId.replace('Chart', 'ModeSeg')).nextElementSibling;
-}
-
-// Re-creates the <canvas> inside its wrap if an earlier empty-state
-// render replaced it with emptyStateHtml() -- without this, switching
-// back to a non-empty range/mode after an empty one left makeChart()
-// silently drawing nothing (no canvas for Chart.js to attach to).
-function ensureChartCanvas(canvasId, ariaLabel) {
-    if (document.getElementById(canvasId)) return;
-    chartWrapFor(canvasId).innerHTML = `<canvas id="${canvasId}" aria-label="${escapeHtml(ariaLabel)}" role="img"></canvas>`;
-}
-
-const SALES_TREND_ARIA_LABELS = { ovTrendChart: 'Sales over time', salesTrendChart: 'Revenue over time' };
-
 function renderSalesTrendChart(canvasId, rows, previousRows, granularity, mode) {
     const current = cumulativeUpToToday(rows);
     const previous = previousRows && previousRows.length ? cumulativeUpToToday(previousRows) : [];
     if (!current.length) {
-        destroyChart(canvasId);
-        chartWrapFor(canvasId).innerHTML = emptyStateHtml();
+        setChartEmptyState(canvasId);
         return { current, previous, peak: null, total: 0 };
     }
-    ensureChartCanvas(canvasId, SALES_TREND_ARIA_LABELS[canvasId] || '');
 
     const field = mode === 'cumulative' ? 'cumulative' : 'total';
     const labels = current.map((r) => salesTrendAxisLabel(r.date, granularity));
@@ -770,8 +807,7 @@ function renderTrendWithPeak(series) {
     }
     ovTrendCache = { rows, previousRows, granularity: state.granularity };
     if (!rows.length) {
-        destroyChart('ovTrendChart');
-        chartWrapFor('ovTrendChart').innerHTML = emptyStateHtml();
+        setChartEmptyState('ovTrendChart');
         document.getElementById('ovTrendPeak').textContent = '';
         return;
     }
@@ -787,10 +823,8 @@ function renderTrendWithPeak(series) {
 }
 
 function renderPaymentMixOverview(mix) {
-    const wrap = document.getElementById('ovPaymentMixChart').closest('.dash-card');
     if (!mix.length) {
-        destroyChart('ovPaymentMixChart');
-        document.getElementById('ovPaymentMixChart').closest('.dash-chart-wrap').innerHTML = emptyStateHtml();
+        setChartEmptyState('ovPaymentMixChart');
         document.getElementById('ovPaymentMixLegend').innerHTML = '';
         return;
     }
@@ -799,7 +833,7 @@ function renderPaymentMixOverview(mix) {
 }
 
 function renderTopProductsOverview(products) {
-    if (!products.length) { destroyChart('ovTopProductsChart'); document.getElementById('ovTopProductsChart').closest('.dash-chart-wrap').innerHTML = emptyStateHtml(); return; }
+    if (!products.length) { setChartEmptyState('ovTopProductsChart'); return; }
     makeChart('ovTopProductsChart', { type: 'bar', data: { labels: products.map((p) => p.name), datasets: [{ label: 'Qty', data: products.map((p) => p.qty + p.weight_kg), backgroundColor: PALETTE[0] }] }, options: { indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#8fa391', font: { size: 9 } } }, y: { ticks: { color: '#8fa391', font: { size: 9 } } } } } });
 }
 
@@ -817,7 +851,7 @@ function renderOverviewMiniBars(byHour, byDow) {
 }
 
 function renderCategoryOverview(categories) {
-    if (!categories.length) { destroyChart('ovCategoryChart'); document.getElementById('ovCategoryChart').closest('.dash-chart-wrap').innerHTML = emptyStateHtml(); document.getElementById('ovCategoryLegend').innerHTML = ''; return; }
+    if (!categories.length) { setChartEmptyState('ovCategoryChart'); document.getElementById('ovCategoryLegend').innerHTML = ''; return; }
     makeChart('ovCategoryChart', { type: 'doughnut', data: { labels: categories.map((c) => c.category), datasets: [{ data: categories.map((c) => c.revenue_est), backgroundColor: PALETTE }] }, options: { plugins: { legend: { display: false } } } });
     document.getElementById('ovCategoryLegend').innerHTML = doughnutLegendHtml(categories.map((c) => c.category), categories.map((c) => c.revenue_est), formatRs);
 }
@@ -975,13 +1009,13 @@ function refreshTopProductsChart() {
 }
 
 function renderTopProductsChart(products, by) {
-    if (!products.length) { destroyChart('productsTopChart'); document.getElementById('productsTopChart').closest('.dash-chart-wrap').innerHTML = emptyStateHtml(); return; }
+    if (!products.length) { setChartEmptyState('productsTopChart'); return; }
     const values = products.map((p) => by === 'revenue' ? p.revenue_est : (p.qty + p.weight_kg));
     makeChart('productsTopChart', { type: 'bar', data: { labels: products.map((p) => p.name), datasets: [{ label: by === 'revenue' ? 'Revenue (est.)' : 'Qty', data: values, backgroundColor: PALETTE[0] }] }, options: { indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#8fa391' } }, y: { ticks: { color: '#8fa391' } } } } });
 }
 
 function renderCategoryChart(categories) {
-    if (!categories.length) { destroyChart('categoryChart'); document.getElementById('categoryChart').closest('.dash-chart-wrap').innerHTML = emptyStateHtml(); document.getElementById('categoryLegend').innerHTML = ''; return; }
+    if (!categories.length) { setChartEmptyState('categoryChart'); document.getElementById('categoryLegend').innerHTML = ''; return; }
     makeChart('categoryChart', { type: 'doughnut', data: { labels: categories.map((c) => c.category), datasets: [{ data: categories.map((c) => c.revenue_est), backgroundColor: PALETTE }] }, options: { plugins: { legend: { display: false } } } });
     document.getElementById('categoryLegend').innerHTML = doughnutLegendHtml(categories.map((c) => c.category), categories.map((c) => c.revenue_est), formatRs);
 }
@@ -1021,8 +1055,7 @@ async function loadCredit() {
             { label: 'Repaid', data: data.trend.map((t) => t.repaid), backgroundColor: PALETTE[1] },
         ] }, options: { scales: { x: { ticks: { color: '#8fa391', font: { size: 9 } } }, y: { ticks: { color: '#8fa391' } } } } });
     } else {
-        destroyChart('creditTrendChart');
-        document.getElementById('creditTrendChart').closest('.dash-chart-wrap').innerHTML = emptyStateHtml();
+        setChartEmptyState('creditTrendChart');
     }
 
     renderTable('creditCustomersTable', [
@@ -1050,8 +1083,7 @@ async function loadInventory() {
         }));
         makeChart('movementsChart', { type: 'bar', data: { labels: allTypes, datasets }, options: { scales: { x: { ticks: { color: '#8fa391', font: { size: 9 } } }, y: { ticks: { color: '#8fa391' } } } } });
     } else {
-        destroyChart('movementsChart');
-        document.getElementById('movementsChart').closest('.dash-chart-wrap').innerHTML = emptyStateHtml();
+        setChartEmptyState('movementsChart');
     }
     renderTable('wasteTable', [{ key: 'product', label: 'Product' }, { key: 'total', label: 'Qty wasted', num: true }, { key: 'count', label: 'Entries', num: true }], data.waste, { emptyMessage: 'No waste recorded in this period.' });
     renderTable('stockTable', [
@@ -1076,8 +1108,7 @@ async function loadOrders() {
         makeChart('ordersByStatusChart', { type: 'doughnut', data: { labels: statuses, datasets: [{ data: statuses.map((s) => data.by_status[s]), backgroundColor: PALETTE }] }, options: { plugins: { legend: { display: false } } } });
         document.getElementById('ordersByStatusLegend').innerHTML = doughnutLegendHtml(statuses, statuses.map((s) => data.by_status[s]), (v) => formatNum(v));
     } else {
-        destroyChart('ordersByStatusChart');
-        document.getElementById('ordersByStatusChart').closest('.dash-chart-wrap').innerHTML = emptyStateHtml();
+        setChartEmptyState('ordersByStatusChart');
         document.getElementById('ordersByStatusLegend').innerHTML = '';
     }
     renderOrdersFunnel(data.by_status);
@@ -1085,8 +1116,7 @@ async function loadOrders() {
         const rows = state.granularity === 'day' ? zeroFillDaily(data.over_time, state.start, state.end, ['count']) : data.over_time;
         makeChart('ordersOverTimeChart', timeSeriesChartConfig(rows, [{ label: 'Orders', field: 'count', color: PALETTE[0] }], { integerTicks: true }));
     } else {
-        destroyChart('ordersOverTimeChart');
-        document.getElementById('ordersOverTimeChart').closest('.dash-chart-wrap').innerHTML = emptyStateHtml();
+        setChartEmptyState('ordersOverTimeChart');
     }
     renderOrdersTable(data.recent_orders);
 }
