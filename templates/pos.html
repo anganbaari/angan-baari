@@ -130,47 +130,79 @@
 
         /* ── Receipt view ── */
         #receiptView { display: flex; flex-direction: column; flex: 1; min-height: 0; }
-        /* Up to 7 rows per page, same paging behaviour as before, but rows
-           are no longer forced to an equal 1fr share that clips overflow --
-           minmax(max(44px, min-content), 1fr) means every row is STILL at
-           least 44px (touch target) and still stretches via 1fr to fill
-           leftover space the normal way when a row's content is short, but
-           a row whose content genuinely needs more (a long product name +
-           its detail line + the below-direct-cost note -- see
-           lineBelowCostNote()/renderReceipt()) grows to fit instead of
-           clipping. .receipt-table-wrap gained overflow-y:auto (was
-           overflow:hidden) so the rare case of several tall rows at once
-           scrolls instead of being cut off below the fold. This is a real
-           <table> for markup/semantics, laid out as a CSS Grid; thead/
-           tbody/tr get display:contents so th/td become direct grid items
-           in DOM order. */
-        .receipt-table-row { display: flex; gap: 8px; flex: 1; min-height: 0; }
-        .receipt-table-wrap { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; }
+        /* STATIC table: exactly 7 data rows, every one the SAME fixed
+           height (--receipt-row-h) regardless of content -- an empty row
+           and a row with the longest product name take up identically
+           sized grid cells. Deliberately not responsive: the SAME height
+           is used at every width (1280/820/390), not just a touch-target
+           floor like the old minmax(max(44px, min-content), 1fr) did.
+           76px was sized to comfortably fit a 2-line product name (the
+           name itself is clamped to 2 lines via -webkit-line-clamp
+           below -- longer names ellipsis, with a title attribute for the
+           full text) plus the detail/below-cost-note line underneath,
+           at the table's own font sizes, with room to spare -- confirmed
+           by measuring actual rendered row heights in a browser (see the
+           POS fixes task's report). Because every row's height is now a
+           fixed constant instead of content-driven, the table's own
+           total height is also fixed (no height:100%, no flex grow/
+           shrink, no vertical overflow -- see .receipt-table-row/
+           .receipt-table-wrap just below), so adding or removing a
+           product, or applying/removing the coupon row, can never resize
+           the table itself. */
+        :root { --receipt-row-h: 76px; }
+        .receipt-table-row { display: flex; gap: 8px; }
+        /* flex:1 here is about WIDTH, not height -- .receipt-table-row is a
+           flex ROW (.receipt-table-wrap alongside .table-pager), so flex
+           controls the horizontal main axis: without it the wrap has no
+           definite width for .receipt-table's own width:100% to resolve
+           against, and the grid silently shrinks to its (near-zero, for
+           blank rows) content width instead of filling the available
+           space. Vertical sizing is unaffected by this -- the table's
+           height is now fixed by its grid-template-rows regardless. */
+        .receipt-table-wrap { flex: 1; overflow-x: hidden; }
         .receipt-table {
             display: grid; grid-template-columns: 6% 34% 15% 13% 17% 15%;
-            grid-template-rows: auto repeat(7, minmax(max(44px, min-content), 1fr));
-            width: 100%; height: 100%; background: var(--pos-bg); border: 2px solid var(--pos-border-dark);
+            grid-template-rows: auto repeat(7, var(--receipt-row-h));
+            width: 100%; background: var(--pos-bg); border: 2px solid var(--pos-border-dark);
         }
         .receipt-table thead, .receipt-table tbody, .receipt-table tr { display: contents; }
         .receipt-table th, .receipt-table td {
-            display: flex; align-items: center; justify-content: center;
+            display: flex; align-items: center; justify-content: center; overflow: hidden;
             border: 1px solid var(--pos-border-dark); padding: 6px 10px; font-size: 0.95rem; font-weight: 700;
             text-align: center; color: var(--pos-text-black); line-height: 1.15; box-sizing: border-box;
         }
         .receipt-table th { background: var(--pos-bg); font-weight: 800; font-family: 'Noto Sans Devanagari', 'DM Sans', sans-serif; }
         .receipt-table td.name-cell { justify-content: flex-start; text-align: left; }
         .name-cell-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; width: 100%; min-height: 100%; }
-        .name-cell-row > div.name-cell-text { min-width: 0; flex: 1; }
-        .cart-line-name { overflow-wrap: anywhere; }
+        .name-cell-row > div.name-cell-text { min-width: 0; flex: 1; overflow: hidden; }
+        /* Clamped to 2 lines, ellipsis past that -- never grows the fixed-
+           height row. renderReceipt() sets a title attribute with the
+           full name alongside this, so a clamped name is still readable
+           on hover/long-press. */
+        .cart-line-name {
+            overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
         .receipt-coupon-row td { background: #fdf3f3; }
         .receipt-coupon-row .cart-line-name { color: #b23b3b; font-weight: 800; }
         /* Detail ("1.000kg") and the amber below-direct-cost note share one
            line, note to the right -- wraps under the detail instead of
            clipping if the row is too narrow for both. */
-        .cart-line-detail-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; margin-top: 1px; }
-        .cart-line-detail { font-size: 0.88rem; color: var(--text-muted); }
+        /* Single line, never wraps -- the row's height is now fixed (see
+           --receipt-row-h above), so there's no room to grow into a
+           second line the way this used to when a row could stretch.
+           Detail ("1.000kg") and the amber below-cost note share this one
+           line; each truncates with its own ellipsis + title (already
+           set on both spans in renderReceipt()) if the two together
+           don't fit, rather than wrapping or clipping awkwardly. */
+        .cart-line-detail-row { display: flex; flex-wrap: nowrap; align-items: baseline; gap: 6px; margin-top: 1px; min-width: 0; }
+        .cart-line-detail {
+            font-size: 0.88rem; color: var(--text-muted); white-space: nowrap; overflow: hidden;
+            text-overflow: ellipsis; flex-shrink: 1; min-width: 0;
+        }
         .cart-line-note {
-            font-size: 11px; font-weight: 700; color: var(--pos-enter-orange); overflow-wrap: anywhere;
+            font-size: 11px; font-weight: 700; color: var(--pos-enter-orange);
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 2; min-width: 0;
         }
         @media (max-width: 480px) {
             .cart-line-note { font-size: 10px; }
@@ -660,20 +692,20 @@
                stay tappable, but no longer insists on its exact
                kiosk-width pixel value.
 
-               Found by testing: simply letting this row wrap, with
-               nothing else changed, grows it so tall (5+ stacked button
-               groups plus the reminder card plus the full tax box) that
-               it squeezes .receipt-table-row -- the actual cart -- down
-               to 0 height, since that row only has flex:1 of whatever's
-               left after this flex-shrink:0 row takes what it wants. Two
-               changes fix that together: .receipt-table-row gets an
-               explicit min-height so the cart itself can never be
-               squeezed away, and `order` puts the tax box + Pay button
-               FIRST in this row (right after the cart, before Logout/
-               reminder/Low-Stock/Repay/Offers) so "the total and the Pay
-               button stay reachable without scrolling" even though the
-               rest of this row may now need a scroll to reach. */
-            .receipt-table-row { min-height: 230px; }
+               `order` puts the tax box + Pay button FIRST in this row
+               (right after the cart, before Logout/reminder/Low-Stock/
+               Repay/Offers) so "the total and the Pay button stay
+               reachable without scrolling" even though the rest of this
+               row may now need a scroll to reach. (An explicit min-height
+               on .receipt-table-row used to live here too, to stop this
+               wrapped row's stacked content squeezing the cart table down
+               to 0 height when both shared leftover flex space -- the
+               cart table is now a fixed size of its own regardless of
+               what this row does, see --receipt-row-h above, so that
+               squeeze can no longer happen and the min-height was
+               removed as dead weight.) #receiptView's own overflow-y:auto
+               below is what actually keeps this row's wrapped content
+               reachable if it's ever taller than the viewport. */
             .receipt-combined-row { flex-wrap: wrap; }
             .tax-box { order: 1; flex: 1 1 100%; min-width: 0; }
             .payment-col { order: 2; width: auto; flex: 1 1 100%; }
@@ -852,7 +884,6 @@
                         <div class="tax-row coupon-row" id="couponRow"></div>
                         <div class="tax-row discount-row" id="discountRow" style="display:none;"><span>छुट</span><span id="taxDiscount">Rs. 0</span></div>
                         <div class="tax-row"><span>कुल कर</span><span id="taxVat">Rs. 0</span></div>
-                        <div class="tax-row"><span>कर बा. मूल्य</span><span id="taxTaxable">Rs. 0</span></div>
                         <div class="tax-row"><span>कर स. मूल्य</span><span id="taxExempt">Rs. 0</span></div>
                         <div class="tax-row round-off-row" id="roundOffRow" style="display:none;"><span>राउन्ड अफ</span><span id="taxRoundOff">Rs. 0</span></div>
                         <div class="tax-row grand-total"><span>जम्मा</span><span id="cartTotal">Rs. 0</span></div>
@@ -1022,12 +1053,14 @@
         const LIVE_COUPONS = JSON.parse(document.getElementById('posCouponsData').textContent);
         const IS_VAT_ENABLED = {{ is_vat_enabled|yesno:"true,false" }};
         const VAT_RATE = {{ vat_rate }};
-        // Same gate the old bottom-left Wholesale/Retail button was
-        // server-rendered under (the is_owner_or_manager context var) --
-        // now that the header RETAIL/WHOLESALE label is the only mode
-        // control, it reads this directly instead of checking whether
-        // that button exists.
-        const IS_OWNER_OR_MANAGER = {{ is_owner_or_manager|yesno:"true,false" }};
+        // NOTE: deliberately NOT reading a page-load-time
+        // is_owner_or_manager flag here (there used to be one,
+        // IS_OWNER_OR_MANAGER) -- it reflected whichever Django session is
+        // logged into this terminal, not the PIN-identified operator
+        // currently standing at it, and went stale the moment a different
+        // staff member PIN-unlocked on top of an owner's day-long login.
+        // See operatorCanToggleWholesale() for the operator-aware
+        // replacement.
 
         let activeCategory = CATEGORIES[0] || null;
         let cart = []; // { product_id, name, pricing_mode, qty, weight, variant_id, unit_id, unit_name, offer_id, combo_instance_id, detail, unit_price, line_total, is_taxable, price_override, list_line_total }
@@ -1202,6 +1235,11 @@
                 nameEl.title = '';
                 el.innerHTML = `<div class="pos-lock-instruction">कृपया बारकोड स्क्यान गर्नुहोस् वा staff को नम्बर हालेर Enter बटन थिच्छुहोस् ।</div>`;
             }
+            // Re-syncs the header mode label (and, if necessary, resets
+            // Wholesale mode) to whoever the operator identity just
+            // became -- runs on every lock AND every unlock, since both
+            // are "the operator standing here might have just changed."
+            syncWholesaleModeToOperator();
         }
 
         function setLocked(locked) {
@@ -2731,9 +2769,9 @@
                         <td class="name-cell">
                             <div class="name-cell-row">
                                 <div class="name-cell-text">
-                                    <div class="cart-line-name">${line.name}</div>
+                                    <div class="cart-line-name" title="${line.name}">${line.name}</div>
                                     <div class="cart-line-detail-row">
-                                        <span class="cart-line-detail">${line.detail}</span>
+                                        <span class="cart-line-detail" title="${line.detail}">${line.detail}</span>
                                         ${belowCostNote ? `<span class="cart-line-note" title="${belowCostNote}">⚠ ${belowCostNote}</span>` : ''}
                                     </div>
                                 </div>
@@ -2794,7 +2832,10 @@
 
             document.getElementById('cartTotal').textContent = 'Rs. ' + formatMoney(totals.grandTotal);
             document.getElementById('taxVat').textContent = 'Rs. ' + formatMoney(totals.vatAmount);
-            document.getElementById('taxTaxable').textContent = 'Rs. ' + formatMoney(totals.taxableValue);
+            // The #taxTaxable row (the taxable-value line) was removed
+            // from the totals box display -- totals.taxableValue is still
+            // computed exactly as before (used for VAT math and still on
+            // the saved sale), it's just no longer shown here.
             document.getElementById('taxExempt').textContent = 'Rs. ' + formatMoney(totals.exemptValue);
             updateCouponUI(totals.discount);
             updateRoundOffUI(totals.roundOff);
@@ -2897,16 +2938,43 @@
         // ══════════════════════════════════════════════════════════════
         // Wholesale mode — bulk sale to a named buyer, manual per-line
         // prices, no coupons/offers/combos. The header RETAIL/WHOLESALE
-        // label is the only control that switches it; it's tappable only
-        // for an owner/manager account (IS_OWNER_OR_MANAGER, same gate the
-        // old bottom-left button was server-rendered under -- see
-        // is_owner_or_manager in the template context); create_pos_sale()
-        // re-checks this independently from request.user, so this is a UI
-        // convenience, never the real authorization boundary.
+        // label is the only control that switches it. Gated on the
+        // CURRENTLY PIN-UNLOCKED OPERATOR (see operatorCanToggleWholesale()
+        // below), not on whichever Django session happens to be logged
+        // into this terminal -- the terminal login can stay active all day
+        // while different staff take turns operating the register via PIN
+        // (see CLAUDE.md / create_pos_sale()'s own docstring), so a flag
+        // computed once at page-render time from request.user would be
+        // stale the moment a different operator PIN-unlocks.
+        // create_pos_sale()/POSSaleView re-check authorization server-side
+        // too (see api/views.py's POSSaleView.post(), which currently
+        // computes wholesale_authorized from request.user the same
+        // session-based way this client-side gate used to -- flagged
+        // separately, not changed here).
         // ══════════════════════════════════════════════════════════════
         const headerModeLabel = document.getElementById('headerModeLabel');
 
+        // Single source of truth for "can the operator standing at this
+        // terminal RIGHT NOW switch Wholesale mode" -- re-evaluated fresh
+        // on every call from the live currentOperator (set only by a real
+        // PIN unlock, online or offline; see submitPin()/
+        // submitPinOffline()), never cached. Requires an actually unlocked
+        // operator: the lock screen's own pointer-events:none only covers
+        // #posBody, not the header, so without this explicit isUnlocked
+        // check the label stayed live (and, before this fix, authorized)
+        // straight through the lock screen too.
+        function operatorCanToggleWholesale() {
+            if (!isUnlocked || !currentOperator) return false;
+            return currentOperator.role === 'admin' || currentOperator.role === 'manager';
+        }
+
         function toggleWholesaleMode() {
+            // Defense in depth, not just the header label's own disabled
+            // state (which already stops a normal tap from reaching here)
+            // -- this makes the function itself safe against any other
+            // path that might call it (keyboard activation, the browser
+            // console, a future leftover handler).
+            if (!operatorCanToggleWholesale()) return;
             if (cart.length > 0) {
                 if (!confirm('Switching wholesale mode will clear your cart. Continue?')) return;
                 cart = [];
@@ -2917,24 +2985,27 @@
             renderReceipt();
             updateCartIndicator();
         }
-        if (headerModeLabel) {
-            if (IS_OWNER_OR_MANAGER) {
-                headerModeLabel.addEventListener('click', toggleWholesaleMode);
-            } else {
-                // Anyone else sees plain, disabled, display-only text --
-                // whatever mode an owner/manager already put this shared
-                // till into, same as the old button being absent entirely.
-                headerModeLabel.disabled = true;
-            }
-        }
+        // Always attached -- toggleWholesaleMode() guards itself above, so
+        // the listener doesn't need to be conditionally wired/unwired as
+        // the operator changes; only the label's visual/disabled state
+        // (in applyWholesaleModeUI(), re-run on every operator change via
+        // renderHeaderStatus() -> syncWholesaleModeToOperator()) does.
+        if (headerModeLabel) headerModeLabel.addEventListener('click', toggleWholesaleMode);
         applyWholesaleModeUI(); // set the label's initial state on page load
 
         function applyWholesaleModeUI() {
             document.getElementById('wholesaleBanner').style.display = wholesaleMode ? '' : 'none';
             if (headerModeLabel) {
+                const canToggle = operatorCanToggleWholesale();
                 headerModeLabel.textContent = wholesaleMode ? 'WHOLESALE' : 'RETAIL';
                 headerModeLabel.classList.toggle('wholesale', wholesaleMode);
-                headerModeLabel.title = IS_OWNER_OR_MANAGER
+                // A disabled <button> neither fires click events nor shows
+                // a pointer cursor/hover effect (see .pos-header-mode-
+                // label:disabled in the CSS) -- this alone satisfies "not
+                // clickable, no pointer cursor, no hover" for an operator
+                // who isn't authorized; it still displays the current mode.
+                headerModeLabel.disabled = !canToggle;
+                headerModeLabel.title = canToggle
                     ? (wholesaleMode ? 'Switch to retail mode' : 'Switch to wholesale mode')
                     : 'Wholesale mode';
             }
@@ -2946,6 +3017,24 @@
             if (creditLabel) creditLabel.textContent = wholesaleMode ? 'Buyer (required for wholesale)' : 'Credit customer';
             if (wholesaleMode) clearCoupon(true);
             updatePaymentSummary();
+        }
+
+        // Re-syncs wholesale-mode gating to whoever the operator identity
+        // just became -- called from renderHeaderStatus() (below, in the
+        // Lock/unlock section), which already runs on every PIN unlock and
+        // every lock. A newly-identified operator who ISN'T authorized
+        // must not silently inherit Wholesale mode left on by whoever
+        // operated this shared till before them (e.g. an owner leaves it
+        // in wholesale mode, a cashier PIN-unlocks next) -- resets to
+        // Retail in that case; an operator who IS authorized keeps
+        // whatever mode was already active.
+        function syncWholesaleModeToOperator() {
+            if (wholesaleMode && !operatorCanToggleWholesale()) {
+                wholesaleMode = false;
+                renderReceipt();
+                updateCartIndicator();
+            }
+            applyWholesaleModeUI();
         }
 
         // Tapping a cart line's price cell in wholesale mode opens this --

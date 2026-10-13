@@ -1100,31 +1100,85 @@ class WholesaleSaleTests(TestCase):
 class PosHeaderModeLabelGatingTests(TestCase):
     """The old bottom-left Wholesale/Retail button was deleted -- the
     header's RETAIL/WHOLESALE label is now the only control that switches
-    modes, gated client-side by IS_OWNER_OR_MANAGER (embedded in pos_view()'s
-    own JS payload), the SAME owner/manager check create_pos_sale() enforces
-    server-side. That gate is a UI convenience, never the real authorization
-    boundary, but it must still never let someone who can't actually use
-    wholesale mode tap their way into it."""
+    modes.
 
-    def test_cashier_cannot_toggle_wholesale(self):
-        user = User.objects.create_user('tmpl_cashier', password='pw', is_staff=True)
-        UserProfile.objects.create(user=user, role='cashier')
-        self.client.login(username='tmpl_cashier', password='pw')
+    A PREVIOUS version of this fix gated the label on an IS_OWNER_OR_MANAGER
+    flag computed once at page-render time from request.user (the
+    terminal's own day-long Django session) and baked into the page's JS.
+    That was a real bug: the terminal login can stay active all day while
+    different staff take turns operating the register via PIN (see
+    CLAUDE.md / create_pos_sale()'s own docstring), so the flag went stale
+    -- and, since it was still TRUE for whoever's session rendered the
+    page, a cashier who PIN-unlocked on top of an owner's left-open
+    session inherited the owner's wholesale authorization. The fix derives
+    the gate fresh from the live PIN-identified operator instead
+    (operatorCanToggleWholesale(), reading currentOperator.role, itself
+    returned by POST /api/v1/pos/unlock/ -- see PosUnlockApiTests for that
+    endpoint's own coverage) -- there is no longer a page-load-time flag
+    AT ALL for a Django TestCase to inspect per session, so this just
+    guards against the old flag (or the old button) reappearing, for any
+    session role."""
+
+    def _render_pos_for(self, username, role):
+        user = User.objects.create_user(username, password='pw', is_staff=True)
+        UserProfile.objects.create(user=user, role=role)
+        self.client.login(username=username, password='pw')
         response = self.client.get('/pos/')
         self.assertEqual(response.status_code, 200)
-        content = response.content.decode()
+        return response.content.decode()
+
+    def test_no_stale_session_based_flag_for_cashier_session(self):
+        content = self._render_pos_for('tmpl_cashier', 'cashier')
         self.assertNotIn('id="wholesaleToggleBtn"', content)  # the old button no longer exists at all
-        self.assertIn('const IS_OWNER_OR_MANAGER = false;', content)
+        # The stale page-load-time flag/variable is gone -- checking the
+        # declaration pattern specifically (not the bare identifier) since
+        # a code comment nearby still explains, in prose, why it was
+        # removed.
+        self.assertNotIn('const IS_OWNER_OR_MANAGER', content)
 
-    def test_owner_can_toggle_wholesale(self):
-        user = User.objects.create_user('tmpl_owner', password='pw', is_staff=True)
-        UserProfile.objects.create(user=user, role='admin')
-        self.client.login(username='tmpl_owner', password='pw')
+    def test_no_stale_session_based_flag_for_owner_session(self):
+        content = self._render_pos_for('tmpl_owner', 'admin')
+        self.assertNotIn('id="wholesaleToggleBtn"', content)
+        self.assertNotIn('const IS_OWNER_OR_MANAGER', content)
+
+    def test_operator_aware_gating_functions_are_present(self):
+        # Regression guard that the operator-derived replacement actually
+        # ships on the page, for any session -- not a behavioral test
+        # (that's the browser verification in this task's report), just
+        # confirms the fix's own code wasn't accidentally dropped/renamed.
+        content = self._render_pos_for('tmpl_any', 'cashier')
+        self.assertIn('function operatorCanToggleWholesale()', content)
+        self.assertIn('function syncWholesaleModeToOperator()', content)
+        self.assertIn('if (!operatorCanToggleWholesale()) return;', content)
+
+
+class PosTotalsBoxTaxableRowRemovedTests(TestCase):
+    """The "कर बा. मूल्य" (#taxTaxable) row was removed from the POS
+    totals box display -- shop/views.py's tax/total calculation itself
+    (and the saved POSSale record) are untouched; only this one row's
+    markup and its JS write are gone."""
+
+    def setUp(self):
+        user = User.objects.create_user('taxrow_cashier', password='pw', is_staff=True)
+        UserProfile.objects.create(user=user, role='cashier')
+        self.client.login(username='taxrow_cashier', password='pw')
+
+    def test_taxable_row_not_rendered(self):
         response = self.client.get('/pos/')
         self.assertEqual(response.status_code, 200)
         content = response.content.decode()
-        self.assertNotIn('id="wholesaleToggleBtn"', content)
-        self.assertIn('const IS_OWNER_OR_MANAGER = true;', content)
+        self.assertNotIn('id="taxTaxable"', content)
+        self.assertNotIn('कर बा. मूल्य', content)
+
+    def test_other_totals_rows_still_rendered(self):
+        response = self.client.get('/pos/')
+        content = response.content.decode()
+        self.assertIn('id="taxVat"', content)
+        self.assertIn('id="taxExempt"', content)
+        self.assertIn('id="cartTotal"', content)
+        self.assertIn('कुल कर', content)
+        self.assertIn('कर स. मूल्य', content)
+        self.assertIn('जम्मा', content)
 
 
 class PosCouponPickerDataTests(TestCase):
