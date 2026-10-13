@@ -1,3 +1,5 @@
+import json
+import re
 import uuid
 from datetime import timedelta
 from decimal import Decimal
@@ -14,7 +16,7 @@ from rest_framework.test import APIClient
 
 from .admin import UserProfileInlineForm
 from .models import (
-    BundleItem, Category, CostEntry, CreditTransaction, Customer, FarmAsset, InventoryMovement,
+    BundleItem, Category, CostEntry, Coupon, CreditTransaction, Customer, FarmAsset, InventoryMovement,
     ContactMessage, NewsletterSubscriber, Offer, POSSale, Product, ProductVariant, PurchaseBatch, UserProfile,
 )
 from .views import create_pos_sale, POSSaleValidationError
@@ -1117,6 +1119,88 @@ class PosWholesaleToggleVisibilityTests(TestCase):
         response = self.client.get('/pos/')
         self.assertEqual(response.status_code, 200)
         self.assertIn('id="wholesaleToggleBtn"', response.content.decode())
+
+
+class PosCouponPickerDataTests(TestCase):
+    """pos_view() embeds a live-coupons list (POS Phase E coupon picker)
+    the same way PRODUCTS/CATEGORIES are already embedded -- staff-only
+    (this whole view is @staff_member_required) and never exposed through
+    a public page or the public /api/v1/coupons/ endpoint, which has its
+    own separate, pre-existing get_live_coupons() call."""
+
+    def setUp(self):
+        now = timezone.now()
+        self.live = Coupon.objects.create(
+            code='PICKERLIVE', discount_type='percent', discount_value=Decimal('10'),
+            start_date=now - timedelta(days=1), end_date=now + timedelta(days=1),
+        )
+        self.expired = Coupon.objects.create(
+            code='PICKEREXPIRED', discount_type='fixed', discount_value=Decimal('50'),
+            start_date=now - timedelta(days=10), end_date=now - timedelta(days=1),
+        )
+        self.inactive = Coupon.objects.create(
+            code='PICKERINACTIVE', discount_type='fixed', discount_value=Decimal('50'),
+            start_date=now - timedelta(days=1), end_date=now + timedelta(days=1), is_active=False,
+        )
+        self.used_up = Coupon.objects.create(
+            code='PICKERUSEDUP', discount_type='fixed', discount_value=Decimal('50'),
+            start_date=now - timedelta(days=1), end_date=now + timedelta(days=1),
+            max_uses=1, used_count=1,
+        )
+        self.staff = User.objects.create_user('picker_cashier', password='pw', is_staff=True)
+        UserProfile.objects.create(user=self.staff, role='cashier')
+
+    def test_pos_view_embeds_only_live_coupons(self):
+        self.client.login(username='picker_cashier', password='pw')
+        response = self.client.get('/pos/')
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertIn('PICKERLIVE', content)
+        self.assertNotIn('PICKEREXPIRED', content)
+        self.assertNotIn('PICKERINACTIVE', content)
+        self.assertNotIn('PICKERUSEDUP', content)
+
+    def test_pos_view_coupon_entry_shape(self):
+        self.client.login(username='picker_cashier', password='pw')
+        response = self.client.get('/pos/')
+        match = re.search(
+            r'<script id="posCouponsData" type="application/json">(.*?)</script>',
+            response.content.decode(), re.S,
+        )
+        self.assertIsNotNone(match)
+        coupons = json.loads(match.group(1))
+        self.assertEqual(len(coupons), 1)
+        entry = coupons[0]
+        self.assertEqual(entry['code'], 'PICKERLIVE')
+        self.assertEqual(entry['discount_text'], '10% off')
+        self.assertEqual(entry['min_order_amount'], '0.00')
+
+    def test_anonymous_request_never_reaches_coupon_data(self):
+        # pos_view is @staff_member_required -- an anonymous request never
+        # reaches the point where coupons_json is built, so this list can
+        # never leak to a logged-out visitor via /pos/.
+        response = self.client.get('/pos/')
+        self.assertNotEqual(response.status_code, 200)
+        self.assertNotIn('PICKERLIVE', response.content.decode())
+
+    def test_public_coupon_api_unaffected_by_picker_data(self):
+        # The pre-existing public /api/v1/coupons/ list (get_live_coupons(),
+        # shared with the public offers page) is untouched by the POS
+        # picker's own, separately-embedded staff-only list -- same live
+        # coupon shows up on both, but through two independent code paths.
+        token_user = User.objects.create_user('public_coupon_viewer', password='pw')
+        token = Token.objects.create(user=token_user)
+        client = APIClient()
+        client.credentials(HTTP_AUTHORIZATION=f'Token {token.key}')
+        response = client.get(reverse('v1_coupon_list'))
+        self.assertEqual(response.status_code, 200)
+        results = response.data['results']
+        codes = {c['code'] for c in results}
+        self.assertIn('PICKERLIVE', codes)  # same is_live() rule, independently applied
+        self.assertNotIn('PICKEREXPIRED', codes)
+        # Only the public-safe fields -- never the picker's own discount_text/
+        # min_order_amount shape, confirming the two serializers are separate.
+        self.assertNotIn('discount_text', results[0])
 
 
 class HiddenProductPublicVisibilityTests(TestCase):

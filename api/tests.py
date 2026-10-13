@@ -678,6 +678,31 @@ class POSCouponApiTests(ApiTestBase):
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
+    def test_sale_with_coupon_produces_same_total_as_before_picker(self):
+        """Regression guard for the POS coupon-picker UI change (tap-to-
+        apply from a popup instead of a typed code) -- the picker only
+        changes how pos.html gathers a code before calling this exact same
+        endpoint/payload shape; create_pos_sale()/resolve_pos_coupon() were
+        never touched, so an identical payload must still produce the exact
+        same total and discount it always did."""
+        payload = {
+            'client_sale_id': str(uuid.uuid4()),
+            'coupon_code': 'dashain25',
+            # 250 - 25% = 187.50 -- rounds UP to 188 (POS cash rounding, ROUND_HALF_UP).
+            'payments': [{'method': 'cash', 'amount': '188.00'}],
+            'cart': [{'product_id': self.jar.id, 'qty': 1}],
+        }
+        response = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+
+        sale = POSSale.objects.get(client_sale_id=payload['client_sale_id'])
+        self.assertEqual(sale.discount_amount, Decimal('62.50'))
+        self.assertEqual(sale.total_amount, Decimal('188.00'))
+        self.assertEqual(sale.coupon.code, 'DASHAIN25')
+
+        self.percent_coupon.refresh_from_db()
+        self.assertEqual(self.percent_coupon.used_count, 1)
+
     def test_validate_endpoint_enforces_min_order_amount(self):
         self.fixed_coupon.min_order_amount = Decimal('1000.00')
         self.fixed_coupon.save(update_fields=['min_order_amount'])

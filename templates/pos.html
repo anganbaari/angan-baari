@@ -67,12 +67,39 @@
         .pos-header-divider { width: 1.5px; align-self: stretch; background: var(--mist); }
         .pos-header-right { flex: 1; display: flex; align-items: center; justify-content: flex-end; gap: 14px; text-align: right; z-index: 1; }
 
+        /* Staff name -- centred on the whole header, not just in the
+           leftover space between the logo and the edge, so its position
+           doesn't shift with the brand block's width. Absolutely
+           positioned against .pos-header (position:relative above);
+           max-width keeps it clear of the brand block and the mode
+           label/lock-instruction on a laptop-width header -- empty and
+           inert (no min-height claimed) when there's no operator name to
+           show, so the lock-instruction text in .pos-header-right stays
+           centred in its own row as before. */
+        .pos-header-operator-center {
+            position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+            max-width: 34vw; font-size: 1.15rem; font-weight: 800; color: var(--pos-text-green);
+            letter-spacing: 0.03em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        /* The mode label always agrees with the bottom-left Wholesale/
+           Retail button (applyWholesaleModeUI() updates both from the
+           one wholesaleMode variable) -- RETAIL and WHOLESALE get
+           distinct colours so the two are easy to tell apart at a
+           glance, not just by text. Tappable only when the bottom-left
+           button also exists (owner/manager); otherwise a plain label. */
+        .pos-header-mode-label {
+            font-family: 'DM Sans', sans-serif; border: none; border-radius: 8px; padding: 6px 14px;
+            font-weight: 800; font-size: 0.82rem; letter-spacing: 0.06em; cursor: pointer;
+            background: #dcecd4; color: var(--pos-text-green); flex-shrink: 0;
+        }
+        .pos-header-mode-label.wholesale { background: #f0a500; color: #1a1a1a; }
+        .pos-header-mode-label:disabled { cursor: default; }
+
         .offline-banner {
             display: none; background: #b4790f; color: #fff; text-align: center; font-weight: 700;
             font-size: 0.85rem; padding: 6px 12px; flex-shrink: 0; font-family: 'DM Sans', sans-serif;
         }
         .pos-lock-instruction { font-size: 0.82rem; color: var(--pos-text-green); line-height: 1.4; font-weight: 700; }
-        .pos-operator { font-size: 1.15rem; font-weight: 800; color: var(--pos-text-green); letter-spacing: 0.03em; min-width: 220px; text-align: center; }
 
         /* ── Main layout: everything below header, category row pinned to bottom.
            No page scroll -- .pos-content is a flex column and the table wrap is
@@ -233,17 +260,66 @@
         .tax-box .tax-row.grand-total span { font-size: 1.12rem; }
         .tax-box .tax-row.discount-row span:last-child { color: #b23b3b; }
 
-        .tax-box .coupon-row { display: flex; gap: 6px; padding: 5px 8px; }
-        .tax-box .coupon-row input {
-            flex: 1; min-width: 0; border: 1.5px solid var(--pos-border-dark); border-radius: 6px;
-            padding: 4px 8px; font-size: 0.9rem; font-family: 'DM Sans', sans-serif;
+        .tax-box .coupon-row { display: flex; padding: 5px 8px; }
+        .coupon-picker-btn {
+            flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
+            min-height: 44px; border: 1.5px dashed var(--pos-border-dark); border-radius: 6px;
+            background: #fff; color: var(--pos-text-green); font-weight: 800; font-size: 0.9rem;
+            font-family: 'DM Sans', sans-serif; cursor: pointer;
         }
-        .tax-box .coupon-row input:disabled { background: #f3f8f0; color: var(--pos-text-green); font-weight: 700; }
-        .tax-box .coupon-row button {
-            flex-shrink: 0; border: none; border-radius: 6px; padding: 4px 12px; font-weight: 800;
+        .coupon-picker-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        .coupon-applied-chip {
+            flex: 1; display: flex; align-items: center; justify-content: space-between; gap: 8px;
+            min-height: 44px; padding: 0 10px; border-radius: 6px; background: #f3f8f0;
+            border: 1.5px solid var(--pos-text-green);
+        }
+        .coupon-applied-chip span { font-weight: 800; color: var(--pos-text-green); font-size: 0.9rem; }
+        .coupon-applied-chip button {
+            flex-shrink: 0; min-height: 36px; border: none; border-radius: 6px; padding: 4px 12px;
+            font-weight: 800; font-size: 0.82rem; cursor: pointer; background: #b23b3b; color: #fff;
+        }
+
+        /* ── Coupon picker popup -- its own backdrop (not the shared
+           #itemModal) so tap-outside-to-close only ever applies here,
+           never to the weight/variant/offers/restock modals that already
+           share #itemModal without one. ── */
+        #couponBackdrop {
+            display: none; position: fixed; inset: 0; z-index: 400; background: rgba(26,47,30,0.45);
+            align-items: center; justify-content: center; padding: 16px; box-sizing: border-box;
+        }
+        #couponBackdrop.active { display: flex; }
+        .coupon-modal-card {
+            background: var(--white); border-radius: 16px; padding: 22px; width: 100%; max-width: 420px;
+            max-height: 100dvh; max-height: 90vh; overflow-y: auto; box-sizing: border-box;
+        }
+        .coupon-modal-card h3 { margin: 0 0 14px; font-family: 'Cormorant Garamond', serif; color: var(--forest); font-size: 1.25rem; text-align: center; }
+        .coupon-options-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+        .coupon-option {
+            display: block; width: 100%; min-height: 44px; text-align: left; padding: 10px 14px;
+            border: 1.5px solid var(--mist); border-radius: 10px; background: var(--white);
+            cursor: pointer; font-family: inherit; box-sizing: border-box;
+        }
+        .coupon-option:hover { border-color: var(--moss); background: #f3f8f3; }
+        .coupon-option:disabled, .coupon-option.coupon-unavailable { opacity: 0.55; cursor: not-allowed; }
+        .coupon-option-code { font-weight: 800; color: var(--forest); font-size: 0.95rem; letter-spacing: 0.03em; }
+        .coupon-option-desc { font-size: 0.85rem; color: var(--moss); font-weight: 700; margin: 2px 0; }
+        .coupon-option-sub { font-size: 0.78rem; color: var(--text-muted); }
+        .coupon-option-sub.reason { color: #b23b3b; }
+        .coupon-type-link {
+            display: block; width: 100%; min-height: 44px; background: none; border: none; cursor: pointer;
+            color: var(--moss); font-weight: 700; font-size: 0.85rem; text-decoration: underline;
+            font-family: inherit;
+        }
+        .coupon-type-row { display: none; gap: 6px; padding: 8px 0 0; }
+        .coupon-type-row.active { display: flex; }
+        .coupon-type-row input {
+            flex: 1; min-width: 0; min-height: 40px; border: 1.5px solid var(--pos-border-dark); border-radius: 6px;
+            padding: 4px 8px; font-size: 0.9rem; font-family: 'DM Sans', sans-serif; box-sizing: border-box;
+        }
+        .coupon-type-row button {
+            flex-shrink: 0; min-height: 40px; border: none; border-radius: 6px; padding: 4px 14px; font-weight: 800;
             font-size: 0.85rem; cursor: pointer; background: var(--pos-text-green); color: #fff;
         }
-        .tax-box .coupon-row button:disabled { opacity: 0.6; cursor: not-allowed; }
 
         .side-btn {
             border: none; border-radius: 12px; padding: 7px; font-family: 'Noto Sans Devanagari', 'DM Sans', sans-serif; font-weight: 800;
@@ -541,7 +617,16 @@
             .pos-brand img.flag { width: 26px; }
             .pos-header-divider { display: none; }
             .pos-header-right { flex: 1 1 100%; justify-content: flex-start; text-align: left; gap: 10px; }
-            .pos-operator { min-width: 0; font-size: 1rem; }
+            /* Header wraps to multiple lines below 1024px (see above), so
+               absolute centring against the whole (now taller) header box
+               would drift over the brand/clock row -- fall back to a
+               normal, full-width, still-centred flex row of its own
+               between the brand line and the mode-label/lock-instruction
+               line instead. */
+            .pos-header-operator-center {
+                position: static; transform: none; max-width: none; flex: 1 1 100%;
+                text-align: center; font-size: 1rem;
+            }
 
             .pos-content { padding: 6px 12px; }
             .cat-row { padding: 6px 12px 8px; gap: 8px; }
@@ -602,7 +687,7 @@
                was set below that threshold for the kiosk's tighter laptop
                layout; bump them back up only in this mobile/tablet band so
                the laptop look is unaffected. */
-            .shop-search-wrap input, .tax-box .coupon-row input, .lock-bar input,
+            .shop-search-wrap input, .coupon-type-row input, .lock-bar input,
             .repay-search-input, #repayAmountInput, .pay-method-row input,
             .new-customer-form input, .restock-origin-row input {
                 font-size: 16px;
@@ -677,10 +762,12 @@
             <img class="flag" src="https://upload.wikimedia.org/wikipedia/commons/9/9b/Flag_of_Nepal.svg" alt="Nepal">
         </div>
         <div class="pos-header-divider"></div>
+        <div class="pos-header-operator-center" id="headerOperatorCenter"></div>
         <div class="pos-header-right" id="headerRight">
             <div id="headerStatus">
                 <div class="pos-lock-instruction">कृपया बारकोड स्क्यान गर्नुहोस् वा staff को नम्बर हालेर Enter बटन थिच्छुहोस् ।</div>
             </div>
+            <button type="button" class="pos-header-mode-label" id="headerModeLabel">RETAIL</button>
         </div>
     </div>
 
@@ -728,9 +815,6 @@
                 <div class="receipt-combined-row">
                     <div class="logout-col" style="flex-direction: column; gap: 4px;">
                         <button type="button" class="side-btn logout-btn" id="logoutBtn">Logout</button>
-                        {% if show_reports_link %}
-                        <a href="{% url 'dashboard' %}" class="side-btn logout-btn" style="text-decoration: none; display: flex; align-items: center; justify-content: center; font-size: 0.75rem;">Reports</a>
-                        {% endif %}
                         {% if is_owner_or_manager %}
                         <button type="button" class="side-btn logout-btn" id="wholesaleToggleBtn" style="font-size: 0.75rem;" title="Switch to wholesale mode" aria-label="Switch to wholesale mode">Wholesale</button>
                         {% endif %}
@@ -766,10 +850,7 @@
                     </div>
 
                     <div class="tax-box">
-                        <div class="tax-row coupon-row">
-                            <input type="text" id="couponInput" placeholder="Coupon code" autocomplete="off">
-                            <button type="button" id="applyCouponBtn">Apply</button>
-                        </div>
+                        <div class="tax-row coupon-row" id="couponRow"></div>
                         <div class="tax-row discount-row" id="discountRow" style="display:none;"><span>छुट</span><span id="taxDiscount">Rs. 0</span></div>
                         <div class="tax-row"><span>कुल कर</span><span id="taxVat">Rs. 0</span></div>
                         <div class="tax-row"><span>कर बा. मूल्य</span><span id="taxTaxable">Rs. 0</span></div>
@@ -873,6 +954,12 @@
         <div class="item-modal-card" id="itemModalBody"></div>
     </div>
 
+    <!-- Coupon picker popup -- its own backdrop, not the shared #itemModal
+         above, so tap-outside-to-close is scoped to just this popup. -->
+    <div id="couponBackdrop">
+        <div class="coupon-modal-card" id="couponModalBody"></div>
+    </div>
+
     <!-- Payment panel -->
     <div id="paymentBackdrop"></div>
     <div id="paymentPanel">
@@ -923,10 +1010,17 @@
 
     <script id="posProductsData" type="application/json">{{ products_json|safe }}</script>
     <script id="posCategoriesData" type="application/json">{{ categories_json|safe }}</script>
+    <script id="posCouponsData" type="application/json">{{ coupons_json|safe }}</script>
     <script src="{% static 'js/pos-offline-queue.js' %}"></script>
     <script>
         const PRODUCTS = JSON.parse(document.getElementById('posProductsData').textContent);
         const CATEGORIES = JSON.parse(document.getElementById('posCategoriesData').textContent);
+        // Staff-only -- embedded in this page's own server-rendered payload
+        // the same way PRODUCTS/CATEGORIES are, never fetched from a public
+        // endpoint. See pos_view() in shop/views.py for how this list is
+        // built (is_live() coupons only) and why it's kept separate from
+        // the public /api/v1/coupons/ list that already exists.
+        const LIVE_COUPONS = JSON.parse(document.getElementById('posCouponsData').textContent);
         const IS_VAT_ENABLED = {{ is_vat_enabled|yesno:"true,false" }};
         const VAT_RATE = {{ vat_rate }};
 
@@ -1092,9 +1186,15 @@
         // ══════════════════════════════════════════════════════════════
         function renderHeaderStatus() {
             const el = document.getElementById('headerStatus');
+            const nameEl = document.getElementById('headerOperatorCenter');
             if (isUnlocked && currentOperator) {
-                el.innerHTML = `<div class="pos-operator">${currentOperator.name.toUpperCase()} ${currentOperator.staff_number || ''}</div>`;
+                const name = `${currentOperator.name.toUpperCase()} ${currentOperator.staff_number || ''}`.trim();
+                nameEl.textContent = name;
+                nameEl.title = name; // ellipsis-truncated at narrow widths -- title gives the full name on hover/long-press
+                el.innerHTML = '';
             } else {
+                nameEl.textContent = '';
+                nameEl.title = '';
                 el.innerHTML = `<div class="pos-lock-instruction">कृपया बारकोड स्क्यान गर्नुहोस् वा staff को नम्बर हालेर Enter बटन थिच्छुहोस् ।</div>`;
             }
         }
@@ -2393,15 +2493,13 @@
 
         function updateCouponUI(discount) {
             const row = document.getElementById('discountRow');
-            const btn = document.getElementById('applyCouponBtn');
             if (appliedCoupon) {
                 row.style.display = '';
                 document.getElementById('taxDiscount').textContent = '- Rs. ' + formatMoney(discount);
-                btn.textContent = 'Remove';
             } else {
                 row.style.display = 'none';
-                btn.textContent = 'Apply';
             }
+            renderCouponRow();
         }
 
         function updateRoundOffUI(roundOff) {
@@ -2419,27 +2517,135 @@
         // server round trip, and there's nothing to usefully cache -- a
         // code's validity depends on used_count/min_order_amount/timing
         // that's only meaningful checked fresh). Unlike offers, this is a
-        // straight block, not stale-while-revalidate: disables the input
-        // itself while offline rather than letting staff type a code and
-        // fail on Apply. Only gates APPLYING a new code -- applyCouponBtn's
-        // own "remove an already-applied one" branch needs no network at
-        // all and stays available regardless of connectivity, see below.
-        function updateCouponAvailability() {
-            if (appliedCoupon) return; // disabled because applied, not because of connectivity -- leave it alone
-            const input = document.getElementById('couponInput');
+        // straight block, not stale-while-revalidate: the tap-to-open
+        // button itself is disabled while offline rather than letting
+        // staff open the picker and have every option fail. Only gates
+        // APPLYING a new code -- the applied-coupon chip's own "remove"
+        // button needs no network at all and stays available regardless
+        // of connectivity, see below.
+        //
+        // Single render for the whole coupon-row area (replaced the old
+        // always-present input+Apply button): shows either the tap-to-open
+        // picker button or, once a coupon is applied, the applied-coupon
+        // chip with its own Remove button.
+        function renderCouponRow() {
+            const row = document.getElementById('couponRow');
+            if (appliedCoupon) {
+                row.innerHTML = `<div class="coupon-applied-chip"><span>🎟 ${appliedCoupon.code} applied</span><button type="button" id="removeCouponBtn">Remove</button></div>`;
+                document.getElementById('removeCouponBtn').addEventListener('click', () => clearCoupon());
+                return;
+            }
             const offline = !navigator.onLine;
-            input.disabled = offline;
-            input.placeholder = offline ? 'Coupons need a connection' : 'Coupon code';
+            row.innerHTML = `<button type="button" class="coupon-picker-btn" id="couponPickerBtn" ${offline ? 'disabled' : ''}>🎟 ${offline ? 'Coupons need a connection' : 'Apply a coupon'}</button>`;
+            if (!offline) document.getElementById('couponPickerBtn').addEventListener('click', openCouponModal);
         }
 
         function clearCoupon(silent) {
             if (!appliedCoupon) return;
             appliedCoupon = null;
-            document.getElementById('couponInput').value = '';
-            document.getElementById('couponInput').disabled = false;
-            updateCouponAvailability();
+            renderCouponRow();
             if (!silent) showToast('Coupon removed');
         }
+
+        // Shared apply logic -- called whether the code came from tapping a
+        // listed coupon or from the popup's "Type a code" fallback input,
+        // and is the exact same validation applyCouponBtn's click handler
+        // used to run directly: same endpoint, same subtotal rule, same
+        // error handling. The sale payload/totals this produces are
+        // unchanged from before this picker existed.
+        async function applyCouponCode(code) {
+            if (!navigator.onLine) { showToast('Coupons need a connection'); return; }
+            code = (code || '').trim();
+            if (!code) { showToast('Enter a coupon code'); return; }
+
+            const subtotal = couponEligibleSubtotal();
+            if (subtotal <= 0) {
+                showToast("This coupon doesn't apply — every item in the cart is already discounted by an offer.");
+                return;
+            }
+
+            try {
+                const response = await apiFetch('/api/v1/pos/coupon/validate/', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ code, subtotal: subtotal.toFixed(2) }),
+                });
+                const data = await response.json().catch(() => ({}));
+                if (data.status === 'ok') {
+                    appliedCoupon = { code: data.code, discount_amount: parseFloat(data.discount_amount), subtotalAtApply: subtotal };
+                    showToast(`Coupon ${data.code} applied — Rs. ${data.discount_amount} off`);
+                    renderReceipt();
+                } else {
+                    showToast(data.message || 'Invalid coupon');
+                }
+            } catch (err) {
+                showToast('Network error — please try again');
+            }
+        }
+
+        // ══════════════════════════════════════════════════════════════
+        // Coupon picker popup -- lists LIVE_COUPONS (server-embedded, see
+        // pos_view()), greys out (with the reason) any coupon the current
+        // cart doesn't meet min_order_amount for rather than hiding it, and
+        // applies the tapped one via applyCouponCode() above. "Type a code"
+        // stays as a fallback for a coupon that isn't listed (expired-
+        // looking by a clock skew, or simply not surfaced for some reason)
+        // -- the main flow needs no typing.
+        // ══════════════════════════════════════════════════════════════
+        function openCouponModal() {
+            const subtotal = couponEligibleSubtotal();
+            const optionsHtml = LIVE_COUPONS.map((c) => {
+                const minOrder = parseFloat(c.min_order_amount) || 0;
+                const ineligible = minOrder > 0 && subtotal < minOrder;
+                const subLine = ineligible
+                    ? `<div class="coupon-option-sub reason">Needs a Rs. ${formatMoney(minOrder)}+ order (cart: Rs. ${formatMoney(subtotal)})</div>`
+                    : (minOrder > 0 ? `<div class="coupon-option-sub">Min. order Rs. ${formatMoney(minOrder)}</div>` : '');
+                return `
+                <button type="button" class="coupon-option${ineligible ? ' coupon-unavailable' : ''}" data-code="${c.code}" ${ineligible ? 'disabled' : ''}>
+                    <div class="coupon-option-code">${c.code}</div>
+                    <div class="coupon-option-desc">${c.discount_text}${c.description ? ' — ' + c.description : ''}</div>
+                    ${subLine}
+                </button>`;
+            }).join('');
+
+            document.getElementById('couponModalBody').innerHTML = `
+                <h3>Apply a coupon</h3>
+                <div class="coupon-options-list">${optionsHtml || `<div style="text-align:center;color:var(--text-muted);padding:16px 0;">No coupons live right now.</div>`}</div>
+                <button type="button" class="coupon-type-link" id="couponTypeLink">Type a code instead</button>
+                <div class="coupon-type-row" id="couponTypeRow">
+                    <input type="text" id="couponTypeInput" placeholder="Coupon code" autocomplete="off">
+                    <button type="button" id="couponTypeApplyBtn">Apply</button>
+                </div>
+                <div class="item-modal-actions"><button type="button" class="btn-cancel" id="couponModalCloseBtn">Close</button></div>
+            `;
+
+            document.getElementById('couponModalBody').querySelectorAll('[data-code]').forEach((btn) => {
+                btn.addEventListener('click', () => { closeCouponModal(); applyCouponCode(btn.dataset.code); });
+            });
+            document.getElementById('couponTypeLink').addEventListener('click', () => {
+                document.getElementById('couponTypeRow').classList.add('active');
+                document.getElementById('couponTypeLink').style.display = 'none';
+                document.getElementById('couponTypeInput').focus();
+            });
+            document.getElementById('couponTypeApplyBtn').addEventListener('click', () => {
+                const code = document.getElementById('couponTypeInput').value;
+                closeCouponModal();
+                applyCouponCode(code);
+            });
+            document.getElementById('couponTypeInput').addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') document.getElementById('couponTypeApplyBtn').click();
+            });
+            document.getElementById('couponModalCloseBtn').addEventListener('click', closeCouponModal);
+
+            document.getElementById('couponBackdrop').classList.add('active');
+        }
+
+        function closeCouponModal() {
+            document.getElementById('couponBackdrop').classList.remove('active');
+        }
+
+        document.getElementById('couponBackdrop').addEventListener('click', (e) => {
+            if (e.target.id === 'couponBackdrop') closeCouponModal();
+        });
 
         // Fixed rows-per-page, matching the mockup's "1/1" page indicator --
         // no internal table scroll, ever. Extra items spill onto new pages
@@ -2630,31 +2836,56 @@
         // convenience, never the real authorization boundary.
         // ══════════════════════════════════════════════════════════════
         const wholesaleToggleBtn = document.getElementById('wholesaleToggleBtn');
-        if (wholesaleToggleBtn) {
-            wholesaleToggleBtn.addEventListener('click', () => {
-                if (cart.length > 0) {
-                    if (!confirm('Switching wholesale mode will clear your cart. Continue?')) return;
-                    cart = [];
-                    receiptPage = 0;
-                }
-                wholesaleMode = !wholesaleMode;
-                applyWholesaleModeUI();
-                renderReceipt();
-                updateCartIndicator();
-            });
+        const headerModeLabel = document.getElementById('headerModeLabel');
+
+        // Single source of truth for entering/leaving wholesale mode --
+        // both the bottom-left button and the header's RETAIL/WHOLESALE
+        // label call this SAME function, so they can never disagree with
+        // each other (applyWholesaleModeUI() below is what actually
+        // repaints both from the one wholesaleMode variable).
+        function toggleWholesaleMode() {
+            if (cart.length > 0) {
+                if (!confirm('Switching wholesale mode will clear your cart. Continue?')) return;
+                cart = [];
+                receiptPage = 0;
+            }
+            wholesaleMode = !wholesaleMode;
+            applyWholesaleModeUI();
+            renderReceipt();
+            updateCartIndicator();
         }
-        applyWholesaleModeUI(); // set the button's initial label/title on page load
+        if (wholesaleToggleBtn) wholesaleToggleBtn.addEventListener('click', toggleWholesaleMode);
+        // The header label is only ever tappable for the same owner/manager
+        // account the bottom-left button itself is rendered for -- for
+        // anyone else it's a plain, disabled, display-only indicator of
+        // whatever mode an owner/manager already put this shared till into.
+        if (headerModeLabel) {
+            if (wholesaleToggleBtn) {
+                headerModeLabel.addEventListener('click', toggleWholesaleMode);
+            } else {
+                headerModeLabel.disabled = true;
+            }
+        }
+        applyWholesaleModeUI(); // set the button's/label's initial state on page load
 
         function applyWholesaleModeUI() {
             document.getElementById('wholesaleBanner').style.display = wholesaleMode ? '' : 'none';
+            const label = wholesaleMode ? 'Switch to retail mode' : 'Switch to wholesale mode';
             if (wholesaleToggleBtn) {
                 // Button always names the mode you'd switch TO, not the
                 // mode you're currently in.
                 wholesaleToggleBtn.textContent = wholesaleMode ? 'Retail' : 'Wholesale';
-                const label = wholesaleMode ? 'Switch to retail mode' : 'Switch to wholesale mode';
                 wholesaleToggleBtn.title = label;
                 wholesaleToggleBtn.setAttribute('aria-label', label);
                 wholesaleToggleBtn.classList.toggle('active', wholesaleMode);
+            }
+            if (headerModeLabel) {
+                // The header label names the mode you're currently IN, the
+                // opposite convention from the button above -- it's read as
+                // a status indicator first, a toggle second.
+                headerModeLabel.textContent = wholesaleMode ? 'WHOLESALE' : 'RETAIL';
+                headerModeLabel.classList.toggle('wholesale', wholesaleMode);
+                headerModeLabel.title = wholesaleToggleBtn ? label : 'Wholesale mode';
             }
             const couponRow = document.querySelector('.coupon-row');
             if (couponRow) couponRow.style.display = wholesaleMode ? 'none' : '';
@@ -2721,56 +2952,13 @@
             }
         }
 
-        // ══════════════════════════════════════════════════════════════
-        // Coupon (POS Phase C) — validated live against /api/v1/pos/coupon/
+        // Coupon apply/picker logic (applyCouponCode(), renderCouponRow(),
+        // openCouponModal()) is defined earlier, alongside updateCouponUI()
+        // and clearCoupon() -- validated live against /api/v1/pos/coupon/
         // validate/ (resolve_pos_coupon() in shop/views.py) so staff sees
         // the discount before checkout, but create_pos_sale() re-validates
         // the same code from scratch at Complete Sale -- this is a preview,
         // never the source of truth.
-        // ══════════════════════════════════════════════════════════════
-        document.getElementById('applyCouponBtn').addEventListener('click', async () => {
-            if (appliedCoupon) {
-                clearCoupon();
-                renderReceipt();
-                return;
-            }
-            if (!navigator.onLine) {
-                showToast('Coupons need a connection');
-                return;
-            }
-            const input = document.getElementById('couponInput');
-            const code = input.value.trim();
-            if (!code) { showToast('Enter a coupon code'); return; }
-
-            const subtotal = couponEligibleSubtotal();
-            if (subtotal <= 0) {
-                showToast("This coupon doesn't apply — every item in the cart is already discounted by an offer.");
-                return;
-            }
-
-            const btn = document.getElementById('applyCouponBtn');
-            btn.disabled = true;
-            try {
-                const response = await apiFetch('/api/v1/pos/coupon/validate/', {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ code, subtotal: subtotal.toFixed(2) }),
-                });
-                const data = await response.json().catch(() => ({}));
-                if (data.status === 'ok') {
-                    appliedCoupon = { code: data.code, discount_amount: parseFloat(data.discount_amount), subtotalAtApply: subtotal };
-                    input.value = data.code;
-                    input.disabled = true;
-                    showToast(`Coupon ${data.code} applied — Rs. ${data.discount_amount} off`);
-                    renderReceipt();
-                } else {
-                    showToast(data.message || 'Invalid coupon');
-                }
-            } catch (err) {
-                showToast('Network error — please try again');
-            } finally {
-                btn.disabled = false;
-            }
-        });
 
         document.getElementById('openPaymentBtn').addEventListener('click', openPaymentPanel);
         document.getElementById('closePaymentBtn').addEventListener('click', closePaymentPanel);
@@ -3311,19 +3499,19 @@
             await updateOfflineBanner();
             await posReplayQueue();
             await renderQueueBox();
-            updateCouponAvailability();
+            renderCouponRow();
             refreshCreditCustomerCacheQuietly(); // "refresh whenever the till is online" -- not awaited, non-blocking
         });
-        window.addEventListener('offline', () => { updateOfflineBanner(); updateCouponAvailability(); });
+        window.addEventListener('offline', () => { updateOfflineBanner(); renderCouponRow(); });
         document.addEventListener('visibilitychange', async () => {
             if (!document.hidden) {
                 await updateOfflineBanner();
                 await posReplayQueue();
                 await renderQueueBox();
-                updateCouponAvailability();
+                renderCouponRow();
             }
         });
-        updateCouponAvailability();
+        renderCouponRow();
         // Catches the "wifi silently died mid-shift with no OS-level event"
         // case -- the online/offline/visibilitychange listeners above are
         // all reactive to something actually happening; this is the one

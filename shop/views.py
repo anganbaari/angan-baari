@@ -1359,7 +1359,38 @@ def pos_view(request):
     login as admin, no separate token/auth system needed)."""
     import json
     from . import batch_report
-    from .models import BusinessSettings, Category, CropBatch, Product, POSSale
+    from .models import BusinessSettings, Category, CropBatch, Product, POSSale, get_live_coupons
+
+    def fmt_decimal(value):
+        # str(value.normalize()) alone turns a whole number like 200.00
+        # into scientific notation ("2E+2") -- Decimal's own quirk, not
+        # something worth pulling in a new dependency to avoid.
+        if value == value.to_integral_value():
+            return str(value.to_integral_value())
+        return str(value.normalize())
+
+    def discount_text(c):
+        # Human-readable discount, derived straight from the model's own
+        # fields (discount_type/discount_value/max_discount_amount) -- no
+        # separate "display label" field exists or is being added.
+        if c.discount_type == 'percent':
+            text = f'{fmt_decimal(c.discount_value)}% off'
+            if c.max_discount_amount:
+                text += f' (up to Rs. {fmt_decimal(c.max_discount_amount)})'
+            return text
+        return f'Rs. {fmt_decimal(c.discount_value)} off'
+
+    def coupon_entry(c):
+        return {
+            'code': c.code,
+            'description': c.description or c.festival_name or '',
+            'discount_text': discount_text(c),
+            # Decimal, not float -- so a JS string compare against the
+            # live cart subtotal (also formatted to 2dp) never hits a
+            # binary-float rounding mismatch at the picker's eligibility
+            # check. str() keeps DecimalField's own 2dp exactly.
+            'min_order_amount': str(c.min_order_amount),
+        }
 
     def top_level_category(category):
         # The POS category row shows broad groups (Fruits, Vegetables, ...),
@@ -1449,14 +1480,26 @@ def pos_view(request):
 
     vat_settings = BusinessSettings.get_solo()
 
+    # Coupon picker (staff-only -- this whole view is @staff_member_required,
+    # and this list is embedded only in pos.html's own server-rendered
+    # payload, the same way PRODUCTS/CATEGORIES already are, never through a
+    # public page or the public /api/v1/coupons/ endpoint, which has its own
+    # separate, unrelated get_live_coupons() call for the public offers
+    # page's coupon display). Reuses the exact is_live() check (active,
+    # within date range, under its use cap) the website checkout and
+    # /api/v1/coupons/ already use, so this list only ever shows a coupon
+    # currently actually usable at checkout -- never expired/inactive/used
+    # up, and never invented eligibility logic of its own.
+    coupons_data = [coupon_entry(c) for c in get_live_coupons()]
+
     return render(request, 'pos.html', {
         'products_json': json.dumps(products_data),
         'categories': categories,
         'categories_json': json.dumps(categories),
+        'coupons_json': json.dumps(coupons_data),
         'payment_methods': POSSale.PAYMENT_METHOD_CHOICES,
         'is_vat_enabled': vat_settings.is_vat_enabled,
         'vat_rate': VAT_RATE,
-        'show_reports_link': _is_owner_or_manager(request.user),
         # Same check, reused for the Wholesale toggle's visibility — see
         # CLAUDE.md: wholesale sales must use the SAME owner/manager gate
         # as the Reports dashboard, enforced again server-side in
