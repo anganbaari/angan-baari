@@ -181,6 +181,10 @@
                         <div class="dash-card c8">
                             <h3>Sales over time <span class="sub" id="ovTrendPeak"></span></h3>
                             <button type="button" class="dash-view-as-table-btn" data-chart="ovTrendChart">Table</button>
+                            <div class="dash-segmented" id="ovTrendModeSeg" role="group" aria-label="Sales over time display" style="margin-bottom:8px;">
+                                <button type="button" data-value="cumulative" aria-pressed="true">Running total</button>
+                                <button type="button" data-value="daily" aria-pressed="false">Daily</button>
+                            </div>
                             <div class="dash-chart-wrap"><canvas id="ovTrendChart" aria-label="Sales over time" role="img"></canvas></div>
                             <div class="dash-table-scroll" id="ovTrendTable" style="display:none;"></div>
                         </div>
@@ -237,7 +241,11 @@
                 <section class="dash-section" id="section-sales">
                     <div class="dash-grid">
                         <div class="dash-card c12">
-                            <h3>Revenue over time</h3>
+                            <h3>Revenue over time <span class="sub" id="salesTrendPeak"></span></h3>
+                            <div class="dash-segmented" id="salesTrendModeSeg" role="group" aria-label="Revenue over time display" style="margin-bottom:8px;">
+                                <button type="button" data-value="cumulative" aria-pressed="true">Running total</button>
+                                <button type="button" data-value="daily" aria-pressed="false">Daily</button>
+                            </div>
                             <div class="dash-chart-wrap"><canvas id="salesTrendChart" aria-label="Revenue over time" role="img"></canvas></div>
                         </div>
                         <div class="dash-card c6">
@@ -471,6 +479,6 @@
 
     <script src="{% static 'vendor/chart.min.js' %}"></script>
     <script src="{% static 'js/bs-calendar.js' %}?v=1"></script>
-    <script src="{% static 'js/dashboard.js' %}?v=6"></script>
+    <script src="{% static 'js/dashboard.js' %}?v=7"></script>
 </body>
 </html>

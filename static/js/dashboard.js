@@ -450,6 +450,22 @@ function zeroFillDaily(rows, startIso, endIso, fields) {
 
 function bsLabelsForSeries(rows) { return rows.map((r) => formatBsDateOnly(r.date + 'T00:00:00Z')); }
 
+// Mirrors shop/reports.py's previous_period(): the previous period is the
+// same number of days, immediately before the current period's start.
+// zeroFillDaily must fill across THIS range for a previous-period series,
+// not the current period's start/end -- the two ranges only share calendar
+// dates by coincidence, so filling by the current range silently zeroed
+// out every real previous-period value (a pre-existing bug, found while
+// verifying the Compare overlay for Task A).
+function previousPeriodRange(startIso, endIso) {
+    const start = new Date(startIso + 'T00:00:00Z');
+    const end = new Date(endIso + 'T00:00:00Z');
+    const lengthDays = Math.round((end - start) / 86400000) + 1;
+    const prevEnd = new Date(start.getTime() - 86400000);
+    const prevStart = new Date(prevEnd.getTime() - (lengthDays - 1) * 86400000);
+    return [adDateToYmd(prevStart), adDateToYmd(prevEnd)];
+}
+
 function timeSeriesChartConfig(rows, datasetDefs, opts) {
     opts = opts || {};
     const useBars = rows.length < 4;
@@ -600,28 +616,167 @@ function renderOverview(data) {
     renderProductComparison(data.product_comparison);
 }
 
+// ── Sales-over-time trend charts (Overview's "Sales over time" and the
+// Sales tab's "Revenue over time") -- the only two LINE charts of sales
+// over time in this dashboard. Deliberately NOT folded into
+// timeSeriesChartConfig() itself, since that helper is also used by the
+// (non-sales) Online Orders trend chart, which this feature must leave
+// untouched -- these two charts get their own render path instead.
+//
+// "Running total" (default) plots the cumulative sum so the line can
+// only ever go up; "Daily" plots the old per-bucket numbers unchanged.
+// Both modes' tooltips always show the full B.S. date, the running
+// total AT that point, and that bucket's own amount -- computed once
+// regardless of which field is actually being plotted, so switching
+// modes is a pure client-side re-render with no new fetch.
+let ovTrendMode = 'cumulative';
+let salesTrendMode = 'cumulative';
+let ovTrendCache = null;
+let salesTrendCache = null;
+
+function salesTrendAxisLabel(dateStr, granularity) {
+    const bs = BsCalendar.adToBs(new Date(dateStr + 'T00:00:00Z'));
+    // B.S. day number only for day/week buckets (week shows the week's
+    // first day's number) -- B.S. month name only for month buckets, a
+    // bare number would mean nothing there. Never the year, on any axis.
+    return granularity === 'bs_month' ? BsCalendar.MONTH_NAMES[bs.month - 1] : String(bs.day);
+}
+
+// Cumulative sum, stopping at today rather than continuing flat through
+// any zero-filled future buckets a custom range might include -- "the
+// line stops at today instead of continuing flat into the future".
+function cumulativeUpToToday(rows) {
+    const todayYmd = adDateToYmd(nepalTodayAd());
+    let sum = 0;
+    const out = [];
+    for (const r of rows) {
+        // week/bs_month buckets come back as a full ISO datetime
+        // ("2026-09-14T00:00:00+05:45"), day buckets as a plain
+        // "YYYY-MM-DD" -- normalize to the first 10 chars so the
+        // today-cutoff comparison and every downstream date parse
+        // (axis labels, tooltip, subtitle) see one consistent shape.
+        const dateYmd = r.date.slice(0, 10);
+        if (dateYmd > todayYmd) break; // rows are date-sorted ascending
+        sum += r.total || 0;
+        out.push({ date: dateYmd, total: r.total || 0, cumulative: sum });
+    }
+    return out;
+}
+
+// The chart-wrap div is always the next sibling of the mode-seg div
+// ("ovTrendModeSeg" -> "ovTrendChart", "salesTrendModeSeg" ->
+// "salesTrendChart") -- a stable path to find it that doesn't depend on
+// the canvas itself still existing, unlike .closest() from the canvas.
+function chartWrapFor(canvasId) {
+    return document.getElementById(canvasId.replace('Chart', 'ModeSeg')).nextElementSibling;
+}
+
+// Re-creates the <canvas> inside its wrap if an earlier empty-state
+// render replaced it with emptyStateHtml() -- without this, switching
+// back to a non-empty range/mode after an empty one left makeChart()
+// silently drawing nothing (no canvas for Chart.js to attach to).
+function ensureChartCanvas(canvasId, ariaLabel) {
+    if (document.getElementById(canvasId)) return;
+    chartWrapFor(canvasId).innerHTML = `<canvas id="${canvasId}" aria-label="${escapeHtml(ariaLabel)}" role="img"></canvas>`;
+}
+
+const SALES_TREND_ARIA_LABELS = { ovTrendChart: 'Sales over time', salesTrendChart: 'Revenue over time' };
+
+function renderSalesTrendChart(canvasId, rows, previousRows, granularity, mode) {
+    const current = cumulativeUpToToday(rows);
+    const previous = previousRows && previousRows.length ? cumulativeUpToToday(previousRows) : [];
+    if (!current.length) {
+        destroyChart(canvasId);
+        chartWrapFor(canvasId).innerHTML = emptyStateHtml();
+        return { current, previous, peak: null, total: 0 };
+    }
+    ensureChartCanvas(canvasId, SALES_TREND_ARIA_LABELS[canvasId] || '');
+
+    const field = mode === 'cumulative' ? 'cumulative' : 'total';
+    const labels = current.map((r) => salesTrendAxisLabel(r.date, granularity));
+    const datasets = [{
+        label: mode === 'cumulative' ? 'Running total' : 'Sales',
+        data: current.map((r) => r[field]),
+        borderColor: PALETTE[0], backgroundColor: 'transparent', borderWidth: 2, tension: 0,
+    }];
+    if (previous.length) {
+        datasets.push({
+            label: 'Previous period', data: previous.map((r) => r[field]),
+            borderColor: PALETTE[1], borderDash: [6, 4], backgroundColor: 'transparent', borderWidth: 2, tension: 0,
+        });
+    }
+
+    makeChart(canvasId, {
+        type: 'line',
+        data: { labels, datasets },
+        options: {
+            plugins: {
+                legend: { display: datasets.length > 1, labels: { color: '#9aab96', boxWidth: 10, font: { size: 10 } } },
+                tooltip: {
+                    callbacks: {
+                        title: (items) => {
+                            const src = items[0].datasetIndex === 1 ? previous : current;
+                            const r = src[items[0].dataIndex];
+                            return r ? BsCalendar.formatBs(BsCalendar.adToBs(new Date(r.date + 'T00:00:00Z'))) : '';
+                        },
+                        label: (item) => {
+                            const src = item.datasetIndex === 1 ? previous : current;
+                            const r = src[item.dataIndex];
+                            if (!r) return '';
+                            return [`${item.dataset.label} running total: ${formatRs(r.cumulative)}`, `That bucket: ${formatRs(r.total)}`];
+                        },
+                    },
+                },
+            },
+            scales: {
+                // maxRotation/minRotation 0 -- these labels (a bare day
+                // number, or a short B.S. month name) are short enough to
+                // never need tilting; Chart.js's own autoSkip thins them
+                // out instead if a narrow chart truly can't fit them all.
+                x: { ticks: { color: '#8fa391', font: { size: 9 }, maxRotation: 0, minRotation: 0 }, grid: { color: 'rgba(255,255,255,0.04)' } },
+                y: { ticks: { color: '#8fa391', font: { size: 9 } }, grid: { color: 'rgba(255,255,255,0.04)' } },
+            },
+        },
+    });
+
+    const peak = current.reduce((best, r) => (r.total > (best ? best.total : -1) ? r : best), null);
+    const total = current.length ? current[current.length - 1].cumulative : 0;
+    return { current, previous, peak, total };
+}
+
+function updateTrendSubtitle(elId, result, mode) {
+    const el = document.getElementById(elId);
+    if (!el) return;
+    if (!result.peak || result.peak.total <= 0) { el.textContent = ''; return; }
+    if (mode === 'cumulative') {
+        const bestDayLabel = BsCalendar.formatBs(BsCalendar.adToBs(new Date(result.peak.date + 'T00:00:00Z')), false);
+        el.textContent = `Total ${formatRs(result.total)} · Best day ${formatRs(result.peak.total)} (${bestDayLabel})`;
+    } else {
+        el.textContent = `Peak ${formatRs(result.peak.total)}, ${formatBsDateOnly(result.peak.date + 'T00:00:00Z')}`;
+    }
+}
+
 function renderTrendWithPeak(series) {
     let rows = series.current || [];
     if (state.granularity === 'day') rows = zeroFillDaily(rows, state.start, state.end, ['total', 'count']);
+    let previousRows = [];
+    if (series.previous && series.previous.length) {
+        if (state.granularity === 'day') {
+            const [prevStart, prevEnd] = previousPeriodRange(state.start, state.end);
+            previousRows = zeroFillDaily(series.previous, prevStart, prevEnd, ['total', 'count']);
+        } else {
+            previousRows = series.previous;
+        }
+    }
+    ovTrendCache = { rows, previousRows, granularity: state.granularity };
     if (!rows.length) {
         destroyChart('ovTrendChart');
-        document.getElementById('ovTrendChart').closest('.dash-chart-wrap').innerHTML = emptyStateHtml();
+        chartWrapFor('ovTrendChart').innerHTML = emptyStateHtml();
         document.getElementById('ovTrendPeak').textContent = '';
         return;
     }
-    const datasetDefs = [{ label: 'Sales', field: 'total', color: PALETTE[0] }];
-    let previousRows = [];
-    if (series.previous && series.previous.length) {
-        previousRows = state.granularity === 'day' ? zeroFillDaily(series.previous, state.start, state.end, ['total', 'count']) : series.previous;
-    }
-    const config = timeSeriesChartConfig(rows, datasetDefs);
-    if (previousRows.length) {
-        config.data.datasets.push({ label: 'Previous period', data: previousRows.map((r) => r.total || 0), borderColor: PALETTE[1], borderDash: [6, 4], backgroundColor: 'transparent', borderWidth: 2, tension: 0 });
-    }
-    makeChart('ovTrendChart', config);
-
-    const peak = rows.reduce((best, r) => (r.total > (best ? best.total : -1) ? r : best), null);
-    document.getElementById('ovTrendPeak').textContent = peak && peak.total > 0 ? `Peak ${formatRs(peak.total)}, ${formatBsDateOnly(peak.date + 'T00:00:00Z')}` : '';
+    const result = renderSalesTrendChart('ovTrendChart', rows, previousRows, state.granularity, ovTrendMode);
+    updateTrendSubtitle('ovTrendPeak', result, ovTrendMode);
 
     document.querySelector('[data-chart="ovTrendChart"]').onclick = () => {
         const tbl = document.getElementById('ovTrendTable');
@@ -760,17 +915,19 @@ async function loadSales() {
 function renderSalesTrend(trend) {
     let rows = trend.series.current || [];
     if (state.granularity === 'day') rows = zeroFillDaily(rows, state.start, state.end, ['total', 'count']);
-    if (rows.length) {
-        const config = timeSeriesChartConfig(rows, [{ label: 'Revenue', field: 'total', color: PALETTE[0] }]);
-        if (trend.series.previous && trend.series.previous.length) {
-            let prevRows = state.granularity === 'day' ? zeroFillDaily(trend.series.previous, state.start, state.end, ['total']) : trend.series.previous;
-            config.data.datasets.push({ label: 'Previous period', data: prevRows.map((r) => r.total || 0), borderColor: PALETTE[1], borderDash: [6, 4], backgroundColor: 'transparent', borderWidth: 2, tension: 0 });
+    let previousRows = [];
+    if (trend.series.previous && trend.series.previous.length) {
+        if (state.granularity === 'day') {
+            const [prevStart, prevEnd] = previousPeriodRange(state.start, state.end);
+            previousRows = zeroFillDaily(trend.series.previous, prevStart, prevEnd, ['total']);
+        } else {
+            previousRows = trend.series.previous;
         }
-        makeChart('salesTrendChart', config);
-    } else {
-        destroyChart('salesTrendChart');
-        document.getElementById('salesTrendChart').closest('.dash-chart-wrap').innerHTML = emptyStateHtml();
     }
+    salesTrendCache = { rows, previousRows, granularity: state.granularity };
+    const result = renderSalesTrendChart('salesTrendChart', rows, previousRows, state.granularity, salesTrendMode);
+    updateTrendSubtitle('salesTrendPeak', result, salesTrendMode);
+
     makeChart('salesByHourChart', { type: 'bar', data: { labels: Array.from({ length: 24 }, (_, h) => h), datasets: [{ label: 'Sales', data: trend.by_hour, backgroundColor: PALETTE[1] }] }, options: { plugins: { legend: { display: false } }, scales: { y: { ticks: { precision: 0, color: '#8fa391' } }, x: { ticks: { color: '#8fa391', font: { size: 9 } } } } } });
     makeChart('salesByDowChart', { type: 'bar', data: { labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'], datasets: [{ label: 'Sales', data: trend.by_day_of_week, backgroundColor: PALETTE[2] }] }, options: { plugins: { legend: { display: false } }, scales: { y: { ticks: { precision: 0, color: '#8fa391' } }, x: { ticks: { color: '#8fa391' } } } } });
 }
@@ -1228,6 +1385,23 @@ function initControls() {
     });
     wireSegmented('plViewSeg', null, () => {
         switchPlView(document.querySelector('#plViewSeg button[aria-pressed="true"]').dataset.value);
+    });
+    // Running total / Daily switches -- pure client-side re-render from
+    // the already-fetched rows cached by renderTrendWithPeak()/
+    // renderSalesTrend(), no new fetch needed.
+    wireSegmented('ovTrendModeSeg', null, () => {
+        ovTrendMode = document.querySelector('#ovTrendModeSeg button[aria-pressed="true"]').dataset.value;
+        if (ovTrendCache) {
+            const result = renderSalesTrendChart('ovTrendChart', ovTrendCache.rows, ovTrendCache.previousRows, ovTrendCache.granularity, ovTrendMode);
+            updateTrendSubtitle('ovTrendPeak', result, ovTrendMode);
+        }
+    });
+    wireSegmented('salesTrendModeSeg', null, () => {
+        salesTrendMode = document.querySelector('#salesTrendModeSeg button[aria-pressed="true"]').dataset.value;
+        if (salesTrendCache) {
+            const result = renderSalesTrendChart('salesTrendChart', salesTrendCache.rows, salesTrendCache.previousRows, salesTrendCache.granularity, salesTrendMode);
+            updateTrendSubtitle('salesTrendPeak', result, salesTrendMode);
+        }
     });
     // Event delegation (not a per-row listener) so re-sorting plBatchListTable
     // (renderTable() fully redraws its <tbody> on every sort click) never
