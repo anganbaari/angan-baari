@@ -130,82 +130,94 @@
 
         /* ── Receipt view ── */
         #receiptView { display: flex; flex-direction: column; flex: 1; min-height: 0; }
-        /* STATIC table: exactly 7 data rows, every one the SAME fixed
-           height (--receipt-row-h) regardless of content -- an empty row
-           and a row with the longest product name take up identically
-           sized grid cells. Deliberately not responsive: the SAME height
-           is used at every width (1280/820/390), not just a touch-target
-           floor like the old minmax(max(44px, min-content), 1fr) did.
-           76px was sized to comfortably fit a 2-line product name (the
-           name itself is clamped to 2 lines via -webkit-line-clamp
-           below -- longer names ellipsis, with a title attribute for the
-           full text) plus the detail/below-cost-note line underneath,
-           at the table's own font sizes, with room to spare -- confirmed
-           by measuring actual rendered row heights in a browser (see the
-           POS fixes task's report). Because every row's height is now a
-           fixed constant instead of content-driven, the table's own
-           total height is also fixed (no height:100%, no flex grow/
-           shrink, no vertical overflow -- see .receipt-table-row/
-           .receipt-table-wrap just below), so adding or removing a
-           product, or applying/removing the coupon row, can never resize
-           the table itself. */
-        :root { --receipt-row-h: 76px; }
-        .receipt-table-row { display: flex; gap: 8px; }
-        /* flex:1 here is about WIDTH, not height -- .receipt-table-row is a
-           flex ROW (.receipt-table-wrap alongside .table-pager), so flex
-           controls the horizontal main axis: without it the wrap has no
-           definite width for .receipt-table's own width:100% to resolve
-           against, and the grid silently shrinks to its (near-zero, for
-           blank rows) content width instead of filling the available
-           space. Vertical sizing is unaffected by this -- the table's
-           height is now fixed by its grid-template-rows regardless. */
-        .receipt-table-wrap { flex: 1; overflow-x: hidden; }
+        /* The table's OVERALL size comes from the layout (flex:1/
+           min-height:0, same as before this whole row-sizing feature
+           existed) -- NOT from its rows. A fixed per-row pixel height
+           (an earlier version of this used 76px) was the wrong approach:
+           on a short viewport (a 1366x650-ish laptop window) 7 fixed-size
+           rows plus the header row were taller than the space actually
+           available, pushing the totals box, Pay button, search and the
+           category bar off-screen entirely. Rows are EQUAL and
+           independent of content (minmax(0, 1fr) -- an empty row, a
+           product row and the coupon row always divide up whatever
+           vertical space the layout actually gave the table into 7 equal
+           shares, nothing bigger, nothing smaller), but that per-row
+           share is itself however big or small the viewport allows, not
+           a fixed constant. Text fits that varying row height via
+           container-query-based font sizing just below, instead of
+           letting the row grow into the text or letting the text clip
+           mid-letter. This is a real <table> for markup/semantics, laid
+           out as a CSS Grid; thead/tbody/tr get display:contents so
+           th/td become direct grid items in DOM order. */
+        .receipt-table-row { display: flex; gap: 8px; flex: 1; min-height: 0; }
+        .receipt-table-wrap {
+            flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden;
+            container-type: size; container-name: receipt-table;
+        }
         .receipt-table {
             display: grid; grid-template-columns: 6% 34% 15% 13% 17% 15%;
-            grid-template-rows: auto repeat(7, var(--receipt-row-h));
-            width: 100%; background: var(--pos-bg); border: 2px solid var(--pos-border-dark);
+            grid-template-rows: auto repeat(7, minmax(0, 1fr));
+            width: 100%; height: 100%; background: var(--pos-bg); border: 2px solid var(--pos-border-dark);
         }
         .receipt-table thead, .receipt-table tbody, .receipt-table tr { display: contents; }
+        /* Font sizes below are in container query height units (cqh, % of
+           .receipt-table-wrap's own height -- the actual space the table
+           was given, not the viewport) rather than a fixed rem value, so
+           text shrinks together with the rows on a short viewport instead
+           of overflowing or clipping, and grows back up to its normal
+           kiosk size whenever there's room. clamp()'s rem floor/ceiling
+           keep it from ever going illegibly small or comically large.
+           Bounds tuned against the project's required viewport list
+           (1366x650 up to 1920x1080) -- see this task's verification
+           report for the measured result at each one. A cell has to fit
+           up to THREE lines at once (2-line clamped name + the detail/
+           note line below it), so the per-line budget is roughly a third
+           of one row's share of the container, not a flat fraction of the
+           whole container's height -- the coefficients below (and the
+           tight 1.05 line-height / minimal padding floor) come from that,
+           not from the container's height alone. */
         .receipt-table th, .receipt-table td {
-            display: flex; align-items: center; justify-content: center; overflow: hidden;
-            border: 1px solid var(--pos-border-dark); padding: 6px 10px; font-size: 0.95rem; font-weight: 700;
-            text-align: center; color: var(--pos-text-black); line-height: 1.15; box-sizing: border-box;
+            display: flex; align-items: center; justify-content: center; overflow: hidden; min-height: 0; min-width: 0;
+            border: 1px solid var(--pos-border-dark); padding: clamp(1px, 0.6cqh, 6px) clamp(3px, 1cqw, 10px);
+            font-size: clamp(0.52rem, 3cqh, 0.95rem); font-weight: 700;
+            text-align: center; color: var(--pos-text-black); line-height: 1.05; box-sizing: border-box;
         }
         .receipt-table th { background: var(--pos-bg); font-weight: 800; font-family: 'Noto Sans Devanagari', 'DM Sans', sans-serif; }
         .receipt-table td.name-cell { justify-content: flex-start; text-align: left; }
-        .name-cell-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; width: 100%; min-height: 100%; }
-        .name-cell-row > div.name-cell-text { min-width: 0; flex: 1; overflow: hidden; }
-        /* Clamped to 2 lines, ellipsis past that -- never grows the fixed-
-           height row. renderReceipt() sets a title attribute with the
-           full name alongside this, so a clamped name is still readable
-           on hover/long-press. */
+        /* align-items/justify-content: flex-start (not center) -- if the
+           3-line content ever still doesn't quite fit a very short row,
+           the overflow is trimmed from the BOTTOM (the detail/note line,
+           less critical) by the cell's own overflow:hidden, never from
+           the top (which would cut into the product name itself and look
+           broken). */
+        .name-cell-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 6px; width: 100%; height: 100%; min-height: 0; }
+        .name-cell-row > div.name-cell-text { min-width: 0; min-height: 0; flex: 1; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-start; }
+        /* Clamped to 2 lines, ellipsis past that -- never grows the row.
+           renderReceipt() sets a title attribute with the full name
+           alongside this, so a clamped/shrunk name is still readable on
+           hover/long-press. */
         .cart-line-name {
             overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical;
             overflow: hidden;
         }
         .receipt-coupon-row td { background: #fdf3f3; }
         .receipt-coupon-row .cart-line-name { color: #b23b3b; font-weight: 800; }
-        /* Detail ("1.000kg") and the amber below-direct-cost note share one
-           line, note to the right -- wraps under the detail instead of
-           clipping if the row is too narrow for both. */
-        /* Single line, never wraps -- the row's height is now fixed (see
-           --receipt-row-h above), so there's no room to grow into a
-           second line the way this used to when a row could stretch.
-           Detail ("1.000kg") and the amber below-cost note share this one
-           line; each truncates with its own ellipsis + title (already
-           set on both spans in renderReceipt()) if the two together
-           don't fit, rather than wrapping or clipping awkwardly. */
-        .cart-line-detail-row { display: flex; flex-wrap: nowrap; align-items: baseline; gap: 6px; margin-top: 1px; min-width: 0; }
+        /* Single line, never wraps -- rows are short on some viewports, so
+           there's no room to grow into a second line. Detail ("1.000kg")
+           and the amber below-cost note share this one line; each
+           truncates with its own ellipsis + title (set on both spans in
+           renderReceipt()) if the two together don't fit, rather than
+           wrapping or clipping mid-letter. Its own font-size is a notch
+           below the cell's (cqh-based, same reasoning as above) so it
+           reads as a secondary line under the name at every size. */
+        .cart-line-detail-row { display: flex; flex-wrap: nowrap; align-items: baseline; gap: 6px; margin-top: 1px; min-width: 0; flex-shrink: 0; }
         .cart-line-detail {
-            font-size: 0.88rem; color: var(--text-muted); white-space: nowrap; overflow: hidden;
+            font-size: clamp(0.46rem, 2.5cqh, 0.88rem); color: var(--text-muted); white-space: nowrap; overflow: hidden;
             text-overflow: ellipsis; flex-shrink: 1; min-width: 0;
         }
         .cart-line-note {
-            font-size: 11px; font-weight: 700; color: var(--pos-enter-orange);
+            font-size: clamp(0.44rem, 2.3cqh, 0.72rem); font-weight: 700; color: var(--pos-enter-orange);
             white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 2; min-width: 0;
-        }
-        @media (max-width: 480px) {
-            .cart-line-note { font-size: 10px; }
         }
         .receipt-table .row-remove {
             background: #fdecea; border: 1.5px solid #c0392b; color: #c0392b; cursor: pointer;
@@ -692,20 +704,20 @@
                stay tappable, but no longer insists on its exact
                kiosk-width pixel value.
 
-               `order` puts the tax box + Pay button FIRST in this row
-               (right after the cart, before Logout/reminder/Low-Stock/
-               Repay/Offers) so "the total and the Pay button stay
-               reachable without scrolling" even though the rest of this
-               row may now need a scroll to reach. (An explicit min-height
-               on .receipt-table-row used to live here too, to stop this
-               wrapped row's stacked content squeezing the cart table down
-               to 0 height when both shared leftover flex space -- the
-               cart table is now a fixed size of its own regardless of
-               what this row does, see --receipt-row-h above, so that
-               squeeze can no longer happen and the min-height was
-               removed as dead weight.) #receiptView's own overflow-y:auto
-               below is what actually keeps this row's wrapped content
-               reachable if it's ever taller than the viewport. */
+               Found by testing: simply letting this row wrap, with
+               nothing else changed, grows it so tall (5+ stacked button
+               groups plus the reminder card plus the full tax box) that
+               it squeezes .receipt-table-row -- the actual cart -- down
+               to 0 height, since that row only has flex:1 of whatever's
+               left after this flex-shrink:0 row takes what it wants. Two
+               changes fix that together: .receipt-table-row gets an
+               explicit min-height so the cart itself can never be
+               squeezed away, and `order` puts the tax box + Pay button
+               FIRST in this row (right after the cart, before Logout/
+               reminder/Low-Stock/Repay/Offers) so "the total and the Pay
+               button stay reachable without scrolling" even though the
+               rest of this row may now need a scroll to reach. */
+            .receipt-table-row { min-height: 230px; }
             .receipt-combined-row { flex-wrap: wrap; }
             .tax-box { order: 1; flex: 1 1 100%; min-width: 0; }
             .payment-col { order: 2; width: auto; flex: 1 1 100%; }
