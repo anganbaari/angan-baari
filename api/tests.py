@@ -507,9 +507,18 @@ class POSSaleLineApiTests(ApiTestBase):
 
 class WholesaleSaleApiTests(ApiTestBase):
     """POST /api/v1/sales/ with is_wholesale -- confirms the real HTTP path
-    (authorization computed from request.user, see POSSaleView.post())
     behaves the same as the direct create_pos_sale() coverage in
-    shop.tests.WholesaleSaleTests."""
+    shop.tests.WholesaleSaleTests.
+
+    Authorization is decided by the CURRENTLY PIN-unlocked operator (role
+    admin/manager) -- never by whichever Django session happens to be
+    logged into the terminal, and never by the client-supplied
+    queued_operator_id, which has no server-side proof it corresponds to a
+    real PIN unlock on this session. See
+    _wholesale_authorized_for_request() in api/views.py for the full
+    reasoning; this used to be computed from request.user alone, which let
+    a cashier who PIN-unlocked on an owner's still-logged-in terminal
+    session inherit that owner's wholesale authorization."""
 
     def setUp(self):
         super().setUp()
@@ -549,7 +558,146 @@ class WholesaleSaleApiTests(ApiTestBase):
         }
         response = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN, response.data)
+        self.assertEqual(response.data.get('reason'), 'wholesale_unauthorized')
         self.assertFalse(POSSale.objects.filter(is_wholesale=True).exists())
+
+    def test_owner_session_but_cashier_operator_wholesale_rejected(self):
+        """The actual reported bug: a cashier who PIN-unlocks on a
+        terminal whose Django login belongs to an owner must NOT inherit
+        that owner's wholesale authorization. The session is 'owner' --
+        only the PIN-unlocked operator is the cashier."""
+        self.client.login(username='owner', password='pw')
+        self.unlock_terminal(pin=self.staff_pin)  # cashier's PIN -- a different person from the session login
+        payload = {
+            'client_sale_id': str(uuid.uuid4()),
+            'payments': [{'method': 'cash', 'amount': '1.00'}],
+            'cart': [{'product_id': self.jar.id, 'qty': 1, 'price_override': '1'}],
+            'customer_id': self.buyer.id,
+            'is_wholesale': True,
+        }
+        response = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN, response.data)
+        self.assertEqual(response.data.get('reason'), 'wholesale_unauthorized')
+        self.assertFalse(POSSale.objects.filter(is_wholesale=True).exists())
+
+    def test_cashier_session_but_owner_operator_wholesale_accepted(self):
+        """The inverse of the bug scenario above -- an owner/manager who
+        PIN-unlocks on a terminal whose Django login belongs to a cashier
+        IS authorized. Proves the OPERATOR decides, not the session,
+        in both directions, and that the sale is attributed to the
+        operator (not the session login)."""
+        self.client.login(username='cashier', password='pw')
+        self.unlock_terminal(pin=self.owner_pin)
+        payload = {
+            'client_sale_id': str(uuid.uuid4()),
+            'payments': [{'method': 'cash', 'amount': '500.00'}],
+            'cart': [{'product_id': self.jar.id, 'qty': 2, 'price_override': '250'}],
+            'customer_id': self.buyer.id,
+            'is_wholesale': True,
+        }
+        response = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        sale = POSSale.objects.get(sale_number=response.data['sale_number'])
+        self.assertTrue(sale.is_wholesale)
+        self.assertEqual(sale.cashier_id, self.owner.id)
+
+    def test_cashier_operator_normal_catalogue_sale_accepted(self):
+        """A plain catalogue-price sale from a cashier operator is
+        completely unaffected -- this authorization path only matters
+        when is_wholesale is actually set."""
+        self.client.login(username='cashier', password='pw')
+        self.unlock_terminal()
+        payload = {
+            'client_sale_id': str(uuid.uuid4()),
+            'payments': [{'method': 'cash', 'amount': '250.00'}],
+            'cart': [{'product_id': self.jar.id, 'qty': 1}],
+        }
+        response = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        sale = POSSale.objects.get(sale_number=response.data['sale_number'])
+        self.assertFalse(sale.is_wholesale)
+        self.assertEqual(sale.cashier_id, self.staff.id)
+
+    def test_wholesale_rejected_with_no_operator_unlocked(self):
+        """No PIN unlock at all on this session -- get_pos_operator()
+        (resolving operator_user for attribution) already fails closed
+        with its own 403 before wholesale authorization is even reached.
+        Still a clean 403, no sale created, regardless of which Django
+        session is logged into the terminal."""
+        self.client.login(username='owner', password='pw')
+        # Deliberately no self.unlock_terminal() call.
+        payload = {
+            'client_sale_id': str(uuid.uuid4()),
+            'payments': [{'method': 'cash', 'amount': '1.00'}],
+            'cart': [{'product_id': self.jar.id, 'qty': 1, 'price_override': '1'}],
+            'customer_id': self.buyer.id,
+            'is_wholesale': True,
+        }
+        response = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN, response.data)
+        self.assertFalse(POSSale.objects.filter(is_wholesale=True).exists())
+
+    def test_forged_queued_operator_id_does_not_grant_wholesale(self):
+        """A cashier operator cannot buy wholesale authorization by
+        sending a forged queued_operator_id pointing at an owner's user
+        id -- queued_operator_id is a plain client-supplied field with no
+        proof it corresponds to a real PIN unlock on THIS session, and
+        _wholesale_authorized_for_request() deliberately never reads it."""
+        self.client.login(username='cashier', password='pw')
+        self.unlock_terminal()  # live operator is the cashier
+        payload = {
+            'client_sale_id': str(uuid.uuid4()),
+            'payments': [{'method': 'cash', 'amount': '1.00'}],
+            'cart': [{'product_id': self.jar.id, 'qty': 1, 'price_override': '1'}],
+            'customer_id': self.buyer.id,
+            'is_wholesale': True,
+            'queued_operator_id': self.owner.id,  # forged -- claims to be a queued sale from the owner
+        }
+        response = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN, response.data)
+        self.assertEqual(response.data.get('reason'), 'wholesale_unauthorized')
+        self.assertFalse(POSSale.objects.filter(is_wholesale=True).exists())
+
+    def test_legitimate_queued_operator_id_still_attributes_non_wholesale_sale(self):
+        """queued_operator_id still correctly attributes a REPLAYED
+        ordinary (non-wholesale) sale to the operator who actually queued
+        it, even when a different operator is live-unlocked by the time
+        it replays (simulates a shift change while a sale sat queued
+        offline) -- only wholesale AUTHORIZATION ignores this field, not
+        attribution."""
+        self.client.login(username='cashier', password='pw')
+        self.unlock_terminal(pin=self.owner_pin)  # someone else is live-unlocked now
+        payload = {
+            'client_sale_id': str(uuid.uuid4()),
+            'payments': [{'method': 'cash', 'amount': '250.00'}],
+            'cart': [{'product_id': self.jar.id, 'qty': 1}],
+            'queued_operator_id': self.staff.id,  # the cashier originally queued this sale
+        }
+        response = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        sale = POSSale.objects.get(sale_number=response.data['sale_number'])
+        self.assertEqual(sale.cashier_id, self.staff.id)
+
+    def test_idempotent_wholesale_replay_returns_same_sale(self):
+        """A resubmit with the same client_sale_id (the normal offline-
+        queue idempotency path) still returns the original sale rather
+        than re-running authorization or creating a second one."""
+        self.client.login(username='owner', password='pw')
+        self.unlock_terminal(pin=self.owner_pin)
+        client_sale_id = str(uuid.uuid4())
+        payload = {
+            'client_sale_id': client_sale_id,
+            'payments': [{'method': 'cash', 'amount': '500.00'}],
+            'cart': [{'product_id': self.jar.id, 'qty': 2, 'price_override': '250'}],
+            'customer_id': self.buyer.id,
+            'is_wholesale': True,
+        }
+        first = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        second = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        self.assertEqual(first.status_code, status.HTTP_201_CREATED, first.data)
+        self.assertEqual(second.status_code, status.HTTP_200_OK, second.data)
+        self.assertEqual(first.data['sale_number'], second.data['sale_number'])
+        self.assertEqual(POSSale.objects.filter(is_wholesale=True).count(), 1)
 
     def test_retail_sale_from_owner_account_is_unaffected(self):
         """Being an owner doesn't change anything about an ordinary sale --

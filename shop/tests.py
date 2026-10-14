@@ -944,9 +944,12 @@ class POSSaleLineCreationTests(TestCase):
 class WholesaleSaleTests(TestCase):
     """create_pos_sale(is_wholesale=True, ...) -- bulk sales to a named
     buyer at manual per-line prices. wholesale_authorized is computed by
-    the CALLER from request.user (see api/views.py's POSSaleView.post())
-    -- these direct-call tests pass it explicitly; the 403-from-a-real-
-    HTTP-request path is covered separately in api.tests.WholesaleSaleApiTests."""
+    the CALLER, from the currently PIN-unlocked operator, not whichever
+    Django session is logged into the terminal (see api/views.py's
+    _wholesale_authorized_for_request()) -- these direct-call tests pass
+    it explicitly; the 403-from-a-real-HTTP-request path (including the
+    operator-vs-session distinction) is covered separately in
+    api.tests.WholesaleSaleApiTests."""
 
     def setUp(self):
         self.category = Category.objects.create(name='Wholesale Test', order=1)

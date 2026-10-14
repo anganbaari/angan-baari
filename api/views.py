@@ -172,6 +172,48 @@ class CostEntryListView(generics.ListAPIView):
 
 # ─── POS SALES (staff-only list + create) ──────────────────────
 
+def _wholesale_authorized_for_request(request):
+    """Wholesale/price-override authorization, decided by the CURRENTLY
+    PIN-unlocked operator on THIS session -- the operator decides, not
+    whichever Django session happens to be logged into the terminal (see
+    POSSaleView.post()'s own comment for why request.user was wrong here).
+
+    Deliberately ignores queued_operator_id. That field (POSSaleCreateSerializer)
+    is a plain, client-supplied integer with no server-side proof it
+    corresponds to a real PIN unlock on this session -- get_pos_operator()'s
+    own docstring is explicit that it exists only to fix sale ATTRIBUTION
+    for a replayed offline sale, on the reasoning that attribution "grants
+    no additional access" since every POST here already requires a live
+    is_staff session regardless. That reasoning holds for attribution; it
+    does NOT hold for authorization -- if this function trusted
+    queued_operator_id, any staff session (a cashier's own included) could
+    POST a queued-looking sale with queued_operator_id set to an owner's
+    user id and buy itself wholesale pricing. So this resolves the operator
+    fresh from request.session only (get_pos_operator(request), no
+    queued_operator_id argument), same as a live (non-replayed) sale would.
+
+    Fails closed (False) if nobody is currently unlocked on this session --
+    same as any other missing-operator case elsewhere in this module.
+
+    A queued wholesale sale whose operator has since changed (a cashier PIN-
+    unlocked after the owner who queued it, or the terminal is simply
+    locked when the queue flushes) is REJECTED on replay with the same
+    403/reason='wholesale_unauthorized' a live attempt would get -- which
+    the offline queue (static/js/pos-offline-queue.js) already buckets as
+    'needsReauth' for any 401/403, the same non-destructive state a locked
+    terminal produces: the entry stays in the queue, nothing is lost, no
+    false failure alert fires. It replays successfully once the original
+    (or another owner/manager) operator is live-unlocked on this session
+    again."""
+    if not request.session.get('pos_operator_id'):
+        return False
+    try:
+        live_operator = get_pos_operator(request)
+    except POSSaleValidationError:
+        return False
+    return _is_owner_or_manager(live_operator)
+
+
 class POSSaleView(generics.ListAPIView):
     """GET: sale history (staff-only). POST: create a sale via the API —
     delegates to create_pos_sale() (shop/views.py). This is the only way a
@@ -209,13 +251,20 @@ class POSSaleView(generics.ListAPIView):
                 note_prefix='POS sale (API)',
                 coupon_code=data.get('coupon_code'),
                 is_wholesale=data.get('is_wholesale', False),
-                # Deliberately request.user, not operator_user: wholesale
-                # authorization is the terminal's own Django login (same
-                # check the Reports dashboard gates on), independent of
-                # which PIN-identified operator is ringing up this specific
-                # sale. create_pos_sale() itself still enforces this (fails
+                # The CURRENTLY PIN-unlocked operator decides, not whichever
+                # Django session happens to be logged into the terminal --
+                # the terminal login can stay active all day while
+                # different staff take turns via PIN (same reasoning as
+                # operator_user above), so a flag computed from
+                # request.user alone would let a cashier inherit an
+                # owner's wholesale authorization just by PIN-unlocking on
+                # their session. See _wholesale_authorized_for_request()'s
+                # own docstring for why this deliberately does NOT reuse
+                # operator_user (queued_operator_id, used for attribution
+                # above, is not trustworthy for authorization).
+                # create_pos_sale() itself still enforces this (fails
                 # closed if omitted) — this is just where it's computed.
-                wholesale_authorized=_is_owner_or_manager(request.user),
+                wholesale_authorized=_wholesale_authorized_for_request(request),
             )
         except POSSaleValidationError as e:
             # `reason` lets the offline queue (static/js/pos-offline-queue.js)
