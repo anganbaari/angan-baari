@@ -350,11 +350,11 @@ class CouponAdmin(admin.ModelAdmin):
 class InventoryMovementAdmin(admin.ModelAdmin):
     list_display = ['created_at', 'product', 'variant', 'movement_type', 'change_display', 'unit_cost', 'source', 'related_order']
     list_filter = ['movement_type', 'source', 'created_at']
-    search_fields = ['product__name', 'note', 'related_order__order_number']
+    search_fields = ['product__name', 'note', 'related_order__order_number', 'abms_id']
     autocomplete_fields = ['product']
     date_hierarchy = 'created_at'
     ordering = ['-created_at']
-    readonly_fields = ['created_at', 'unit_cost']
+    readonly_fields = ['created_at', 'unit_cost', 'abms_id', 'reversal_of_abms_id']
     list_select_related = ['product', 'variant', 'related_order']
 
     def change_display(self, obj):

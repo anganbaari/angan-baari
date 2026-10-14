@@ -738,9 +738,32 @@ class InventoryMovement(models.Model):
                    "CostEntry.reversal_of above -- ABMS is the source of truth for the code."
     )
     created_at = models.DateTimeField(auto_now_add=True)
+    abms_id = models.CharField(
+        max_length=64, unique=True, null=True, blank=True,
+        help_text="Idempotency key for a movement pushed from ABMS (harvest/waste sync) -- "
+                   "same pattern as CostEntry.abms_id. Always stored as NULL when not "
+                   "supplied (never '' -- a unique column would treat every blank row as "
+                   "colliding with every other), normalised in both clean() and save() so "
+                   "this holds regardless of whether a caller goes through full_clean()."
+    )
+    reversal_of_abms_id = models.CharField(
+        max_length=64, blank=True, default='',
+        help_text="abms_id of the original harvest/waste movement this one reverses "
+                   "(movement_type='adjustment_remove' reversing a 'harvest', or "
+                   "'adjustment_add' reversing a 'waste') -- same reasoning as "
+                   "CostEntry.reversal_of. Blank means this movement isn't a reversal."
+    )
 
     class Meta:
         ordering = ['-created_at']
+
+    def save(self, *args, **kwargs):
+        # Belt-and-suspenders alongside the same normalisation in clean() below --
+        # some callers (e.g. the admin's batch-harvest creation) call
+        # objects.create() directly and never go through full_clean()/clean() at all.
+        if not self.abms_id:
+            self.abms_id = None
+        super().save(*args, **kwargs)
 
     def __str__(self):
         sign = '+' if self.movement_type in self.INCREASE_TYPES else '\u2212'
@@ -764,6 +787,12 @@ class InventoryMovement(models.Model):
            or the same kg of produce, from being "sold" twice)."""
         from django.core.exceptions import ValidationError
         from decimal import Decimal
+
+        # Normalise before validate_unique() runs (full_clean() calls clean_fields(),
+        # then clean(), then validate_unique(), in that order) -- otherwise two blank
+        # abms_id rows would look like they collide on ''.
+        if not self.abms_id:
+            self.abms_id = None
 
         if self.product_id and self.product.pricing_mode == 'fixed_weight' and self.quantity != 1:
             raise ValidationError({

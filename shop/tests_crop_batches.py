@@ -8,6 +8,7 @@ module docstring)."""
 import uuid
 from datetime import date
 from decimal import Decimal
+from unittest.mock import patch
 
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError as DjangoValidationError
@@ -731,3 +732,264 @@ class PosViewCostPerKgTests(TestCase):
         self.assertTrue(created)
         self.assertEqual(sale.total_amount, Decimal('400.00'))
         self.assertEqual(sale.lines.get().quantity, Decimal('2'))
+
+
+class InventoryMovementAbmsIdempotencyTests(TestCase):
+    """POST /api/inventory/movements/ -- the abms_id idempotency key and
+    reversal_of_abms_id reversal contract (see
+    Angan-Baari-Knowledge/06-API/ABMS-Integration.md). Mirrors CostEntry/
+    CostSyncView's duplicate/conflict/create pattern (shop/costs_views.py),
+    adapted for an append-only ledger that can never be edited or deleted --
+    undoing a harvest/waste is always a NEW reversal row, never a change to
+    the original."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user('abms-sync-bridge', password='pw')
+        self.token = Token.objects.create(user=self.user)
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
+        self.url = reverse('api_inventory_movement_create')
+        self.category = Category.objects.create(name='ABMS Sync Test', order=1)
+        self.mango = Product.objects.create(
+            name='Sync Mango', slug='sync-mango', category=self.category, description='t',
+            price=Decimal('100'), pricing_mode='variable_weight', origin='farm',
+        )
+        self.honey = Product.objects.create(
+            name='Sync Honey', slug='sync-honey', category=self.category, description='t',
+            price=Decimal('500'), pricing_mode='variable_weight', origin='farm',
+        )
+        # Two batches mapped to the SAME product, so a batch_code-mismatch
+        # test can swap one for the other without also tripping the
+        # unrelated "product doesn't match this batch" check.
+        self.batch = CropBatch.objects.create(
+            code='sync-mango-2026-01', abms_id='sb1', cost_centre='crop:syncmango',
+            product=self.mango, start_date=date(2026, 1, 1),
+        )
+        self.other_batch = CropBatch.objects.create(
+            code='sync-mango-2026-02', abms_id='sb2', cost_centre='crop:syncmango',
+            product=self.mango, start_date=date(2026, 2, 1),
+        )
+
+    def test_no_abms_id_call_is_unchanged(self):
+        response = self.client.post(self.url, {
+            'product': self.mango.id, 'movement_type': 'harvest', 'source': 'abms', 'quantity': '10',
+        }, format='json')
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertNotIn('status', response.data)
+        self.assertIsNone(response.data.get('abms_id'))
+        self.assertEqual(response.data.get('reversal_of_abms_id'), '')
+        self.assertEqual(InventoryMovement.objects.count(), 1)
+
+    def test_create_with_new_abms_id(self):
+        response = self.client.post(self.url, {
+            'product': self.mango.id, 'movement_type': 'harvest', 'source': 'abms',
+            'quantity': '10', 'abms_id': 'harvest-001',
+        }, format='json')
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(response.data['status'], 'created')
+        self.assertEqual(response.data['abms_id'], 'harvest-001')
+        self.assertIn('id', response.data)
+        self.assertNotIn('code', response.data)
+        self.assertEqual(InventoryMovement.objects.count(), 1)
+
+    def test_identical_duplicate_returns_200_and_creates_nothing(self):
+        payload = {
+            'product': self.mango.id, 'movement_type': 'harvest', 'source': 'abms',
+            'quantity': '10', 'abms_id': 'harvest-002',
+        }
+        first = self.client.post(self.url, payload, format='json')
+        self.assertEqual(first.status_code, 201, first.data)
+        second = self.client.post(self.url, payload, format='json')
+        self.assertEqual(second.status_code, 200, second.data)
+        self.assertEqual(second.data['status'], 'duplicate')
+        self.assertEqual(second.data['id'], first.data['id'])
+        self.assertNotIn('code', second.data)
+        self.assertEqual(InventoryMovement.objects.filter(abms_id='harvest-002').count(), 1)
+
+    def test_conflicting_resend_returns_409_and_original_unchanged(self):
+        first = self.client.post(self.url, {
+            'product': self.mango.id, 'movement_type': 'harvest', 'source': 'abms',
+            'quantity': '10', 'abms_id': 'harvest-003',
+        }, format='json')
+        self.assertEqual(first.status_code, 201, first.data)
+        second = self.client.post(self.url, {
+            'product': self.mango.id, 'movement_type': 'harvest', 'source': 'abms',
+            'quantity': '99', 'abms_id': 'harvest-003',
+        }, format='json')
+        self.assertEqual(second.status_code, 409, second.data)
+        self.assertEqual(second.data['status'], 'conflict')
+        self.assertEqual(second.data['code'], 'abms_id_conflict')
+        movement = InventoryMovement.objects.get(abms_id='harvest-003')
+        self.assertEqual(movement.quantity, Decimal('10'))
+        self.assertEqual(InventoryMovement.objects.filter(abms_id='harvest-003').count(), 1)
+
+    def test_concurrent_duplicate_is_handled_via_integrity_error(self):
+        # Simulates two identical requests arriving together: the row
+        # already exists, but we force the view's own existence check to
+        # miss it (as a real race would), so it falls through to save()
+        # and hits the real unique-constraint IntegrityError.
+        InventoryMovement.objects.create(
+            product=self.mango, movement_type='harvest', source='abms',
+            quantity=Decimal('10'), abms_id='harvest-race',
+        )
+        with patch('shop.api_views.InventoryMovementCreateView._find_existing', return_value=None):
+            response = self.client.post(self.url, {
+                'product': self.mango.id, 'movement_type': 'harvest', 'source': 'abms',
+                'quantity': '10', 'abms_id': 'harvest-race',
+            }, format='json')
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data['status'], 'duplicate')
+        self.assertEqual(InventoryMovement.objects.filter(abms_id='harvest-race').count(), 1)
+
+    def test_harvest_reversal_within_stock_succeeds(self):
+        self.client.post(self.url, {
+            'product': self.mango.id, 'movement_type': 'harvest', 'source': 'abms',
+            'quantity': '20', 'abms_id': 'harvest-orig-1',
+        }, format='json')
+        response = self.client.post(self.url, {
+            'movement_type': 'adjustment_remove', 'source': 'abms', 'quantity': '5',
+            'abms_id': 'rev-1', 'reversal_of_abms_id': 'harvest-orig-1',
+        }, format='json')
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(response.data['status'], 'created')
+        movement = InventoryMovement.objects.get(abms_id='rev-1')
+        self.assertEqual(movement.product_id, self.mango.id)
+        self.assertEqual(movement.movement_type, 'adjustment_remove')
+        self.assertEqual(InventoryMovement.current_stock(self.mango), Decimal('15'))
+
+    def test_harvest_reversal_beyond_remaining_stock_gives_400_insufficient_stock(self):
+        self.client.post(self.url, {
+            'product': self.mango.id, 'movement_type': 'harvest', 'source': 'abms',
+            'quantity': '10', 'abms_id': 'harvest-orig-2',
+        }, format='json')
+        # A sale in between eats most of the stock -- within the ORIGINAL's
+        # own quantity (so this isn't an over-reversal), but beyond what's
+        # actually left right now.
+        InventoryMovement.objects.create(
+            product=self.mango, movement_type='sale', source='pos', quantity=Decimal('8'),
+        )
+        self.assertEqual(InventoryMovement.current_stock(self.mango), Decimal('2'))
+        response = self.client.post(self.url, {
+            'movement_type': 'adjustment_remove', 'source': 'abms', 'quantity': '5',
+            'abms_id': 'rev-2', 'reversal_of_abms_id': 'harvest-orig-2',
+        }, format='json')
+        self.assertEqual(response.status_code, 400, response.data)
+        self.assertEqual(response.data.get('code'), 'insufficient_stock')
+        self.assertIn('currently available', response.data['message'])
+        self.assertFalse(InventoryMovement.objects.filter(abms_id='rev-2').exists())
+
+    def test_reversal_with_unknown_original_gives_400(self):
+        response = self.client.post(self.url, {
+            'product': self.mango.id, 'movement_type': 'adjustment_remove', 'source': 'abms',
+            'quantity': '5', 'abms_id': 'rev-3', 'reversal_of_abms_id': 'no-such-original',
+        }, format='json')
+        self.assertEqual(response.status_code, 400, response.data)
+        self.assertEqual(response.data.get('code'), 'original_not_found')
+        self.assertIn('original not found', response.data['message'])
+        self.assertFalse(InventoryMovement.objects.filter(abms_id='rev-3').exists())
+
+    def test_wrong_type_combination_gives_400(self):
+        self.client.post(self.url, {
+            'product': self.mango.id, 'movement_type': 'harvest', 'source': 'abms',
+            'quantity': '10', 'abms_id': 'harvest-orig-3',
+        }, format='json')
+        # adjustment_add can only reverse a 'waste', not a 'harvest'.
+        response = self.client.post(self.url, {
+            'movement_type': 'adjustment_add', 'source': 'abms', 'quantity': '5',
+            'abms_id': 'rev-4', 'reversal_of_abms_id': 'harvest-orig-3',
+        }, format='json')
+        self.assertEqual(response.status_code, 400, response.data)
+        self.assertEqual(response.data.get('code'), 'invalid_reversal')
+        self.assertFalse(InventoryMovement.objects.filter(abms_id='rev-4').exists())
+
+    def test_over_reversal_gives_400(self):
+        self.client.post(self.url, {
+            'product': self.mango.id, 'movement_type': 'harvest', 'source': 'abms',
+            'quantity': '10', 'abms_id': 'harvest-orig-4',
+        }, format='json')
+        first = self.client.post(self.url, {
+            'movement_type': 'adjustment_remove', 'source': 'abms', 'quantity': '6',
+            'abms_id': 'rev-5a', 'reversal_of_abms_id': 'harvest-orig-4',
+        }, format='json')
+        self.assertEqual(first.status_code, 201, first.data)
+        second = self.client.post(self.url, {
+            'movement_type': 'adjustment_remove', 'source': 'abms', 'quantity': '5',
+            'abms_id': 'rev-5b', 'reversal_of_abms_id': 'harvest-orig-4',
+        }, format='json')
+        # 6 + 5 = 11 > the original's own 10 -- rejected as an over-reversal,
+        # a different failure from the plain stock-insufficient case above.
+        self.assertEqual(second.status_code, 400, second.data)
+        self.assertEqual(second.data.get('code'), 'over_reversal')
+        self.assertFalse(InventoryMovement.objects.filter(abms_id='rev-5b').exists())
+
+    def test_waste_reversal_via_adjustment_add_succeeds(self):
+        self.client.post(self.url, {
+            'product': self.mango.id, 'movement_type': 'harvest', 'source': 'abms',
+            'quantity': '20', 'abms_id': 'harvest-for-waste',
+        }, format='json')
+        waste = self.client.post(self.url, {
+            'product': self.mango.id, 'movement_type': 'waste', 'source': 'abms',
+            'quantity': '5', 'abms_id': 'waste-1',
+        }, format='json')
+        self.assertEqual(waste.status_code, 201, waste.data)
+        response = self.client.post(self.url, {
+            'movement_type': 'adjustment_add', 'source': 'abms', 'quantity': '5',
+            'abms_id': 'rev-waste-1', 'reversal_of_abms_id': 'waste-1',
+        }, format='json')
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(response.data['status'], 'created')
+        self.assertEqual(InventoryMovement.current_stock(self.mango), Decimal('20'))
+
+    def test_batch_code_mismatch_gives_400(self):
+        self.client.post(self.url, {
+            'product': self.mango.id, 'movement_type': 'harvest', 'source': 'abms',
+            'quantity': '20', 'abms_id': 'harvest-batch-1', 'batch_code': self.batch.code,
+        }, format='json')
+        response = self.client.post(self.url, {
+            'product': self.mango.id, 'movement_type': 'adjustment_remove', 'source': 'abms',
+            'quantity': '5', 'abms_id': 'rev-batch-1', 'reversal_of_abms_id': 'harvest-batch-1',
+            'batch_code': self.other_batch.code,
+        }, format='json')
+        self.assertEqual(response.status_code, 400, response.data)
+        self.assertEqual(response.data.get('code'), 'invalid_reversal')
+        self.assertFalse(InventoryMovement.objects.filter(abms_id='rev-batch-1').exists())
+
+    def test_closed_batch_with_abms_id_gives_409_batch_closed(self):
+        self.batch.status = 'closed'
+        self.batch.save()
+        response = self.client.post(self.url, {
+            'product': self.mango.id, 'movement_type': 'harvest', 'source': 'abms',
+            'quantity': '10', 'abms_id': 'harvest-closed-1', 'batch_code': self.batch.code,
+        }, format='json')
+        self.assertEqual(response.status_code, 409, response.data)
+        self.assertEqual(response.data.get('status'), 'error')
+        self.assertEqual(response.data.get('code'), 'batch_closed')
+        self.assertFalse(InventoryMovement.objects.filter(abms_id='harvest-closed-1').exists())
+
+    def test_closed_batch_reversal_gives_409_batch_closed(self):
+        self.client.post(self.url, {
+            'product': self.mango.id, 'movement_type': 'harvest', 'source': 'abms',
+            'quantity': '20', 'abms_id': 'harvest-batch-closed', 'batch_code': self.batch.code,
+        }, format='json')
+        self.batch.status = 'closed'
+        self.batch.save()
+        response = self.client.post(self.url, {
+            'product': self.mango.id, 'movement_type': 'adjustment_remove', 'source': 'abms',
+            'quantity': '5', 'abms_id': 'rev-batch-closed', 'reversal_of_abms_id': 'harvest-batch-closed',
+            'batch_code': self.batch.code,
+        }, format='json')
+        self.assertEqual(response.status_code, 409, response.data)
+        self.assertEqual(response.data.get('code'), 'batch_closed')
+        self.assertFalse(InventoryMovement.objects.filter(abms_id='rev-batch-closed').exists())
+
+    def test_honey_harvest_with_abms_id_works(self):
+        # Named for the real case this guards against: a non-crop, never-
+        # batched product (honey) going through the plain harvest+abms_id
+        # path with no batch_code involved at all.
+        response = self.client.post(self.url, {
+            'product': self.honey.id, 'movement_type': 'harvest', 'source': 'abms',
+            'quantity': '3', 'abms_id': 'honey-harvest-1',
+        }, format='json')
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(response.data['status'], 'created')
+        self.assertEqual(InventoryMovement.current_stock(self.honey), Decimal('3'))
