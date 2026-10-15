@@ -609,9 +609,35 @@
         /* Total / Paid / Remaining-or-Change-due header */
         .pay-summary { border: 1.5px solid var(--mist); border-radius: 10px; padding: 12px 14px; margin-bottom: 14px; }
         .pay-summary-row { display: flex; justify-content: space-between; align-items: baseline; font-size: 0.85rem; font-weight: 600; color: var(--forest); padding: 3px 0; }
+        /* Display-only tax rows (कुल कर / कर स. मूल्य) -- smaller and
+           muted, same Devanagari-first font stack already used for this
+           page's other Devanagari text (e.g. .receipt-table th). */
+        .pay-summary-tax-row { font-size: 0.74rem; font-weight: 600; color: var(--text-muted); font-family: 'Noto Sans Devanagari', 'DM Sans', sans-serif; }
         .pay-summary-remaining { border-top: 1px dashed var(--mist); margin-top: 6px; padding-top: 8px; font-size: 1.05rem; font-weight: 800; }
         .pay-summary-remaining.settled { color: var(--moss); }
         .pay-summary-remaining.change-due { color: var(--pos-enter-orange); }
+
+        /* Full cash confirmation -- centred within #paymentPanel (which is
+           already position:fixed, so this absolutely-positioned child
+           covers exactly the panel's own box, not the whole screen). */
+        .full-cash-confirm-backdrop {
+            display: none; position: absolute; inset: 0; background: rgba(255,255,255,0.94);
+            align-items: center; justify-content: center; z-index: 5; padding: 24px; box-sizing: border-box;
+        }
+        .full-cash-confirm-backdrop.active { display: flex; }
+        .full-cash-confirm-card {
+            background: var(--white); border: 1.5px solid var(--mist); border-radius: 14px; padding: 24px;
+            text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.18); max-width: 300px;
+        }
+        .full-cash-confirm-card p { font-size: 1.05rem; font-weight: 700; color: var(--forest); margin: 0 0 18px; }
+        .full-cash-confirm-actions { display: flex; gap: 12px; }
+        .full-cash-cancel-btn, .full-cash-confirm-btn {
+            flex: 1; padding: 14px 10px; border: none; border-radius: 12px; font-family: inherit;
+            font-weight: 800; font-size: 0.95rem; cursor: pointer;
+        }
+        .full-cash-cancel-btn { background: var(--mist); color: #2a2f2a; }
+        .full-cash-confirm-btn { background: var(--pos-enter-orange); color: #2a1200; }
+        .full-cash-confirm-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
         /* Added payment lines -- removable rows */
         .pay-lines { margin-bottom: 12px; }
@@ -1088,10 +1114,17 @@
         <h2>Payment</h2>
 
         <div class="pay-summary" id="paySummary">
-            <div class="pay-summary-row"><span>Total</span><span id="paySummaryTotal">Rs. 0.00</span></div>
-            <div class="pay-summary-row"><span>Paid</span><span id="paySummaryPaid">Rs. 0.00</span></div>
+            <!-- Display-only -- bound to the same computeTotals() fields
+                 as the cart-totals box's own कुल कर/कर स. मूल्य rows
+                 (vatAmount/exemptValue; कुल कर is always Rs. 0 while VAT
+                 is off). Neither feeds into Total/Paid/Remaining or the
+                 payload -- see renderPaymentSummaryHeader(). -->
+            <div class="pay-summary-row pay-summary-tax-row"><span>कुल कर</span><span id="paySummaryTax">Rs. 0</span></div>
+            <div class="pay-summary-row pay-summary-tax-row"><span>कर स. मूल्य</span><span id="paySummaryValueInclTax">Rs. 0</span></div>
+            <div class="pay-summary-row"><span>Total</span><span id="paySummaryTotal">Rs. 0</span></div>
+            <div class="pay-summary-row"><span>Paid</span><span id="paySummaryPaid">Rs. 0</span></div>
             <div class="pay-summary-row pay-summary-remaining" id="paySummaryRemainingRow">
-                <span id="paySummaryRemainingLabel">Remaining</span><span id="paySummaryRemainingValue">Rs. 0.00</span>
+                <span id="paySummaryRemainingLabel">Remaining</span><span id="paySummaryRemainingValue">Rs. 0</span>
             </div>
         </div>
 
@@ -1181,6 +1214,20 @@
         </div>
 
         <button type="button" id="completeSaleBtn" disabled>Complete Sale</button>
+
+        <!-- Full cash confirmation -- centred within the payment panel
+             itself (an absolutely-positioned child of #paymentPanel, not
+             a page-wide overlay like the QR one), so Full cash never
+             completes a sale on a single tap. See openFullCashConfirm(). -->
+        <div class="full-cash-confirm-backdrop" id="fullCashConfirmBackdrop">
+            <div class="full-cash-confirm-card">
+                <p id="fullCashConfirmText">Complete sale with cash Rs. 0?</p>
+                <div class="full-cash-confirm-actions">
+                    <button type="button" class="full-cash-cancel-btn" id="fullCashConfirmCancel">Cancel</button>
+                    <button type="button" class="full-cash-confirm-btn" id="fullCashConfirmYes" disabled>Confirm cash sale</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Payment QR overlay -- full-screen, purely informational, never
@@ -1275,6 +1322,8 @@
         let keypadValue = '0';
         let keypadTouched = false; // false until the first keypress replaces the Remaining pre-fill
         let saleInFlight = false; // guards against double-submit from completeSaleBtn AND fullCashBtn together
+        let fullCashConfirmTimer = null; // the 500ms Confirm-disable window -- see openFullCashConfirm()
+        let fullCashConfirmKeyHandler = null; // attached/removed on open/close, same convention as keypadKeyHandler (openQtyModal())
         let selectedCustomer = null;
         let appliedCoupon = null; // { code, discount_amount, subtotalAtApply } — see renderReceipt()
         let liveOffers = null; // { discount_offers, combo_offers } — fetched fresh each time the Offers modal opens
@@ -1295,6 +1344,15 @@
             if (isNaN(n)) return String(amount);
             const rounded = Math.round(n * 100) / 100;
             return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(2);
+        }
+        // Thin cents-aware wrapper around the existing formatMoney() above --
+        // deliberately NOT a second definition of formatMoney() itself (the
+        // payment panel's internal math is cents-based; formatMoney()
+        // itself is rupees-based and already used throughout this file --
+        // redefining it with a different unit would silently break every
+        // existing Rs. display elsewhere on this page).
+        function formatMoneyFromCents(cents) {
+            return formatMoney(cents / 100);
         }
 
         function apiFetch(path, options) {
@@ -2833,7 +2891,7 @@
                     // renderReceipt()) -- jump to the page it lands on, same
                     // convention as adding a new product (see onProductTap()).
                     receiptPage = Math.ceil((cart.length + 1) / RECEIPT_PAGE_SIZE) - 1;
-                    showToast(`Coupon ${data.code} applied — Rs. ${data.discount_amount} off`);
+                    showToast(`Coupon ${data.code} applied — Rs. ${formatMoney(data.discount_amount)} off`);
                     renderReceipt();
                 } else {
                     showToast(data.message || 'Invalid coupon');
@@ -3108,20 +3166,33 @@
         }
 
         function renderPaymentSummaryHeader() {
+            // Display-only tax rows -- कुल कर/कर स. मूल्य never feed into
+            // Total/Paid/Remaining or the payload (see the HTML comment
+            // above #paySummary). Bound to the exact same computeTotals()
+            // fields as the cart-totals box's own कुल कर/कर स. मूल्य rows
+            // (#taxVat/#taxExempt, vatAmount/exemptValue) so the two boxes
+            // never show different numbers under the same label.
+            // computeTotals() already returns 0 for vatAmount whenever
+            // IS_VAT_ENABLED is off, so "no tax added yet" falls out of
+            // the existing VAT scaffolding for free.
+            const totals = computeTotals();
+            document.getElementById('paySummaryTax').textContent = 'Rs. ' + formatMoney(totals.vatAmount);
+            document.getElementById('paySummaryValueInclTax').textContent = 'Rs. ' + formatMoney(totals.exemptValue);
+
             const remaining = remainingCents();
-            document.getElementById('paySummaryTotal').textContent = 'Rs. ' + centsToStr(totalCents());
-            document.getElementById('paySummaryPaid').textContent = 'Rs. ' + centsToStr(paymentLinesSumCents());
+            document.getElementById('paySummaryTotal').textContent = 'Rs. ' + formatMoneyFromCents(totalCents());
+            document.getElementById('paySummaryPaid').textContent = 'Rs. ' + formatMoneyFromCents(paymentLinesSumCents());
             const label = document.getElementById('paySummaryRemainingLabel');
             const value = document.getElementById('paySummaryRemainingValue');
             const row = document.getElementById('paySummaryRemainingRow');
             if (remaining < 0) {
                 label.textContent = 'Change due';
-                value.textContent = 'Rs. ' + centsToStr(-remaining);
+                value.textContent = 'Rs. ' + formatMoneyFromCents(-remaining);
                 row.classList.add('change-due');
                 row.classList.remove('settled');
             } else {
                 label.textContent = 'Remaining';
-                value.textContent = 'Rs. ' + centsToStr(remaining);
+                value.textContent = 'Rs. ' + formatMoneyFromCents(remaining);
                 row.classList.toggle('settled', remaining === 0);
                 row.classList.remove('change-due');
             }
@@ -3129,10 +3200,15 @@
 
         function renderPaymentLinesList() {
             const list = document.getElementById('payLinesList');
+            // line.amount is always stored as a precise "850.00"-style
+            // string (see centsToStr()) -- formatMoney() (rupees-based)
+            // reformats it for display only; the stored value itself,
+            // and whatever eventually reaches buildPaymentsPayload(), is
+            // untouched by this.
             list.innerHTML = paymentLines.map((line, i) => `
                 <div class="pay-line-row">
                     <span class="pay-line-method">${PAYMENT_METHOD_LABELS[line.method] || line.method}</span>
-                    <span class="pay-line-amount">Rs. ${line.amount}</span>
+                    <span class="pay-line-amount">Rs. ${formatMoney(line.amount)}</span>
                     <button type="button" class="pay-line-remove" data-index="${i}" aria-label="Remove this payment line">
                         <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 5l14 14M19 5L5 19"/></svg>
                     </button>
@@ -3197,16 +3273,28 @@
         }
 
         function renderKeypad() {
+            // keypadValue is shown exactly as-is, never reformatted here --
+            // before the first keypress it already holds the formatMoney()-
+            // styled pre-fill (set in openPaymentKeypad(), below), and once
+            // the cashier starts typing it's their raw in-progress buffer
+            // (e.g. "850." while entering a decimal) -- running THAT
+            // through formatMoney() mid-edit would silently eat the "."
+            // the cashier just typed (formatMoney("850.") -> "850").
             document.getElementById('paymentKeypadAmount').textContent = keypadValue;
             const hint = document.getElementById('paymentKeypadHint');
-            hint.textContent = activePaymentMethod === 'cash' ? '' : ('Max Rs. ' + centsToStr(Math.max(0, remainingCents())));
+            hint.textContent = activePaymentMethod === 'cash' ? '' : ('Max Rs. ' + formatMoneyFromCents(Math.max(0, remainingCents())));
             updateKeypadAddButtonState();
         }
 
         function openPaymentKeypad(method) {
             activePaymentMethod = method;
             keypadTouched = false;
-            keypadValue = centsToStr(Math.max(0, remainingCents()));
+            // formatMoney() here (not centsToStr()) is what makes the
+            // pre-fill show "850" instead of "850.00" -- the first
+            // keypress in handleKeypadKey() discards this entirely and
+            // starts a fresh raw buffer, so this formatting only ever
+            // affects the untouched pre-fill, never live editing.
+            keypadValue = formatMoney(Math.max(0, remainingCents()) / 100);
             document.getElementById('paymentKeypadTitle').textContent = PAYMENT_METHOD_LABELS[method] || method;
             document.getElementById('payMethodPage').style.display = 'none';
             document.getElementById('payKeypadPage').style.display = '';
@@ -3349,7 +3437,7 @@
                     const wholesaleLabel = wholesaleMode
                         ? ` — WHOLESALE${selectedCustomer ? ' (' + selectedCustomer.name + ')' : ''}`
                         : '';
-                    showToast(`Sale ${data.sale_number} — Rs. ${data.total} recorded${wholesaleLabel}`);
+                    showToast(`Sale ${data.sale_number} — Rs. ${formatMoney(data.total)} recorded${wholesaleLabel}`);
                     resetPostSaleState();
                 } else {
                     // A real validation/stock error (400/409) -- either
@@ -3404,7 +3492,7 @@
             // either way a sensible live figure, never blocking the sale
             // either way (this overlay only ever displays, never gates).
             const amountCents = (activePaymentMethod === method) ? keypadAmountCents() : Math.max(0, remainingCents());
-            document.getElementById('paymentQrAmount').textContent = 'Rs. ' + centsToStr(amountCents);
+            document.getElementById('paymentQrAmount').textContent = 'Rs. ' + formatMoneyFromCents(amountCents);
             document.getElementById('paymentQrBackdrop').style.display = 'flex';
         }
 
@@ -3428,20 +3516,62 @@
             paymentLines.push({ method: activePaymentMethod, amount: centsToStr(keypadAmountCents()) });
             closePaymentKeypad();
         });
+        // Full cash confirmation -- a tap on Full cash no longer completes
+        // the sale immediately; it opens this dialog first (see the
+        // fullCashBtn handler below). Confirm then runs the exact same
+        // cash-line-plus-performCompleteSale() path the old direct-tap
+        // behaviour used.
+        function openFullCashConfirm() {
+            const remaining = remainingCents();
+            document.getElementById('fullCashConfirmText').textContent =
+                `Complete sale with cash Rs. ${formatMoneyFromCents(remaining)}?`;
+            const confirmBtn = document.getElementById('fullCashConfirmYes');
+            confirmBtn.disabled = true;
+            document.getElementById('fullCashConfirmBackdrop').classList.add('active');
+            // Default focus on Cancel -- a stray Enter keypress right after
+            // the dialog opens cancels rather than confirms.
+            document.getElementById('fullCashConfirmCancel').focus();
+            clearTimeout(fullCashConfirmTimer);
+            fullCashConfirmTimer = setTimeout(() => { confirmBtn.disabled = false; }, 500);
+            fullCashConfirmKeyHandler = (e) => {
+                if (e.key === 'Escape') closeFullCashConfirm();
+            };
+            document.addEventListener('keydown', fullCashConfirmKeyHandler);
+        }
+        function closeFullCashConfirm() {
+            clearTimeout(fullCashConfirmTimer);
+            fullCashConfirmTimer = null;
+            document.getElementById('fullCashConfirmBackdrop').classList.remove('active');
+            if (fullCashConfirmKeyHandler) {
+                document.removeEventListener('keydown', fullCashConfirmKeyHandler);
+                fullCashConfirmKeyHandler = null;
+            }
+        }
+
         document.getElementById('fullCashBtn').addEventListener('click', () => {
             const btn = document.getElementById('fullCashBtn');
             if (btn.disabled) return;
-            // Checked BEFORE adding the cash line below -- a blocked
-            // attempt (wholesale with no buyer chosen yet) must show the
-            // same toast Complete would, without leaving a stray
-            // just-added cash line sitting in paymentLines behind it.
+            // Checked BEFORE opening the dialog -- a blocked attempt
+            // (wholesale with no buyer chosen yet) shows the same toast
+            // Complete would, and the dialog never opens at all.
             const gateMessage = completeSaleGateMessage();
             if (gateMessage) { showToast(gateMessage); return; }
+            if (remainingCents() <= 0) return; // defensive; button is already disabled in this state
+            openFullCashConfirm();
+        });
+        document.getElementById('fullCashConfirmCancel').addEventListener('click', closeFullCashConfirm);
+        document.getElementById('fullCashConfirmBackdrop').addEventListener('click', (e) => {
+            if (e.target.id === 'fullCashConfirmBackdrop') closeFullCashConfirm();
+        });
+        document.getElementById('fullCashConfirmYes').addEventListener('click', () => {
+            const confirmBtn = document.getElementById('fullCashConfirmYes');
+            if (confirmBtn.disabled) return;
             const remaining = remainingCents();
-            if (remaining <= 0) return; // defensive; button is already disabled in this state
+            closeFullCashConfirm();
+            if (remaining <= 0) return; // defensive; the dialog only ever opens when remaining > 0
             paymentLines.push({ method: 'cash', amount: centsToStr(remaining) });
             updatePaymentSummary();
-            performCompleteSale(btn);
+            performCompleteSale(document.getElementById('fullCashBtn'));
         });
         document.getElementById('paymentQrCloseBtn').addEventListener('click', () => {
             document.getElementById('paymentQrBackdrop').style.display = 'none';
@@ -4348,7 +4478,7 @@
                 return;
             }
             if (!response.ok) { showToast(data.message || 'Could not record repayment'); return; }
-            showToast(`Repayment recorded — new balance Rs. ${data.outstanding_balance}`);
+            showToast(`Repayment recorded — new balance Rs. ${formatMoney(data.outstanding_balance)}`);
             // Stay on the Repay Credit screen and refresh the table (updated
             // balance/last-repaid) rather than bouncing back to the receipt
             // -- a full view makes it easy to process several customers'
