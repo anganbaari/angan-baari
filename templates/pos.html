@@ -599,11 +599,16 @@
         #paymentBackdrop { display: none; position: fixed; inset: 0; background: rgba(26,47,30,0.35); z-index: 300; }
         #paymentBackdrop.active { display: block; }
         #paymentPanel {
-            position: fixed; top: 0; right: -420px; width: 400px; max-width: 92vw; height: 100vh; height: 100dvh; background: var(--white);
-            box-shadow: -6px 0 24px rgba(0,0,0,0.15); z-index: 310; transition: right 0.25s; padding: 22px; box-sizing: border-box;
-            overflow-y: auto;
+            /* transform, not right -- opacity/transform-only per the POS
+               animation rule below, and translateX(100%) moves it fully
+               off the right edge of the viewport regardless of the
+               panel's own resolved width (400px, or less under max-width
+               on a narrow screen), unlike the old fixed -420px offset. */
+            position: fixed; top: 0; right: 0; width: 400px; max-width: 92vw; height: 100vh; height: 100dvh; background: var(--white);
+            box-shadow: -6px 0 24px rgba(0,0,0,0.15); z-index: 310; transform: translateX(100%); transition: transform 0.1s;
+            padding: 22px; box-sizing: border-box; overflow-y: auto;
         }
-        #paymentPanel.active { right: 0; }
+        #paymentPanel.active { transform: translateX(0); }
         #paymentPanel h2 { font-family: 'Cormorant Garamond', serif; color: var(--forest); margin: 0 0 16px; }
 
         /* Total / Paid / Remaining-or-Change-due header */
@@ -636,8 +641,11 @@
             font-weight: 800; font-size: 0.95rem; cursor: pointer;
         }
         .full-cash-cancel-btn { background: var(--mist); color: #2a2f2a; }
+        /* Fully coloured from the first frame -- no disabled/faded state.
+           The first-300ms tap guard is a plain JS timestamp check (see
+           openFullCashConfirm()), not the disabled attribute, precisely
+           so this never looks "greyed out" or slow to respond. */
         .full-cash-confirm-btn { background: var(--pos-enter-orange); color: #2a1200; }
-        .full-cash-confirm-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
         /* Added payment lines -- removable rows */
         .pay-lines { margin-bottom: 12px; }
@@ -663,17 +671,34 @@
         .pm-btn:disabled { opacity: 0.45; cursor: not-allowed; }
         .pm-sub { font-size: 0.72rem; font-weight: 600; }
         .pm-cash { background: #F2C14E; color: #2a1e00; }
+        .pm-esewa, .pm-khalti, .pm-bank {
+            /* Room for the 44px QR tap target (inset 6px from the cell's
+               corner) on the right -- without this, the label text (e.g.
+               "Bank Transfer") can run under/behind the badge instead of
+               staying centred in the remaining space. */
+            padding-right: 34px;
+        }
         .pm-esewa { background: #1FA850; color: var(--white); }
         .pm-khalti { background: #D7263D; color: var(--white); }
         .pm-bank { background: #6B3FA0; color: var(--white); }
         .pm-credit { background: #2E6FD9; color: var(--white); }
         .pm-fullcash { background: var(--pos-enter-orange); color: #2a1200; }
+        /* QR badge -- a 44x44px tap target (inset 6px from the cell's
+           corner), well above the ~24px the old badge used. The visible
+           filled circle is the smaller inner .pm-qr-btn-circle (~40px)
+           so the tap target can be bigger than the badge LOOKS without
+           making it visually heavier -- stopPropagation() on this button
+           (wired in the script below) is what keeps a tap on it from
+           also opening the keypad underneath. */
         .pm-qr-btn {
-            position: absolute; top: 6px; right: 6px; width: 24px; height: 24px; border-radius: 50%;
-            border: none; background: rgba(255,255,255,0.85); color: #1a2f1e; display: flex; align-items: center;
-            justify-content: center; cursor: pointer; padding: 0;
+            position: absolute; top: 6px; right: 6px; width: 44px; height: 44px; border: none; background: transparent;
+            display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0;
         }
-        .pm-qr-btn:hover { background: var(--white); }
+        .pm-qr-btn-circle {
+            width: 40px; height: 40px; border-radius: 50%; background: rgba(255,255,255,0.85); color: #1a2f1e;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .pm-qr-btn:hover .pm-qr-btn-circle { background: var(--white); }
 
         /* Amount-entry keypad page */
         .pay-keypad-page { margin-bottom: 14px; }
@@ -737,9 +762,18 @@
             position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px);
             background: var(--forest); color: var(--gold); padding: 12px 22px; border-radius: 50px;
             font-size: 0.85rem; font-weight: 600; box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-            opacity: 0; pointer-events: none; transition: opacity 0.25s, transform 0.25s; z-index: 900;
+            opacity: 0; pointer-events: none; transition: opacity 0.1s, transform 0.1s; z-index: 900;
         }
         #posToast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+        /* Every POS overlay/panel/toast open-close animation is already
+           100ms or less (opacity/transform only); this just drops that to
+           effectively instant for anyone who's asked for reduced motion.
+           0.01ms rather than 0s so JS transitionend-style timing isn't
+           left waiting on an animation that never technically "ends". */
+        @media (prefers-reduced-motion: reduce) {
+            #paymentPanel, #posToast { transition-duration: 0.01ms !important; }
+        }
 
         /* ── Mobile & tablet (<=1024px) ──
            This page has no width-based layout below this point otherwise --
@@ -861,6 +895,12 @@
         @media (max-width: 480px) {
             .pos-brand .brand-text span { display: none; }
             .pos-clock { min-width: 0; }
+            /* The 44px QR badge's own padding-right on the eSewa/Khalti/
+               Bank transfer buttons doesn't leave quite enough room for
+               their label at the narrowest panel widths -- shrink the
+               label text slightly rather than the badge (never the
+               badge -- it's a tap target, see .pm-qr-btn above). */
+            .pm-esewa, .pm-khalti, .pm-bank { font-size: 0.82rem; }
         }
 
         /* ── Tablet landscape: shorter viewport heights need every row of
@@ -1138,19 +1178,25 @@
             <div class="pm-cell">
                 <button type="button" class="pm-btn pm-esewa" data-method="esewa">eSewa</button>
                 <button type="button" class="pm-qr-btn" data-method="esewa" aria-label="Show eSewa QR" title="Show QR">
-                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="3" height="3"/><rect x="18" y="18" width="3" height="3"/><rect x="14" y="18" width="3" height="3"/><rect x="18" y="14" width="3" height="3"/></svg>
+                    <span class="pm-qr-btn-circle">
+                        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="3" height="3"/><rect x="18" y="18" width="3" height="3"/><rect x="14" y="18" width="3" height="3"/><rect x="18" y="14" width="3" height="3"/></svg>
+                    </span>
                 </button>
             </div>
             <div class="pm-cell">
                 <button type="button" class="pm-btn pm-khalti" data-method="khalti">Khalti</button>
                 <button type="button" class="pm-qr-btn" data-method="khalti" aria-label="Show Khalti QR" title="Show QR">
-                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="3" height="3"/><rect x="18" y="18" width="3" height="3"/><rect x="14" y="18" width="3" height="3"/><rect x="18" y="14" width="3" height="3"/></svg>
+                    <span class="pm-qr-btn-circle">
+                        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="3" height="3"/><rect x="18" y="18" width="3" height="3"/><rect x="14" y="18" width="3" height="3"/><rect x="18" y="14" width="3" height="3"/></svg>
+                    </span>
                 </button>
             </div>
             <div class="pm-cell">
                 <button type="button" class="pm-btn pm-bank" data-method="bank_transfer">Bank Transfer</button>
                 <button type="button" class="pm-qr-btn" data-method="bank_transfer" aria-label="Show Bank Transfer QR" title="Show QR">
-                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="3" height="3"/><rect x="18" y="18" width="3" height="3"/><rect x="14" y="18" width="3" height="3"/><rect x="18" y="14" width="3" height="3"/></svg>
+                    <span class="pm-qr-btn-circle">
+                        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="3" height="3"/><rect x="18" y="18" width="3" height="3"/><rect x="14" y="18" width="3" height="3"/><rect x="18" y="14" width="3" height="3"/></svg>
+                    </span>
                 </button>
             </div>
             <div class="pm-cell">
@@ -1224,7 +1270,7 @@
                 <p id="fullCashConfirmText">Complete sale with cash Rs. 0?</p>
                 <div class="full-cash-confirm-actions">
                     <button type="button" class="full-cash-cancel-btn" id="fullCashConfirmCancel">Cancel</button>
-                    <button type="button" class="full-cash-confirm-btn" id="fullCashConfirmYes" disabled>Confirm cash sale</button>
+                    <button type="button" class="full-cash-confirm-btn" id="fullCashConfirmYes">Confirm cash sale</button>
                 </div>
             </div>
         </div>
@@ -1322,7 +1368,7 @@
         let keypadValue = '0';
         let keypadTouched = false; // false until the first keypress replaces the Remaining pre-fill
         let saleInFlight = false; // guards against double-submit from completeSaleBtn AND fullCashBtn together
-        let fullCashConfirmTimer = null; // the 500ms Confirm-disable window -- see openFullCashConfirm()
+        let fullCashConfirmOpenedAt = 0; // Date.now() at open -- the 300ms tap-ignore window, see openFullCashConfirm()
         let fullCashConfirmKeyHandler = null; // attached/removed on open/close, same convention as keypadKeyHandler (openQtyModal())
         let selectedCustomer = null;
         let appliedCoupon = null; // { code, discount_amount, subtotalAtApply } — see renderReceipt()
@@ -3521,26 +3567,34 @@
         // fullCashBtn handler below). Confirm then runs the exact same
         // cash-line-plus-performCompleteSale() path the old direct-tap
         // behaviour used.
+        //
+        // openFullCashConfirm() itself does no heavy work -- remainingCents()
+        // is a synchronous arithmetic read over the in-memory cart/
+        // paymentLines (no network, no image loading), followed by a
+        // handful of cheap DOM writes (textContent/classList/focus) and
+        // attaching one keydown listener. There's no updatePaymentSummary()
+        // call here either, so opening this dialog never re-renders the
+        // rest of the panel.
         function openFullCashConfirm() {
             const remaining = remainingCents();
             document.getElementById('fullCashConfirmText').textContent =
                 `Complete sale with cash Rs. ${formatMoneyFromCents(remaining)}?`;
-            const confirmBtn = document.getElementById('fullCashConfirmYes');
-            confirmBtn.disabled = true;
+            // Confirm stays fully coloured (no disabled attribute, no
+            // faded styling) from the first frame -- taps are ignored by
+            // timestamp below instead, so a fast double-tap on Full cash
+            // still can't confirm by accident, without the button ever
+            // looking greyed-out/slow.
+            fullCashConfirmOpenedAt = Date.now();
             document.getElementById('fullCashConfirmBackdrop').classList.add('active');
             // Default focus on Cancel -- a stray Enter keypress right after
             // the dialog opens cancels rather than confirms.
             document.getElementById('fullCashConfirmCancel').focus();
-            clearTimeout(fullCashConfirmTimer);
-            fullCashConfirmTimer = setTimeout(() => { confirmBtn.disabled = false; }, 500);
             fullCashConfirmKeyHandler = (e) => {
                 if (e.key === 'Escape') closeFullCashConfirm();
             };
             document.addEventListener('keydown', fullCashConfirmKeyHandler);
         }
         function closeFullCashConfirm() {
-            clearTimeout(fullCashConfirmTimer);
-            fullCashConfirmTimer = null;
             document.getElementById('fullCashConfirmBackdrop').classList.remove('active');
             if (fullCashConfirmKeyHandler) {
                 document.removeEventListener('keydown', fullCashConfirmKeyHandler);
@@ -3564,8 +3618,9 @@
             if (e.target.id === 'fullCashConfirmBackdrop') closeFullCashConfirm();
         });
         document.getElementById('fullCashConfirmYes').addEventListener('click', () => {
-            const confirmBtn = document.getElementById('fullCashConfirmYes');
-            if (confirmBtn.disabled) return;
+            // Ignored by elapsed time, not the disabled attribute -- see
+            // openFullCashConfirm()'s own comment for why.
+            if (Date.now() - fullCashConfirmOpenedAt < 300) return;
             const remaining = remainingCents();
             closeFullCashConfirm();
             if (remaining <= 0) return; // defensive; the dialog only ever opens when remaining > 0
