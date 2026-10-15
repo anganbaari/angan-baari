@@ -1271,8 +1271,7 @@ class PosBusinessDataTests(TestCase):
     """pos_view() embeds BusinessSettings' shop-info/payment-QR fields as
     POS_BUSINESS the same way PRODUCTS/CATEGORIES/LIVE_COUPONS are already
     embedded -- see BusinessSettings' own docstring (shop/models.py) and
-    POS_BUSINESS in templates/pos.html. Nothing reads this yet; these
-    tests only confirm the context/embedding itself, not any behaviour."""
+    POS_BUSINESS/openPaymentQr() in templates/pos.html."""
 
     def setUp(self):
         self.staff = User.objects.create_user('business_data_cashier', password='pw', is_staff=True)
@@ -1304,6 +1303,37 @@ class PosBusinessDataTests(TestCase):
         # No QR images uploaded in this test -- each must be '', never None
         # or a stale/placeholder path.
         self.assertEqual(business['qr'], {'esewa': '', 'khalti': '', 'bank_transfer': ''})
+
+    def test_business_json_escapes_script_tag_breakout_characters(self):
+        # shop_name/receipt_footer etc. are free-text admin input -- a
+        # literal "</script>" or a bare "<"/"&" inside one must not be
+        # able to break out of the <script type="application/json"> block
+        # pos_view() embeds it in (see that view's own comment). The
+        # raw HTML must never contain an unescaped "</script>" coming
+        # from OUR data, and the escaped JSON must still decode back to
+        # the exact original string.
+        settings_row = BusinessSettings.get_solo()
+        settings_row.shop_name = '</script><script>alert(1)</script> & Sons'
+        settings_row.save()
+
+        self.client.login(username='business_data_cashier', password='pw')
+        response = self.client.get('/pos/')
+        content = response.content.decode()
+        # The literal, executable tag text -- not just the word "alert(1)"
+        # on its own, which has no special characters and legitimately
+        # still appears verbatim inside the escaped JSON string value.
+        self.assertNotIn('<script>alert(1)</script>', content)
+
+        match = re.search(
+            r'<script id="posBusinessData" type="application/json">(.*?)</script>',
+            content, re.S,
+        )
+        self.assertIsNotNone(match)
+        raw = match.group(1)
+        self.assertNotIn('<script>', raw)
+        self.assertIn('\\u003c', raw)
+        business = json.loads(raw)
+        self.assertEqual(business['shopName'], '</script><script>alert(1)</script> & Sons')
 
 
 class HiddenProductPublicVisibilityTests(TestCase):

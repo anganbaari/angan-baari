@@ -1418,11 +1418,11 @@ class BusinessSettings(models.Model):
     stored per-sale at creation time).
 
     shop_name/shop_address/shop_phone/pan_vat_number/receipt_footer and the
-    three QR images below are POS payment-redesign scaffolding (see
-    Angan-Baari-Knowledge) — not yet read anywhere. They're embedded into
-    pos_view()'s context and templates/pos.html's POS_BUSINESS JS object
-    so that work exists, but nothing consumes them yet; this is purely
-    additive, no visible behaviour change."""
+    three QR images below back the POS payment panel (see
+    Angan-Baari-Knowledge) — embedded into pos_view()'s context and read
+    client-side as templates/pos.html's POS_BUSINESS JS object (the QR
+    images by openPaymentQr(); the shop-info strings are reserved for a
+    later receipt-printing task and not yet read anywhere)."""
 
     is_vat_enabled = models.BooleanField(default=False)
 

@@ -605,11 +605,80 @@
         }
         #paymentPanel.active { right: 0; }
         #paymentPanel h2 { font-family: 'Cormorant Garamond', serif; color: var(--forest); margin: 0 0 16px; }
-        .pay-method-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
-        .pay-method-row label { flex: 1; font-size: 0.85rem; font-weight: 600; color: var(--forest); }
-        .pay-method-row input { width: 110px; padding: 8px 10px; border: 1.5px solid var(--mist); border-radius: 8px; font-family: inherit; text-align: right; }
-        .pay-remaining { text-align: right; font-size: 0.9rem; font-weight: 700; color: var(--forest); margin: 10px 0 16px; }
-        .pay-remaining.settled { color: var(--moss); }
+
+        /* Total / Paid / Remaining-or-Change-due header */
+        .pay-summary { border: 1.5px solid var(--mist); border-radius: 10px; padding: 12px 14px; margin-bottom: 14px; }
+        .pay-summary-row { display: flex; justify-content: space-between; align-items: baseline; font-size: 0.85rem; font-weight: 600; color: var(--forest); padding: 3px 0; }
+        .pay-summary-remaining { border-top: 1px dashed var(--mist); margin-top: 6px; padding-top: 8px; font-size: 1.05rem; font-weight: 800; }
+        .pay-summary-remaining.settled { color: var(--moss); }
+        .pay-summary-remaining.change-due { color: var(--pos-enter-orange); }
+
+        /* Added payment lines -- removable rows */
+        .pay-lines { margin-bottom: 12px; }
+        .pay-line-row {
+            display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1.5px solid var(--mist);
+            border-radius: 8px; margin-bottom: 6px; font-size: 0.85rem;
+        }
+        .pay-line-method { flex: 1; font-weight: 700; color: var(--forest); }
+        .pay-line-amount { font-weight: 600; color: var(--pos-text-green); }
+        .pay-line-remove {
+            display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%;
+            border: none; background: var(--mist); color: #5a6b60; cursor: pointer; padding: 0; flex-shrink: 0;
+        }
+        .pay-line-remove:hover { background: #d8ddd6; }
+
+        /* 3x2 payment method grid */
+        .pm-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+        .pm-cell { position: relative; }
+        .pm-btn {
+            width: 100%; height: 64px; border: none; border-radius: 14px; font-family: inherit; font-size: 0.95rem;
+            font-weight: 800; cursor: pointer; box-shadow: 0 2px 6px rgba(26,47,30,0.12);
+        }
+        .pm-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+        .pm-sub { font-size: 0.72rem; font-weight: 600; }
+        .pm-cash { background: #F2C14E; color: #2a1e00; }
+        .pm-esewa { background: #1FA850; color: var(--white); }
+        .pm-khalti { background: #D7263D; color: var(--white); }
+        .pm-bank { background: #6B3FA0; color: var(--white); }
+        .pm-credit { background: #2E6FD9; color: var(--white); }
+        .pm-fullcash { background: var(--pos-enter-orange); color: #2a1200; }
+        .pm-qr-btn {
+            position: absolute; top: 6px; right: 6px; width: 24px; height: 24px; border-radius: 50%;
+            border: none; background: rgba(255,255,255,0.85); color: #1a2f1e; display: flex; align-items: center;
+            justify-content: center; cursor: pointer; padding: 0;
+        }
+        .pm-qr-btn:hover { background: var(--white); }
+
+        /* Amount-entry keypad page */
+        .pay-keypad-page { margin-bottom: 14px; }
+        .pay-keypad-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+        .pay-keypad-back {
+            width: 30px; height: 30px; border-radius: 50%; border: 1.5px solid var(--mist); background: var(--white);
+            color: var(--forest); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0;
+        }
+        .pay-keypad-header span { font-weight: 800; color: var(--forest); font-size: 1rem; }
+        .pay-keypad-amount {
+            text-align: right; font-size: 1.6rem; font-weight: 800; color: var(--forest); background: var(--pos-bg);
+            border-radius: 8px; padding: 10px 14px; margin-bottom: 4px;
+        }
+        .pay-keypad-hint { text-align: right; font-size: 0.78rem; color: var(--text-muted); margin-bottom: 10px; min-height: 1em; }
+        .pay-keypad-buttons { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+        .keypad-key {
+            height: 48px; border: 1.5px solid var(--mist); border-radius: 10px; background: var(--white); font-family: inherit;
+            font-size: 1.05rem; font-weight: 700; color: var(--forest); cursor: pointer; display: flex; align-items: center; justify-content: center;
+        }
+        .keypad-key:hover { background: var(--pos-bg); }
+        .pay-keypad-actions { display: flex; gap: 10px; }
+        .pay-keypad-clear {
+            flex: 1; padding: 12px; border: 1.5px solid var(--mist); border-radius: 10px; background: var(--white);
+            font-family: inherit; font-weight: 700; color: var(--forest); cursor: pointer;
+        }
+        .pay-keypad-add {
+            flex: 2; padding: 12px; border: none; border-radius: 10px; background: var(--moss); color: var(--white);
+            font-family: inherit; font-weight: 800; cursor: pointer;
+        }
+        .pay-keypad-add:disabled { opacity: 0.45; cursor: not-allowed; }
+
         .credit-section { border-top: 1px dashed var(--mist); margin-top: 10px; padding-top: 14px; }
         .credit-section input[type="text"] { width: 100%; padding: 9px 12px; border: 1.5px solid var(--mist); border-radius: 8px; font-family: inherit; margin-bottom: 8px; }
         .customer-card {
@@ -627,6 +696,16 @@
         }
         #completeSaleBtn:disabled { opacity: 0.45; cursor: not-allowed; }
         .panel-close { position: absolute; top: 18px; right: 18px; background: none; border: none; font-size: 1.2rem; color: var(--text-muted); cursor: pointer; }
+
+        /* Payment QR overlay */
+        .payment-qr-card {
+            position: relative; background: var(--white); border-radius: 16px; padding: 28px; max-width: 360px; width: 90vw;
+            text-align: center; box-shadow: 0 16px 40px rgba(0,0,0,0.3);
+        }
+        .payment-qr-card h3 { font-family: 'Cormorant Garamond', serif; color: var(--forest); margin: 0 0 14px; }
+        #paymentQrImage { width: 100%; max-width: 260px; border-radius: 8px; margin-bottom: 14px; }
+        #paymentQrMissing { color: var(--text-muted); font-size: 0.9rem; font-weight: 600; margin: 10px 0 14px; }
+        .payment-qr-amount { font-size: 1.6rem; font-weight: 800; color: var(--forest); }
 
         #posToast {
             position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px);
@@ -734,7 +813,7 @@
                layout; bump them back up only in this mobile/tablet band so
                the laptop look is unaffected. */
             .shop-search-wrap input, .coupon-type-row input, .lock-bar input,
-            .repay-search-input, #repayAmountInput, .pay-method-row input,
+            .repay-search-input, #repayAmountInput,
             .new-customer-form input, .restock-origin-row input {
                 font-size: 16px;
             }
@@ -1007,8 +1086,83 @@
     <div id="paymentPanel">
         <button type="button" class="panel-close" id="closePaymentBtn"><i class="fas fa-times"></i></button>
         <h2>Payment</h2>
-        <div id="payMethodRows"></div>
-        <div class="pay-remaining" id="payRemaining">Remaining: Rs. 0</div>
+
+        <div class="pay-summary" id="paySummary">
+            <div class="pay-summary-row"><span>Total</span><span id="paySummaryTotal">Rs. 0.00</span></div>
+            <div class="pay-summary-row"><span>Paid</span><span id="paySummaryPaid">Rs. 0.00</span></div>
+            <div class="pay-summary-row pay-summary-remaining" id="paySummaryRemainingRow">
+                <span id="paySummaryRemainingLabel">Remaining</span><span id="paySummaryRemainingValue">Rs. 0.00</span>
+            </div>
+        </div>
+
+        <div class="pay-lines" id="payLinesList"></div>
+
+        <!-- Method grid -- page 1 of the payment panel -->
+        <div class="pm-grid" id="payMethodPage">
+            <div class="pm-cell">
+                <button type="button" class="pm-btn pm-cash" data-method="cash">Cash</button>
+            </div>
+            <div class="pm-cell">
+                <button type="button" class="pm-btn pm-esewa" data-method="esewa">eSewa</button>
+                <button type="button" class="pm-qr-btn" data-method="esewa" aria-label="Show eSewa QR" title="Show QR">
+                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="3" height="3"/><rect x="18" y="18" width="3" height="3"/><rect x="14" y="18" width="3" height="3"/><rect x="18" y="14" width="3" height="3"/></svg>
+                </button>
+            </div>
+            <div class="pm-cell">
+                <button type="button" class="pm-btn pm-khalti" data-method="khalti">Khalti</button>
+                <button type="button" class="pm-qr-btn" data-method="khalti" aria-label="Show Khalti QR" title="Show QR">
+                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="3" height="3"/><rect x="18" y="18" width="3" height="3"/><rect x="14" y="18" width="3" height="3"/><rect x="18" y="14" width="3" height="3"/></svg>
+                </button>
+            </div>
+            <div class="pm-cell">
+                <button type="button" class="pm-btn pm-bank" data-method="bank_transfer">Bank Transfer</button>
+                <button type="button" class="pm-qr-btn" data-method="bank_transfer" aria-label="Show Bank Transfer QR" title="Show QR">
+                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="3" height="3"/><rect x="18" y="18" width="3" height="3"/><rect x="14" y="18" width="3" height="3"/><rect x="18" y="14" width="3" height="3"/></svg>
+                </button>
+            </div>
+            <div class="pm-cell">
+                <button type="button" class="pm-btn pm-credit" data-method="credit">Credit<br><span class="pm-sub">उधारो</span></button>
+            </div>
+            <div class="pm-cell">
+                <button type="button" class="pm-btn pm-fullcash" id="fullCashBtn" disabled>Full cash</button>
+            </div>
+        </div>
+
+        <!-- Amount box + keypad -- page 2, shown instead of the grid above
+             while entering one payment line's amount. An inline page swap
+             (not a floating modal) specifically so creditSection below
+             stays reachable/visible at the same time for a Credit entry --
+             see updatePaymentSummary(). -->
+        <div class="pay-keypad-page" id="payKeypadPage" style="display:none;">
+            <div class="pay-keypad-header">
+                <button type="button" class="pay-keypad-back" id="paymentKeypadBack" aria-label="Back to payment methods">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+                </button>
+                <span id="paymentKeypadTitle">Cash</span>
+            </div>
+            <div class="pay-keypad-amount" id="paymentKeypadAmount">0.00</div>
+            <div class="pay-keypad-hint" id="paymentKeypadHint"></div>
+            <div class="pay-keypad-buttons">
+                <button type="button" class="keypad-key" data-key="1">1</button>
+                <button type="button" class="keypad-key" data-key="2">2</button>
+                <button type="button" class="keypad-key" data-key="3">3</button>
+                <button type="button" class="keypad-key" data-key="4">4</button>
+                <button type="button" class="keypad-key" data-key="5">5</button>
+                <button type="button" class="keypad-key" data-key="6">6</button>
+                <button type="button" class="keypad-key" data-key="7">7</button>
+                <button type="button" class="keypad-key" data-key="8">8</button>
+                <button type="button" class="keypad-key" data-key="9">9</button>
+                <button type="button" class="keypad-key" data-key=".">.</button>
+                <button type="button" class="keypad-key" data-key="0">0</button>
+                <button type="button" class="keypad-key keypad-key-back" data-key="back" aria-label="Backspace">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 6H8l-6 6 6 6h14a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1z"/><path d="M14 9l5 6M19 9l-5 6"/></svg>
+                </button>
+            </div>
+            <div class="pay-keypad-actions">
+                <button type="button" class="pay-keypad-clear" id="paymentKeypadClear">Clear</button>
+                <button type="button" class="pay-keypad-add" id="paymentKeypadAdd" disabled>Add</button>
+            </div>
+        </div>
 
         <div class="credit-section" id="creditSection" style="display:none;">
             <div id="creditSectionLabel" style="font-weight:700;font-size:0.85rem;color:var(--forest);margin-bottom:8px;">Credit customer</div>
@@ -1027,6 +1181,18 @@
         </div>
 
         <button type="button" id="completeSaleBtn" disabled>Complete Sale</button>
+    </div>
+
+    <!-- Payment QR overlay -- full-screen, purely informational, never
+         gates Add/Complete (see openPaymentQr() in the script below). -->
+    <div id="paymentQrBackdrop" style="display:none;position:fixed;inset:0;background:rgba(26,47,30,0.78);z-index:330;align-items:center;justify-content:center;">
+        <div class="payment-qr-card">
+            <button type="button" class="panel-close" id="paymentQrCloseBtn"><i class="fas fa-times"></i></button>
+            <h3 id="paymentQrTitle"></h3>
+            <img id="paymentQrImage" src="" alt="Payment QR code" style="display:none;">
+            <p id="paymentQrMissing" style="display:none;">QR not uploaded. Add it in Admin &gt; Business settings.</p>
+            <div class="payment-qr-amount" id="paymentQrAmount"></div>
+        </div>
     </div>
 
     <!-- Restock modal (same visual style as the old Repay Credit modal, now a full view above) -->
@@ -1066,9 +1232,9 @@
         const LIVE_COUPONS = JSON.parse(document.getElementById('posCouponsData').textContent);
         // Shop name/address/phone/PAN-VAT/receipt footer + the three
         // payment QR image URLs (empty string when nothing's uploaded in
-        // admin yet) -- POS payment-redesign scaffolding, embedded the
-        // same way PRODUCTS/CATEGORIES are so it survives the existing
-        // offline shell cache. Nothing reads this yet.
+        // admin yet) -- embedded the same way PRODUCTS/CATEGORIES are so
+        // it survives the existing offline shell cache. Read by
+        // openPaymentQr() below for the Show QR overlay.
         const POS_BUSINESS = JSON.parse(document.getElementById('posBusinessData').textContent);
         const IS_VAT_ENABLED = {{ is_vat_enabled|yesno:"true,false" }};
         const VAT_RATE = {{ vat_rate }};
@@ -1095,7 +1261,20 @@
         let isUnlocked = false;
         let currentOperator = null; // { id, name, staff_number, role }
         let clientSaleId = null;
-        let payments = { cash: '', esewa: '', khalti: '', bank_transfer: '', credit: '' };
+        // Payment panel (see renderPaymentMethodGrid()/openPaymentKeypad()
+        // onward) -- paymentLines replaces the old five-field `payments`
+        // dict: each entry is one added, removable {method, amount} line,
+        // amount always a "123.45"-shaped string (see centsToStr()) so it's
+        // never re-derived from a float that might carry rounding drift.
+        let paymentLines = [];
+        // Which method the keypad page is currently entering an amount
+        // for, or null while the method grid is showing. Doubles as the
+        // signal for "show creditSection even before a credit line has
+        // actually been Added yet" (see updatePaymentSummary()).
+        let activePaymentMethod = null;
+        let keypadValue = '0';
+        let keypadTouched = false; // false until the first keypress replaces the Remaining pre-fill
+        let saleInFlight = false; // guards against double-submit from completeSaleBtn AND fullCashBtn together
         let selectedCustomer = null;
         let appliedCoupon = null; // { code, discount_amount, subtotalAtApply } — see renderReceipt()
         let liveOffers = null; // { discount_offers, combo_offers } — fetched fresh each time the Offers modal opens
@@ -2898,54 +3077,390 @@
             return computeTotals().grandTotal;
         }
 
-        function renderPaymentRows() {
-            const methods = [
-                ['cash', 'Cash'], ['esewa', 'eSewa'], ['khalti', 'Khalti'],
-                ['bank_transfer', 'Bank Transfer'], ['credit', 'Credit (उधारो)'],
-            ];
-            document.getElementById('payMethodRows').innerHTML = methods.map(([key, label]) => `
-                <div class="pay-method-row">
-                    <label>${label}</label>
-                    <input type="text" inputmode="decimal" data-method="${key}" value="${payments[key]}" placeholder="0">
+        // ══════════════════════════════════════════════════════════════
+        // Payment panel -- method grid + keypad + removable payment lines.
+        // Everything below works in integer paisa (cents) internally
+        // (centsToStr()/parseFloat-then-Math.round) specifically so adding
+        // several lines never accumulates float drift the way repeatedly
+        // adding plain JS floats can -- the server re-validates the exact
+        // same sum regardless, but a UI that's even one paisa off from its
+        // own Remaining figure would be a confusing, hard-to-explain bug.
+        // ══════════════════════════════════════════════════════════════
+        const PAYMENT_METHOD_LABELS = {
+            cash: 'Cash', esewa: 'eSewa', khalti: 'Khalti', bank_transfer: 'Bank Transfer', credit: 'Credit',
+        };
+
+        function centsToStr(cents) {
+            return (cents / 100).toFixed(2);
+        }
+        function totalCents() {
+            return Math.round(cartTotalWithVat() * 100);
+        }
+        function paymentLinesSumCents() {
+            return paymentLines.reduce((sum, l) => sum + Math.round(parseFloat(l.amount) * 100), 0);
+        }
+        function remainingCents() {
+            return totalCents() - paymentLinesSumCents();
+        }
+        function keypadAmountCents() {
+            const n = parseFloat(keypadValue);
+            return isNaN(n) ? 0 : Math.round(n * 100);
+        }
+
+        function renderPaymentSummaryHeader() {
+            const remaining = remainingCents();
+            document.getElementById('paySummaryTotal').textContent = 'Rs. ' + centsToStr(totalCents());
+            document.getElementById('paySummaryPaid').textContent = 'Rs. ' + centsToStr(paymentLinesSumCents());
+            const label = document.getElementById('paySummaryRemainingLabel');
+            const value = document.getElementById('paySummaryRemainingValue');
+            const row = document.getElementById('paySummaryRemainingRow');
+            if (remaining < 0) {
+                label.textContent = 'Change due';
+                value.textContent = 'Rs. ' + centsToStr(-remaining);
+                row.classList.add('change-due');
+                row.classList.remove('settled');
+            } else {
+                label.textContent = 'Remaining';
+                value.textContent = 'Rs. ' + centsToStr(remaining);
+                row.classList.toggle('settled', remaining === 0);
+                row.classList.remove('change-due');
+            }
+        }
+
+        function renderPaymentLinesList() {
+            const list = document.getElementById('payLinesList');
+            list.innerHTML = paymentLines.map((line, i) => `
+                <div class="pay-line-row">
+                    <span class="pay-line-method">${PAYMENT_METHOD_LABELS[line.method] || line.method}</span>
+                    <span class="pay-line-amount">Rs. ${line.amount}</span>
+                    <button type="button" class="pay-line-remove" data-index="${i}" aria-label="Remove this payment line">
+                        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 5l14 14M19 5L5 19"/></svg>
+                    </button>
                 </div>`
             ).join('');
-            document.getElementById('payMethodRows').querySelectorAll('input').forEach(input => {
-                input.addEventListener('input', () => {
-                    payments[input.dataset.method] = input.value;
+            list.querySelectorAll('.pay-line-remove').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    paymentLines.splice(parseInt(btn.dataset.index, 10), 1);
                     updatePaymentSummary();
                 });
             });
-            updatePaymentSummary();
         }
 
+        // Single source of truth for every disabled/visible state the
+        // payment panel has -- called after any change to paymentLines,
+        // selectedCustomer, wholesaleMode, or the cart itself, so none of
+        // those can drift out of sync with each other. Mirrors the old
+        // dict-based updatePaymentSummary()'s name/role so every existing
+        // call site (customer lookup/create, applyWholesaleModeUI())
+        // keeps working unchanged.
         function updatePaymentSummary() {
-            const total = cartTotalWithVat();
-            const sum = Object.values(payments).reduce((s, v) => s + (parseFloat(v) || 0), 0);
-            const remaining = Math.round((total - sum) * 100) / 100;
-            const remainingEl = document.getElementById('payRemaining');
-            remainingEl.textContent = remaining === 0 ? 'Settled ✓' : `Remaining: Rs. ${remaining.toFixed(2)}`;
-            remainingEl.classList.toggle('settled', remaining === 0);
+            renderPaymentSummaryHeader();
+            renderPaymentLinesList();
 
-            const creditAmount = parseFloat(payments.credit) || 0;
+            const remaining = remainingCents();
+            const hasCreditLine = paymentLines.some(l => l.method === 'credit');
             // A wholesale sale needs a buyer regardless of payment method --
             // the same section (and the same selectedCustomer variable) a
             // credit sale already uses is shown/required here too, rather
-            // than building a second, separate buyer picker.
-            document.getElementById('creditSection').style.display = (creditAmount > 0 || wholesaleMode) ? '' : 'none';
-            if (creditAmount <= 0 && !wholesaleMode) selectedCustomer = null;
+            // than building a second, separate buyer picker. Also shown as
+            // soon as the Credit keypad page opens (activePaymentMethod ===
+            // 'credit'), even before a credit line is actually Added, so
+            // staff can pick the customer while entering the amount.
+            const showCredit = wholesaleMode || hasCreditLine || activePaymentMethod === 'credit';
+            document.getElementById('creditSection').style.display = showCredit ? '' : 'none';
 
-            const needsCustomer = (creditAmount > 0 || wholesaleMode) && !selectedCustomer;
-            document.getElementById('completeSaleBtn').disabled = remaining !== 0 || needsCustomer;
+            const needsCustomer = (hasCreditLine || wholesaleMode) && !selectedCustomer;
+            // Complete is enabled at Remaining <= 0 -- covers both exactly
+            // settled (0) and a cash overpay (negative, shown as Change
+            // due); only cash can ever push this negative, since every
+            // other method's Add button is capped at Remaining (see
+            // keypadAddIsValid()).
+            document.getElementById('completeSaleBtn').disabled = remaining > 0 || needsCustomer || saleInFlight;
+
+            const fullCashBtn = document.getElementById('fullCashBtn');
+            if (fullCashBtn) fullCashBtn.disabled = cart.length === 0 || remaining <= 0 || saleInFlight;
+
+            updateKeypadAddButtonState();
         }
 
+        function keypadAddIsValid() {
+            const amt = keypadAmountCents();
+            if (amt <= 0) return false;
+            if (activePaymentMethod === 'cash') return true; // cash may exceed Remaining -- shows as change due
+            if (amt > remainingCents()) return false; // eSewa/Khalti/Bank transfer/Credit are all capped at Remaining
+            if (activePaymentMethod === 'credit' && !selectedCustomer) return false;
+            return true;
+        }
+        function updateKeypadAddButtonState() {
+            const btn = document.getElementById('paymentKeypadAdd');
+            if (btn) btn.disabled = !keypadAddIsValid();
+        }
+
+        function renderKeypad() {
+            document.getElementById('paymentKeypadAmount').textContent = keypadValue;
+            const hint = document.getElementById('paymentKeypadHint');
+            hint.textContent = activePaymentMethod === 'cash' ? '' : ('Max Rs. ' + centsToStr(Math.max(0, remainingCents())));
+            updateKeypadAddButtonState();
+        }
+
+        function openPaymentKeypad(method) {
+            activePaymentMethod = method;
+            keypadTouched = false;
+            keypadValue = centsToStr(Math.max(0, remainingCents()));
+            document.getElementById('paymentKeypadTitle').textContent = PAYMENT_METHOD_LABELS[method] || method;
+            document.getElementById('payMethodPage').style.display = 'none';
+            document.getElementById('payKeypadPage').style.display = '';
+            renderKeypad();
+            updatePaymentSummary(); // reveals creditSection immediately for 'credit'
+        }
+        function closePaymentKeypad() {
+            activePaymentMethod = null;
+            document.getElementById('payKeypadPage').style.display = 'none';
+            document.getElementById('payMethodPage').style.display = '';
+            updatePaymentSummary();
+        }
+
+        function handleKeypadKey(key) {
+            if (key === 'back') {
+                if (!keypadTouched) { keypadValue = '0'; keypadTouched = true; renderKeypad(); return; }
+                keypadValue = keypadValue.length > 1 ? keypadValue.slice(0, -1) : '0';
+                renderKeypad();
+                return;
+            }
+            // The first keypress replaces the Remaining pre-fill entirely
+            // (standard calculator-style "start typing to overwrite"),
+            // rather than appending onto it.
+            if (!keypadTouched) { keypadValue = ''; keypadTouched = true; }
+            if (key === '.') {
+                if (keypadValue.includes('.')) return;
+                keypadValue = keypadValue === '' ? '0.' : keypadValue + '.';
+            } else {
+                keypadValue = (keypadValue === '0' || keypadValue === '') ? key : keypadValue + key;
+            }
+            renderKeypad();
+        }
+
+        // Reduces cash line(s) by exactly the overpaid amount so the sent
+        // lines sum to the real total -- change can only ever come from
+        // cash, since every other method's own Add button already caps it
+        // at Remaining (keypadAddIsValid()). Order of the original lines
+        // doesn't matter (per spec); the largest cash line is reduced
+        // first purely so a line is never left negative.
+        function buildPaymentsPayload() {
+            const changeCents = Math.max(0, -remainingCents());
+            const lines = paymentLines.map(l => ({ method: l.method, cents: Math.round(parseFloat(l.amount) * 100) }));
+            let toRemove = changeCents;
+            if (toRemove > 0) {
+                const cashIndexesDesc = lines
+                    .map((l, i) => i)
+                    .filter(i => lines[i].method === 'cash')
+                    .sort((a, b) => lines[b].cents - lines[a].cents);
+                for (const i of cashIndexesDesc) {
+                    if (toRemove <= 0) break;
+                    const take = Math.min(lines[i].cents, toRemove);
+                    lines[i].cents -= take;
+                    toRemove -= take;
+                }
+            }
+            return lines.filter(l => l.cents > 0).map(l => ({ method: l.method, amount: centsToStr(l.cents) }));
+        }
+
+        // Shared by performCompleteSale() AND fullCashBtn's own handler --
+        // checked by Full cash BEFORE it adds its cash line, so a blocked
+        // attempt (e.g. wholesale with no buyer yet) leaves paymentLines
+        // untouched instead of silently leaving a stray cash line behind
+        // that the operator never actually submitted.
+        function completeSaleGateMessage() {
+            const hasCreditLine = paymentLines.some(l => l.method === 'credit');
+            if ((hasCreditLine || wholesaleMode) && !selectedCustomer) {
+                return wholesaleMode
+                    ? 'Select a buyer before completing a wholesale sale.'
+                    : 'Select a customer for the credit payment.';
+            }
+            return null;
+        }
+
+        async function performCompleteSale(triggerBtn) {
+            const gateMessage = completeSaleGateMessage();
+            if (gateMessage) { showToast(gateMessage); return; }
+            if (remainingCents() > 0) {
+                // Defensive only -- both entry points (Complete/Full cash)
+                // already gate on this before calling here.
+                showToast('Payment does not cover the total yet.');
+                return;
+            }
+
+            saleInFlight = true;
+            const originalText = triggerBtn.textContent;
+            triggerBtn.textContent = 'Processing…';
+            updatePaymentSummary(); // disables both Complete and Full cash while in flight
+
+            // price_override is deliberately only ever added to a line's
+            // payload when wholesaleMode is on -- a retail payload's cart
+            // lines must stay byte-for-byte the same shape as before, no
+            // new key appearing at all.
+            const payload = {
+                client_sale_id: clientSaleId,
+                cart: cart.map(l => {
+                    const cartLine = {
+                        product_id: l.product_id, qty: l.qty, weight: l.weight || null, variant_id: l.variant_id || null,
+                        unit_id: l.unit_id || null, offer_id: l.offer_id || null, combo_instance_id: l.combo_instance_id || null,
+                    };
+                    if (wholesaleMode && l.price_override != null) cartLine.price_override = l.price_override;
+                    return cartLine;
+                }),
+                payments: buildPaymentsPayload(),
+            };
+            if (selectedCustomer) payload.customer_id = selectedCustomer.id;
+            if (appliedCoupon) payload.coupon_code = appliedCoupon.code;
+            if (wholesaleMode) payload.is_wholesale = true;
+
+            try {
+                const response = await apiFetch('/api/v1/sales/', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+                });
+                const data = await response.json().catch(() => ({}));
+                // A rejected wholesale sale (non-owner/manager account) is
+                // also a plain 403 -- carries its own `reason` tag so it
+                // isn't swallowed into the generic idle-lock handling right
+                // below, which treats every OTHER 403 as "show the PIN
+                // screen again" (get_pos_operator() raises that exact same
+                // shape for "no PIN unlock yet").
+                if (response.status === 403 && data.reason === 'wholesale_unauthorized') {
+                    showToast(data.message || 'Wholesale sales require an owner/manager account.');
+                    return;
+                }
+                if (response.status === 401 || response.status === 403) {
+                    // Idle-locked mid-checkout (403, Phase A PIN lock) or the
+                    // underlying Django session itself has expired (401,
+                    // DRF SessionAuthentication) -- either way the cart/
+                    // payment state stays intact, resuming right after a
+                    // fresh PIN unlock (401 additionally needs a real
+                    // re-login, but that's a full-page redirect the staff
+                    // will hit on their own next action; this terminal
+                    // doesn't try to auto-redirect out of an active sale).
+                    closePaymentPanel();
+                    currentOperator = null;
+                    setLocked(true);
+                    showToast('Terminal locked — enter PIN to resume');
+                    return;
+                }
+                if (data.status === 'ok') {
+                    const wholesaleLabel = wholesaleMode
+                        ? ` — WHOLESALE${selectedCustomer ? ' (' + selectedCustomer.name + ')' : ''}`
+                        : '';
+                    showToast(`Sale ${data.sale_number} — Rs. ${data.total} recorded${wholesaleLabel}`);
+                    resetPostSaleState();
+                } else {
+                    // A real validation/stock error (400/409) -- either
+                    // POSSaleValidationError's {status,message} shape, or
+                    // DRF's own {field: [errors]} shape if the payload
+                    // itself failed POSSaleCreateSerializer -- queuing this
+                    // would just fail identically again, so it's shown as
+                    // a normal failure, never queued.
+                    showToast(extractErrorMessage(data));
+                }
+            } catch (err) {
+                // fetch() itself threw -- no response at all, i.e. a real
+                // connectivity failure, not a validation error. Queue the
+                // sale instead of losing it: idempotent on client_sale_id,
+                // so it's safe to replay later even if this same request
+                // actually reached the server moments before the
+                // connection dropped.
+                //
+                // queued_operator_id captures WHO is unlocked right now, at
+                // the moment this sale is actually being rung up -- not
+                // whoever happens to be unlocked later when this replays.
+                // See CLAUDE.md's POS-PWA section for the full reasoning.
+                payload.queued_operator_id = currentOperator ? currentOperator.id : null;
+                await posQueueEnqueue(payload);
+                await registerPosBackgroundSync();
+                renderQueueBox();
+                showToast('Sale queued — will sync when back online');
+                resetPostSaleState();
+            } finally {
+                saleInFlight = false;
+                triggerBtn.textContent = originalText;
+                updatePaymentSummary();
+            }
+        }
+
+        function openPaymentQr(method) {
+            const titles = { esewa: 'eSewa', khalti: 'Khalti', bank_transfer: 'Bank Transfer' };
+            document.getElementById('paymentQrTitle').textContent = titles[method] || method;
+            const url = (POS_BUSINESS.qr && POS_BUSINESS.qr[method]) || '';
+            const img = document.getElementById('paymentQrImage');
+            const missing = document.getElementById('paymentQrMissing');
+            if (url) {
+                img.src = url;
+                img.style.display = '';
+                missing.style.display = 'none';
+            } else {
+                img.style.display = 'none';
+                missing.style.display = '';
+            }
+            // Shows whatever's currently in the keypad's amount box when
+            // it's open for THIS method, else the current Remaining --
+            // either way a sensible live figure, never blocking the sale
+            // either way (this overlay only ever displays, never gates).
+            const amountCents = (activePaymentMethod === method) ? keypadAmountCents() : Math.max(0, remainingCents());
+            document.getElementById('paymentQrAmount').textContent = 'Rs. ' + centsToStr(amountCents);
+            document.getElementById('paymentQrBackdrop').style.display = 'flex';
+        }
+
+        document.querySelectorAll('.pm-btn[data-method]').forEach(btn => {
+            btn.addEventListener('click', () => openPaymentKeypad(btn.dataset.method));
+        });
+        document.querySelectorAll('.pm-qr-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => { e.stopPropagation(); openPaymentQr(btn.dataset.method); });
+        });
+        document.getElementById('paymentKeypadBack').addEventListener('click', closePaymentKeypad);
+        document.querySelectorAll('.keypad-key').forEach(btn => {
+            btn.addEventListener('click', () => handleKeypadKey(btn.dataset.key));
+        });
+        document.getElementById('paymentKeypadClear').addEventListener('click', () => {
+            keypadValue = '0';
+            keypadTouched = true;
+            renderKeypad();
+        });
+        document.getElementById('paymentKeypadAdd').addEventListener('click', () => {
+            if (document.getElementById('paymentKeypadAdd').disabled) return;
+            paymentLines.push({ method: activePaymentMethod, amount: centsToStr(keypadAmountCents()) });
+            closePaymentKeypad();
+        });
+        document.getElementById('fullCashBtn').addEventListener('click', () => {
+            const btn = document.getElementById('fullCashBtn');
+            if (btn.disabled) return;
+            // Checked BEFORE adding the cash line below -- a blocked
+            // attempt (wholesale with no buyer chosen yet) must show the
+            // same toast Complete would, without leaving a stray
+            // just-added cash line sitting in paymentLines behind it.
+            const gateMessage = completeSaleGateMessage();
+            if (gateMessage) { showToast(gateMessage); return; }
+            const remaining = remainingCents();
+            if (remaining <= 0) return; // defensive; button is already disabled in this state
+            paymentLines.push({ method: 'cash', amount: centsToStr(remaining) });
+            updatePaymentSummary();
+            performCompleteSale(btn);
+        });
+        document.getElementById('paymentQrCloseBtn').addEventListener('click', () => {
+            document.getElementById('paymentQrBackdrop').style.display = 'none';
+        });
+        document.getElementById('paymentQrBackdrop').addEventListener('click', (e) => {
+            if (e.target.id === 'paymentQrBackdrop') document.getElementById('paymentQrBackdrop').style.display = 'none';
+        });
+
         function openPaymentPanel() {
-            payments = { cash: '', esewa: '', khalti: '', bank_transfer: '', credit: '' };
+            paymentLines = [];
             selectedCustomer = null;
+            activePaymentMethod = null;
+            document.getElementById('payKeypadPage').style.display = 'none';
+            document.getElementById('payMethodPage').style.display = '';
             document.getElementById('customerResults').innerHTML = '';
             document.getElementById('selectedCustomerLabel').style.display = 'none';
             document.getElementById('newCustomerForm').classList.remove('active');
             document.getElementById('customerPhoneInput').value = '';
-            renderPaymentRows();
+            updatePaymentSummary();
             document.getElementById('paymentPanel').classList.add('active');
             document.getElementById('paymentBackdrop').classList.add('active');
         }
@@ -3268,114 +3783,14 @@
             updatePaymentSummary();
         });
 
-        document.getElementById('completeSaleBtn').addEventListener('click', async () => {
+        // The actual POST/offline-queue/response-handling logic lives in
+        // performCompleteSale() (defined earlier, alongside the rest of
+        // the payment panel) -- Full cash calls the exact same function,
+        // per the "through the SAME Complete path" requirement.
+        document.getElementById('completeSaleBtn').addEventListener('click', () => {
             const btn = document.getElementById('completeSaleBtn');
-            btn.disabled = true;
-            const originalText = btn.textContent;
-            btn.textContent = 'Processing…';
-
-            const paymentsPayload = Object.entries(payments)
-                .filter(([, amount]) => parseFloat(amount) > 0)
-                .map(([method, amount]) => ({ method, amount: parseFloat(amount).toFixed(2) }));
-
-            const payload = {
-                client_sale_id: clientSaleId,
-                // price_override is deliberately only ever added to a
-                // line's payload when wholesaleMode is on -- a retail
-                // payload's cart lines must stay byte-for-byte the same
-                // shape as before, no new key appearing at all.
-                cart: cart.map(l => {
-                    const cartLine = {
-                        product_id: l.product_id, qty: l.qty, weight: l.weight || null, variant_id: l.variant_id || null,
-                        unit_id: l.unit_id || null, offer_id: l.offer_id || null, combo_instance_id: l.combo_instance_id || null,
-                    };
-                    if (wholesaleMode && l.price_override != null) cartLine.price_override = l.price_override;
-                    return cartLine;
-                }),
-                payments: paymentsPayload,
-            };
-            if (selectedCustomer) payload.customer_id = selectedCustomer.id;
-            if (appliedCoupon) payload.coupon_code = appliedCoupon.code;
-            if (wholesaleMode) payload.is_wholesale = true;
-
-            try {
-                const response = await apiFetch('/api/v1/sales/', {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
-                });
-                const data = await response.json().catch(() => ({}));
-                // A rejected wholesale sale (non-owner/manager account) is
-                // also a plain 403 -- carries its own `reason` tag so it
-                // isn't swallowed into the generic idle-lock handling right
-                // below, which treats every OTHER 403 as "show the PIN
-                // screen again" (get_pos_operator() raises that exact same
-                // shape for "no PIN unlock yet").
-                if (response.status === 403 && data.reason === 'wholesale_unauthorized') {
-                    showToast(data.message || 'Wholesale sales require an owner/manager account.');
-                    btn.disabled = false;
-                    btn.textContent = originalText;
-                    return;
-                }
-                if (response.status === 401 || response.status === 403) {
-                    // Idle-locked mid-checkout (403, Phase A PIN lock) or the
-                    // underlying Django session itself has expired (401,
-                    // DRF SessionAuthentication) -- either way the cart/
-                    // payment state stays intact, resuming right after a
-                    // fresh PIN unlock (401 additionally needs a real
-                    // re-login, but that's a full-page redirect the staff
-                    // will hit on their own next action; this terminal
-                    // doesn't try to auto-redirect out of an active sale).
-                    closePaymentPanel();
-                    currentOperator = null;
-                    setLocked(true);
-                    showToast('Terminal locked — enter PIN to resume');
-                    return;
-                }
-                if (data.status === 'ok') {
-                    const wholesaleLabel = wholesaleMode
-                        ? ` — WHOLESALE${selectedCustomer ? ' (' + selectedCustomer.name + ')' : ''}`
-                        : '';
-                    showToast(`Sale ${data.sale_number} — Rs. ${data.total} recorded${wholesaleLabel}`);
-                    resetPostSaleState();
-                } else {
-                    // A real validation/stock error (400/409) -- either
-                    // POSSaleValidationError's {status,message} shape, or
-                    // DRF's own {field: [errors]} shape if the payload
-                    // itself failed POSSaleCreateSerializer -- queuing this
-                    // would just fail identically again, so it's shown as
-                    // a normal failure, never queued.
-                    showToast(extractErrorMessage(data));
-                    btn.disabled = false;
-                }
-            } catch (err) {
-                // fetch() itself threw -- no response at all, i.e. a real
-                // connectivity failure, not a validation error. Queue the
-                // sale instead of losing it: idempotent on client_sale_id,
-                // so it's safe to replay later even if this same request
-                // actually reached the server moments before the
-                // connection dropped.
-                //
-                // queued_operator_id captures WHO is unlocked right now, at
-                // the moment this sale is actually being rung up -- not
-                // whoever happens to be unlocked later when this replays.
-                // Without it, create_pos_sale() would attribute the sale to
-                // the session's operator AT REPLAY TIME, which after a
-                // shift change is a different person (or nobody) than
-                // whoever actually handled this sale. The server still
-                // independently re-verifies this id is still active staff
-                // at replay time (get_pos_operator() in shop/views.py) --
-                // this changes who a sale is ATTRIBUTED to, not whether the
-                // request is authorized at all, since every POST here
-                // already requires a live is_staff session regardless. See
-                // CLAUDE.md's POS-PWA section for the full reasoning.
-                payload.queued_operator_id = currentOperator ? currentOperator.id : null;
-                await posQueueEnqueue(payload);
-                await registerPosBackgroundSync();
-                renderQueueBox();
-                showToast('Sale queued — will sync when back online');
-                resetPostSaleState();
-            } finally {
-                btn.textContent = originalText;
-            }
+            if (btn.disabled) return;
+            performCompleteSale(btn);
         });
 
         // Shared by both the success and queued-offline outcomes above --
@@ -3392,7 +3807,10 @@
             receiptPage = 0;
             clearCoupon(true);
             newClientSaleId();
-            payments = { cash: '', esewa: '', khalti: '', bank_transfer: '', credit: '' };
+            paymentLines = [];
+            activePaymentMethod = null;
+            document.getElementById('payKeypadPage').style.display = 'none';
+            document.getElementById('payMethodPage').style.display = '';
             selectedCustomer = null;
             document.getElementById('selectedCustomerLabel').style.display = 'none';
             closePaymentPanel();

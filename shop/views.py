@@ -1492,13 +1492,13 @@ def pos_view(request):
     # up, and never invented eligibility logic of its own.
     coupons_data = [coupon_entry(c) for c in get_live_coupons()]
 
-    # POS payment-redesign scaffolding -- not read by templates/pos.html
-    # yet (see BusinessSettings' own docstring and POS_BUSINESS in that
-    # template). ImageKitStorage stores the field's value as ImageKit's own
-    # absolute URL already (see shop/imagekit_storage.py), so .url just
-    # returns that back -- same "field.url if field else ''" shape every
-    # other main_image-style lookup in this file already uses (e.g. the
-    # products_data loop above).
+    # POS payment panel's shop-info + payment-QR data, read as POS_BUSINESS
+    # in templates/pos.html (openPaymentQr() etc. -- see BusinessSettings'
+    # own docstring in shop/models.py). ImageKitStorage stores the field's
+    # value as ImageKit's own absolute URL already (see
+    # shop/imagekit_storage.py), so .url just returns that back -- same
+    # "field.url if field else ''" shape every other main_image-style
+    # lookup in this file already uses (e.g. the products_data loop above).
     business_data = {
         'shopName': vat_settings.shop_name,
         'shopAddress': vat_settings.shop_address,
@@ -1511,13 +1511,24 @@ def pos_view(request):
             'bank_transfer': vat_settings.bank_qr.url if vat_settings.bank_qr else '',
         },
     }
+    # Escaped the same way Django's own json_script() template filter
+    # escapes its output (django.utils.html._json_script_escapes) -- these
+    # values are free-text admin input (shop_name/address/footer etc.), so
+    # a literal "</script>" or "<" inside one must never be able to break
+    # out of the <script type="application/json"> block below. <
+    # etc. are plain JSON string escapes; JSON.parse() decodes them back
+    # to the literal character, so POS_BUSINESS's shape in JS is unchanged.
+    business_json_str = (
+        json.dumps(business_data)
+        .replace('<', '\\u003c').replace('>', '\\u003e').replace('&', '\\u0026')
+    )
 
     return render(request, 'pos.html', {
         'products_json': json.dumps(products_data),
         'categories': categories,
         'categories_json': json.dumps(categories),
         'coupons_json': json.dumps(coupons_data),
-        'business_json': json.dumps(business_data),
+        'business_json': business_json_str,
         'payment_methods': POSSale.PAYMENT_METHOD_CHOICES,
         'is_vat_enabled': vat_settings.is_vat_enabled,
         'vat_rate': VAT_RATE,
