@@ -1415,9 +1415,31 @@ class BusinessSettings(models.Model):
     dormant switch for POS Phase B's VAT scaffolding; flipping it changes
     how future sales compute their taxable/exempt/VAT split, never
     retroactively (see POSSale.taxable_value/exempt_value/vat_amount,
-    stored per-sale at creation time)."""
+    stored per-sale at creation time).
+
+    shop_name/shop_address/shop_phone/pan_vat_number/receipt_footer and the
+    three QR images below are POS payment-redesign scaffolding (see
+    Angan-Baari-Knowledge) — not yet read anywhere. They're embedded into
+    pos_view()'s context and templates/pos.html's POS_BUSINESS JS object
+    so that work exists, but nothing consumes them yet; this is purely
+    additive, no visible behaviour change."""
 
     is_vat_enabled = models.BooleanField(default=False)
+
+    shop_name = models.CharField(max_length=200, blank=True)
+    shop_address = models.CharField(max_length=300, blank=True)
+    shop_phone = models.CharField(max_length=20, blank=True)
+    pan_vat_number = models.CharField(max_length=30, blank=True)
+    receipt_footer = models.CharField(max_length=300, blank=True)
+
+    # Same convention as Product.main_image/image2-4 (shop/models.py) --
+    # ImageKitStorage._save() returns ImageKit's own absolute URL, stored
+    # directly as the field's name, so .url on any of these just returns
+    # that URL back (see ImageKitStorage.url()). Each is this one payment
+    # method's fixed merchant QR code, uploaded once in admin.
+    esewa_qr = models.ImageField(storage=ImageKitStorage(), upload_to='business/', blank=True)
+    khalti_qr = models.ImageField(storage=ImageKitStorage(), upload_to='business/', blank=True)
+    bank_qr = models.ImageField(storage=ImageKitStorage(), upload_to='business/', blank=True)
 
     class Meta:
         verbose_name = 'Business Settings'

@@ -1492,11 +1492,32 @@ def pos_view(request):
     # up, and never invented eligibility logic of its own.
     coupons_data = [coupon_entry(c) for c in get_live_coupons()]
 
+    # POS payment-redesign scaffolding -- not read by templates/pos.html
+    # yet (see BusinessSettings' own docstring and POS_BUSINESS in that
+    # template). ImageKitStorage stores the field's value as ImageKit's own
+    # absolute URL already (see shop/imagekit_storage.py), so .url just
+    # returns that back -- same "field.url if field else ''" shape every
+    # other main_image-style lookup in this file already uses (e.g. the
+    # products_data loop above).
+    business_data = {
+        'shopName': vat_settings.shop_name,
+        'shopAddress': vat_settings.shop_address,
+        'shopPhone': vat_settings.shop_phone,
+        'panVat': vat_settings.pan_vat_number,
+        'receiptFooter': vat_settings.receipt_footer,
+        'qr': {
+            'esewa': vat_settings.esewa_qr.url if vat_settings.esewa_qr else '',
+            'khalti': vat_settings.khalti_qr.url if vat_settings.khalti_qr else '',
+            'bank_transfer': vat_settings.bank_qr.url if vat_settings.bank_qr else '',
+        },
+    }
+
     return render(request, 'pos.html', {
         'products_json': json.dumps(products_data),
         'categories': categories,
         'categories_json': json.dumps(categories),
         'coupons_json': json.dumps(coupons_data),
+        'business_json': json.dumps(business_data),
         'payment_methods': POSSale.PAYMENT_METHOD_CHOICES,
         'is_vat_enabled': vat_settings.is_vat_enabled,
         'vat_rate': VAT_RATE,

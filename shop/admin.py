@@ -664,10 +664,19 @@ class CropBatchAdmin(admin.ModelAdmin):
 
 @admin.register(BusinessSettings)
 class BusinessSettingsAdmin(admin.ModelAdmin):
-    """The one editable toggle — everything else about this model is
-    singleton plumbing (see BusinessSettings.save()/get_solo())."""
+    """The VAT toggle plus the POS payment-redesign scaffolding (shop info
+    + payment QR codes, not yet read anywhere -- see BusinessSettings'
+    own docstring). Everything else about this model is singleton
+    plumbing (see BusinessSettings.save()/get_solo())."""
 
-    list_display = ['is_vat_enabled']
+    list_display = ['is_vat_enabled', 'shop_name']
+    fieldsets = (
+        (None, {'fields': ('is_vat_enabled',)}),
+        ('Shop details', {
+            'fields': ('shop_name', 'shop_address', 'shop_phone', 'pan_vat_number', 'receipt_footer'),
+        }),
+        ('Payment QR codes', {'fields': ('esewa_qr', 'khalti_qr', 'bank_qr')}),
+    )
 
     def has_add_permission(self, request):
         # Exactly one row should ever exist; get_solo() creates it lazily,

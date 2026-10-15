@@ -1053,6 +1053,7 @@
     <script id="posProductsData" type="application/json">{{ products_json|safe }}</script>
     <script id="posCategoriesData" type="application/json">{{ categories_json|safe }}</script>
     <script id="posCouponsData" type="application/json">{{ coupons_json|safe }}</script>
+    <script id="posBusinessData" type="application/json">{{ business_json|safe }}</script>
     <script src="{% static 'js/pos-offline-queue.js' %}"></script>
     <script>
         const PRODUCTS = JSON.parse(document.getElementById('posProductsData').textContent);
@@ -1063,6 +1064,12 @@
         // built (is_live() coupons only) and why it's kept separate from
         // the public /api/v1/coupons/ list that already exists.
         const LIVE_COUPONS = JSON.parse(document.getElementById('posCouponsData').textContent);
+        // Shop name/address/phone/PAN-VAT/receipt footer + the three
+        // payment QR image URLs (empty string when nothing's uploaded in
+        // admin yet) -- POS payment-redesign scaffolding, embedded the
+        // same way PRODUCTS/CATEGORIES are so it survives the existing
+        // offline shell cache. Nothing reads this yet.
+        const POS_BUSINESS = JSON.parse(document.getElementById('posBusinessData').textContent);
         const IS_VAT_ENABLED = {{ is_vat_enabled|yesno:"true,false" }};
         const VAT_RATE = {{ vat_rate }};
         // NOTE: deliberately NOT reading a page-load-time

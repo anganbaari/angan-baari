@@ -16,8 +16,9 @@ from rest_framework.test import APIClient
 
 from .admin import UserProfileInlineForm
 from .models import (
-    BundleItem, Category, CostEntry, Coupon, CreditTransaction, Customer, FarmAsset, InventoryMovement,
-    ContactMessage, NewsletterSubscriber, Offer, POSSale, Product, ProductVariant, PurchaseBatch, UserProfile,
+    BundleItem, BusinessSettings, Category, CostEntry, Coupon, CreditTransaction, Customer, FarmAsset,
+    InventoryMovement, ContactMessage, NewsletterSubscriber, Offer, POSSale, Product, ProductVariant,
+    PurchaseBatch, UserProfile,
 )
 from .views import create_pos_sale, POSSaleValidationError
 from .stock import get_stock_table_rows
@@ -1264,6 +1265,45 @@ class PosCouponPickerDataTests(TestCase):
         # Only the public-safe fields -- never the picker's own discount_text/
         # min_order_amount shape, confirming the two serializers are separate.
         self.assertNotIn('discount_text', results[0])
+
+
+class PosBusinessDataTests(TestCase):
+    """pos_view() embeds BusinessSettings' shop-info/payment-QR fields as
+    POS_BUSINESS the same way PRODUCTS/CATEGORIES/LIVE_COUPONS are already
+    embedded -- see BusinessSettings' own docstring (shop/models.py) and
+    POS_BUSINESS in templates/pos.html. Nothing reads this yet; these
+    tests only confirm the context/embedding itself, not any behaviour."""
+
+    def setUp(self):
+        self.staff = User.objects.create_user('business_data_cashier', password='pw', is_staff=True)
+        UserProfile.objects.create(user=self.staff, role='cashier')
+
+    def test_pos_view_embeds_business_data_with_blank_qr_as_empty_string(self):
+        settings_row = BusinessSettings.get_solo()
+        settings_row.shop_name = 'Angan Baari'
+        settings_row.shop_address = 'Bhulka Danda, Rupandehi'
+        settings_row.shop_phone = '98XXXXXXXX'
+        settings_row.pan_vat_number = 'PAN-123456'
+        settings_row.receipt_footer = 'Thank you for shopping with us!'
+        settings_row.save()
+
+        self.client.login(username='business_data_cashier', password='pw')
+        response = self.client.get('/pos/')
+        self.assertEqual(response.status_code, 200)
+        match = re.search(
+            r'<script id="posBusinessData" type="application/json">(.*?)</script>',
+            response.content.decode(), re.S,
+        )
+        self.assertIsNotNone(match)
+        business = json.loads(match.group(1))
+        self.assertEqual(business['shopName'], 'Angan Baari')
+        self.assertEqual(business['shopAddress'], 'Bhulka Danda, Rupandehi')
+        self.assertEqual(business['shopPhone'], '98XXXXXXXX')
+        self.assertEqual(business['panVat'], 'PAN-123456')
+        self.assertEqual(business['receiptFooter'], 'Thank you for shopping with us!')
+        # No QR images uploaded in this test -- each must be '', never None
+        # or a stale/placeholder path.
+        self.assertEqual(business['qr'], {'esewa': '', 'khalti': '', 'bank_transfer': ''})
 
 
 class HiddenProductPublicVisibilityTests(TestCase):
