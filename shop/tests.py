@@ -1336,6 +1336,63 @@ class PosBusinessDataTests(TestCase):
         self.assertEqual(business['shopName'], '</script><script>alert(1)</script> & Sons')
 
 
+class PosReceiptViewTests(TestCase):
+    """GET /pos/receipt/<sale_number>/ (pos_receipt_view, shop/views.py) --
+    the printable receipt page, also the reprint target for
+    POSSaleAdmin.receipt_link() (shop/admin.py)."""
+
+    def setUp(self):
+        self.category = Category.objects.create(name='Receipt Test', order=1)
+        self.operator = User.objects.create_user('receipt_cashier', password='pw', is_staff=True, first_name='Receipt Tester')
+        self.product = Product.objects.create(
+            name='Receipt Jar', slug='receipt-jar', category=self.category, description='test',
+            price=Decimal('200.00'), pricing_mode='fixed_quantity', origin='farm',
+        )
+        InventoryMovement.objects.create(product=self.product, movement_type='harvest', source='admin', quantity=Decimal('10'))
+        self.sale, created = create_pos_sale(
+            client_sale_id=str(uuid.uuid4()),
+            cart=[{'product_id': self.product.id, 'qty': 2}],
+            payments=[{'method': 'cash', 'amount': '400.00'}],
+            operator_user=self.operator,
+        )
+        self.assertTrue(created)
+        settings_row = BusinessSettings.get_solo()
+        settings_row.shop_name = 'Angan Baari Receipt Shop'
+        settings_row.save()
+
+    def test_anonymous_user_is_redirected(self):
+        response = self.client.get(reverse('pos_receipt', args=[self.sale.sale_number]))
+        self.assertEqual(response.status_code, 302)
+
+    def test_staff_user_sees_shop_name_and_line_items(self):
+        self.client.login(username='receipt_cashier', password='pw')
+        response = self.client.get(reverse('pos_receipt', args=[self.sale.sale_number]))
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertIn('Angan Baari Receipt Shop', content)
+        self.assertIn('Receipt Jar', content)
+        self.assertIn(self.sale.sale_number, content)
+        # Whole-rupee totals show with no ".00" -- Rs. 400, not Rs. 400.00.
+        self.assertIn('Rs. 400', content)
+        self.assertNotIn('Rs. 400.00', content)
+
+    def test_unknown_sale_number_is_404(self):
+        self.client.login(username='receipt_cashier', password='pw')
+        response = self.client.get(reverse('pos_receipt', args=['POS-NOSUCH1']))
+        self.assertEqual(response.status_code, 404)
+
+    def test_admin_changelist_receipt_link_renders(self):
+        """POSSaleAdmin.receipt_link() (shop/admin.py) -- the reprint
+        column added to the admin changelist; confirms reverse()+
+        format_html() there don't error and the link points at this
+        same pos_receipt view."""
+        superuser = User.objects.create_superuser('receipt_admin', 'receipt_admin@example.com', 'pw')
+        self.client.login(username='receipt_admin', password='pw')
+        response = self.client.get(reverse('admin:shop_possale_changelist'))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(reverse('pos_receipt', args=[self.sale.sale_number]), response.content.decode())
+
+
 class HiddenProductPublicVisibilityTests(TestCase):
     """Product.hide_from_website -- a hidden product must be invisible to
     the public website (but fully usable in the POS/admin/inventory)."""

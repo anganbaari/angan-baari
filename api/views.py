@@ -25,6 +25,7 @@ from shop.models import (
     UserProfile, Wishlist, get_live_coupons,
 )
 from shop.views import (
+    build_sale_receipt_data,
     create_inventory_movements_from_snapshot,
     create_order_inventory_movements,
     create_pos_sale,
@@ -278,10 +279,34 @@ class POSSaleView(generics.ListAPIView):
                 body['reason'] = e.reason
             return Response(body, status=e.status)
 
+        # build_sale_receipt_data() (shop/views.py) is the SAME helper
+        # pos_receipt_view() uses for the printable receipt -- called here
+        # on `sale` itself (never on anything computed only at create
+        # time), so a replay of the same client_sale_id (created=False,
+        # nothing new written) returns byte-identical lines/payments/VAT
+        # figures to the original call, and a later reprint always
+        # matches what this response already showed.
+        #
+        # The sale is already fully committed by this point -- whatever
+        # create_pos_sale() did (InventoryMovement rows, POSSalePayment
+        # rows, etc.) happened inside its OWN transaction.atomic(), which
+        # has already returned successfully. A problem building this
+        # extra receipt-shaped data must never turn an already-saved sale
+        # into what pos.html's completeSaleBtn handler would read as a
+        # failure (risking a confusing re-ring-up of a sale that actually
+        # went through) -- so this is best-effort: on any failure here,
+        # the response still carries every key it always has, just none
+        # of the new ones.
+        try:
+            receipt_data = build_sale_receipt_data(sale)
+        except Exception:
+            receipt_data = {}
+
         return Response(
             {
                 'status': 'ok', 'sale_number': sale.sale_number, 'total': str(sale.total_amount),
                 'discount_amount': str(sale.discount_amount), 'round_off_amount': str(sale.round_off_amount),
+                **receipt_data,
             },
             status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
         )

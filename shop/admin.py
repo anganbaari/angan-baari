@@ -3,7 +3,7 @@ from django.contrib import admin, messages
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import User
 from django.db.models import Case, DecimalField, F, Sum, When
-from django.urls import path
+from django.urls import path, reverse
 from django.http import HttpResponse
 from django.shortcuts import redirect
 from django.middleware.csrf import get_token
@@ -476,7 +476,7 @@ class POSSaleLineInline(admin.TabularInline):
 
 @admin.register(POSSale)
 class POSSaleAdmin(admin.ModelAdmin):
-    list_display = ['sale_number', 'cashier', 'customer', 'payment_method', 'is_wholesale', 'coupon', 'discount_amount', 'round_off_amount', 'total_amount', 'created_at']
+    list_display = ['sale_number', 'cashier', 'customer', 'payment_method', 'is_wholesale', 'coupon', 'discount_amount', 'round_off_amount', 'total_amount', 'created_at', 'receipt_link']
     list_filter = ['payment_method', 'is_wholesale', 'cashier', 'coupon', 'created_at']
     search_fields = ['sale_number']
     date_hierarchy = 'created_at'
@@ -492,6 +492,11 @@ class POSSaleAdmin(admin.ModelAdmin):
         # Sales are created by the POS screen itself, never by hand in admin —
         # a manually-created "sale" here wouldn't actually move any inventory.
         return False
+
+    def receipt_link(self, obj):
+        url = reverse('pos_receipt', args=[obj.sale_number])
+        return format_html('<a href="{}" target="_blank">Receipt</a>', url)
+    receipt_link.short_description = 'Receipt'
 
 
 class UserProfileInlineForm(forms.ModelForm):

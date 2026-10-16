@@ -247,6 +247,75 @@ class POSSaleApiTests(ApiTestBase):
         self.assertEqual(InventoryMovement.current_stock(self.jar), Decimal('9'))
         self.assertEqual(POSSale.objects.filter(client_sale_id=client_sale_id).count(), 1)
 
+    def test_create_sale_response_includes_lines_and_payments(self):
+        """build_sale_receipt_data() (shop/views.py) -- the receipt-shaped
+        fields added to POSSaleView.post()'s response alongside the
+        pre-existing status/sale_number/total/discount_amount/
+        round_off_amount keys, which must stay exactly as before."""
+        self.client.login(username='cashier', password='pw')
+        self.unlock_terminal()
+        payload = {
+            'client_sale_id': str(uuid.uuid4()),
+            'payments': [{'method': 'cash', 'amount': '600.00'}, {'method': 'esewa', 'amount': '500.00'}],
+            'cart': [
+                {'product_id': self.jar.id, 'qty': 2},
+                {'product_id': self.fruit.id, 'qty': 1, 'weight': '2.00'},
+            ],
+        }
+        response = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        # Pre-existing keys, unchanged.
+        self.assertEqual(response.data['status'], 'ok')
+        self.assertIn('sale_number', response.data)
+        self.assertEqual(Decimal(response.data['total']), Decimal('1100.00'))
+        self.assertIn('discount_amount', response.data)
+        self.assertIn('round_off_amount', response.data)
+        # New keys.
+        self.assertIn('sale_id', response.data)
+        self.assertIn('created_at', response.data)
+        self.assertEqual(response.data['cashier'], 'cashier')  # no first/last name set -> falls back to username
+        self.assertIsNone(response.data['customer_name'])
+        self.assertIn('vat_amount', response.data)
+        self.assertIn('exempt_value', response.data)
+
+        lines = response.data['lines']
+        self.assertEqual(len(lines), 2)
+        jar_line = next(l for l in lines if l['name'] == 'Pickle Jar')
+        self.assertEqual(Decimal(jar_line['quantity']), Decimal('2'))
+        self.assertEqual(Decimal(jar_line['line_total']), Decimal('500.00'))
+        self.assertEqual(Decimal(jar_line['unit_price']), Decimal('250.00'))
+        mango_line = next(l for l in lines if l['name'] == 'Mango')
+        self.assertEqual(Decimal(mango_line['line_total']), Decimal('600.00'))
+        self.assertEqual(mango_line['unit'], 'kg')
+
+        payments = response.data['payments']
+        self.assertEqual({(p['method'], Decimal(p['amount'])) for p in payments},
+                          {('cash', Decimal('600.00')), ('esewa', Decimal('500.00'))})
+
+    def test_replay_returns_identical_lines_and_payments(self):
+        """Idempotent replay of the same client_sale_id re-fetches the
+        same POSSale (create_pos_sale() creates nothing new) --
+        build_sale_receipt_data() is called on that same sale object
+        both times, so the receipt-shaped fields must be byte-identical,
+        not just the pre-existing total/sale_number."""
+        self.client.login(username='cashier', password='pw')
+        self.unlock_terminal()
+        client_sale_id = str(uuid.uuid4())
+        payload = {
+            'client_sale_id': client_sale_id,
+            'payments': [{'method': 'cash', 'amount': '500.00'}],
+            'cart': [{'product_id': self.jar.id, 'qty': 2}],
+        }
+        first = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        second = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        self.assertEqual(first.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(second.status_code, status.HTTP_200_OK)
+        self.assertEqual(first.data['lines'], second.data['lines'])
+        self.assertEqual(first.data['payments'], second.data['payments'])
+        self.assertEqual(first.data['sale_id'], second.data['sale_id'])
+        self.assertEqual(first.data['vat_amount'], second.data['vat_amount'])
+        self.assertEqual(first.data['exempt_value'], second.data['exempt_value'])
+
     def test_create_sale_rejects_overselling_fixed_weight_animal(self):
         self.client.login(username='cashier', password='pw')
         self.unlock_terminal()

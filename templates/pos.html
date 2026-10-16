@@ -751,15 +751,57 @@
         #completeSaleBtn:disabled { opacity: 0.45; cursor: not-allowed; }
         .panel-close { position: absolute; top: 18px; right: 18px; background: none; border: none; font-size: 1.2rem; color: var(--text-muted); cursor: pointer; }
 
-        /* Payment QR overlay */
+        /* Payment QR overlay -- centred on the WHOLE viewport (fixed,
+           inset 0, flex-centred), above #paymentPanel (z-index 310). */
+        #paymentQrBackdrop {
+            display: none; position: fixed; inset: 0; background: rgba(26,47,30,0.5); z-index: 330;
+            align-items: center; justify-content: center;
+        }
+        #paymentQrBackdrop.active { display: flex; }
         .payment-qr-card {
             position: relative; background: var(--white); border-radius: 16px; padding: 28px; max-width: 360px; width: 90vw;
             text-align: center; box-shadow: 0 16px 40px rgba(0,0,0,0.3);
         }
         .payment-qr-card h3 { font-family: 'Cormorant Garamond', serif; color: var(--forest); margin: 0 0 14px; }
-        #paymentQrImage { width: 100%; max-width: 260px; border-radius: 8px; margin-bottom: 14px; }
+        /* display:block + margin:0 auto (not text-align:center on an
+           inline <img>) is what actually guarantees this sits dead
+           centre regardless of any inline-level whitespace/gap quirk --
+           found by testing: the previous width:100%;max-width:260px (on
+           a still-inline img) rendered the QR about 22px left of centre.
+           Equal width/height (not aspect-ratio-via-percentage) keeps it
+           square; object-fit:contain is a safety net if an uploaded QR
+           image isn't perfectly square to begin with. */
+        #paymentQrImage {
+            display: block; width: 240px; height: 240px; max-width: 100%;
+            margin: 0 auto 14px; border-radius: 8px; object-fit: contain;
+        }
         #paymentQrMissing { color: var(--text-muted); font-size: 0.9rem; font-weight: 600; margin: 10px 0 14px; }
         .payment-qr-amount { font-size: 1.6rem; font-weight: 800; color: var(--forest); }
+
+        /* "Sale complete" overlay -- same plain dim as every other POS
+           backdrop, no blur, no animation (plain display toggle). */
+        #saleCompleteBackdrop {
+            display: none; position: fixed; inset: 0; background: rgba(26,47,30,0.35); z-index: 340;
+            align-items: center; justify-content: center;
+        }
+        #saleCompleteBackdrop.active { display: flex; }
+        .sale-complete-card {
+            background: var(--white); border-radius: 16px; padding: 28px; max-width: 340px; width: 90vw;
+            text-align: center; box-shadow: 0 16px 40px rgba(0,0,0,0.3);
+        }
+        .sale-complete-card h3 { font-family: 'Cormorant Garamond', serif; color: var(--forest); margin: 0 0 4px; }
+        #saleCompleteNumber { font-size: 0.82rem; color: var(--text-muted); font-weight: 700; margin: 0 0 16px; }
+        .sale-complete-row { display: flex; justify-content: space-between; text-align: left; font-size: 0.95rem; font-weight: 700; color: var(--forest); padding: 3px 0; }
+        .sale-complete-tax { font-size: 0.76rem; font-weight: 600; color: var(--text-muted); font-family: 'Noto Sans Devanagari', 'DM Sans', sans-serif; }
+        .sale-complete-total { font-size: 1.15rem; font-weight: 800; border-top: 1px dashed var(--mist); margin-top: 6px; padding-top: 8px; }
+        .sale-complete-change { color: var(--pos-enter-orange); }
+        .sale-complete-actions { display: flex; gap: 10px; margin-top: 18px; }
+        .sale-complete-actions button {
+            flex: 1; padding: 13px 10px; border: none; border-radius: 12px; font-family: inherit;
+            font-weight: 800; font-size: 0.9rem; cursor: pointer;
+        }
+        #saleCompletePrintBtn { background: var(--moss); color: var(--white); }
+        #saleCompleteNewSaleBtn { background: var(--forest); color: var(--gold); }
 
         #posToast {
             position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px);
@@ -1280,14 +1322,38 @@
     </div>
 
     <!-- Payment QR overlay -- full-screen, purely informational, never
-         gates Add/Complete (see openPaymentQr() in the script below). -->
-    <div id="paymentQrBackdrop" style="display:none;position:fixed;inset:0;background:rgba(26,47,30,0.5);z-index:330;align-items:center;justify-content:center;">
+         gates Add/Complete (see openPaymentQr() in the script below).
+         display:flex lives in the .active CSS rule, not an inline style,
+         so this is centred on the whole viewport the same provable way
+         #paymentBackdrop/.full-cash-confirm-backdrop already are. -->
+    <div id="paymentQrBackdrop">
         <div class="payment-qr-card">
             <button type="button" class="panel-close" id="paymentQrCloseBtn"><i class="fas fa-times"></i></button>
             <h3 id="paymentQrTitle"></h3>
             <img id="paymentQrImage" src="" alt="Payment QR code" style="display:none;">
             <p id="paymentQrMissing" style="display:none;">QR not uploaded. Add it in Admin &gt; Business settings.</p>
             <div class="payment-qr-amount" id="paymentQrAmount"></div>
+        </div>
+    </div>
+
+    <!-- "Sale complete" overlay -- shown after a successful (online) sale;
+         see performCompleteSale()'s success branch. A queued-offline sale
+         has no sale number yet, so it gets a toast instead (see the same
+         function's catch branch), never this overlay. -->
+    <div id="saleCompleteBackdrop">
+        <div class="sale-complete-card">
+            <h3>Sale complete</h3>
+            <p id="saleCompleteNumber"></p>
+            <div class="sale-complete-row sale-complete-tax"><span>कुल कर</span><span id="saleCompleteTax">Rs. 0</span></div>
+            <div class="sale-complete-row sale-complete-tax"><span>कर स. मूल्य</span><span id="saleCompleteValueInclTax">Rs. 0</span></div>
+            <div class="sale-complete-row sale-complete-total"><span>Total</span><span id="saleCompleteTotal">Rs. 0</span></div>
+            <div class="sale-complete-row sale-complete-change" id="saleCompleteChangeRow" style="display:none;">
+                <span>Change due</span><span id="saleCompleteChange">Rs. 0</span>
+            </div>
+            <div class="sale-complete-actions">
+                <button type="button" id="saleCompletePrintBtn">Print receipt</button>
+                <button type="button" id="saleCompleteNewSaleBtn">New sale</button>
+            </div>
         </div>
     </div>
 
@@ -3420,12 +3486,19 @@
         async function performCompleteSale(triggerBtn) {
             const gateMessage = completeSaleGateMessage();
             if (gateMessage) { showToast(gateMessage); return; }
-            if (remainingCents() > 0) {
+            const remainingAtStart = remainingCents();
+            if (remainingAtStart > 0) {
                 // Defensive only -- both entry points (Complete/Full cash)
                 // already gate on this before calling here.
                 showToast('Payment does not cover the total yet.');
                 return;
             }
+            // Captured now, before buildPaymentsPayload() below reduces
+            // the cash line(s) to make the SENT sum match the total
+            // exactly -- the server never sees an overpayment at all, so
+            // this is the only point "how much change was actually given"
+            // is still knowable, for the Sale complete overlay.
+            const changeDueCents = -remainingAtStart;
 
             saleInFlight = true;
             const originalText = triggerBtn.textContent;
@@ -3487,6 +3560,15 @@
                         ? ` — WHOLESALE${selectedCustomer ? ' (' + selectedCustomer.name + ')' : ''}`
                         : '';
                     showToast(`Sale ${data.sale_number} — Rs. ${formatMoney(data.total)} recorded${wholesaleLabel}`);
+                    // A receipt-overlay problem must never affect the
+                    // already-saved sale -- resetPostSaleState() below
+                    // runs exactly as before regardless of what happens
+                    // in here.
+                    try {
+                        showSaleCompleteOverlay(data, changeDueCents);
+                    } catch (overlayErr) {
+                        /* intentionally swallowed -- see comment above */
+                    }
                     resetPostSaleState();
                 } else {
                     // A real validation/stock error (400/409) -- either
@@ -3513,7 +3595,11 @@
                 await posQueueEnqueue(payload);
                 await registerPosBackgroundSync();
                 renderQueueBox();
-                showToast('Sale queued — will sync when back online');
+                // No sale number exists yet (nothing was created server-side) --
+                // no receipt to show, so no Sale complete overlay here, just
+                // this toast. The receipt becomes available once this syncs
+                // and gets a real sale_number (see the queue panel/history).
+                showToast('Saved offline. Receipt available after it syncs.');
                 resetPostSaleState();
             } finally {
                 saleInFlight = false;
@@ -3542,7 +3628,7 @@
             // either way (this overlay only ever displays, never gates).
             const amountCents = (activePaymentMethod === method) ? keypadAmountCents() : Math.max(0, remainingCents());
             document.getElementById('paymentQrAmount').textContent = 'Rs. ' + formatMoneyFromCents(amountCents);
-            document.getElementById('paymentQrBackdrop').style.display = 'flex';
+            document.getElementById('paymentQrBackdrop').classList.add('active');
         }
 
         document.querySelectorAll('.pm-btn[data-method]').forEach(btn => {
@@ -3632,10 +3718,50 @@
             performCompleteSale(document.getElementById('fullCashBtn'));
         });
         document.getElementById('paymentQrCloseBtn').addEventListener('click', () => {
-            document.getElementById('paymentQrBackdrop').style.display = 'none';
+            document.getElementById('paymentQrBackdrop').classList.remove('active');
         });
         document.getElementById('paymentQrBackdrop').addEventListener('click', (e) => {
-            if (e.target.id === 'paymentQrBackdrop') document.getElementById('paymentQrBackdrop').style.display = 'none';
+            if (e.target.id === 'paymentQrBackdrop') document.getElementById('paymentQrBackdrop').classList.remove('active');
+        });
+
+        // ══════════════════════════════════════════════════════════════
+        // "Sale complete" overlay -- shown after a successful online sale
+        // (see performCompleteSale()'s success branch). Change due is
+        // known only client-side (the server only ever receives the
+        // already-reduced cash line -- see buildPaymentsPayload()), so
+        // it's passed in directly rather than re-derived here.
+        // ══════════════════════════════════════════════════════════════
+        function showSaleCompleteOverlay(data, changeDueCents) {
+            // vat_amount/exempt_value fall back to 0 -- the server's own
+            // build_sale_receipt_data() call is best-effort (see
+            // POSSaleView.post(), api/views.py): on the rare failure
+            // there, these two keys are simply absent from an otherwise
+            // perfectly normal success response, and this overlay must
+            // never show "Rs. undefined" for an already-saved sale.
+            document.getElementById('saleCompleteNumber').textContent = `Sale ${data.sale_number}`;
+            document.getElementById('saleCompleteTax').textContent = 'Rs. ' + formatMoney(data.vat_amount || 0);
+            document.getElementById('saleCompleteValueInclTax').textContent = 'Rs. ' + formatMoney(data.exempt_value || 0);
+            document.getElementById('saleCompleteTotal').textContent = 'Rs. ' + formatMoney(data.total);
+            const changeRow = document.getElementById('saleCompleteChangeRow');
+            if (changeDueCents > 0) {
+                document.getElementById('saleCompleteChange').textContent = 'Rs. ' + formatMoneyFromCents(changeDueCents);
+                changeRow.style.display = '';
+            } else {
+                changeRow.style.display = 'none';
+            }
+            document.getElementById('saleCompletePrintBtn').dataset.saleNumber = data.sale_number;
+            document.getElementById('saleCompleteBackdrop').classList.add('active');
+        }
+        function closeSaleCompleteOverlay() {
+            document.getElementById('saleCompleteBackdrop').classList.remove('active');
+        }
+        document.getElementById('saleCompleteNewSaleBtn').addEventListener('click', closeSaleCompleteOverlay);
+        document.getElementById('saleCompleteBackdrop').addEventListener('click', (e) => {
+            if (e.target.id === 'saleCompleteBackdrop') closeSaleCompleteOverlay();
+        });
+        document.getElementById('saleCompletePrintBtn').addEventListener('click', () => {
+            const saleNumber = document.getElementById('saleCompletePrintBtn').dataset.saleNumber;
+            if (saleNumber) window.open(`/pos/receipt/${saleNumber}/`, '_blank');
         });
 
         function openPaymentPanel() {

@@ -1321,6 +1321,98 @@ def create_pos_sale(*, client_sale_id, cart, payments, operator_user, customer=N
     return sale, True
 
 
+def format_money_display(amount):
+    """Rs display formatting matching templates/pos.html's own JS
+    formatMoney() exactly -- whole rupees show no decimals ("850"), a
+    non-zero fraction always shows exactly 2dp ("850.50"), never rounded
+    away. Used by pos_receipt_view() below; deliberately NOT used inside
+    build_sale_receipt_data() itself, since that function also backs the
+    POST /api/v1/sales/ response (api/views.py), which needs the precise
+    "850.00"-style value, not this display-only rounding."""
+    from decimal import Decimal
+
+    d = Decimal(str(amount)).quantize(Decimal('0.01'))
+    if d == d.to_integral_value():
+        return str(d.to_integral_value())
+    return f'{d:.2f}'
+
+
+def build_sale_receipt_data(sale):
+    """Everything a receipt (templates/pos_receipt.html, pos_receipt_view()
+    below) or the sale-completion API response (POSSaleView.post(),
+    api/views.py) needs beyond the handful of keys POSSaleView already
+    returned before this -- derived entirely from `sale`'s own persisted
+    rows (POSSaleLine/POSSalePayment/POSSale fields), never from any
+    create-time-only local variable, so a replay of the same
+    client_sale_id (which just re-fetches the same existing POSSale,
+    nothing new created) returns byte-identical data to the original
+    call, and a reprint always matches what was shown at sale time.
+
+    unit/unit_price per line are DERIVED, not stored directly on
+    POSSaleLine -- cart_snapshot's own unit_name (only ever set for a
+    fixed_quantity line sold by a ProductSellingUnit) is cross-referenced
+    by position, since create_pos_sale_lines() creates one POSSaleLine
+    per cart_snapshot entry in that same order (POSSaleLine.Meta.ordering
+    = ['id'], ids assigned in that same enumerate() order) -- this is the
+    one place that ordering guarantee is relied on. unit_price itself is
+    always line_total/quantity, the only historically-accurate per-unit
+    price available (cart_snapshot itself never stored a price -- see
+    ProductOrder.cart_snapshot's own help_text for the same reasoning)."""
+    from decimal import Decimal
+
+    cart_snapshot = sale.cart_snapshot or []
+    lines_data = []
+    for index, line in enumerate(sale.lines.select_related('product', 'variant').all()):
+        product = line.product
+        snap = cart_snapshot[index] if index < len(cart_snapshot) else {}
+        if product.pricing_mode == 'fixed_weight':
+            unit = 'animal'
+        elif snap.get('unit_name'):
+            unit = snap['unit_name']
+        elif product.pricing_mode == 'variable_weight':
+            unit = product.weight_unit_label or 'kg'
+        else:
+            unit = 'pc'
+
+        name = product.name
+        if line.variant_id and line.variant:
+            name = f'{name} ({line.variant.weight}kg)'
+
+        unit_price = (line.line_total / line.quantity) if line.quantity else line.line_total
+        lines_data.append({
+            'name': name,
+            'quantity': str(line.quantity),
+            'unit': unit,
+            'unit_price': str(unit_price.quantize(Decimal('0.01'))),
+            'line_total': str(line.line_total),
+        })
+
+    payments_data = [
+        {'method': p.method, 'amount': str(p.amount)}
+        for p in sale.payments.all()
+    ]
+
+    # Explicitly quantized here (unlike lines_data/payments_data above,
+    # which always come from a fresh sale.lines.all()/sale.payments.all()
+    # query either way) -- sale.vat_amount/exempt_value are read straight
+    # off `sale` itself, which on the CREATE path is the in-memory
+    # instance POSSale.objects.create() just returned (e.g. a bare
+    # Decimal('0') literal, str() -> "0"), but on an idempotent REPLAY is
+    # a genuinely DB-refetched instance (str() -> "0.00", the field's own
+    # decimal_places). Without this, "byte-identical" would fail on
+    # exactly this kind of value.
+    return {
+        'sale_id': sale.id,
+        'created_at': sale.created_at.isoformat(),
+        'cashier': sale.cashier.get_full_name() or sale.cashier.username,
+        'customer_name': sale.customer.name if sale.customer_id else None,
+        'lines': lines_data,
+        'payments': payments_data,
+        'vat_amount': str(Decimal(sale.vat_amount).quantize(Decimal('0.01'))),
+        'exempt_value': str(Decimal(sale.exempt_value).quantize(Decimal('0.01'))),
+    }
+
+
 def pos_service_worker(request):
     """Serves static/js/pos-sw.js at /pos/service-worker.js -- NOT through
     Django's normal static-files pipeline, and deliberately not staff-only
@@ -1537,6 +1629,72 @@ def pos_view(request):
         # as the Reports dashboard, enforced again server-side in
         # create_pos_sale() (this is only ever a UI convenience).
         'is_owner_or_manager': _is_owner_or_manager(request.user),
+    })
+
+
+@staff_member_required
+def pos_receipt_view(request, sale_number):
+    """Printable receipt for a completed POS sale -- GET /pos/receipt/
+    <sale_number>/, url name 'pos_receipt'. Reachable by any staff login,
+    not scoped to whoever actually rang the sale up, since this is also
+    the reprint path (see shop/admin.py's POSSaleAdmin.receipt_link()).
+    ?width=58 switches the print CSS to a 58mm roll; anything else
+    (including no param) uses 80mm.
+
+    Uses build_sale_receipt_data() -- the exact same helper
+    POSSaleView.post() (api/views.py) uses for its own response -- so
+    this always shows exactly what the original sale-completion response
+    already returned, and a reprint later is never out of sync with it.
+    Every amount is pre-formatted here via format_money_display() (no
+    ".00" on whole rupees); `sale` itself is also passed into the
+    template context so {% if %} checks on discount/round-off can test
+    the real Decimal's truthiness, not a formatted string (which, being
+    non-empty, would be truthy even for "0")."""
+    from decimal import Decimal
+    from django.utils import timezone
+    from .models import BusinessSettings, POSSale, POSSalePayment
+
+    payment_method_labels = dict(POSSalePayment.METHOD_CHOICES)
+
+    sale = get_object_or_404(
+        POSSale.objects.select_related('cashier', 'customer'), sale_number=sale_number
+    )
+    data = build_sale_receipt_data(sale)
+    business = BusinessSettings.get_solo()
+
+    subtotal = sum((Decimal(line['line_total']) for line in data['lines']), Decimal('0'))
+    lines_display = [{
+        'name': line['name'],
+        'quantity': line['quantity'],
+        'unit': line['unit'],
+        'unit_price': format_money_display(line['unit_price']),
+        'line_total': format_money_display(line['line_total']),
+    } for line in data['lines']]
+    payments_display = [{
+        'method_label': payment_method_labels.get(p['method'], p['method']),
+        'amount': format_money_display(p['amount']),
+    } for p in data['payments']]
+
+    width_mm = 58 if request.GET.get('width') == '58' else 80
+
+    return render(request, 'pos_receipt.html', {
+        'business': business,
+        'sale': sale,
+        'sale_number': sale.sale_number,
+        'created_at_local': timezone.localtime(sale.created_at),
+        'cashier': data['cashier'],
+        'customer_name': data['customer_name'],
+        'lines': lines_display,
+        'subtotal': format_money_display(subtotal),
+        'discount_amount': format_money_display(sale.discount_amount),
+        'round_off_sign': '+' if sale.round_off_amount > 0 else '−',
+        'round_off_abs': format_money_display(abs(sale.round_off_amount)),
+        'vat_amount': format_money_display(data['vat_amount']),
+        'exempt_value': format_money_display(data['exempt_value']),
+        'total': format_money_display(sale.total_amount),
+        'payments': payments_display,
+        'receipt_footer': business.receipt_footer,
+        'width_mm': width_mm,
     })
 
 
