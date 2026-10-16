@@ -1417,16 +1417,23 @@ class BusinessSettings(models.Model):
     retroactively (see POSSale.taxable_value/exempt_value/vat_amount,
     stored per-sale at creation time).
 
-    shop_name/shop_address/shop_phone/pan_vat_number/receipt_footer and the
-    three QR images below back the POS payment panel (see
+    shop_name/shop_address/shop_phone/pan_vat_number/receipt_footer and
+    esewa_qr/khalti_qr/bank_qr back the POS payment panel (see
     Angan-Baari-Knowledge) — embedded into pos_view()'s context and read
     client-side as templates/pos.html's POS_BUSINESS JS object (the QR
-    images by openPaymentQr(); the shop-info strings are reserved for a
-    later receipt-printing task and not yet read anywhere)."""
+    images by openPaymentQr(); shop_name/shop_address/pan_vat_number/
+    receipt_footer are also read server-side by pos_receipt_view()).
+    shop_name_en/receipt_logo/receipt_flag/qr_website/qr_tiktok/
+    qr_facebook are printed-receipt-only -- read only by
+    pos_receipt_view(), never by the POS payment panel itself."""
 
     is_vat_enabled = models.BooleanField(default=False)
 
     shop_name = models.CharField(max_length=200, blank=True)
+    shop_name_en = models.CharField(
+        max_length=200, blank=True,
+        help_text="English name shown under shop_name on the printed receipt header."
+    )
     shop_address = models.CharField(max_length=300, blank=True)
     shop_phone = models.CharField(max_length=20, blank=True)
     pan_vat_number = models.CharField(max_length=30, blank=True)
@@ -1440,6 +1447,18 @@ class BusinessSettings(models.Model):
     esewa_qr = models.ImageField(storage=ImageKitStorage(), upload_to='business/', blank=True)
     khalti_qr = models.ImageField(storage=ImageKitStorage(), upload_to='business/', blank=True)
     bank_qr = models.ImageField(storage=ImageKitStorage(), upload_to='business/', blank=True)
+
+    # Printed-receipt-only images (templates/pos_receipt.html) -- none of
+    # these are read by the POS payment panel itself. Each is skipped on
+    # the receipt (not shown as a broken image) when left blank.
+    receipt_logo = models.ImageField(storage=ImageKitStorage(), upload_to='business/', blank=True)
+    receipt_flag = models.ImageField(
+        storage=ImageKitStorage(), upload_to='business/', blank=True,
+        help_text="e.g. the Nepal flag, shown top-right of the receipt header."
+    )
+    qr_website = models.ImageField(storage=ImageKitStorage(), upload_to='business/', blank=True)
+    qr_tiktok = models.ImageField(storage=ImageKitStorage(), upload_to='business/', blank=True)
+    qr_facebook = models.ImageField(storage=ImageKitStorage(), upload_to='business/', blank=True)
 
     class Meta:
         verbose_name = 'Business Settings'

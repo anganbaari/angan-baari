@@ -678,9 +678,10 @@ class BusinessSettingsAdmin(admin.ModelAdmin):
     fieldsets = (
         (None, {'fields': ('is_vat_enabled',)}),
         ('Shop details', {
-            'fields': ('shop_name', 'shop_address', 'shop_phone', 'pan_vat_number', 'receipt_footer'),
+            'fields': ('shop_name', 'shop_name_en', 'shop_address', 'shop_phone', 'pan_vat_number', 'receipt_footer'),
         }),
         ('Payment QR codes', {'fields': ('esewa_qr', 'khalti_qr', 'bank_qr')}),
+        ('Receipt images', {'fields': ('receipt_logo', 'receipt_flag', 'qr_website', 'qr_tiktok', 'qr_facebook')}),
     )
 
     def has_add_permission(self, request):

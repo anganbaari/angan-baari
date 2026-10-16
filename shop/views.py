@@ -1337,6 +1337,34 @@ def format_money_display(amount):
     return f'{d:.2f}'
 
 
+def format_quantity_display(value):
+    """Trims trailing zeros for a QUANTITY display on the receipt's
+    "@<unit price>*<qty> <unit>" line (e.g. "2" not "2.000", "0.5" not
+    "0.500", "0.335" stays "0.335") -- never used for money, which
+    always keeps a non-zero fraction at exactly 2dp (format_money_display
+    above). Deliberately avoids Decimal.normalize() (which can flip a
+    whole number like 20 into scientific notation, "2E+1")."""
+    from decimal import Decimal
+
+    d = Decimal(str(value))
+    if d == d.to_integral_value():
+        return str(d.to_integral_value())
+    return f'{d:f}'.rstrip('0').rstrip('.')
+
+
+_DEVANAGARI_DIGITS = str.maketrans('0123456789', '०१२३४५६७८९')
+
+
+def to_devanagari_digits(text):
+    """Converts only ASCII 0-9 to Devanagari digits (०-९) -- every other
+    character (letters, dashes, punctuation) passes through unchanged.
+    Used on the printed receipt for shop_phone/pan_vat_number only; Sale
+    No. is shown exactly as stored (Latin), and date/time stay in Latin
+    digits too (see pos_receipt_view()). Nothing in the POS payment
+    panel/API uses this at all."""
+    return str(text).translate(_DEVANAGARI_DIGITS)
+
+
 def build_sale_receipt_data(sale):
     """Everything a receipt (templates/pos_receipt.html, pos_receipt_view()
     below) or the sale-completion API response (POSSaleView.post(),
@@ -1646,13 +1674,21 @@ def pos_receipt_view(request, sale_number):
     this always shows exactly what the original sale-completion response
     already returned, and a reprint later is never out of sync with it.
     Every amount is pre-formatted here via format_money_display() (no
-    ".00" on whole rupees); `sale` itself is also passed into the
-    template context so {% if %} checks on discount/round-off can test
-    the real Decimal's truthiness, not a formatted string (which, being
-    non-empty, would be truthy even for "0")."""
+    ".00" on whole rupees, no currency prefix except the TOTAL row's
+    literal "रू/RS" -- see the template); `sale` itself is also passed
+    into the template context so {% if %} checks on discount/round-off
+    can test the real Decimal's truthiness, not a formatted string
+    (which, being non-empty, would be truthy even for "0").
+
+    Change due is deliberately NOT shown here -- it only ever exists
+    client-side, at the moment of sale, in templates/pos.html's own
+    paymentLines/buildPaymentsPayload() (see that file's Full cash/
+    performCompleteSale() handling); nothing is persisted that would let
+    a later reprint reconstruct it."""
     from decimal import Decimal
     from django.utils import timezone
     from .models import BusinessSettings, POSSale, POSSalePayment
+    from .bs_calendar import ad_to_bs, BSDateOutOfRangeError
 
     payment_method_labels = dict(POSSalePayment.METHOD_CHOICES)
 
@@ -1665,34 +1701,80 @@ def pos_receipt_view(request, sale_number):
     subtotal = sum((Decimal(line['line_total']) for line in data['lines']), Decimal('0'))
     lines_display = [{
         'name': line['name'],
-        'quantity': line['quantity'],
-        'unit': line['unit'],
-        'unit_price': format_money_display(line['unit_price']),
         'line_total': format_money_display(line['line_total']),
+        # "@<unit price>*<qty> <unit>" -- for a variable_weight line, unit
+        # is already the product's own weight_unit_label and quantity is
+        # already the weight itself (see build_sale_receipt_data()), so
+        # this one format covers "use the weight with its unit" for free.
+        'detail': f"@{format_money_display(line['unit_price'])}*{format_quantity_display(line['quantity'])} {line['unit']}",
     } for line in data['lines']]
     payments_display = [{
         'method_label': payment_method_labels.get(p['method'], p['method']),
         'amount': format_money_display(p['amount']),
     } for p in data['payments']]
 
+    created_at_local = timezone.localtime(sale.created_at)
+    try:
+        bs_year, bs_month, bs_day = ad_to_bs(created_at_local.date())
+        date_display = f'{bs_year:04d}/{bs_month:02d}/{bs_day:02d}'
+    except BSDateOutOfRangeError:
+        # Falls back to the plain A.D. calendar date in the same slot --
+        # never raises, never blocks the receipt from rendering.
+        date_display = created_at_local.strftime('%Y/%m/%d')
+
+    # "Credit due" (the customer's current, all-time outstanding balance,
+    # not just this sale's own credit portion) -- an addition beyond what
+    # the receipt showed before this task, since there was no such figure
+    # on it previously; shown only when THIS sale actually had a credit
+    # payment line (sale.customer_id alone doesn't imply that -- a
+    # wholesale buyer paying entirely in cash also has customer_id set).
+    has_credit_line = any(p['method'] == 'credit' for p in data['payments'])
+    customer_outstanding_balance = (
+        format_money_display(sale.customer.outstanding_balance())
+        if has_credit_line and sale.customer_id else None
+    )
+
+    vat_amount_decimal = Decimal(data['vat_amount'])
+
+    def image_url(field):
+        return field.url if field else ''
+
+    qr_website_url = image_url(business.qr_website)
+    qr_tiktok_url = image_url(business.qr_tiktok)
+    qr_facebook_url = image_url(business.qr_facebook)
+
     width_mm = 58 if request.GET.get('width') == '58' else 80
 
     return render(request, 'pos_receipt.html', {
         'business': business,
         'sale': sale,
+        # Shown as-is (Latin characters) on the receipt -- no Devanagari
+        # digit conversion for Sale No., unlike shop_phone/pan_vat_number
+        # below.
         'sale_number': sale.sale_number,
-        'created_at_local': timezone.localtime(sale.created_at),
+        'logo_url': image_url(business.receipt_logo),
+        'flag_url': image_url(business.receipt_flag),
+        'shop_phone_devanagari': to_devanagari_digits(business.shop_phone) if business.shop_phone else '',
+        'pan_vat_devanagari': to_devanagari_digits(business.pan_vat_number) if business.pan_vat_number else '',
+        'date_display': date_display,
+        'time_display': created_at_local.strftime('%I:%M %p'),
         'cashier': data['cashier'],
         'customer_name': data['customer_name'],
+        'customer_outstanding_balance': customer_outstanding_balance,
         'lines': lines_display,
         'subtotal': format_money_display(subtotal),
         'discount_amount': format_money_display(sale.discount_amount),
         'round_off_sign': '+' if sale.round_off_amount > 0 else '−',
         'round_off_abs': format_money_display(abs(sale.round_off_amount)),
-        'vat_amount': format_money_display(data['vat_amount']),
+        # Blank (not "0") when there's no tax yet, per the design.
+        'vat_amount_display': format_money_display(vat_amount_decimal) if vat_amount_decimal else '',
         'exempt_value': format_money_display(data['exempt_value']),
         'total': format_money_display(sale.total_amount),
         'payments': payments_display,
+        'qr_website_url': qr_website_url,
+        'qr_tiktok_url': qr_tiktok_url,
+        'qr_facebook_url': qr_facebook_url,
+        'has_any_social_qr': bool(qr_website_url or qr_tiktok_url or qr_facebook_url),
         'receipt_footer': business.receipt_footer,
         'width_mm': width_mm,
     })

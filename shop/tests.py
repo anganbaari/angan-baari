@@ -1371,10 +1371,87 @@ class PosReceiptViewTests(TestCase):
         content = response.content.decode()
         self.assertIn('Angan Baari Receipt Shop', content)
         self.assertIn('Receipt Jar', content)
-        self.assertIn(self.sale.sale_number, content)
-        # Whole-rupee totals show with no ".00" -- Rs. 400, not Rs. 400.00.
-        self.assertIn('Rs. 400', content)
-        self.assertNotIn('Rs. 400.00', content)
+        # Bare "400" (subtotal/item amount), no currency prefix in the rows,
+        # no ".00" on a whole rupee amount -- only the TOTAL row gets the
+        # literal "रू/RS" prefix.
+        self.assertIn('>400<', content)
+        self.assertNotIn('400.00', content)
+        self.assertIn('रू/RS 400', content)
+        self.assertNotIn('Rs. 400', content)
+        self.assertNotIn('₹', content)
+        # The item detail line: "@<unit price>*<qty> <unit>".
+        self.assertIn('@200*2 pc', content)
+
+    def test_sale_number_shown_exactly_as_stored_no_devanagari_conversion(self):
+        """Sale No. shows the plain Latin sale_number -- no Devanagari
+        digit conversion (unlike shop_phone/pan_vat_number below)."""
+        self.client.login(username='receipt_cashier', password='pw')
+        response = self.client.get(reverse('pos_receipt', args=[self.sale.sale_number]))
+        content = response.content.decode()
+        self.assertIn(f'Sale No.: {self.sale.sale_number}', content)
+        devanagari_map = str.maketrans('0123456789', '०१२३४५६७८९')
+        devanagari_form = self.sale.sale_number.translate(devanagari_map)
+        self.assertNotIn(devanagari_form, content)
+
+    def test_zero_vat_is_blank_not_zero(self):
+        """VAT is off by default in this test's BusinessSettings -- कुल कर
+        must render with an EMPTY value, not "0" (per the design), while
+        कर स. मूल्य (exempt_value) still shows the real figure."""
+        self.client.login(username='receipt_cashier', password='pw')
+        response = self.client.get(reverse('pos_receipt', args=[self.sale.sale_number]))
+        content = response.content.decode()
+        self.assertIn('<span>कुल कर</span><span></span>', content)
+        self.assertIn('<span>कर स. मूल्य</span><span>400</span>', content)
+
+    def test_blank_images_are_skipped_not_broken(self):
+        """No BusinessSettings images are uploaded in setUp() -- the logo/
+        flag/social-QR <img> tags must not appear at all (not render with
+        an empty src), and the whole social-QR row must be skipped since
+        all three of its images are blank."""
+        self.client.login(username='receipt_cashier', password='pw')
+        response = self.client.get(reverse('pos_receipt', args=[self.sale.sale_number]))
+        content = response.content.decode()
+        # "<img" alone also matches a CSS comment mentioning "<img>" by
+        # name, and "r-social-qr-row" alone also matches that class's own
+        # CSS rule (always present in <style> regardless of whether the
+        # row renders) -- check for the actual rendered element instead.
+        self.assertNotIn('<img src', content)
+        self.assertNotIn('<div class="r-social-qr-row">', content)
+
+    def test_uploaded_social_qr_image_renders_with_caption(self):
+        """The inverse of test_blank_images_are_skipped_not_broken -- one
+        QR uploaded is enough to show the row (per the design, the row is
+        only skipped when ALL THREE are blank), with its own caption and
+        the other two still absent."""
+        settings_row = BusinessSettings.get_solo()
+        settings_row.qr_website = 'business/website-qr-test.png'
+        settings_row.save()
+        self.client.login(username='receipt_cashier', password='pw')
+        response = self.client.get(reverse('pos_receipt', args=[self.sale.sale_number]))
+        content = response.content.decode()
+        self.assertIn('<div class="r-social-qr-row">', content)
+        self.assertIn('business/website-qr-test.png', content)
+        self.assertIn('>Website<', content)
+        self.assertNotIn('>Tiktok<', content)
+        self.assertNotIn('>facebook<', content)
+
+    def test_barcode_element_present(self):
+        self.client.login(username='receipt_cashier', password='pw')
+        response = self.client.get(reverse('pos_receipt', args=[self.sale.sale_number]))
+        content = response.content.decode()
+        self.assertIn('<svg id="receiptBarcode"></svg>', content)
+        self.assertIn("JsBarcode('#receiptBarcode'", content)
+        self.assertIn(f"'{self.sale.sale_number}'", content)
+        self.assertIn('js/vendor/jsbarcode.min.js', content)
+
+    def test_width_58_query_param_renders_58mm(self):
+        self.client.login(username='receipt_cashier', password='pw')
+        response = self.client.get(reverse('pos_receipt', args=[self.sale.sale_number]), {'width': '58'})
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertIn('width: 58mm', content)
+        self.assertNotIn('width: 80mm', content)
+        self.assertIn('@page { size: 58mm auto; margin: 0; }', content)
 
     def test_unknown_sale_number_is_404(self):
         self.client.login(username='receipt_cashier', password='pw')

@@ -1,3 +1,4 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -9,39 +10,80 @@
         * { box-sizing: border-box; }
         html, body {
             margin: 0; padding: 0; background: #e9e9e4;
-            font-family: 'DM Sans', 'Noto Sans Devanagari', sans-serif; color: #1a1a1a;
+            font-family: 'DM Sans', 'Noto Sans Devanagari', sans-serif; color: #000;
         }
         .receipt-wrap { padding: 20px 0 40px; }
         .receipt {
-            width: {{ width_mm }}mm; margin: 0 auto; background: #fff; padding: 10px 12px;
-            font-size: 12px; line-height: 1.45; box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+            width: {{ width_mm }}mm; max-width: 100%; margin: 0 auto; background: #fff; padding: 10px 10px;
+            font-size: 11.5px; line-height: 1.4; box-shadow: 0 2px 10px rgba(0,0,0,0.15); overflow: hidden;
         }
-        .receipt h1 {
-            font-family: 'Cormorant Garamond', 'Noto Sans Devanagari', serif;
-            font-size: 17px; text-align: center; margin: 0 0 2px;
+
+        /* 1. Header: logo | shop name (+ English) | flag -- fixed equal
+           side columns so a blank image on either side still leaves the
+           centre column dead-centred (same structure either way, just an
+           empty column instead of an <img>). */
+        .r-header { display: flex; align-items: center; }
+        .r-header-side { flex: 0 0 44px; display: flex; align-items: center; justify-content: center; }
+        .r-header-side img { max-width: 44px; max-height: 44px; filter: grayscale(1) contrast(1.3); }
+        .r-header-center { flex: 1; text-align: center; min-width: 0; }
+        .r-shop-name {
+            font-family: 'Noto Sans Devanagari', 'Cormorant Garamond', serif;
+            font-size: 18px; font-weight: 800; margin: 0; word-break: break-word;
         }
-        .shop-line { text-align: center; font-size: 10.5px; margin: 0; }
-        .meta-line { font-size: 11px; margin: 0; }
-        hr { border: none; border-top: 1px dashed #999; margin: 8px 0; }
-        table { width: 100%; border-collapse: collapse; font-size: 11px; }
-        table td { padding: 1px 0; vertical-align: top; }
-        .line-name { font-weight: 700; }
-        .line-detail { color: #444; }
-        .line-detail td:last-child, .totals-row span:last-child { text-align: right; }
-        .totals-row { display: flex; justify-content: space-between; font-size: 11.5px; padding: 1px 0; }
-        .totals-row.muted {
-            color: #666; font-size: 10.5px; font-weight: 600;
-            font-family: 'Noto Sans Devanagari', 'DM Sans', sans-serif;
+        .r-shop-name-en { font-size: 11px; font-weight: 600; margin: 1px 0 0; }
+
+        .r-center { text-align: center; }
+        .r-meta-row { display: flex; justify-content: space-between; margin-top: 6px; font-size: 11px; }
+        .r-meta-col-left, .r-meta-col-right { flex: 1; }
+        .r-meta-col-right { text-align: right; }
+        .r-devanagari { font-family: 'Noto Sans Devanagari', 'DM Sans', sans-serif; }
+
+        hr.r-dash { border: none; border-top: 1px dashed #000; margin: 7px 0; }
+
+        .r-table-head { display: flex; justify-content: space-between; font-weight: 700; font-size: 11px; font-family: 'Noto Sans Devanagari', 'DM Sans', sans-serif; }
+        .r-item { margin: 5px 0; }
+        .r-item-row { display: flex; justify-content: space-between; gap: 6px; }
+        .r-item-name { font-weight: 700; word-break: break-word; }
+        .r-item-amount { white-space: nowrap; }
+        .r-item-detail { font-size: 10px; color: #333; padding-left: 10px; margin-top: 1px; }
+
+        .r-row { display: flex; justify-content: space-between; font-size: 11px; padding: 1px 0; }
+        .r-row.r-muted { color: #333; font-size: 10.5px; }
+        .r-row.r-devanagari-label span:first-child { font-family: 'Noto Sans Devanagari', 'DM Sans', sans-serif; font-weight: 600; }
+
+        .r-total-row {
+            display: flex; justify-content: space-between; align-items: baseline;
+            font-size: 16px; font-weight: 800; margin: 2px 0;
         }
-        .totals-row.grand { font-weight: 800; font-size: 14px; border-top: 1px dashed #999; margin-top: 4px; padding-top: 4px; }
-        .footer { text-align: center; font-size: 10.5px; margin-top: 10px; white-space: pre-wrap; }
-        .print-btn-wrap { text-align: center; margin: 14px auto 0; width: {{ width_mm }}mm; }
+        .r-total-row span:first-child { font-family: 'Noto Sans Devanagari', 'DM Sans', sans-serif; }
+
+        .r-social-qr-row { display: flex; justify-content: space-around; margin: 4px 0; gap: 6px; }
+        .r-social-qr-col { flex: 1; min-width: 0; }
+        /* display:block + margin:0 auto (not inherited text-align:center
+           on an inline <img>) -- same fix as the barcode SVG and the
+           earlier payment-panel QR overlay bug. */
+        .r-social-qr-col img { display: block; width: 56px; height: 56px; margin: 0 auto; object-fit: contain; filter: grayscale(1) contrast(1.3); }
+        .r-social-qr-caption { font-size: 9.5px; margin-top: 2px; text-align: center; }
+
+        /* display:block + margin:0 auto, not text-align:center alone --
+           the same inline-centering unreliability already found and
+           fixed for the QR overlay image in templates/pos.html applies
+           just as much to an inline SVG here. */
+        .r-barcode-wrap { margin: 6px 0; }
+        .r-barcode-wrap svg { display: block; max-width: 100%; height: auto; margin: 0 auto; }
+
+        .r-footer {
+            text-align: center; font-size: 13px; font-weight: 700; margin-top: 8px;
+            font-family: 'Noto Sans Devanagari', 'DM Sans', sans-serif; white-space: pre-wrap;
+        }
+
+        .print-btn-wrap { text-align: center; margin: 14px auto 0; width: {{ width_mm }}mm; max-width: 100%; }
         .print-btn-wrap button {
             width: 100%; padding: 12px; border: none; border-radius: 8px; background: #285917; color: #fff;
             font-family: inherit; font-weight: 700; cursor: pointer; font-size: 14px;
         }
 
-        @page { margin: 0; }
+        @page { size: {{ width_mm }}mm auto; margin: 0; }
         @media print {
             html, body { background: #fff; }
             .receipt-wrap { padding: 0; }
@@ -53,48 +95,117 @@
 <body>
     <div class="receipt-wrap">
         <div class="receipt">
-            {% if business.shop_name %}<h1>{{ business.shop_name }}</h1>{% endif %}
-            {% if business.shop_address %}<p class="shop-line">{{ business.shop_address }}</p>{% endif %}
-            {% if business.shop_phone %}<p class="shop-line">Ph: {{ business.shop_phone }}</p>{% endif %}
-            {% if business.pan_vat_number %}<p class="shop-line">PAN/VAT: {{ business.pan_vat_number }}</p>{% endif %}
-            <hr>
-            <p class="meta-line">Sale: {{ sale_number }}</p>
-            <p class="meta-line">{{ created_at_local|date:"Y-m-d H:i" }}</p>
-            <p class="meta-line">Cashier: {{ cashier }}</p>
-            {% if customer_name %}<p class="meta-line">Customer: {{ customer_name }}</p>{% endif %}
-            <hr>
-            <table>
-                {% for line in lines %}
-                <tr class="line-name"><td colspan="2">{{ line.name }}</td></tr>
-                <tr class="line-detail">
-                    <td>{{ line.quantity }} {{ line.unit }} x Rs. {{ line.unit_price }}</td>
-                    <td>Rs. {{ line.line_total }}</td>
-                </tr>
-                {% endfor %}
-            </table>
-            <hr>
-            <div class="totals-row"><span>Subtotal</span><span>Rs. {{ subtotal }}</span></div>
+            <!-- 1. Header -->
+            <div class="r-header">
+                <div class="r-header-side">{% if logo_url %}<img src="{{ logo_url }}" alt="">{% endif %}</div>
+                <div class="r-header-center">
+                    {% if business.shop_name %}<p class="r-shop-name">{{ business.shop_name }}</p>{% endif %}
+                    {% if business.shop_name_en %}<p class="r-shop-name-en">{{ business.shop_name_en }}</p>{% endif %}
+                </div>
+                <div class="r-header-side">{% if flag_url %}<img src="{{ flag_url }}" alt="">{% endif %}</div>
+            </div>
+
+            <!-- 2. Address -->
+            {% if business.shop_address %}<p class="r-center" style="margin:4px 0 0;">{{ business.shop_address }}</p>{% endif %}
+
+            <!-- 3. Sale number (Devanagari digits) -->
+            <!-- Shown exactly as stored (Latin characters), unlike
+                 phone/PAN below -- no Devanagari digit conversion here. -->
+            <p class="r-center" style="margin:4px 0 0;font-weight:700;">Sale No.: {{ sale_number }}</p>
+
+            <!-- 4. Phone/PAN (left, Devanagari digits) and date/time (right, Latin digits, Nepal time) -->
+            <div class="r-meta-row">
+                <div class="r-meta-col-left r-devanagari">
+                    {% if shop_phone_devanagari %}<div>फोन: {{ shop_phone_devanagari }}</div>{% endif %}
+                    {% if pan_vat_devanagari %}<div>PAN नं.: {{ pan_vat_devanagari }}</div>{% endif %}
+                    {% if cashier %}<div>Cashier: {{ cashier }}</div>{% endif %}
+                    {% if customer_name %}<div>Customer: {{ customer_name }}</div>{% endif %}
+                </div>
+                <div class="r-meta-col-right">
+                    <div>{{ date_display }}</div>
+                    <div>{{ time_display }}</div>
+                </div>
+            </div>
+
+            <!-- 5. Items header -->
+            <hr class="r-dash">
+            <div class="r-table-head"><span>विवरण / Description</span><span>रकम / Amount</span></div>
+            <hr class="r-dash">
+
+            <!-- 6. Items -->
+            {% for line in lines %}
+            <div class="r-item">
+                <div class="r-item-row">
+                    <span class="r-item-name">{{ line.name }}</span>
+                    <span class="r-item-amount">{{ line.line_total }}</span>
+                </div>
+                <div class="r-item-detail">{{ line.detail }}</div>
+            </div>
+            {% if not forloop.last %}<hr class="r-dash">{% endif %}
+            {% endfor %}
+
+            <!-- Kept from the previous receipt layout, shown smaller, above Total -->
+            <hr class="r-dash">
+            <div class="r-row r-muted"><span>Subtotal</span><span>{{ subtotal }}</span></div>
             {% if sale.discount_amount %}
-            <div class="totals-row"><span>Discount</span><span>-Rs. {{ discount_amount }}</span></div>
+            <div class="r-row r-muted"><span>Discount</span><span>-{{ discount_amount }}</span></div>
             {% endif %}
             {% if sale.round_off_amount %}
-            <div class="totals-row"><span>Round off</span><span>{{ round_off_sign }} Rs. {{ round_off_abs }}</span></div>
+            <div class="r-row r-muted"><span>Round off</span><span>{{ round_off_sign }}{{ round_off_abs }}</span></div>
             {% endif %}
-            <div class="totals-row muted"><span>कुल कर</span><span>Rs. {{ vat_amount }}</span></div>
-            <div class="totals-row muted"><span>कर स. मूल्य</span><span>Rs. {{ exempt_value }}</span></div>
-            <div class="totals-row grand"><span>TOTAL</span><span>Rs. {{ total }}</span></div>
-            <hr>
+
+            <!-- 7. Tax rows (same vat_amount/exempt_value fields as the POS payment panel) -->
+            <hr class="r-dash">
+            <div class="r-row r-devanagari-label"><span>कुल कर</span><span>{{ vat_amount_display }}</span></div>
+            <div class="r-row r-devanagari-label"><span>कर स. मूल्य</span><span>{{ exempt_value }}</span></div>
+
+            <!-- 8. Total -->
+            <hr class="r-dash">
+            <div class="r-total-row"><span>कुल/Total</span><span>रू/RS {{ total }}</span></div>
+            <hr class="r-dash">
+
+            <!-- Kept: payment lines + credit due, below Total, smaller -->
             {% for p in payments %}
-            <div class="totals-row"><span>{{ p.method_label }}</span><span>Rs. {{ p.amount }}</span></div>
+            <div class="r-row r-muted"><span>{{ p.method_label }}</span><span>{{ p.amount }}</span></div>
             {% endfor %}
-            {% if receipt_footer %}
-            <hr>
-            <p class="footer">{{ receipt_footer }}</p>
+            {% if customer_outstanding_balance %}
+            <div class="r-row r-muted"><span>Credit due (बाँकी)</span><span>{{ customer_outstanding_balance }}</span></div>
             {% endif %}
+
+            <!-- 9. Social QR row -->
+            {% if has_any_social_qr %}
+            <hr class="r-dash">
+            <div class="r-social-qr-row">
+                {% if qr_website_url %}
+                <div class="r-social-qr-col"><img src="{{ qr_website_url }}" alt=""><div class="r-social-qr-caption">Website</div></div>
+                {% endif %}
+                {% if qr_tiktok_url %}
+                <div class="r-social-qr-col"><img src="{{ qr_tiktok_url }}" alt=""><div class="r-social-qr-caption">Tiktok</div></div>
+                {% endif %}
+                {% if qr_facebook_url %}
+                <div class="r-social-qr-col"><img src="{{ qr_facebook_url }}" alt=""><div class="r-social-qr-caption">facebook</div></div>
+                {% endif %}
+            </div>
+            {% endif %}
+
+            <!-- 10. Barcode + thank-you footer -->
+            <hr class="r-dash">
+            <div class="r-barcode-wrap"><svg id="receiptBarcode"></svg></div>
+            {% if receipt_footer %}<p class="r-footer">{{ receipt_footer }}</p>{% endif %}
         </div>
         <div class="print-btn-wrap">
             <button type="button" onclick="window.print()">Print</button>
         </div>
     </div>
+
+    <script src="{% static 'js/vendor/jsbarcode.min.js' %}"></script>
+    <script>
+        // No displayValue -- the sale number is already shown (in
+        // Devanagari digits) near the top of the receipt; printing it a
+        // second time under the barcode would be redundant.
+        JsBarcode('#receiptBarcode', '{{ sale_number }}', {
+            format: 'CODE128', displayValue: false, height: 40, margin: 0,
+        });
+    </script>
 </body>
 </html>
