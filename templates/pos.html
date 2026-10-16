@@ -626,7 +626,10 @@
            already position:fixed, so this absolutely-positioned child
            covers exactly the panel's own box, not the whole screen). */
         .full-cash-confirm-backdrop {
-            display: none; position: absolute; inset: 0; background: rgba(255,255,255,0.94);
+            /* Same plain dim as #paymentBackdrop -- was a near-opaque
+               white overlay, which made the panel behind it look faded/
+               washed out even though nothing was actually given opacity. */
+            display: none; position: absolute; inset: 0; background: rgba(26,47,30,0.35);
             align-items: center; justify-content: center; z-index: 5; padding: 24px; box-sizing: border-box;
         }
         .full-cash-confirm-backdrop.active { display: flex; }
@@ -1278,7 +1281,7 @@
 
     <!-- Payment QR overlay -- full-screen, purely informational, never
          gates Add/Complete (see openPaymentQr() in the script below). -->
-    <div id="paymentQrBackdrop" style="display:none;position:fixed;inset:0;background:rgba(26,47,30,0.78);z-index:330;align-items:center;justify-content:center;">
+    <div id="paymentQrBackdrop" style="display:none;position:fixed;inset:0;background:rgba(26,47,30,0.5);z-index:330;align-items:center;justify-content:center;">
         <div class="payment-qr-card">
             <button type="button" class="panel-close" id="paymentQrCloseBtn"><i class="fas fa-times"></i></button>
             <h3 id="paymentQrTitle"></h3>
