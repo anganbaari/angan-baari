@@ -18,19 +18,20 @@
             font-size: 11.5px; line-height: 1.4; box-shadow: 0 2px 10px rgba(0,0,0,0.15); overflow: hidden;
         }
 
-        /* 1. Header: logo | shop name (+ English) | flag -- fixed equal
-           side columns so a blank image on either side still leaves the
-           centre column dead-centred (same structure either way, just an
-           empty column instead of an <img>). */
-        .r-header { display: flex; align-items: center; }
-        .r-header-side { flex: 0 0 58px; display: flex; align-items: center; }
-        /* Each side pushes its image toward the CENTRE (not centred
-           within its own box) -- that's what actually brings logo/flag
-           closer to the shop name, rather than just growing their box. */
-        .r-header-side:first-child { justify-content: flex-end; }
-        .r-header-side:last-child { justify-content: flex-start; }
+        /* 1. Header: logo, shop name (+ English), flag as ONE centred
+           group with a small fixed gap between whichever of them are
+           actually present -- NOT fixed-width side columns (which kept
+           the centre dead-centred regardless of a blank image, but held
+           the logo/flag far away from the name). The logo/flag <div>
+           isn't rendered at all when blank (see below), so `gap` only
+           ever applies between items that actually exist -- trade-off:
+           if only ONE of logo/flag is present, the group (and so the
+           shop name) sits slightly off the receipt's true centre, since
+           nothing reserves space for the missing side anymore. */
+        .r-header { display: flex; align-items: center; justify-content: center; gap: 8px; }
+        .r-header-side { flex: 0 0 auto; display: flex; align-items: center; }
         .r-header-side img { max-width: 57px; max-height: 57px; filter: grayscale(1) contrast(1.3); }
-        .r-header-center { flex: 1; text-align: center; min-width: 0; }
+        .r-header-center { flex: 0 1 auto; text-align: center; min-width: 0; }
         .r-shop-name {
             font-family: 'Noto Sans Devanagari', 'Cormorant Garamond', serif;
             font-size: 23px; font-weight: 800; margin: 0; line-height: 1.1; word-break: break-word;
@@ -62,23 +63,37 @@
         }
         .r-total-row span:first-child { font-family: 'Noto Sans Devanagari', 'DM Sans', sans-serif; }
 
-        .r-social-qr-row { display: flex; justify-content: center; margin: 4px 0; gap: 3px; }
+        .r-social-qr-row { display: flex; justify-content: center; margin: 4px 0; gap: 10px; }
         .r-social-qr-col { flex: 0 0 auto; min-width: 0; }
         /* display:block + margin:0 auto (not inherited text-align:center
            on an inline <img>) -- same fix as the barcode SVG and the
-           earlier payment-panel QR overlay bug. */
-        .r-social-qr-col img { display: block; width: 70px; height: 70px; margin: 0 auto; object-fit: contain; filter: grayscale(1) contrast(1.3); }
+           earlier payment-panel QR overlay bug. 3x78px + 2x10px gap =
+           254px, comfortably under the ~282px content width at 80mm
+           (80mm receipt minus 2x10px padding), so all three still fit
+           on one row. */
+        .r-social-qr-col img { display: block; width: 78px; height: 78px; margin: 0 auto; object-fit: contain; filter: grayscale(1) contrast(1.3); }
         .r-social-qr-caption { font-size: 9.5px; margin-top: 2px; text-align: center; }
 
         /* display:block + margin:0 auto, not text-align:center alone --
            the same inline-centering unreliability already found and
            fixed for the QR overlay image in templates/pos.html applies
-           just as much to an inline SVG here. */
-        .r-barcode-wrap { margin: 6px 0; }
+           just as much to an inline SVG here. Top margin roughly doubled
+           (was 6px, giving a ~10px total gap together with
+           .r-social-qr-row's own 4px bottom margin above it, now that
+           there's no <hr> between them any more) so the barcode sits
+           lower. */
+        .r-barcode-wrap { margin: 16px 0 6px; }
         .r-barcode-wrap svg { display: block; max-width: 100%; height: auto; margin: 0 auto; }
 
         .r-footer {
-            text-align: center; font-size: 16px; font-weight: 700; margin-top: 17px; /* ~4.5mm */
+            /* ~34px top margin -- roughly double the previous 17px, so
+               together with .r-barcode-wrap's own 6px bottom margin the
+               barcode-to-footer gap is roughly double its old total. */
+            text-align: center; font-size: 16px; font-weight: 700; margin-top: 34px;
+            /* text-wrap:balance avoids a single word stranded alone on
+               its own last line; unsupported browsers simply ignore this
+               one declaration and fall back to normal wrapping. */
+            text-wrap: balance;
             font-family: 'Noto Sans Devanagari', 'DM Sans', sans-serif; white-space: pre-wrap;
         }
 
@@ -102,12 +117,12 @@
         <div class="receipt">
             <!-- 1. Header -->
             <div class="r-header">
-                <div class="r-header-side">{% if logo_url %}<img src="{{ logo_url }}" alt="">{% endif %}</div>
+                {% if logo_url %}<div class="r-header-side"><img src="{{ logo_url }}" alt=""></div>{% endif %}
                 <div class="r-header-center">
                     {% if business.shop_name %}<p class="r-shop-name">{{ business.shop_name }}</p>{% endif %}
                     {% if business.shop_name_en %}<p class="r-shop-name-en">{{ business.shop_name_en }}</p>{% endif %}
                 </div>
-                <div class="r-header-side">{% if flag_url %}<img src="{{ flag_url }}" alt="">{% endif %}</div>
+                {% if flag_url %}<div class="r-header-side"><img src="{{ flag_url }}" alt=""></div>{% endif %}
             </div>
 
             <!-- 2. Address -->
@@ -152,15 +167,17 @@
             {% endfor %}
 
             <!-- Kept from the previous receipt layout, shown smaller.
-                 Order: items, subtotal/discount/round-off, payment lines
-                 (+ credit due), कुल कर, कर स. मूल्य, Total. -->
+                 No Round-off row -- the receipt shows what was actually
+                 paid, not the pre-rounding math (see Subtotal/कर स. मूल्य
+                 below). Order: items, dashed, [Subtotal, Discount if
+                 any, payment lines, credit due], dashed, कुल कर,
+                 कर स. मूल्य, dashed, Total, dashed, QR row, barcode,
+                 thank-you -- exactly ONE dashed line in each of those
+                 slots, not two stacked after Total as before. -->
             <hr class="r-dash">
-            <div class="r-row r-muted"><span>Subtotal</span><span>{{ subtotal }}</span></div>
+            <div class="r-row r-muted"><span>Subtotal</span><span>{{ subtotal_display }}</span></div>
             {% if sale.discount_amount %}
             <div class="r-row r-muted"><span>Discount</span><span>-{{ discount_amount }}</span></div>
-            {% endif %}
-            {% if sale.round_off_amount %}
-            <div class="r-row r-muted"><span>Round off</span><span>{{ round_off_sign }}{{ round_off_abs }}</span></div>
             {% endif %}
             {% for p in payments %}
             <div class="r-row r-muted"><span>{{ p.method_label }}</span><span>{{ p.amount }}</span></div>
@@ -172,7 +189,7 @@
             <!-- 7. Tax rows (same vat_amount/exempt_value fields as the POS payment panel) -->
             <hr class="r-dash">
             <div class="r-row r-devanagari-label"><span>कुल कर</span><span>{{ vat_amount_display }}</span></div>
-            <div class="r-row r-devanagari-label"><span>कर स. मूल्य</span><span>{{ exempt_value }}</span></div>
+            <div class="r-row r-devanagari-label"><span>कर स. मूल्य</span><span>{{ exempt_value_display }}</span></div>
 
             <!-- 8. Total -->
             <hr class="r-dash">
@@ -181,7 +198,6 @@
 
             <!-- 9. Social QR row -->
             {% if has_any_social_qr %}
-            <hr class="r-dash">
             <div class="r-social-qr-row">
                 {% if qr_website_url %}
                 <div class="r-social-qr-col"><img src="{{ qr_website_url }}" alt=""><div class="r-social-qr-caption">Website</div></div>
@@ -196,7 +212,6 @@
             {% endif %}
 
             <!-- 10. Barcode + thank-you footer -->
-            <hr class="r-dash">
             <div class="r-barcode-wrap"><svg id="receiptBarcode"></svg></div>
             {% if receipt_footer %}<p class="r-footer">{{ receipt_footer }}</p>{% endif %}
         </div>
@@ -211,7 +226,7 @@
         // Devanagari digits) near the top of the receipt; printing it a
         // second time under the barcode would be redundant.
         JsBarcode('#receiptBarcode', '{{ sale_number }}', {
-            format: 'CODE128', displayValue: false, height: 40, margin: 0,
+            format: 'CODE128', displayValue: false, height: 30, margin: 0, /* height -25% (was 40); width/margin (quiet zones) unchanged */
         });
     </script>
 </body>

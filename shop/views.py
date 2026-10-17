@@ -1736,6 +1736,22 @@ def pos_receipt_view(request, sale_number):
 
     vat_amount_decimal = Decimal(data['vat_amount'])
 
+    # No "Round off" row on the receipt -- it must show what the
+    # customer actually paid, not the pre-rounding arithmetic. Subtotal
+    # shows the ROUNDED total (matching sale.total_amount exactly)
+    # whenever there's no discount; with a discount, Subtotal/Discount
+    # stay as the plain pre-round figures (per spec) and the rounding
+    # gap is simply not shown anywhere. कर स. मूल्य always absorbs the
+    # round-off: data['exempt_value'] is the pre-round required_total
+    # whenever VAT is off (the only state this project currently uses --
+    # BusinessSettings.is_vat_enabled, see create_pos_sale()), so adding
+    # round_off_amount to it always reproduces total_amount exactly,
+    # regardless of discount. Item line amounts are untouched (still
+    # their own exact, pre-round totals).
+    has_discount = bool(sale.discount_amount)
+    subtotal_display = format_money_display(sale.total_amount if not has_discount else subtotal)
+    exempt_value_display = format_money_display(Decimal(data['exempt_value']) + sale.round_off_amount)
+
     def image_url(field):
         return field.url if field else ''
 
@@ -1771,13 +1787,11 @@ def pos_receipt_view(request, sale_number):
         'customer_name': data['customer_name'],
         'customer_outstanding_balance': customer_outstanding_balance,
         'lines': lines_display,
-        'subtotal': format_money_display(subtotal),
+        'subtotal_display': subtotal_display,
         'discount_amount': format_money_display(sale.discount_amount),
-        'round_off_sign': '+' if sale.round_off_amount > 0 else '−',
-        'round_off_abs': format_money_display(abs(sale.round_off_amount)),
         # Blank (not "0") when there's no tax yet, per the design.
         'vat_amount_display': format_money_display(vat_amount_decimal) if vat_amount_decimal else '',
-        'exempt_value': format_money_display(data['exempt_value']),
+        'exempt_value_display': exempt_value_display,
         'total': format_money_display(sale.total_amount),
         'payments': payments_display,
         'qr_website_url': qr_website_url,

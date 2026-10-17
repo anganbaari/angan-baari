@@ -1415,9 +1415,10 @@ class PosReceiptViewTests(TestCase):
         self.assertIn('class="r-meta-row r-cashier-sale-row"', content)
 
     def test_payment_lines_appear_before_tax_rows(self):
-        """New order: items, subtotal/round-off, payment lines, कुल कर,
-        कर स. मूल्य, Total -- confirmed by comparing string positions in
-        the rendered HTML, not just presence."""
+        """Order: items, Subtotal/Discount, payment lines, कुल कर,
+        कर स. मूल्य, Total (no Round off row at all) -- confirmed by
+        comparing string positions in the rendered HTML, not just
+        presence."""
         self.client.login(username='receipt_cashier', password='pw')
         response = self.client.get(reverse('pos_receipt', args=[self.sale.sale_number]))
         content = response.content.decode()
@@ -1469,13 +1470,55 @@ class PosReceiptViewTests(TestCase):
         self.assertNotIn('>Tiktok<', content)
         self.assertNotIn('>facebook<', content)
 
-    def test_barcode_element_present(self):
+    def test_no_round_off_row_on_receipt(self):
+        self.client.login(username='receipt_cashier', password='pw')
+        response = self.client.get(reverse('pos_receipt', args=[self.sale.sale_number]))
+        content = response.content.decode()
+        self.assertNotIn('Round off', content)
+
+    def test_subtotal_and_exempt_value_equal_total_with_round_off_no_discount(self):
+        """17.50 rounds (ROUND_HALF_UP) to 18 -- with no discount, both
+        Subtotal and कर स. मूल्य must show the ROUNDED total (18), the
+        exact same figure as the Total row, not the raw pre-round 17.50.
+        The ITEM's own line amount stays untouched at the exact 17.50."""
+        weight_product = Product.objects.create(
+            name='Round Off Mango', slug='round-off-mango', category=self.category, description='test',
+            price=Decimal('100.00'), pricing_mode='variable_weight', origin='farm',
+        )
+        InventoryMovement.objects.create(
+            product=weight_product, movement_type='harvest', source='admin', quantity=Decimal('10'),
+        )
+        sale, created = create_pos_sale(
+            client_sale_id=str(uuid.uuid4()),
+            cart=[{'product_id': weight_product.id, 'qty': 1, 'weight': '0.175'}],
+            payments=[{'method': 'cash', 'amount': '18.00'}],
+            operator_user=self.operator,
+        )
+        self.assertTrue(created)
+        self.assertEqual(sale.total_amount, Decimal('18'))
+        self.assertEqual(sale.round_off_amount, Decimal('0.50'))  # sanity: this sale genuinely rounds
+
+        self.client.login(username='receipt_cashier', password='pw')
+        response = self.client.get(reverse('pos_receipt', args=[sale.sale_number]))
+        content = response.content.decode()
+        self.assertIn('<span>Subtotal</span><span>18</span>', content)
+        self.assertIn('<span>कर स. मूल्य</span><span>18</span>', content)
+        self.assertIn('रू/RS 18', content)
+        self.assertNotIn('Round off', content)
+        # The item line's own amount is untouched -- exact, unrounded.
+        self.assertIn('17.50', content)
+
+    def test_barcode_element_present_and_encodes_full_sale_number(self):
         self.client.login(username='receipt_cashier', password='pw')
         response = self.client.get(reverse('pos_receipt', args=[self.sale.sale_number]))
         content = response.content.decode()
         self.assertIn('<svg id="receiptBarcode"></svg>', content)
         self.assertIn("JsBarcode('#receiptBarcode'", content)
-        self.assertIn(f"'{self.sale.sale_number}'", content)
+        # The FULL sale_number ("POS-XXXXXXXX"), never the "POS-"-stripped
+        # display form used elsewhere on the receipt -- a real barcode
+        # has to scan back to the exact original value.
+        self.assertIn(f"JsBarcode('#receiptBarcode', '{self.sale.sale_number}'", content)
+        self.assertIn('height: 30', content)  # -25% from the original 40
         self.assertIn('js/vendor/jsbarcode.min.js', content)
 
     def test_width_58_query_param_renders_58mm(self):
