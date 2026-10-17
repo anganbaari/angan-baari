@@ -841,6 +841,84 @@ def resolve_pos_offer_discount(offer_id, product, base_price):
     return offer.discounted_price(base_price)
 
 
+def price_pos_cart_line(*, product, qty, weight, variant_id, unit_id, is_wholesale,
+                         price_override, is_single_offer_line, offer_id):
+    """The per-pricing_mode line-total computation for one POS cart line —
+    extracted out of create_pos_sale()'s own loop so there is exactly ONE
+    place this logic lives (create_pos_sale() is still its only caller;
+    POSSaleView.post(), api/views.py, was checked and found to already
+    delegate entirely to create_pos_sale() with no separate copy of its
+    own — this extraction exists so any future second caller, and the
+    whole-rupee rounding rule below, only ever have to be right in one
+    place). Returns (line_total, list_line_total, unit) — `unit` is only
+    ever set for a fixed_quantity line sold by a non-default selling unit,
+    and is handed back (rather than re-derived by the caller) purely so
+    cart_snapshot can record its id/display name. A combo-priced line's
+    `line_total` returned here is NOT final — the caller still overwrites
+    it with the combo's own fixed share afterward, same as before this was
+    extracted.
+
+    Money rule (new): a variable_weight line's amount — unit price times
+    weight, after any single-product offer discount, BEFORE any combo
+    override — is rounded to the nearest whole rupee (ROUND_HALF_UP,
+    e.g. 17.50->18, 12.49->12), so a cart made only of ordinary lines never
+    needs the order-level round-off step in create_pos_sale() to fix up a
+    fractional total. Applied regardless of is_wholesale — a manually
+    priced wholesale weight line is just as much a cash transaction as a
+    retail one, and nobody is handed paisa change either way. fixed_weight
+    and fixed_quantity lines are untouched: an animal's price and a
+    per-unit catalogue/selling-unit price are already whole-rupee amounts
+    in practice, and qty is always an integer, so there is nothing to round
+    there.
+    """
+    from decimal import Decimal, ROUND_HALF_UP
+
+    unit = None
+    list_line_total = None
+    if product.pricing_mode == 'fixed_weight':
+        variant = product.variants.filter(id=variant_id, is_available=True).first() if variant_id else None
+        if not variant:
+            raise POSSaleValidationError(f'{product.name}: that animal is no longer available.')
+        list_line_total = variant.total_price()
+        if is_wholesale:
+            line_total = price_override if price_override is not None else list_line_total
+        else:
+            line_total = list_line_total
+            if is_single_offer_line:
+                line_total = resolve_pos_offer_discount(offer_id, product, line_total)
+    elif product.pricing_mode == 'variable_weight':
+        catalogue_unit_price = Decimal(str(product.price))
+        list_line_total = catalogue_unit_price * Decimal(str(weight or 0))
+        if is_wholesale:
+            effective_unit_price = price_override if price_override is not None else catalogue_unit_price
+            line_total = effective_unit_price * Decimal(str(weight or 0))
+        else:
+            unit_price = catalogue_unit_price
+            if is_single_offer_line:
+                unit_price = resolve_pos_offer_discount(offer_id, product, unit_price)
+            line_total = unit_price * Decimal(str(weight or 0))
+        line_total = line_total.quantize(Decimal('1'), rounding=ROUND_HALF_UP)
+    else:
+        if unit_id:
+            unit = product.selling_units.filter(id=unit_id, is_available=True).first()
+            if not unit:
+                raise POSSaleValidationError(f'{product.name}: that selling unit is no longer available.')
+            catalogue_unit_price = unit.price
+        else:
+            catalogue_unit_price = Decimal(str(product.price))
+        list_line_total = catalogue_unit_price * qty
+        if is_wholesale:
+            effective_unit_price = price_override if price_override is not None else catalogue_unit_price
+            line_total = effective_unit_price * qty
+        else:
+            unit_price = catalogue_unit_price
+            if is_single_offer_line:
+                unit_price = resolve_pos_offer_discount(offer_id, product, unit_price)
+            line_total = unit_price * qty
+
+    return line_total, list_line_total, unit
+
+
 def resolve_combo_reference_price(bundle_item, available_variants):
     """For a fixed_weight BundleItem, the price a chosen animal is compared
     against to work out the combo upcharge (see BundleItem.reference_weight).
@@ -1124,7 +1202,6 @@ def create_pos_sale(*, client_sale_id, cart, payments, operator_user, customer=N
             weight = line.get('weight')
             variant_id = line.get('variant_id')
             unit_id = line.get('unit_id')
-            unit = None
             offer_id = line.get('offer_id')
             combo_instance_id = line.get('combo_instance_id')
             # A combo line's price is fixed by resolve_pos_combo_lines() --
@@ -1143,46 +1220,11 @@ def create_pos_sale(*, client_sale_id, cart, payments, operator_user, customer=N
                 if price_override < 0:
                     raise POSSaleValidationError(f'{product.name}: price override cannot be negative.')
 
-            list_line_total = None
-            if product.pricing_mode == 'fixed_weight':
-                variant = product.variants.filter(id=variant_id, is_available=True).first() if variant_id else None
-                if not variant:
-                    raise POSSaleValidationError(f'{product.name}: that animal is no longer available.')
-                list_line_total = variant.total_price()
-                if is_wholesale:
-                    line_total = price_override if price_override is not None else list_line_total
-                else:
-                    line_total = list_line_total
-                    if is_single_offer_line:
-                        line_total = resolve_pos_offer_discount(offer_id, product, line_total)
-            elif product.pricing_mode == 'variable_weight':
-                catalogue_unit_price = Decimal(str(product.price))
-                list_line_total = catalogue_unit_price * Decimal(str(weight or 0))
-                if is_wholesale:
-                    effective_unit_price = price_override if price_override is not None else catalogue_unit_price
-                    line_total = effective_unit_price * Decimal(str(weight or 0))
-                else:
-                    unit_price = catalogue_unit_price
-                    if is_single_offer_line:
-                        unit_price = resolve_pos_offer_discount(offer_id, product, unit_price)
-                    line_total = unit_price * Decimal(str(weight or 0))
-            else:
-                if unit_id:
-                    unit = product.selling_units.filter(id=unit_id, is_available=True).first()
-                    if not unit:
-                        raise POSSaleValidationError(f'{product.name}: that selling unit is no longer available.')
-                    catalogue_unit_price = unit.price
-                else:
-                    catalogue_unit_price = Decimal(str(product.price))
-                list_line_total = catalogue_unit_price * qty
-                if is_wholesale:
-                    effective_unit_price = price_override if price_override is not None else catalogue_unit_price
-                    line_total = effective_unit_price * qty
-                else:
-                    unit_price = catalogue_unit_price
-                    if is_single_offer_line:
-                        unit_price = resolve_pos_offer_discount(offer_id, product, unit_price)
-                    line_total = unit_price * qty
+            line_total, list_line_total, unit = price_pos_cart_line(
+                product=product, qty=qty, weight=weight, variant_id=variant_id, unit_id=unit_id,
+                is_wholesale=is_wholesale, price_override=price_override,
+                is_single_offer_line=is_single_offer_line, offer_id=offer_id,
+            )
 
             if combo_instance_id and not is_wholesale:
                 line_total = combo_line_prices[index]

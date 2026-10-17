@@ -1477,10 +1477,16 @@ class PosReceiptViewTests(TestCase):
         self.assertNotIn('Round off', content)
 
     def test_subtotal_and_exempt_value_equal_total_with_round_off_no_discount(self):
-        """17.50 rounds (ROUND_HALF_UP) to 18 -- with no discount, both
-        Subtotal and कर स. मूल्य must show the ROUNDED total (18), the
-        exact same figure as the Total row, not the raw pre-round 17.50.
-        The ITEM's own line amount stays untouched at the exact 17.50."""
+        """Since the whole-rupee-per-line money rule (price_pos_cart_line(),
+        shop/views.py) was added, a single variable_weight line's own
+        17.50 amount rounds (ROUND_HALF_UP) to 18 at the LINE level itself
+        -- round_off_amount is 0, and Subtotal/कर स. मूल्य/Total/the item's
+        own line amount all show the SAME figure (18), not a raw 17.50
+        anywhere. This replaces the pre-whole-rupee-rule version of this
+        test, which relied on 17.50 reaching the order-level round-off step
+        unrounded -- that path no longer exists for a single ordinary line
+        (see POSRoundOffApiTests' class docstring, api/tests.py, for the
+        order-level-rounding tests rewritten for the same reason)."""
         weight_product = Product.objects.create(
             name='Round Off Mango', slug='round-off-mango', category=self.category, description='test',
             price=Decimal('100.00'), pricing_mode='variable_weight', origin='farm',
@@ -1496,7 +1502,8 @@ class PosReceiptViewTests(TestCase):
         )
         self.assertTrue(created)
         self.assertEqual(sale.total_amount, Decimal('18'))
-        self.assertEqual(sale.round_off_amount, Decimal('0.50'))  # sanity: this sale genuinely rounds
+        self.assertEqual(sale.round_off_amount, Decimal('0.00'))
+        self.assertEqual(sale.lines.get().line_total, Decimal('18.00'))  # the line itself already rounded
 
         self.client.login(username='receipt_cashier', password='pw')
         response = self.client.get(reverse('pos_receipt', args=[sale.sale_number]))
@@ -1505,8 +1512,9 @@ class PosReceiptViewTests(TestCase):
         self.assertIn('<span>कर स. मूल्य</span><span>18</span>', content)
         self.assertIn('रू/RS 18', content)
         self.assertNotIn('Round off', content)
-        # The item line's own amount is untouched -- exact, unrounded.
-        self.assertIn('17.50', content)
+        # The item line itself now shows the SAME rounded figure too --
+        # there's no separate unrounded 17.50 anywhere on the receipt.
+        self.assertNotIn('17.50', content)
 
     def test_barcode_element_present_and_encodes_full_sale_number(self):
         self.client.login(username='receipt_cashier', password='pw')

@@ -1137,7 +1137,20 @@ class POSRoundOffApiTests(ApiTestBase):
     """POS cash rounding: the grand total is rounded to the nearest rupee
     (round-half-up, not Python's banker's-rounding round()) and the
     difference is stored in round_off_amount — see create_pos_sale() in
-    shop/views.py, right before the payments_sum check."""
+    shop/views.py, right before the payments_sum check.
+
+    Since the whole-rupee-per-line rule (price_pos_cart_line(), shop/views.py)
+    was added, a cart made of a SINGLE variable_weight line no longer
+    reaches this order-level step with anything fractional left to round —
+    the line itself already rounded away any .50/.19/etc remainder before
+    `total` is even accumulated. The first two tests below were rewritten
+    to assert exactly that (round_off_amount == 0 now, not the pre-rounded
+    fraction). Order-level rounding is still very much alive and still
+    tested here — it just now needs a cart where the FRACTION is introduced
+    AFTER line pricing (a percentage coupon, or VAT's proportional split),
+    since no single line can produce one on its own anymore. See also
+    POSVariableWeightLineRoundingApiTests below for the new line-level rule
+    itself."""
 
     def setUp(self):
         super().setUp()
@@ -1160,7 +1173,11 @@ class POSRoundOffApiTests(ApiTestBase):
     def test_total_rounds_up_at_exact_half_rupee(self):
         # 233/kg x 0.50kg = 116.50 exactly -- ROUND_HALF_UP must round up to
         # 117, not down to 116 the way Python's bare round() would (banker's
-        # rounding rounds .50 to the nearest EVEN integer).
+        # rounding rounds .50 to the nearest EVEN integer). This now happens
+        # at the LINE level (price_pos_cart_line()) before `total` is even
+        # accumulated, so with only one line in the cart there's nothing
+        # left over for the order-level step -- round_off_amount is 0, not
+        # 0.50 as it was before the whole-rupee-per-line rule existed.
         payload = {
             'client_sale_id': str(uuid.uuid4()),
             'payments': [{'method': 'cash', 'amount': '117.00'}],
@@ -1169,14 +1186,17 @@ class POSRoundOffApiTests(ApiTestBase):
         response = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
         self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
         self.assertEqual(Decimal(response.data['total']), Decimal('117.00'))
-        self.assertEqual(Decimal(response.data['round_off_amount']), Decimal('0.50'))
+        self.assertEqual(Decimal(response.data['round_off_amount']), Decimal('0.00'))
 
         sale = POSSale.objects.get(sale_number=response.data['sale_number'])
         self.assertEqual(sale.total_amount, Decimal('117.00'))
-        self.assertEqual(sale.round_off_amount, Decimal('0.50'))
+        self.assertEqual(sale.round_off_amount, Decimal('0.00'))
+        self.assertEqual(sale.lines.get().line_total, Decimal('117.00'))
 
     def test_total_rounds_down_below_half_rupee(self):
-        # 233/kg x 0.43kg = 100.19 -- rounds down to 100.
+        # 233/kg x 0.43kg = 100.19 -- rounds down to 100, now at the line
+        # level, so round_off_amount is 0 (nothing left for the order-level
+        # step to catch -- see the class docstring).
         payload = {
             'client_sale_id': str(uuid.uuid4()),
             'payments': [{'method': 'cash', 'amount': '100.00'}],
@@ -1185,7 +1205,9 @@ class POSRoundOffApiTests(ApiTestBase):
         response = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
         self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
         self.assertEqual(Decimal(response.data['total']), Decimal('100.00'))
-        self.assertEqual(Decimal(response.data['round_off_amount']), Decimal('-0.19'))
+        self.assertEqual(Decimal(response.data['round_off_amount']), Decimal('0.00'))
+        sale = POSSale.objects.get(sale_number=response.data['sale_number'])
+        self.assertEqual(sale.lines.get().line_total, Decimal('100.00'))
 
     def test_whole_rupee_total_has_zero_round_off(self):
         payload = {
@@ -1199,7 +1221,9 @@ class POSRoundOffApiTests(ApiTestBase):
 
     def test_payment_must_match_rounded_total_not_the_precise_total(self):
         # Paying the PRE-round figure (116.50) must be rejected now that the
-        # server requires the rounded whole-rupee total (117) instead.
+        # server requires the rounded whole-rupee total (117) instead --
+        # rounded at the line level now rather than the order-level step,
+        # but the payment still has to match the rounded figure either way.
         payload = {
             'client_sale_id': str(uuid.uuid4()),
             'payments': [{'method': 'cash', 'amount': '116.50'}],
@@ -1210,25 +1234,36 @@ class POSRoundOffApiTests(ApiTestBase):
         self.assertFalse(POSSale.objects.filter(client_sale_id=payload['client_sale_id']).exists())
 
     def test_round_off_combined_with_coupon_discount(self):
+        # A FIXED-amount coupon no longer exercises order-level rounding
+        # here: 233/kg x 0.50kg = 116.50 rounds (at the line level, before
+        # the coupon even runs) to 117, and 117 - a whole-rupee fixed
+        # discount is still a whole rupee, so there'd be nothing left for
+        # the order-level step to round. A PERCENT coupon still can,
+        # because a percentage of a whole-rupee subtotal isn't guaranteed
+        # to land on a whole rupee itself -- exactly the "percent coupon"
+        # path flagged as still-fractional in this task's own report.
         now = timezone.now()
         coupon = Coupon.objects.create(
-            code='SAVE10', discount_type='fixed', discount_value=Decimal('10'),
+            code='SAVE10PCT', discount_type='percent', discount_value=Decimal('10'),
             start_date=now - timedelta(days=1), end_date=now + timedelta(days=1),
         )
-        # 233/kg x 0.50kg = 116.50, minus Rs.10 fixed = 106.50 -- rounds up to 107.
+        # Line: 233/kg x 0.50kg = 116.50 -> rounds to 117 (line-level).
+        # Coupon: 10% of 117 = 11.70 (exact, no rounding needed there).
+        # Discounted subtotal: 117 - 11.70 = 105.30 -> rounds down to 105.
         payload = {
             'client_sale_id': str(uuid.uuid4()),
-            'coupon_code': 'SAVE10',
-            'payments': [{'method': 'cash', 'amount': '107.00'}],
+            'coupon_code': 'SAVE10PCT',
+            'payments': [{'method': 'cash', 'amount': '105.00'}],
             'cart': [{'product_id': self.round_test_product.id, 'qty': 1, 'weight': '0.50'}],
         }
         response = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
         self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
 
         sale = POSSale.objects.get(sale_number=response.data['sale_number'])
-        self.assertEqual(sale.discount_amount, Decimal('10.00'))  # discount itself stays precise
-        self.assertEqual(sale.total_amount, Decimal('107.00'))
-        self.assertEqual(sale.round_off_amount, Decimal('0.50'))
+        self.assertEqual(sale.lines.get().line_total, Decimal('117.00'))  # line itself already rounded
+        self.assertEqual(sale.discount_amount, Decimal('11.70'))  # discount itself stays precise
+        self.assertEqual(sale.total_amount, Decimal('105.00'))
+        self.assertEqual(sale.round_off_amount, Decimal('-0.30'))
         coupon.refresh_from_db()
         self.assertEqual(coupon.used_count, 1)
 
@@ -1258,6 +1293,222 @@ class POSRoundOffApiTests(ApiTestBase):
         # is exactly round_off_amount, not silently lost or double-counted.
         self.assertEqual(
             sale.taxable_value + sale.exempt_value + sale.vat_amount + sale.round_off_amount,
+            sale.total_amount,
+        )
+
+
+class POSVariableWeightLineRoundingApiTests(ApiTestBase):
+    """The whole-rupee-per-line money rule: a variable_weight line's own
+    amount (unit price x weight, after any per-product offer discount, but
+    BEFORE any combo override) is rounded to the nearest whole rupee
+    (ROUND_HALF_UP) by price_pos_cart_line() (shop/views.py) — the single
+    function create_pos_sale() calls for every cart line's pricing,
+    regardless of pricing_mode. fixed_weight and fixed_quantity lines are
+    deliberately untouched by this rule; see
+    test_fixed_quantity_line_amount_is_not_rounded and
+    test_fixed_weight_line_amount_is_not_rounded below."""
+
+    def setUp(self):
+        super().setUp()
+        self.client.login(username='cashier', password='pw')
+        self.unlock_terminal()
+
+    def test_line_rounds_up_at_exact_half_rupee(self):
+        # self.fruit is 300/kg -> 0.50kg always lands on a whole rupee, so
+        # this uses a dedicated price that doesn't.
+        product = Product.objects.create(
+            name='Half Rupee Mango', slug='half-rupee-mango', category=self.category,
+            description='test', price=Decimal('35.00'), pricing_mode='variable_weight',
+        )
+        InventoryMovement.objects.create(
+            product=product, movement_type='harvest', source='admin', quantity=Decimal('10.000'),
+        )
+        # 35/kg x 0.50kg = 17.50 -> rounds up to 18.
+        payload = {
+            'client_sale_id': str(uuid.uuid4()),
+            'payments': [{'method': 'cash', 'amount': '18.00'}],
+            'cart': [{'product_id': product.id, 'qty': 1, 'weight': '0.50'}],
+        }
+        response = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertEqual(Decimal(response.data['total']), Decimal('18.00'))
+        sale = POSSale.objects.get(sale_number=response.data['sale_number'])
+        self.assertEqual(sale.lines.get().line_total, Decimal('18.00'))
+
+    def test_line_rounds_down_below_half_rupee(self):
+        # 1249/kg x 0.01kg = 12.49 exactly -- below the .5 boundary, so
+        # ROUND_HALF_UP rounds down to 12, the same example the task spec
+        # itself uses (12.49 -> 12).
+        product = Product.objects.create(
+            name='Below Half Rupee Product', slug='below-half-rupee-product',
+            category=self.category, description='test', price=Decimal('1249.00'),
+            pricing_mode='variable_weight',
+        )
+        InventoryMovement.objects.create(
+            product=product, movement_type='harvest', source='admin', quantity=Decimal('10.000'),
+        )
+        payload = {
+            'client_sale_id': str(uuid.uuid4()),
+            'payments': [{'method': 'cash', 'amount': '12.00'}],
+            'cart': [{'product_id': product.id, 'qty': 1, 'weight': '0.01'}],
+        }
+        response = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertEqual(Decimal(response.data['total']), Decimal('12.00'))
+        sale = POSSale.objects.get(sale_number=response.data['sale_number'])
+        self.assertEqual(sale.lines.get().line_total, Decimal('12.00'))
+
+    def test_three_decimal_weight_line_rounds_to_nearest_rupee(self):
+        # 240/kg x 0.337kg = 80.88 exactly -- rounds up to 81. Exercises a
+        # genuine 3-decimal-place scale reading (InventoryMovement.quantity
+        # supports 3dp), not just a round 2dp weight.
+        product = Product.objects.create(
+            name='Three Decimal Weight Product', slug='three-decimal-weight-product',
+            category=self.category, description='test', price=Decimal('240.00'),
+            pricing_mode='variable_weight', weight_entry_mode='exact',
+        )
+        InventoryMovement.objects.create(
+            product=product, movement_type='harvest', source='admin', quantity=Decimal('10.000'),
+        )
+        payload = {
+            'client_sale_id': str(uuid.uuid4()),
+            'payments': [{'method': 'cash', 'amount': '81.00'}],
+            'cart': [{'product_id': product.id, 'qty': 1, 'weight': '0.337'}],
+        }
+        response = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertEqual(Decimal(response.data['total']), Decimal('81.00'))
+        self.assertEqual(InventoryMovement.current_stock(product), Decimal('9.663'))  # weight deducted exactly, unrounded
+
+    def test_offer_discounted_weight_line_rounds_after_discount(self):
+        now = timezone.now()
+        offer = Offer.objects.create(
+            title='Mango Sale', discount_type='percent', discount_value=Decimal('20'),
+            start_date=now - timedelta(days=1), end_date=now + timedelta(days=1),
+        )
+        offer.products.add(self.fruit)
+        # self.fruit is 300/kg; 20% off -> 240/kg effective. 240 x 0.37kg =
+        # 88.80 -> rounds up to 89. Rounding must apply AFTER the discount,
+        # not to the undiscounted 300/kg price.
+        payload = {
+            'client_sale_id': str(uuid.uuid4()),
+            'payments': [{'method': 'cash', 'amount': '89.00'}],
+            'cart': [{'product_id': self.fruit.id, 'qty': 1, 'weight': '0.37', 'offer_id': offer.id}],
+        }
+        response = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertEqual(Decimal(response.data['total']), Decimal('89.00'))
+        sale = POSSale.objects.get(sale_number=response.data['sale_number'])
+        self.assertEqual(sale.lines.get().line_total, Decimal('89.00'))
+
+    def test_fixed_quantity_line_amount_is_not_rounded(self):
+        # Fixed-price/unweighted lines are explicitly untouched by this
+        # rule -- a fractional per-unit price stays exactly as computed at
+        # the LINE level; only the pre-existing order-level step (unrelated
+        # to this change) rounds the final total.
+        product = Product.objects.create(
+            name='Odd Priced Jar', slug='odd-priced-jar', category=self.category,
+            description='test', price=Decimal('99.99'), pricing_mode='fixed_quantity',
+        )
+        InventoryMovement.objects.create(
+            product=product, movement_type='harvest', source='admin', quantity=Decimal('10'),
+        )
+        payload = {
+            'client_sale_id': str(uuid.uuid4()),
+            'payments': [{'method': 'cash', 'amount': '300.00'}],  # 299.97 rounds up to 300
+            'cart': [{'product_id': product.id, 'qty': 3}],
+        }
+        response = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        sale = POSSale.objects.get(sale_number=response.data['sale_number'])
+        self.assertEqual(sale.lines.get().line_total, Decimal('299.97'))  # the LINE itself, untouched
+        self.assertEqual(sale.total_amount, Decimal('300.00'))  # order-level rounding, unrelated to this task
+        self.assertEqual(sale.round_off_amount, Decimal('0.03'))
+
+    def test_fixed_weight_line_amount_is_not_rounded(self):
+        # Same principle for an individual animal: total_price() can land
+        # on a fractional rupee (weight x price, rounded to 2dp by
+        # ProductVariant.total_price() itself, unrelated to this task), and
+        # the new rule must not touch it.
+        goat2 = Product.objects.create(
+            name='Small Goat', slug='small-goat', category=self.category,
+            description='test', price=Decimal('303.00'), pricing_mode='fixed_weight',
+        )
+        variant = ProductVariant.objects.create(product=goat2, weight=Decimal('0.33'))  # 303 x 0.33 = 99.99
+        InventoryMovement.objects.create(
+            product=goat2, variant=variant, movement_type='harvest', source='admin', quantity=Decimal('1'),
+        )
+        payload = {
+            'client_sale_id': str(uuid.uuid4()),
+            'payments': [{'method': 'cash', 'amount': '100.00'}],  # 99.99 rounds up to 100
+            'cart': [{'product_id': goat2.id, 'qty': 1, 'variant_id': variant.id}],
+        }
+        response = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        sale = POSSale.objects.get(sale_number=response.data['sale_number'])
+        self.assertEqual(sale.lines.get().line_total, Decimal('99.99'))  # the LINE itself, untouched
+        self.assertEqual(sale.total_amount, Decimal('100.00'))  # order-level rounding, unrelated to this task
+
+    def test_idempotent_replay_of_rounded_line_is_stable(self):
+        product = Product.objects.create(
+            name='Replay Rounding Mango', slug='replay-rounding-mango', category=self.category,
+            description='test', price=Decimal('35.00'), pricing_mode='variable_weight',
+        )
+        InventoryMovement.objects.create(
+            product=product, movement_type='harvest', source='admin', quantity=Decimal('10.000'),
+        )
+        client_sale_id = str(uuid.uuid4())
+        payload = {
+            'client_sale_id': client_sale_id,
+            'payments': [{'method': 'cash', 'amount': '18.00'}],
+            'cart': [{'product_id': product.id, 'qty': 1, 'weight': '0.50'}],  # 17.50 -> 18
+        }
+        first = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        second = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        self.assertEqual(first.status_code, status.HTTP_201_CREATED, first.data)
+        self.assertEqual(second.status_code, status.HTTP_200_OK)
+        # Decimal(...) comparison, not a raw string one -- str(total_amount)
+        # can legitimately differ ('18' on the just-created in-memory
+        # object, quantized to 0dp by the order-level round; '18.00' once
+        # reloaded from the DB field's own decimal_places=2) for a reason
+        # entirely pre-existing and unrelated to this task, same as the
+        # vat_amount/exempt_value quirk build_sale_receipt_data() already
+        # works around elsewhere.
+        self.assertEqual(Decimal(first.data['total']), Decimal(second.data['total']))
+        self.assertEqual(first.data['lines'], second.data['lines'])
+        self.assertEqual(InventoryMovement.current_stock(product), Decimal('9.500'))  # deducted exactly once
+
+    def test_total_equals_sum_of_rounded_lines_across_mixed_cart(self):
+        """A cart mixing all three pricing modes: the sale total is the sum
+        of each line's OWN already-rounded (or, for fixed_weight/
+        fixed_quantity, never-rounded) amount -- no separate "round the
+        grand total" surprise when every contributing line is already a
+        whole rupee."""
+        weight_product = Product.objects.create(
+            name='Mixed Cart Mango', slug='mixed-cart-mango', category=self.category,
+            description='test', price=Decimal('35.00'), pricing_mode='variable_weight',
+        )
+        InventoryMovement.objects.create(
+            product=weight_product, movement_type='harvest', source='admin', quantity=Decimal('10.000'),
+        )
+        payload = {
+            'client_sale_id': str(uuid.uuid4()),
+            # weight line: 35 x 0.50 = 17.50 -> 18. jar: 2 x 250 = 500.
+            # goat: 20kg x 1200/kg = 24000. Total = 18 + 500 + 24000 = 24518.
+            'payments': [{'method': 'cash', 'amount': '24518.00'}],
+            'cart': [
+                {'product_id': weight_product.id, 'qty': 1, 'weight': '0.50'},
+                {'product_id': self.jar.id, 'qty': 2},
+                {'product_id': self.goat.id, 'qty': 1, 'variant_id': self.goat_variant.id},
+            ],
+        }
+        response = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        sale = POSSale.objects.get(sale_number=response.data['sale_number'])
+        self.assertEqual(sale.total_amount, Decimal('24518.00'))
+        self.assertEqual(sale.round_off_amount, Decimal('0.00'))
+        self.assertEqual(
+            sum((line.line_total for line in sale.lines.all()), Decimal('0')),
             sale.total_amount,
         )
 

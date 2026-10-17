@@ -2136,7 +2136,7 @@
                 line.weight = finalWeight;
                 line.detail = detail;
                 line.unit_price = parseFloat(product.price);
-                line.line_total = parseFloat(product.price) * finalWeight;
+                line.line_total = roundVariableWeightLineTotal(product.price, finalWeight);
                 renderReceipt();
                 updateCartIndicator();
             } else {
@@ -2567,7 +2567,7 @@
                 line.detail = opts.detailOverride;
                 line.qty = 1;
                 line.unit_price = parseFloat(product.price);
-                line.line_total = parseFloat(product.price) * opts.weight;
+                line.line_total = roundVariableWeightLineTotal(product.price, opts.weight);
             } else {
                 line.qty = opts.qty || 1;
                 if (opts.unit) {
@@ -2859,6 +2859,38 @@
 
         function round2(n) {
             return Math.round(n * 100) / 100;
+        }
+
+        // Money rule: a variable_weight line's own amount (unit price x
+        // weight) is rounded to the nearest whole rupee, ROUND_HALF_UP --
+        // mirrors price_pos_cart_line()'s new line-level rounding exactly
+        // (shop/views.py), so the cart/payment-panel total the cashier
+        // sees always matches what create_pos_sale() will recompute and
+        // require payments to sum to. Plain floating-point multiplication
+        // (parseFloat(price) * weight) is NOT safe for this specific
+        // decision: price and weight are each exact in decimal but not
+        // always exact in binary (e.g. 0.285), so their float product can
+        // land a hair off the true value -- harmless for an ordinary
+        // display rounding, but enough to flip which side of a .50
+        // boundary it falls on, which would make the browser's and the
+        // server's rounded totals disagree and fail the server's strict
+        // payments-sum-must-equal-total check. Avoided here by doing the
+        // multiplication in INTEGER paisa x milli-kg instead of float
+        // rupees x kg -- price always has exactly 2 decimal places
+        // (Product.price's own decimal_places) and weight is always
+        // produced via .toFixed(3) before it ever reaches a cart line
+        // (see openWeightModal's formatTyped/onConfirm), so both convert
+        // to an exact integer with a plain Math.round() of their own
+        // (the usual "cents" trick: float error from a clean short decimal
+        // literal is always many orders of magnitude smaller than 0.5).
+        function roundVariableWeightLineTotal(priceStr, weight) {
+            const priceInPaisa = Math.round(parseFloat(priceStr) * 100);
+            const weightInGrams = Math.round(weight * 1000);
+            const scaled = priceInPaisa * weightInGrams; // rupees x 100000
+            const scale = 100000;
+            const rupees = Math.floor(scaled / scale);
+            const remainder = scaled - rupees * scale;
+            return remainder * 2 >= scale ? rupees + 1 : rupees;
         }
 
         // Matches create_pos_sale()'s ROUND_HALF_UP (not JS Math.round's own
@@ -3933,7 +3965,12 @@
                 line.line_total = price;
             } else if (line.pricing_mode === 'variable_weight') {
                 line.unit_price = price;
-                line.line_total = round2(price * (line.weight || 0));
+                // Same whole-rupee rounding as a retail weight line --
+                // price_pos_cart_line() (shop/views.py) applies it
+                // regardless of is_wholesale, so a manually-overridden
+                // wholesale rate must round here too or the exact-sum
+                // payment check would fail for a wholesale sale.
+                line.line_total = roundVariableWeightLineTotal(String(price), line.weight || 0);
             } else {
                 line.unit_price = price;
                 line.line_total = round2(price * (line.qty || 0));
