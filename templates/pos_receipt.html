@@ -77,12 +77,13 @@
         /* display:block + margin:0 auto, not text-align:center alone --
            the same inline-centering unreliability already found and
            fixed for the QR overlay image in templates/pos.html applies
-           just as much to an inline SVG here. Top margin roughly doubled
-           (was 6px, giving a ~10px total gap together with
-           .r-social-qr-row's own 4px bottom margin above it, now that
-           there's no <hr> between them any more) so the barcode sits
-           lower. */
-        .r-barcode-wrap { margin: 16px 0 6px; }
+           just as much to an inline SVG here. Top margin only (bottom
+           margin, and so the thank-you line's own gap below the
+           barcode, stays untouched) -- 31px = 16px + ~15px (~4mm) added
+           on top of it, so the barcode (and the footer under it) sits
+           lower, without changing the barcode's own size or the QR
+           row/footer's position relative to it. */
+        .r-barcode-wrap { margin: 31px 0 6px; }
         .r-barcode-wrap svg { display: block; max-width: 100%; height: auto; margin: 0 auto; }
 
         .r-footer {
