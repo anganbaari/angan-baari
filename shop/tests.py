@@ -1382,16 +1382,50 @@ class PosReceiptViewTests(TestCase):
         # The item detail line: "@<unit price>*<qty> <unit>".
         self.assertIn('@200*2 pc', content)
 
-    def test_sale_number_shown_exactly_as_stored_no_devanagari_conversion(self):
-        """Sale No. shows the plain Latin sale_number -- no Devanagari
-        digit conversion (unlike shop_phone/pan_vat_number below)."""
+    def test_sale_number_shown_without_pos_prefix_no_devanagari_conversion(self):
+        """Sale No. drops the leading 'POS-' for DISPLAY only, stays plain
+        Latin (no Devanagari digit conversion, unlike shop_phone/
+        pan_vat_number below) -- but the barcode still encodes the FULL
+        original value, never this stripped display form."""
+        self.assertTrue(self.sale.sale_number.startswith('POS-'))
+        stripped = self.sale.sale_number[len('POS-'):]
         self.client.login(username='receipt_cashier', password='pw')
         response = self.client.get(reverse('pos_receipt', args=[self.sale.sale_number]))
         content = response.content.decode()
-        self.assertIn(f'Sale No.: {self.sale.sale_number}', content)
+        self.assertIn(f'Sale No.: {stripped}', content)
+        self.assertNotIn(f'Sale No.: {self.sale.sale_number}', content)
         devanagari_map = str.maketrans('0123456789', '०१२३४५६७८९')
-        devanagari_form = self.sale.sale_number.translate(devanagari_map)
-        self.assertNotIn(devanagari_form, content)
+        self.assertNotIn(stripped.translate(devanagari_map), content)
+        # The barcode call still gets the full, unstripped value.
+        self.assertIn(f"JsBarcode('#receiptBarcode', '{self.sale.sale_number}'", content)
+
+    def test_cashier_shown_as_first_name_only(self):
+        """self.operator's stored name is 'Receipt Tester' -- only
+        'Receipt' (the first word) should appear next to 'Cashier:'."""
+        self.client.login(username='receipt_cashier', password='pw')
+        response = self.client.get(reverse('pos_receipt', args=[self.sale.sale_number]))
+        content = response.content.decode()
+        self.assertIn('Cashier: Receipt<', content)
+        self.assertNotIn('Cashier: Receipt Tester', content)
+
+    def test_cashier_and_sale_number_share_one_row(self):
+        self.client.login(username='receipt_cashier', password='pw')
+        response = self.client.get(reverse('pos_receipt', args=[self.sale.sale_number]))
+        content = response.content.decode()
+        self.assertIn('class="r-meta-row r-cashier-sale-row"', content)
+
+    def test_payment_lines_appear_before_tax_rows(self):
+        """New order: items, subtotal/round-off, payment lines, कुल कर,
+        कर स. मूल्य, Total -- confirmed by comparing string positions in
+        the rendered HTML, not just presence."""
+        self.client.login(username='receipt_cashier', password='pw')
+        response = self.client.get(reverse('pos_receipt', args=[self.sale.sale_number]))
+        content = response.content.decode()
+        payment_pos = content.index('<span>Cash</span>')
+        vat_pos = content.index('<span>कुल कर</span>')
+        total_pos = content.index('कुल/Total')
+        self.assertLess(payment_pos, vat_pos)
+        self.assertLess(vat_pos, total_pos)
 
     def test_zero_vat_is_blank_not_zero(self):
         """VAT is off by default in this test's BusinessSettings -- कुल कर

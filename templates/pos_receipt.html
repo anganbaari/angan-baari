@@ -23,14 +23,19 @@
            centre column dead-centred (same structure either way, just an
            empty column instead of an <img>). */
         .r-header { display: flex; align-items: center; }
-        .r-header-side { flex: 0 0 44px; display: flex; align-items: center; justify-content: center; }
-        .r-header-side img { max-width: 44px; max-height: 44px; filter: grayscale(1) contrast(1.3); }
+        .r-header-side { flex: 0 0 58px; display: flex; align-items: center; }
+        /* Each side pushes its image toward the CENTRE (not centred
+           within its own box) -- that's what actually brings logo/flag
+           closer to the shop name, rather than just growing their box. */
+        .r-header-side:first-child { justify-content: flex-end; }
+        .r-header-side:last-child { justify-content: flex-start; }
+        .r-header-side img { max-width: 57px; max-height: 57px; filter: grayscale(1) contrast(1.3); }
         .r-header-center { flex: 1; text-align: center; min-width: 0; }
         .r-shop-name {
             font-family: 'Noto Sans Devanagari', 'Cormorant Garamond', serif;
-            font-size: 18px; font-weight: 800; margin: 0; word-break: break-word;
+            font-size: 23px; font-weight: 800; margin: 0; line-height: 1.1; word-break: break-word;
         }
-        .r-shop-name-en { font-size: 11px; font-weight: 600; margin: 1px 0 0; }
+        .r-shop-name-en { font-size: 11px; font-weight: 600; margin: 0; }
 
         .r-center { text-align: center; }
         .r-meta-row { display: flex; justify-content: space-between; margin-top: 6px; font-size: 11px; }
@@ -57,12 +62,12 @@
         }
         .r-total-row span:first-child { font-family: 'Noto Sans Devanagari', 'DM Sans', sans-serif; }
 
-        .r-social-qr-row { display: flex; justify-content: space-around; margin: 4px 0; gap: 6px; }
-        .r-social-qr-col { flex: 1; min-width: 0; }
+        .r-social-qr-row { display: flex; justify-content: center; margin: 4px 0; gap: 3px; }
+        .r-social-qr-col { flex: 0 0 auto; min-width: 0; }
         /* display:block + margin:0 auto (not inherited text-align:center
            on an inline <img>) -- same fix as the barcode SVG and the
            earlier payment-panel QR overlay bug. */
-        .r-social-qr-col img { display: block; width: 56px; height: 56px; margin: 0 auto; object-fit: contain; filter: grayscale(1) contrast(1.3); }
+        .r-social-qr-col img { display: block; width: 70px; height: 70px; margin: 0 auto; object-fit: contain; filter: grayscale(1) contrast(1.3); }
         .r-social-qr-caption { font-size: 9.5px; margin-top: 2px; text-align: center; }
 
         /* display:block + margin:0 auto, not text-align:center alone --
@@ -73,7 +78,7 @@
         .r-barcode-wrap svg { display: block; max-width: 100%; height: auto; margin: 0 auto; }
 
         .r-footer {
-            text-align: center; font-size: 13px; font-weight: 700; margin-top: 8px;
+            text-align: center; font-size: 16px; font-weight: 700; margin-top: 17px; /* ~4.5mm */
             font-family: 'Noto Sans Devanagari', 'DM Sans', sans-serif; white-space: pre-wrap;
         }
 
@@ -108,23 +113,25 @@
             <!-- 2. Address -->
             {% if business.shop_address %}<p class="r-center" style="margin:4px 0 0;">{{ business.shop_address }}</p>{% endif %}
 
-            <!-- 3. Sale number (Devanagari digits) -->
-            <!-- Shown exactly as stored (Latin characters), unlike
-                 phone/PAN below -- no Devanagari digit conversion here. -->
-            <p class="r-center" style="margin:4px 0 0;font-weight:700;">Sale No.: {{ sale_number }}</p>
-
             <!-- 4. Phone/PAN (left, Devanagari digits) and date/time (right, Latin digits, Nepal time) -->
             <div class="r-meta-row">
                 <div class="r-meta-col-left r-devanagari">
                     {% if shop_phone_devanagari %}<div>फोन: {{ shop_phone_devanagari }}</div>{% endif %}
                     {% if pan_vat_devanagari %}<div>PAN नं.: {{ pan_vat_devanagari }}</div>{% endif %}
-                    {% if cashier %}<div>Cashier: {{ cashier }}</div>{% endif %}
                     {% if customer_name %}<div>Customer: {{ customer_name }}</div>{% endif %}
                 </div>
                 <div class="r-meta-col-right">
                     <div>{{ date_display }}</div>
                     <div>{{ time_display }}</div>
                 </div>
+            </div>
+
+            <!-- 3. Sale No. -- Latin, "POS-" prefix stripped for display
+                 only (the barcode below still encodes the full value).
+                 Shares a row with the cashier's first name. -->
+            <div class="r-meta-row r-cashier-sale-row">
+                <div class="r-meta-col-left">{% if cashier_first_name %}Cashier: {{ cashier_first_name }}{% endif %}</div>
+                <div class="r-meta-col-right">Sale No.: {{ sale_number_display }}</div>
             </div>
 
             <!-- 5. Items header -->
@@ -144,7 +151,9 @@
             {% if not forloop.last %}<hr class="r-dash">{% endif %}
             {% endfor %}
 
-            <!-- Kept from the previous receipt layout, shown smaller, above Total -->
+            <!-- Kept from the previous receipt layout, shown smaller.
+                 Order: items, subtotal/discount/round-off, payment lines
+                 (+ credit due), कुल कर, कर स. मूल्य, Total. -->
             <hr class="r-dash">
             <div class="r-row r-muted"><span>Subtotal</span><span>{{ subtotal }}</span></div>
             {% if sale.discount_amount %}
@@ -152,6 +161,12 @@
             {% endif %}
             {% if sale.round_off_amount %}
             <div class="r-row r-muted"><span>Round off</span><span>{{ round_off_sign }}{{ round_off_abs }}</span></div>
+            {% endif %}
+            {% for p in payments %}
+            <div class="r-row r-muted"><span>{{ p.method_label }}</span><span>{{ p.amount }}</span></div>
+            {% endfor %}
+            {% if customer_outstanding_balance %}
+            <div class="r-row r-muted"><span>Credit due (बाँकी)</span><span>{{ customer_outstanding_balance }}</span></div>
             {% endif %}
 
             <!-- 7. Tax rows (same vat_amount/exempt_value fields as the POS payment panel) -->
@@ -163,14 +178,6 @@
             <hr class="r-dash">
             <div class="r-total-row"><span>कुल/Total</span><span>रू/RS {{ total }}</span></div>
             <hr class="r-dash">
-
-            <!-- Kept: payment lines + credit due, below Total, smaller -->
-            {% for p in payments %}
-            <div class="r-row r-muted"><span>{{ p.method_label }}</span><span>{{ p.amount }}</span></div>
-            {% endfor %}
-            {% if customer_outstanding_balance %}
-            <div class="r-row r-muted"><span>Credit due (बाँकी)</span><span>{{ customer_outstanding_balance }}</span></div>
-            {% endif %}
 
             <!-- 9. Social QR row -->
             {% if has_any_social_qr %}

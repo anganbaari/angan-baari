@@ -1745,6 +1745,14 @@ def pos_receipt_view(request, sale_number):
 
     width_mm = 58 if request.GET.get('width') == '58' else 80
 
+    # Display-only -- the barcode below still encodes sale.sale_number in
+    # FULL (never this stripped form), so it always scans back to the
+    # exact real value regardless of what's shown next to it.
+    sale_number_display = (
+        sale.sale_number[len('POS-'):] if sale.sale_number.startswith('POS-') else sale.sale_number
+    )
+    cashier_first_name = data['cashier'].split()[0] if data['cashier'] else ''
+
     return render(request, 'pos_receipt.html', {
         'business': business,
         'sale': sale,
@@ -1752,13 +1760,14 @@ def pos_receipt_view(request, sale_number):
         # digit conversion for Sale No., unlike shop_phone/pan_vat_number
         # below.
         'sale_number': sale.sale_number,
+        'sale_number_display': sale_number_display,
         'logo_url': image_url(business.receipt_logo),
         'flag_url': image_url(business.receipt_flag),
         'shop_phone_devanagari': to_devanagari_digits(business.shop_phone) if business.shop_phone else '',
         'pan_vat_devanagari': to_devanagari_digits(business.pan_vat_number) if business.pan_vat_number else '',
         'date_display': date_display,
         'time_display': created_at_local.strftime('%I:%M %p'),
-        'cashier': data['cashier'],
+        'cashier_first_name': cashier_first_name,
         'customer_name': data['customer_name'],
         'customer_outstanding_balance': customer_outstanding_balance,
         'lines': lines_display,
