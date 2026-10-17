@@ -1375,6 +1375,118 @@ class POSSaleLine(models.Model):
         return f"{self.sale.sale_number} — {self.product.name} x{self.quantity}"
 
 
+class Refund(models.Model):
+    """A POS refund against an already-completed sale — created only by
+    create_pos_refund() (shop/views.py), the sole entry point (mirrors
+    POSSale/create_pos_sale()). Append-only in practice: no update path
+    exists anywhere in this codebase, and admin enforces it (see
+    RefundAdmin) — same spirit as InventoryMovement/CreditTransaction.
+
+    This row and RefundLine are the RECORD of what happened, not a second
+    source of truth for stock or money — the actual effects are the
+    ordinary mechanisms this already triggers: one InventoryMovement
+    ('return', plus a 'waste' for a discarded line) per refunded line, and
+    one CreditTransaction (transaction_type='repayment') when
+    method='credit'. See create_pos_refund()'s own docstring for the full
+    money/stock rules."""
+
+    METHOD_CHOICES = _BASE_PAYMENT_METHODS + [('credit', 'Credit (उधारो)')]
+
+    REASON_CHOICES = [
+        ('changed_mind', 'Customer changed mind'),
+        ('quality_problem', 'Quality problem'),
+        ('wrong_item', 'Wrong item or weight'),
+        ('billing_mistake', 'Billing mistake'),
+        ('other', 'Other'),
+    ]
+
+    refund_number = models.CharField(max_length=20, unique=True, editable=False)
+    sale = models.ForeignKey(POSSale, on_delete=models.PROTECT, related_name='refunds')
+    created_by = models.ForeignKey(
+        'auth.User', on_delete=models.PROTECT, related_name='pos_refunds',
+        help_text="The PIN-identified operator who processed this refund — the same "
+                  "get_pos_operator() identity POSSale.cashier uses, not necessarily "
+                  "whoever the terminal's own session happens to be logged in as."
+    )
+    method = models.CharField(max_length=20, choices=METHOD_CHOICES)
+    reason = models.CharField(max_length=20, choices=REASON_CHOICES)
+    note = models.CharField(
+        max_length=300, blank=True,
+        help_text='Optional free text — required when reason is "Other" (enforced in create_pos_refund(), not here).'
+    )
+    total_amount = models.DecimalField(
+        max_digits=10, decimal_places=2,
+        help_text="Always a whole rupee (ROUND_HALF_UP) — the sum of this refund's own RefundLine amounts."
+    )
+    client_refund_id = models.CharField(
+        max_length=64, unique=True, null=True, blank=True,
+        help_text='A UUID generated on the refund screen itself before the request is sent — '
+                  'same idempotency pattern as POSSale.client_sale_id. A repeat arrival (double '
+                  'tap, retried request) returns the ORIGINAL refund instead of creating a second one.'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def save(self, *args, **kwargs):
+        if not self.refund_number:
+            import uuid
+            self.refund_number = 'RF-' + uuid.uuid4().hex[:8].upper()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.refund_number} — Rs. {self.total_amount} ({self.get_method_display()})"
+
+
+class RefundLine(models.Model):
+    """One refunded line within a Refund — see Refund's own docstring.
+
+    sale_line is the original POSSaleLine this refunds (PROTECT -- a sale
+    line is never deleted anyway, but this makes the dependency explicit
+    rather than implicit). product/variant are captured directly here too
+    (always equal to sale_line.product/variant at creation time) purely so
+    this row and the printed refund slip can display sensibly without an
+    extra join — not a separate trust boundary from sale_line itself.
+
+    quantity is in the SAME unit as POSSaleLine.quantity/InventoryMovement.
+    quantity for that line — kg for variable_weight, always 1 for
+    fixed_weight, and the product's own BASE counting unit (e.g. pieces,
+    not crates) for fixed_quantity. See create_pos_refund()'s own
+    docstring for why a fixed_quantity line sold by a bulk
+    ProductSellingUnit (e.g. "Crate") is refunded in base-unit (piece)
+    terms rather than crates — a deliberate scope simplification for this
+    feature, not an oversight.
+
+    disposition is only ever blank for a theoretical pre-existing row from
+    before this field existed (none in practice — this model is new);
+    every row create_pos_refund() itself creates always sets one. Not
+    offered as 'discard' for a fixed_weight (animal) line — enforced in
+    create_pos_refund(), not here."""
+
+    DISPOSITION_CHOICES = [
+        ('restock', 'Back to stock'),
+        ('discard', 'Discard (wasted)'),
+    ]
+
+    refund = models.ForeignKey(Refund, on_delete=models.CASCADE, related_name='lines')
+    sale_line = models.ForeignKey(POSSaleLine, on_delete=models.PROTECT, related_name='refund_lines')
+    product = models.ForeignKey('Product', on_delete=models.PROTECT, related_name='pos_refund_lines')
+    variant = models.ForeignKey(
+        'ProductVariant', null=True, blank=True, on_delete=models.SET_NULL, related_name='pos_refund_lines',
+    )
+    description = models.CharField(max_length=300, help_text='Snapshot display text, e.g. "Goat (20.00kg)".')
+    quantity = models.DecimalField(max_digits=10, decimal_places=3)
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    disposition = models.CharField(max_length=10, choices=DISPOSITION_CHOICES, blank=True)
+
+    class Meta:
+        ordering = ['id']
+
+    def __str__(self):
+        return f"{self.refund.refund_number} — {self.description} x{self.quantity}"
+
+
 class CreditTransaction(models.Model):
     """Append-only credit (उधारो) ledger — same philosophy as
     InventoryMovement: rows are never edited or deleted, and a customer's
@@ -1395,6 +1507,15 @@ class CreditTransaction(models.Model):
     related_pos_sale = models.ForeignKey(
         POSSale, on_delete=models.SET_NULL, null=True, blank=True, related_name='credit_transactions',
         help_text='Set for credit_sale rows; left blank for a standalone repayment.'
+    )
+    related_refund = models.ForeignKey(
+        Refund, on_delete=models.PROTECT, null=True, blank=True, related_name='credit_transactions',
+        help_text="Set ONLY for a 'repayment' row created by a credit-balance refund "
+                  "(create_pos_refund(), shop/views.py) -- distinguishes a genuine cash "
+                  "repayment from a refund that merely reduces what the customer owes with "
+                  "no money actually changing hands. shop/pl_report.py excludes these from "
+                  "cash_collected for exactly that reason. Blank for every row that predates "
+                  "this field and for every ordinary repayment/credit_sale row."
     )
     recorded_by = models.ForeignKey(
         'auth.User', on_delete=models.PROTECT, related_name='recorded_credit_transactions',

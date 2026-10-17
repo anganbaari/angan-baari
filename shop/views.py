@@ -1483,6 +1483,455 @@ def build_sale_receipt_data(sale):
     }
 
 
+# ══════════════════════════════════════════════════════════════
+# POS Refunds
+# ══════════════════════════════════════════════════════════════
+
+def normalize_sale_number(raw):
+    """Trim/uppercase a staff-typed or barcode-scanned sale number, adding
+    the 'POS-' prefix back if it was left off. POSSale.sale_number is
+    always stored as 'POS-' + 8 uppercase hex chars, but a keyboard-wedge
+    barcode scan or a staff member typing it from a printed receipt can
+    easily drop the prefix, add stray whitespace, or come through
+    lowercase -- this is the one place that normalization happens, shared
+    by the lookup endpoint and create_pos_refund() so both agree on what
+    counts as "the same sale number"."""
+    value = (raw or '').strip().upper()
+    if value and not value.startswith('POS-'):
+        value = 'POS-' + value
+    return value
+
+
+def allocate_sale_total_to_lines(sale, sale_lines=None):
+    """Splits sale.total_amount across its own POSSaleLine rows,
+    proportionally to each line's gross line_total, largest-remainder
+    apportioned so the shares always sum to EXACTLY sale.total_amount
+    regardless of rounding -- the LAST line absorbs whatever's left over.
+    Same technique resolve_pos_combo_lines() already uses to split a
+    combo's fixed price across its component lines.
+
+    This is what lets a refund answer "what is this one line actually
+    worth, out of what was actually paid" once a sale-level coupon
+    discount/VAT/cash round-off has already been folded into
+    total_amount -- line_total itself is the PRE-discount gross amount
+    (see POSSaleLine's own docstring), so a line's fair share of the
+    final total isn't simply its own line_total.
+
+    Pass `sale_lines` (an already-fetched, sale.lines.all()-ordered list)
+    when the caller already has one, to avoid a second query -- this never
+    re-fetches its own. Returns {POSSaleLine.id: Decimal}, every value a
+    whole rupee."""
+    from decimal import Decimal, ROUND_HALF_UP
+
+    lines = sale_lines if sale_lines is not None else list(sale.lines.all())
+    if not lines:
+        return {}
+
+    gross_total = sum((line.line_total for line in lines), Decimal('0'))
+    target = Decimal(str(sale.total_amount))
+    if gross_total <= 0:
+        # Degenerate -- shouldn't happen for a real sale (every line has a
+        # positive line_total), but dividing by zero would be worse than
+        # just handing the whole total to the first line.
+        allocations = {line.id: Decimal('0') for line in lines}
+        allocations[lines[0].id] = target
+        return allocations
+
+    allocations = {}
+    running = Decimal('0')
+    for index, line in enumerate(lines):
+        if index == len(lines) - 1:
+            share = target - running
+        else:
+            share = (Decimal(str(line.line_total)) / gross_total * target).quantize(Decimal('1'), rounding=ROUND_HALF_UP)
+            running += share
+        allocations[line.id] = share
+    return allocations
+
+
+def _largest_remainder_shares(amount, count):
+    """Splits a whole-rupee Decimal `amount` into `count` whole-rupee
+    shares that sum to it exactly: every share is floor(amount/count), and
+    the remainder (amount - floor*count, always below `count`) is added
+    one rupee at a time to the LAST shares in the returned list, not the
+    first -- so refunding units in their original order and stopping
+    partway only ever takes the plain, un-bumped shares, and the bumped
+    ("remainder") shares are only ever reached once every other unit has
+    already been refunded. Used by create_pos_refund() to work out a
+    partial refund's exact amount for a fixed_quantity line."""
+    from decimal import Decimal
+
+    amount = int(Decimal(str(amount)))
+    base, remainder = divmod(amount, count)
+    return [Decimal(base)] * (count - remainder) + [Decimal(base + 1)] * remainder
+
+
+def get_pos_sale_refund_info(sale):
+    """Everything the refund lookup page (and PosRefundLookupView,
+    api/views.py) needs about one sale: its own identity/payment
+    breakdown, each line's remaining refundable quantity/amount, and any
+    refunds already recorded against it. Deliberately shares
+    allocate_sale_total_to_lines() with create_pos_refund() itself, so
+    what the UI shows as "refundable" can never drift from what that
+    function will actually accept.
+
+    is_partial (quantity-picker allowed, 0 up to remaining) is true only
+    for a plain fixed_quantity line that ISN'T part of a combo -- a
+    variable_weight line, a fixed_weight animal, or ANY line that's part
+    of a combo/bundle group (regardless of its own pricing_mode) is
+    whole-line-only, per this feature's spec. Combo membership is read
+    from sale.cart_snapshot (cross-referenced by POSITION with
+    sale.lines.all(), same technique build_sale_receipt_data() already
+    uses) since POSSaleLine itself doesn't store combo_instance_id."""
+    from decimal import Decimal
+    from django.db.models import Sum
+
+    cart_snapshot = sale.cart_snapshot or []
+    sale_lines = list(sale.lines.select_related('product', 'variant').all())
+    allocations = allocate_sale_total_to_lines(sale, sale_lines)
+
+    lines_data = []
+    for index, line in enumerate(sale_lines):
+        snap = cart_snapshot[index] if index < len(cart_snapshot) else {}
+        product = line.product
+        is_combo = bool(snap.get('combo_instance_id'))
+        is_animal = product.pricing_mode == 'fixed_weight'
+        is_partial = (not is_combo) and product.pricing_mode == 'fixed_quantity'
+
+        if is_animal:
+            unit_label = 'animal'
+        elif snap.get('unit_name'):
+            unit_label = snap['unit_name']
+        elif product.pricing_mode == 'variable_weight':
+            unit_label = product.weight_unit_label or 'kg'
+        else:
+            unit_label = 'pc'
+
+        name = product.name
+        if line.variant_id and line.variant:
+            name = f'{name} ({line.variant.weight}kg)'
+
+        refunded_agg = line.refund_lines.aggregate(qty=Sum('quantity'), amt=Sum('amount'))
+        already_refunded_qty = refunded_agg['qty'] or Decimal('0')
+        already_refunded_amt = refunded_agg['amt'] or Decimal('0')
+        allocated = allocations.get(line.id, Decimal('0'))
+        remaining_qty = line.quantity - already_refunded_qty
+
+        lines_data.append({
+            'sale_line_id': line.id,
+            'product_id': product.id,
+            'variant_id': line.variant_id,
+            'name': name,
+            'combo_instance_id': snap.get('combo_instance_id'),
+            'pricing_mode': product.pricing_mode,
+            'is_partial': is_partial,
+            'unit_label': unit_label,
+            'original_quantity': str(line.quantity),
+            'already_refunded_quantity': str(already_refunded_qty),
+            'remaining_quantity': str(remaining_qty),
+            'allocated_amount': str(allocated),
+            'already_refunded_amount': str(already_refunded_amt),
+            'remaining_amount': str(allocated - already_refunded_amt),
+            'disposition_options': ['restock'] if is_animal else ['restock', 'discard'],
+            'fully_refunded': remaining_qty <= 0,
+        })
+
+    refunds_data = [{
+        'refund_number': r.refund_number,
+        'created_at': r.created_at.isoformat(),
+        'amount': str(r.total_amount),
+        'method': r.method,
+        'reason': r.reason,
+        'created_by': r.created_by.get_full_name() or r.created_by.username,
+    } for r in sale.refunds.select_related('created_by').all()]
+
+    payments_data = [{'method': p.method, 'amount': str(p.amount)} for p in sale.payments.all()]
+    has_credit_line = any(p['method'] == 'credit' for p in payments_data)
+    total_refunded = sum((Decimal(r['amount']) for r in refunds_data), Decimal('0'))
+
+    return {
+        'sale_number': sale.sale_number,
+        'created_at': sale.created_at.isoformat(),
+        'cashier': sale.cashier.get_full_name() or sale.cashier.username,
+        'customer_id': sale.customer_id,
+        'customer_name': sale.customer.name if sale.customer_id else None,
+        'has_credit_line': has_credit_line,
+        'payments': payments_data,
+        'total_amount': str(sale.total_amount),
+        'total_refunded': str(total_refunded),
+        'fully_refunded': total_refunded >= Decimal(str(sale.total_amount)),
+        'lines': lines_data,
+        'refunds': refunds_data,
+    }
+
+
+def create_pos_refund(*, sale_number, selections, method, reason, note, operator_user, client_refund_id):
+    """Sole entry point for completing a POS refund -- called by
+    PosRefundCreateView (api/views.py), the only caller, same one-shared-
+    function shape as create_pos_sale()/price_pos_cart_line().
+
+    selections: [{'sale_line_id': <POSSaleLine.id>, 'quantity': <Decimal-able>,
+    'disposition': 'restock'|'discard'}, ...] -- one entry per POSSaleLine
+    being refunded. A combo/bundle's "single checkbox" in the UI expands
+    to one selection per component POSSaleLine client-side; this function
+    has no notion of a "combo group" at all, it just validates each
+    selection against its own sale_line independently (including the
+    whole-line-only rule, which it re-derives the same way
+    get_pos_sale_refund_info() does).
+
+    Idempotent on client_refund_id: a repeat arrival returns the existing
+    Refund immediately, re-validating nothing and creating nothing new --
+    same reasoning as create_pos_sale()'s client_sale_id handling.
+
+    Money: each line's amount is its share of allocate_sale_total_to_lines()
+    (i.e. of what was actually paid, after any coupon/VAT/round-off),
+    never list/catalogue price. A whole-line refund takes exactly
+    (that line's allocated share) minus (whatever of it, if anything, was
+    already refunded) -- since a whole-line can only ever be refunded
+    once in full (enforced below), this is always just the full
+    allocated share on its one and only refund. A partial (fixed_quantity,
+    non-combo) refund splits the line's allocated share into one
+    whole-rupee share per base unit (_largest_remainder_shares(), remainder
+    on the LAST units) and takes exactly the shares for the units this
+    request is consuming, continuing on from however many units were
+    already refunded. Together these guarantee: refunds on a sale never
+    exceed its total (every line's own shares are a true partition of its
+    allocated amount, which itself is a true partition of the sale total),
+    and refunding every line in full reproduces the sale total exactly.
+
+    Stock: each refunded line appends a 'return' InventoryMovement
+    restoring exactly the refunded quantity (the specific variant, for an
+    animal). disposition='discard' additionally appends a 'waste'
+    movement of the SAME quantity right after -- net stock effect zero,
+    but the waste is recorded, same as the spec's "Back to stock"/
+    "Discard" choice. 'discard' is never valid for a fixed_weight line
+    (checked below). Both movements go through full_clean() (so
+    InventoryMovement.clean()'s own negative-stock guard runs) and are
+    created inside this function's own transaction.atomic(), same
+    strict-mode convention as create_inventory_movements_from_snapshot(
+    strict=True) elsewhere in this file.
+
+    Remaining-quantity validation happens TWICE: once up front (so a
+    hopeless request fails fast with a clear message before anything is
+    staged) and ONCE MORE inside the transaction, against a freshly
+    re-queried already-refunded aggregate, immediately before each line's
+    own write -- so two refund attempts racing for the same remaining
+    quantity can't both succeed (the second one's inside-transaction
+    re-check sees the first one's already-committed RefundLine row).
+
+    Credit: method='credit' requires sale.customer_id (checked below) and
+    records the money back the same way CreditRepayView already does -- a
+    CreditTransaction(transaction_type='repayment', amount=total,
+    recorded_by=operator_user), related_pos_sale left blank (a
+    "standalone" repayment in that model's own terms -- see
+    CreditTransaction's docstring). It reduces Customer.outstanding_
+    balance() exactly the way an ordinary repayment would, with no floor
+    at zero (same as a repayment), since nothing in that model enforces
+    one either. UNLIKE an ordinary repayment, this one DOES set
+    related_refund=refund -- no real money changed hands here, just a
+    balance adjustment, and shop/pl_report.py relies on that field to
+    exclude it from cash_collected (see CreditTransaction.related_refund's
+    own docstring).
+
+    Telegram: sent once, best-effort, only on an actual CREATE (never on
+    an idempotent replay) -- see shop/emails.py's send_telegram(), used
+    with its default raise_on_failure=False so a Telegram outage can never
+    block or roll back an otherwise-valid refund.
+
+    Returns (refund, created)."""
+    from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+    from django.core.exceptions import ValidationError
+    from django.db import transaction
+    from django.db.models import Sum
+    from .emails import send_telegram
+    from .models import CreditTransaction, InventoryMovement, POSSale, POSSaleLine, Refund, RefundLine
+
+    existing = Refund.objects.filter(client_refund_id=client_refund_id).first()
+    if existing:
+        return existing, False
+
+    if not selections:
+        raise POSSaleValidationError('Select at least one line to refund.')
+
+    valid_methods = dict(Refund.METHOD_CHOICES)
+    if method not in valid_methods:
+        raise POSSaleValidationError('Choose a valid refund method.')
+
+    valid_reasons = dict(Refund.REASON_CHOICES)
+    if reason not in valid_reasons:
+        raise POSSaleValidationError('Choose a valid refund reason.')
+    note = (note or '').strip()
+    if reason == 'other' and not note:
+        raise POSSaleValidationError('Add a note describing the reason when "Other" is chosen.')
+
+    normalized_number = normalize_sale_number(sale_number)
+    try:
+        sale = POSSale.objects.select_related('customer').get(sale_number=normalized_number)
+    except POSSale.DoesNotExist:
+        raise POSSaleValidationError('Sale not found. Check the sale number and try again.', status=404)
+
+    if method == 'credit' and not sale.customer_id:
+        raise POSSaleValidationError('This sale has no customer on it, so it can\'t be credited back.')
+
+    cart_snapshot = sale.cart_snapshot or []
+    sale_lines = list(sale.lines.select_related('product', 'variant').all())
+    line_by_id = {line.id: line for line in sale_lines}
+    index_by_line_id = {line.id: index for index, line in enumerate(sale_lines)}
+    allocations = allocate_sale_total_to_lines(sale, sale_lines)
+
+    # First pass -- parse and sanity-check every selection, and fail fast
+    # on anything that can never succeed (a bad line id, a stale/garbage
+    # quantity, a whole-line request for less than the full line, a
+    # discard on an animal) before opening any transaction. Remaining-
+    # quantity itself is checked again below, inside the transaction, since
+    # THAT number is the one that can change between this check and the
+    # actual write.
+    seen_line_ids = set()
+    parsed = []
+    for sel in selections:
+        try:
+            sale_line_id = int(sel.get('sale_line_id'))
+        except (TypeError, ValueError):
+            raise POSSaleValidationError('One of the selected lines is invalid.')
+        if sale_line_id in seen_line_ids:
+            raise POSSaleValidationError('Each line can only appear once in a single refund.')
+        seen_line_ids.add(sale_line_id)
+
+        sale_line = line_by_id.get(sale_line_id)
+        if not sale_line:
+            raise POSSaleValidationError('One of the selected lines does not belong to this sale.')
+
+        try:
+            qty = Decimal(str(sel.get('quantity')))
+        except (InvalidOperation, TypeError, ValueError):
+            raise POSSaleValidationError(f'{sale_line.product.name}: invalid refund quantity.')
+        if qty <= 0:
+            raise POSSaleValidationError(f'{sale_line.product.name}: refund quantity must be greater than zero.')
+
+        snap = cart_snapshot[index_by_line_id[sale_line_id]] if index_by_line_id[sale_line_id] < len(cart_snapshot) else {}
+        is_combo = bool(snap.get('combo_instance_id'))
+        product = sale_line.product
+        is_whole_line_only = is_combo or product.pricing_mode in ('variable_weight', 'fixed_weight')
+        if is_whole_line_only and qty != sale_line.quantity:
+            raise POSSaleValidationError(
+                f'{product.name}: this line can only be refunded in full, not partially.'
+            )
+
+        disposition = sel.get('disposition') or 'restock'
+        if disposition not in ('restock', 'discard'):
+            raise POSSaleValidationError(f'{product.name}: choose a valid disposition.')
+        if disposition == 'discard' and product.pricing_mode == 'fixed_weight':
+            raise POSSaleValidationError(f'{product.name}: an animal can only go back to stock, not be discarded.')
+
+        parsed.append({
+            'sale_line': sale_line, 'product': product, 'variant': sale_line.variant,
+            'qty': qty, 'disposition': disposition, 'is_whole_line_only': is_whole_line_only,
+        })
+
+    try:
+        with transaction.atomic():
+            refund = Refund.objects.create(
+                sale=sale, created_by=operator_user, method=method, reason=reason,
+                note=note, total_amount=Decimal('0'), client_refund_id=client_refund_id,
+            )
+            total_refund_amount = Decimal('0')
+            for item in parsed:
+                sale_line = item['sale_line']
+                product = item['product']
+                qty = item['qty']
+
+                # The re-check this function's own docstring promises --
+                # freshly re-aggregated INSIDE the transaction, immediately
+                # before this line's write, so a second refund racing for
+                # the same remaining quantity (or a double-submit of the
+                # same request under two different client_refund_ids) can't
+                # both succeed.
+                refunded_so_far = sale_line.refund_lines.aggregate(
+                    qty=Sum('quantity'), amt=Sum('amount'),
+                )
+                already_refunded_qty = refunded_so_far['qty'] or Decimal('0')
+                already_refunded_amt = refunded_so_far['amt'] or Decimal('0')
+                remaining_qty = sale_line.quantity - already_refunded_qty
+                if qty > remaining_qty:
+                    raise POSSaleValidationError(
+                        f'{product.name}: only {remaining_qty} left to refund on this line '
+                        f'(already refunded {already_refunded_qty}).'
+                    )
+
+                allocated = allocations.get(sale_line.id, Decimal('0'))
+                if item['is_whole_line_only']:
+                    amount = allocated - already_refunded_amt
+                else:
+                    original_qty = sale_line.quantity
+                    if original_qty != original_qty.to_integral_value():
+                        raise POSSaleValidationError(f'{product.name}: cannot compute a per-unit refund share.')
+                    shares = _largest_remainder_shares(allocated, int(original_qty))
+                    start = int(already_refunded_qty)
+                    end = start + int(qty)
+                    amount = sum(shares[start:end], Decimal('0'))
+
+                description = product.name
+                if sale_line.variant_id and sale_line.variant:
+                    description = f'{description} ({sale_line.variant.weight}kg)'
+
+                RefundLine.objects.create(
+                    refund=refund, sale_line=sale_line, product=product, variant=sale_line.variant,
+                    description=description, quantity=qty, amount=amount, disposition=item['disposition'],
+                )
+
+                return_movement = InventoryMovement(
+                    product=product, variant=sale_line.variant, movement_type='return', source='pos',
+                    quantity=qty, related_pos_sale=sale,
+                    note=f'Refund {refund.refund_number} ({sale.sale_number})',
+                )
+                return_movement.full_clean()
+                return_movement.save()
+
+                if item['disposition'] == 'discard':
+                    waste_movement = InventoryMovement(
+                        product=product, variant=sale_line.variant, movement_type='waste', source='pos',
+                        quantity=qty, related_pos_sale=sale,
+                        note=f'Refund {refund.refund_number} ({sale.sale_number}) — discarded',
+                    )
+                    waste_movement.full_clean()
+                    waste_movement.save()
+
+                total_refund_amount += amount
+
+            if total_refund_amount <= 0:
+                raise POSSaleValidationError('Nothing to refund.')
+
+            refund.total_amount = total_refund_amount
+            refund.save(update_fields=['total_amount'])
+
+            if method == 'credit':
+                CreditTransaction.objects.create(
+                    customer=sale.customer, amount=total_refund_amount,
+                    transaction_type='repayment', recorded_by=operator_user,
+                    related_refund=refund,
+                )
+    except ValidationError as e:
+        message = '; '.join(e.messages) if hasattr(e, 'messages') else str(e)
+        raise POSSaleValidationError(f'Could not process this refund: {message}', status=409)
+    except POSSaleValidationError:
+        raise
+    except Exception:
+        raise POSSaleValidationError(
+            'Could not complete this refund — nothing was recorded. Please try again.'
+        )
+
+    send_telegram(
+        '💸 <b>POS refund processed</b>\n'
+        f'Refund: {refund.refund_number} (sale {sale.sale_number})\n'
+        f'Amount: Rs. {refund.total_amount}\n'
+        f'Method: {valid_methods[method]}\n'
+        f'Reason: {valid_reasons[reason]}\n'
+        f'Staff: {operator_user.get_full_name() or operator_user.username}'
+    )
+
+    return refund, True
+
+
 def pos_service_worker(request):
     """Serves static/js/pos-sw.js at /pos/service-worker.js -- NOT through
     Django's normal static-files pipeline, and deliberately not staff-only
@@ -1841,6 +2290,83 @@ def pos_receipt_view(request, sale_number):
         'qr_facebook_url': qr_facebook_url,
         'has_any_social_qr': bool(qr_website_url or qr_tiktok_url or qr_facebook_url),
         'receipt_footer': business.receipt_footer,
+        'width_mm': width_mm,
+    })
+
+
+@staff_member_required
+def pos_refund_view(request):
+    """Staff-only POS refund lookup/processing screen -- GET /pos/refund/,
+    linked from templates/pos.html's own logout-col. Everything data-
+    driven (sale lookup, line remaining-quantity/amount, submitting the
+    refund) happens client-side against /api/v1/pos/refunds/lookup/ and
+    /api/v1/pos/refunds/ -- this view only renders the page shell plus the
+    two small fixed choice lists (Refund.METHOD_CHOICES/REASON_CHOICES) so
+    the method/reason dropdowns don't need their own round trip."""
+    from .models import Refund
+
+    return render(request, 'pos_refund.html', {
+        'method_choices': Refund.METHOD_CHOICES,
+        'reason_choices': Refund.REASON_CHOICES,
+    })
+
+
+@staff_member_required
+def pos_refund_slip_view(request, refund_number):
+    """Printable refund slip -- GET /pos/refund/<refund_number>/. Same
+    overall shape/conventions as pos_receipt_view() (BS date via
+    bs_calendar.ad_to_bs(), format_money_display() for whole-rupee
+    display, 80mm default / ?width=58 for a 58mm roll, cashier shown by
+    first name only) but for a Refund instead of a POSSale -- no barcode,
+    no QR row, no thank-you line (none of that was asked for here, see
+    templates/pos_refund_slip.html)."""
+    from django.utils import timezone
+    from .models import BusinessSettings, Refund
+    from .bs_calendar import ad_to_bs, BSDateOutOfRangeError
+
+    refund = get_object_or_404(
+        Refund.objects.select_related('sale', 'created_by'), refund_number=refund_number
+    )
+    business = BusinessSettings.get_solo()
+
+    created_at_local = timezone.localtime(refund.created_at)
+    try:
+        bs_year, bs_month, bs_day = ad_to_bs(created_at_local.date())
+        date_display = f'{bs_year:04d}/{bs_month:02d}/{bs_day:02d}'
+    except BSDateOutOfRangeError:
+        date_display = created_at_local.strftime('%Y/%m/%d')
+
+    sale_number = refund.sale.sale_number
+    sale_number_display = sale_number[len('POS-'):] if sale_number.startswith('POS-') else sale_number
+    cashier_name = refund.created_by.get_full_name() or refund.created_by.username
+    cashier_first_name = cashier_name.split()[0] if cashier_name else ''
+
+    lines_display = [{
+        'name': line.description,
+        'quantity': format_quantity_display(line.quantity),
+        'amount': format_money_display(line.amount),
+    } for line in refund.lines.all()]
+
+    def image_url(field):
+        return field.url if field else ''
+
+    width_mm = 58 if request.GET.get('width') == '58' else 80
+
+    return render(request, 'pos_refund_slip.html', {
+        'business': business,
+        'refund': refund,
+        'refund_number': refund.refund_number,
+        'sale_number_display': sale_number_display,
+        'logo_url': image_url(business.receipt_logo),
+        'shop_phone_devanagari': to_devanagari_digits(business.shop_phone) if business.shop_phone else '',
+        'pan_vat_devanagari': to_devanagari_digits(business.pan_vat_number) if business.pan_vat_number else '',
+        'date_display': date_display,
+        'time_display': created_at_local.strftime('%I:%M %p'),
+        'cashier_first_name': cashier_first_name,
+        'lines': lines_display,
+        'total': format_money_display(refund.total_amount),
+        'method_label': dict(Refund.METHOD_CHOICES).get(refund.method, refund.method),
+        'reason_label': dict(Refund.REASON_CHOICES).get(refund.reason, refund.reason),
         'width_mm': width_mm,
     })
 

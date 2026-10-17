@@ -29,5 +29,7 @@ urlpatterns = [
     path('pos/', views.pos_view, name='pos'),
     path('pos/service-worker.js', views.pos_service_worker, name='pos_service_worker'),
     path('pos/receipt/<str:sale_number>/', views.pos_receipt_view, name='pos_receipt'),
+    path('pos/refund/', views.pos_refund_view, name='pos_refund'),
+    path('pos/refund/<str:refund_number>/', views.pos_refund_slip_view, name='pos_refund_slip'),
     path('dashboard/', views.dashboard_view, name='dashboard'),
 ]

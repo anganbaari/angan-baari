@@ -530,3 +530,25 @@ class CreditRepaySerializer(serializers.Serializer):
 
     customer_id = serializers.IntegerField()
     amount = serializers.DecimalField(max_digits=10, decimal_places=2, min_value=Decimal('0.01'))
+
+
+class PosRefundCreateSerializer(serializers.Serializer):
+    """Input-shape validation only -- the actual sale lookup, remaining-
+    quantity/amount checks, and all writes happen in create_pos_refund()
+    (shop/views.py), same reasoning as POSSaleCreateSerializer above.
+    `selections` is left as a loose list of dicts (not a nested
+    serializer), matching this file's existing cart/payments convention --
+    real per-line validation happens in create_pos_refund() either way.
+
+    No operator_id: same as every other POS-mutating endpoint in this
+    file -- the operator comes from request.session via get_pos_operator(),
+    never from client-supplied request data. No offline-queue support
+    either (this feature is online-only, per its own spec), so there's no
+    queued_operator_id field here the way POSSaleCreateSerializer has."""
+
+    sale_number = serializers.CharField(max_length=32)
+    selections = serializers.ListField(child=serializers.DictField(), allow_empty=False)
+    method = serializers.CharField(max_length=20)
+    reason = serializers.CharField(max_length=20)
+    note = serializers.CharField(max_length=300, required=False, allow_blank=True, default='')
+    client_refund_id = serializers.CharField(max_length=64)

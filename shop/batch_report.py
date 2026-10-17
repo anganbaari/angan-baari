@@ -58,7 +58,7 @@ from decimal import Decimal, ROUND_HALF_UP
 from django.db.models import Sum
 
 from .reports import ZERO
-from .models import CostEntry, CropBatch, InventoryMovement
+from .models import CostEntry, CropBatch, InventoryMovement, RefundLine
 
 CENT = Decimal('0.01')
 # 'adjustment_remove' (a stock-count correction) reduces real stock exactly
@@ -130,13 +130,24 @@ def _fifo_simulate(product, pool_order):
     """Walks every harvest/sale/waste/adjustment_remove InventoryMovement
     for `product` in chronological order, maintaining a running stock
     balance per pool (pool key = batch_code, '' for unbatched). Returns
-    four {pool_key: Decimal} dicts: remaining balance, kg sold, kg
-    wasted (waste + adjustment_remove, folded together -- see
-    CONSUMING_TYPES above), revenue."""
+    five values: four {pool_key: Decimal} dicts (remaining balance, kg
+    sold, kg wasted -- waste + adjustment_remove folded together, see
+    CONSUMING_TYPES above -- and revenue), plus `movement_pool_draws`
+    ({movement.id: {pool_key: Decimal}}) recording exactly how much of
+    EACH individual 'sale' movement's own quantity was drawn from which
+    pool -- needed by _refund_revenue_reduction_by_pool() below to
+    attribute a later refund of that same movement back to the right
+    pool(s), in the same proportion the original sale itself drew from
+    them. 'return' movements (refund stock restorations) are
+    DELIBERATELY not included in this walk at all -- they're a pure
+    stock-only event for this report (see this feature's own brief);
+    only a refund's MONEY effect is modelled here, via RefundLine, not a
+    second pass through the ledger."""
     pools = {code: ZERO for code in pool_order}
     sold_by_pool = {code: ZERO for code in pool_order}
     waste_by_pool = {code: ZERO for code in pool_order}
     revenue_by_pool = {code: ZERO for code in pool_order}
+    movement_pool_draws = defaultdict(lambda: defaultdict(lambda: ZERO))
 
     movements = (
         InventoryMovement.objects
@@ -166,6 +177,7 @@ def _fifo_simulate(product, pool_order):
             if m.movement_type == 'sale':
                 sold_by_pool[pool_key] += take
                 revenue_by_pool[pool_key] += take * rate
+                movement_pool_draws[m.id][pool_key] += take
             else:  # 'waste' or 'adjustment_remove' -- same loss treatment, no revenue either way
                 waste_by_pool[pool_key] += take
         # Any `remaining` left over here means this product's ledger has
@@ -174,7 +186,45 @@ def _fifo_simulate(product, pool_order):
         # negative stock), but this is a read-only report, so the excess
         # is dropped rather than raised.
 
-    return pools, sold_by_pool, waste_by_pool, revenue_by_pool
+    return pools, sold_by_pool, waste_by_pool, revenue_by_pool, movement_pool_draws
+
+
+def _refund_revenue_reduction_by_pool(product, movement_pool_draws):
+    """{pool_key: Decimal} -- how much of each pool's revenue (from
+    _fifo_simulate() above) should be reduced because some of what it
+    sold was later refunded.
+
+    A RefundLine doesn't know which FIFO pool its original sale drew
+    from (that's a simulated attribution, never stored) -- this recovers
+    it by finding the ORIGINAL 'sale' InventoryMovement the refunded line
+    corresponds to (same sale, product, variant -- the same lookup
+    _movement_revenue_rate() does in reverse) and splitting the refund's
+    amount across whichever pool(s) THAT movement actually drew from, in
+    the same proportion (take_in_pool / movement.quantity). A movement
+    split across two pools (stock ran out mid-sale) has its refund
+    split the same way -- there's no way to know which specific units
+    physically came back, so pro-rata by the original draw is the most
+    defensible approximation, and it's exact whenever a movement only
+    ever drew from one pool (the common case).
+
+    One query per RefundLine (not bulk) -- acceptable at this module's
+    documented farm-scale data volumes (CropBatch/refund counts are
+    small), same spirit as this module's other per-row lookups."""
+    reduction = defaultdict(lambda: ZERO)
+    refund_lines = RefundLine.objects.filter(product=product).select_related('sale_line__sale')
+    for rl in refund_lines:
+        sale = rl.sale_line.sale
+        movement = InventoryMovement.objects.filter(
+            related_pos_sale=sale, product_id=rl.product_id, variant_id=rl.variant_id, movement_type='sale',
+        ).first()
+        if not movement or movement.quantity <= 0:
+            continue
+        draws = movement_pool_draws.get(movement.id)
+        if not draws:
+            continue
+        for pool_key, qty_drawn in draws.items():
+            reduction[pool_key] += rl.amount * (qty_drawn / movement.quantity)
+    return reduction
 
 
 def build_batch_report(code):
@@ -211,13 +261,24 @@ def build_batch_report(code):
     ]
 
     sold_kg = waste_kg = remaining_kg = revenue = None
+    gross_revenue = refunded_revenue = None
     if batch.product_id:
         pool_order = _fifo_pool_order(batch.product)
-        pools, sold_by_pool, waste_by_pool, revenue_by_pool = _fifo_simulate(batch.product, pool_order)
+        pools, sold_by_pool, waste_by_pool, revenue_by_pool, movement_pool_draws = _fifo_simulate(batch.product, pool_order)
         sold_kg = sold_by_pool.get(code, ZERO)
         waste_kg = waste_by_pool.get(code, ZERO)
         remaining_kg = pools.get(code, ZERO)
-        revenue = _q2(revenue_by_pool.get(code, ZERO))
+        gross_revenue = _q2(revenue_by_pool.get(code, ZERO))
+        # NET of refunds against lines this batch's pool actually sold --
+        # see _refund_revenue_reduction_by_pool()'s own docstring for how
+        # a refund (which has no FIFO-pool concept of its own) is
+        # attributed back to a pool. Not period-scoped (this report has
+        # no date range of its own -- it's a batch's whole lifecycle), so
+        # every refund ever recorded against this product counts, same
+        # as every sale ever recorded against it already does.
+        refund_reduction_by_pool = _refund_revenue_reduction_by_pool(batch.product, movement_pool_draws)
+        refunded_revenue = _q2(refund_reduction_by_pool.get(code, ZERO))
+        revenue = _q2(gross_revenue - refunded_revenue)
     else:
         notes.append(
             'This batch has no product mapped (see Admin -> Cost Centre Products), so '
@@ -251,6 +312,8 @@ def build_batch_report(code):
         'waste_kg': waste_kg,
         'remaining_kg': remaining_kg,
         'revenue': revenue,
+        'gross_revenue': gross_revenue,
+        'refunded_revenue': refunded_revenue,
         'cost_of_sold': cost_of_sold,
         'waste_loss': waste_loss,
         'remaining_value': remaining_value,
@@ -308,7 +371,7 @@ def next_batch_cost_per_kg(product):
     batch_codes = [code for code in pool_order if code]  # drop '' (unbatched stock)
     if not batch_codes:
         return None
-    pools, _, _, _ = _fifo_simulate(product, pool_order)
+    pools, _, _, _, _ = _fifo_simulate(product, pool_order)
     for code in batch_codes:  # already start_date-ordered by _fifo_pool_order
         if pools.get(code, ZERO) > 0:
             return build_batch_report(code)['cost_per_kg']

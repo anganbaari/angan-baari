@@ -91,7 +91,7 @@ from django.utils import timezone as djtz
 from . import bs_calendar
 from .models import (
     Category, Coupon, CreditTransaction, Customer, InventoryMovement,
-    Offer, POSSale, POSSalePayment, Product, ProductOrder, ProductVariant, RevenueTarget,
+    Offer, POSSale, POSSalePayment, Product, ProductOrder, ProductVariant, Refund, RevenueTarget,
 )
 
 LOCAL_TZ = ZoneInfo('Asia/Kathmandu')
@@ -322,6 +322,77 @@ def pos_sales_qs(start_date, end_date, filters=NO_FILTERS):
     return qs
 
 
+def refunds_qs(start_date, end_date, filters=NO_FILTERS):
+    """Refund.created_at falling in [start_date, end_date] -- a refund
+    counts in the period IT happened in, never its original sale's own
+    date (see module docstring additions for this feature). Filters are
+    applied via the refund's own `sale` FK, mirroring pos_sales_qs()
+    exactly, so "net sales under this filter" stays meaningful: a refund
+    against a sale that wouldn't itself match the active filters is
+    excluded the same way that sale would be."""
+    start_utc, end_utc = local_range_to_utc(start_date, end_date)
+    qs = Refund.objects.filter(created_at__gte=start_utc, created_at__lt=end_utc)
+    if filters.operator_id:
+        qs = qs.filter(sale__cashier_id=filters.operator_id)
+    if filters.customer_type == 'credit':
+        qs = qs.filter(sale__customer_id__isnull=False)
+    elif filters.customer_type == 'walkin':
+        qs = qs.filter(sale__customer_id__isnull=True)
+    if filters.payment_type == 'cash':
+        qs = qs.filter(sale__payments__method='cash')
+    elif filters.payment_type == 'credit':
+        qs = qs.filter(sale__payments__method='credit')
+    elif filters.payment_type == 'other':
+        qs = qs.filter(sale__payments__method__in=_OTHER_PAYMENT_METHODS)
+    if filters.payment_type:
+        qs = qs.distinct()
+    return qs
+
+
+def get_refund_total(start_date, end_date, filters=NO_FILTERS):
+    return refunds_qs(start_date, end_date, filters).aggregate(
+        total=Coalesce(Sum('total_amount'), ZERO, output_field=DecimalField())
+    )['total']
+
+
+def _refunds_trend_rows(start_date, end_date, trunc, filters=NO_FILTERS):
+    """Same {'date', 'total'} shape as a gross sales-trend bucket (see
+    get_sales_trend()), bucketed with the SAME trunc function so the two
+    can be merged date-for-date by _merge_gross_and_refunds_by_date()."""
+    rows = (
+        refunds_qs(start_date, end_date, filters)
+        .annotate(bucket=trunc('created_at', tzinfo=LOCAL_TZ))
+        .values('bucket').annotate(total=Sum('total_amount')).order_by('bucket')
+    )
+    return [{'date': r['bucket'].isoformat(), 'total': float(r['total'])} for r in rows]
+
+
+def _merge_gross_and_refunds_by_date(gross_rows, refund_rows):
+    """gross_rows: [{'date', 'total', 'count', ...}], refund_rows:
+    [{'date', 'total'}] (same trunc granularity) -> rows covering every
+    date in EITHER list, with 'total' now NET of that date's refunds and
+    'gross_total'/'refunds' exposed alongside so the two reconcile
+    (gross_total - refunds == total). A date with refunds but no gross
+    sales (an all-refunded day revisited later, or a refund landing on a
+    different day than its sale) still gets its own row -- dropping it
+    would silently hide a negative-net day instead of showing one."""
+    refund_map = {r['date']: r['total'] for r in refund_rows}
+    gross_map = {r['date']: r for r in gross_rows}
+    all_dates = sorted(set(gross_map) | set(refund_map))
+    merged = []
+    for d in all_dates:
+        gross_row = gross_map.get(d, {'total': 0.0, 'count': 0})
+        refund_total = refund_map.get(d, 0.0)
+        merged.append({
+            'date': d,
+            'total': gross_row['total'] - refund_total,
+            'gross_total': gross_row['total'],
+            'refunds': refund_total,
+            'count': gross_row.get('count', 0),
+        })
+    return merged
+
+
 def online_orders_qs(start_date, end_date, exclude_cancelled=True):
     start_utc, end_utc = local_range_to_utc(start_date, end_date)
     qs = ProductOrder.objects.filter(ordered_at__gte=start_utc, ordered_at__lt=end_utc)
@@ -429,9 +500,12 @@ def get_summary(start_date, end_date, channel, compare, granularity='day', filte
         # Repayments are credit-ledger entries, not POS sales -- payment
         # type/customer type/operator filters (which are about a SALE's
         # own lines) don't apply to them, same as the rest of the Credit
-        # tab. Always the full repayment total for the period.
+        # tab. related_refund__isnull=True excludes a credit-balance
+        # REFUND's own repayment-shaped row (see CreditTransaction.
+        # related_refund's docstring) -- no real cash moved for that one.
         repayments = CreditTransaction.objects.filter(
-            transaction_type='repayment', created_at__gte=local_range_to_utc(s, e)[0],
+            transaction_type='repayment', related_refund__isnull=True,
+            created_at__gte=local_range_to_utc(s, e)[0],
             created_at__lt=local_range_to_utc(s, e)[1],
         ).aggregate(total=Coalesce(Sum('amount'), ZERO, output_field=DecimalField()))['total']
 
@@ -447,10 +521,25 @@ def get_summary(start_date, end_date, channel, compare, granularity='day', filte
                 weight_kg += w
 
         aov = (pos_agg['total'] / pos_agg['count']) if pos_agg['count'] else ZERO
-        cash_collected = payment_agg['cash_like'] + repayments
+
+        # NET of refunds recorded in THIS period (by Refund.created_at,
+        # not the original sale's date) -- gross_sales/refunds are
+        # exposed alongside total_sales (now net) so the three reconcile:
+        # gross_sales - refunds == total_sales. cash_collected is
+        # similarly reduced by cash-like (non-credit) refunds only --
+        # a credit-balance refund already left `repayments` above
+        # untouched by excluding it there instead.
+        refund_total = get_refund_total(s, e, filters)
+        refund_cash_like_total = refunds_qs(s, e, filters).exclude(method='credit').aggregate(
+            total=Coalesce(Sum('total_amount'), ZERO, output_field=DecimalField())
+        )['total']
+        gross_sales = pos_agg['total']
+        net_sales = gross_sales - refund_total
+        cash_collected = payment_agg['cash_like'] + repayments - refund_cash_like_total
 
         return {
-            'total_sales': pos_agg['total'], 'transactions': pos_agg['count'],
+            'total_sales': net_sales, 'gross_sales': gross_sales, 'refunds': refund_total,
+            'transactions': pos_agg['count'],
             'online_order_count': online_count, 'aov': aov,
             'units_count': units_count, 'weight_kg': weight_kg,
             'cash_collected': cash_collected, 'credit_given': payment_agg['credit'],
@@ -621,15 +710,22 @@ def get_run_rate(start_date, end_date, filters=NO_FILTERS):
             'available': False,
             'reason': f'Needs at least {RUN_RATE_MIN_DAYS_WITH_SALES} days with a sale in the period (has {days_with_sales}).',
         }
-    total_so_far = sum((r['total'] for r in daily), ZERO)
+    gross_so_far = sum((r['total'] for r in daily), ZERO)
+    # NET of refunds recorded (by Refund.created_at) within the SAME
+    # elapsed window -- the projection is a pace extrapolation, so it
+    # must be paced off actual net sales, not gross.
+    refund_so_far = get_refund_total(start_date, elapsed_end, filters)
+    net_so_far = gross_so_far - refund_so_far
     elapsed_days = (elapsed_end - start_date).days + 1
     full_period_days = (end_date - start_date).days + 1
-    daily_avg = total_so_far / elapsed_days
+    daily_avg = net_so_far / elapsed_days
     return {
         'available': True,
         'daily_avg': float(daily_avg),
         'projected_total': float(daily_avg * full_period_days),
-        'total_so_far': float(total_so_far),
+        'total_so_far': float(net_so_far),
+        'gross_so_far': float(gross_so_far),
+        'refunds_so_far': float(refund_so_far),
         'elapsed_days': elapsed_days,
         'full_period_days': full_period_days,
     }
@@ -641,18 +737,28 @@ def get_insight_strip(start_date, end_date, filters=NO_FILTERS):
     data (e.g. no sales at all in the period) comes back None/0 and the
     frontend shows a plain empty state for it."""
     qs = pos_sales_qs(start_date, end_date, filters)
-    daily = list(
+    rows = list(
         qs.annotate(bucket=TruncDate('created_at', tzinfo=LOCAL_TZ)).values('bucket')
-        .annotate(total=Sum('total_amount')).order_by('-total')
+        .annotate(total=Sum('total_amount')).order_by('bucket')
     )
-    best_day = {'date': daily[0]['bucket'].isoformat(), 'total': float(daily[0]['total'])} if daily else None
+    gross_rows = [{'date': r['bucket'].isoformat(), 'total': float(r['total'])} for r in rows]
+    refund_rows = _refunds_trend_rows(start_date, end_date, TruncDate, filters)
+    # best_day is the highest NET day -- a day that was entirely refunded
+    # later shouldn't still read as this period's best, and a day with
+    # refunds but no gross sales of its own (a refund landing on a
+    # different day than its sale) still needs a row to be considered.
+    merged = _merge_gross_and_refunds_by_date(gross_rows, refund_rows)
+    daily_by_total = sorted(merged, key=lambda r: r['total'], reverse=True)
+    best_day = {'date': daily_by_total[0]['date'], 'total': daily_by_total[0]['total']} if daily_by_total else None
 
     hours = get_sales_by_hour(start_date, end_date, filters)
     peak_hour = max(range(24), key=lambda h: hours[h]) if any(hours) else None
 
     total_days = (end_date - start_date).days + 1
-    total_sales = qs.aggregate(total=Coalesce(Sum('total_amount'), ZERO, output_field=DecimalField()))['total']
-    avg_daily_sales = float(total_sales / total_days) if total_days else 0.0
+    gross_total = qs.aggregate(total=Coalesce(Sum('total_amount'), ZERO, output_field=DecimalField()))['total']
+    refund_total = get_refund_total(start_date, end_date, filters)
+    net_total = gross_total - refund_total
+    avg_daily_sales = float(net_total / total_days) if total_days else 0.0
 
     top = get_top_products(start_date, end_date, limit=1, by='revenue', filters=filters)
     top_product = top[0] if top else None
@@ -661,8 +767,10 @@ def get_insight_strip(start_date, end_date, filters=NO_FILTERS):
         'best_day': best_day,
         'peak_hour': peak_hour,
         'avg_daily_sales': avg_daily_sales,
+        'gross_total': float(gross_total),
+        'refunds_total': float(refund_total),
         'top_product': top_product,
-        'days_with_sales': len(daily),
+        'days_with_sales': len(rows),  # days with a GROSS sale -- unrelated to refund netting
     }
 
 
@@ -693,7 +801,6 @@ def get_sales_trend(start_date, end_date, granularity, compare=False, filters=NO
     trunc = _trunc_fn('day' if bs_mode else granularity)
 
     def bucketed(s, e):
-        start_utc, end_utc = local_range_to_utc(s, e)
         rows = (
             pos_sales_qs(s, e, filters)
             .annotate(bucket=trunc('created_at', tzinfo=LOCAL_TZ))
@@ -701,7 +808,13 @@ def get_sales_trend(start_date, end_date, granularity, compare=False, filters=NO
             .annotate(total=Sum('total_amount'), count=Count('id'))
             .order_by('bucket')
         )
-        out = [{'date': r['bucket'].isoformat(), 'total': float(r['total']), 'count': r['count']} for r in rows]
+        gross_rows = [{'date': r['bucket'].isoformat(), 'total': float(r['total']), 'count': r['count']} for r in rows]
+        # 'total' becomes NET of that same bucket's refunds (by
+        # Refund.created_at); 'gross_total'/'refunds' ride alongside so
+        # the three reconcile per bucket, same convention as
+        # get_summary()/get_insight_strip() above.
+        refund_rows = _refunds_trend_rows(s, e, trunc, filters)
+        out = _merge_gross_and_refunds_by_date(gross_rows, refund_rows)
         return _bucket_daily_rows_into_bs_months(out) if bs_mode else out
 
     series = {'current': bucketed(start_date, end_date)}
@@ -735,11 +848,20 @@ def get_sales_by_day_of_week(start_date, end_date, filters=NO_FILTERS):
 
 
 def get_recent_sales(start_date, end_date, page, page_size, filters=NO_FILTERS):
+    """Kept as a GROSS, per-sale list (no netting here -- a refund is a
+    separate event, possibly in a different period) -- each row is just
+    flagged `has_refund` when at least one Refund exists against it, so
+    the table can show that without pretending the row's own `total`
+    changed."""
     qs = pos_sales_qs(start_date, end_date, filters).select_related('cashier', 'customer').order_by('-created_at')
     total = qs.count()
     offset = (page - 1) * page_size
+    sales_page = list(qs[offset:offset + page_size])
+    refunded_sale_ids = set(
+        Refund.objects.filter(sale_id__in=[s.id for s in sales_page]).values_list('sale_id', flat=True)
+    )
     rows = []
-    for sale in qs[offset:offset + page_size]:
+    for sale in sales_page:
         payments = list(sale.payments.values('method', 'amount'))
         rows.append({
             'sale_number': sale.sale_number,
@@ -748,21 +870,53 @@ def get_recent_sales(start_date, end_date, page, page_size, filters=NO_FILTERS):
             'operator': sale.cashier.get_full_name() or sale.cashier.username,
             'total': float(sale.total_amount),
             'payments': [{'method': p['method'], 'amount': float(p['amount'])} for p in payments],
+            'has_refund': sale.id in refunded_sale_ids,
         })
     return {'results': rows, 'count': total, 'page': page, 'page_size': page_size}
 
 
 def get_sales_by_operator(start_date, end_date, filters=NO_FILTERS):
+    """Gross sales per CASHIER (sale.cashier) stay exactly as before --
+    deliberately NOT netted against refunds here, since a refund is
+    typically processed by whoever's at the till that moment, not
+    necessarily the same person who rang up the original sale. Refunded
+    amount is shown as a SEPARATE figure, keyed by Refund.created_by
+    (whoever actually processed the refund), per this feature's own
+    spec: "do not net one against the other"."""
     rows = (
         pos_sales_qs(start_date, end_date, filters)
-        .values('cashier__username', 'cashier__first_name', 'cashier__last_name')
+        .values('cashier_id', 'cashier__username', 'cashier__first_name', 'cashier__last_name')
         .annotate(total=Sum('total_amount'), count=Count('id'))
         .order_by('-total')
     )
+    refund_rows = (
+        refunds_qs(start_date, end_date, filters)
+        .values('created_by_id', 'created_by__username', 'created_by__first_name', 'created_by__last_name')
+        .annotate(refunded=Sum('total_amount'))
+    )
+    refunded_by_operator = {}
+    refund_names = {}
+    for r in refund_rows:
+        name = f"{r['created_by__first_name']} {r['created_by__last_name']}".strip() or r['created_by__username']
+        refunded_by_operator[r['created_by_id']] = r['refunded']
+        refund_names[r['created_by_id']] = name
+
     out = []
+    seen_operator_ids = set()
     for r in rows:
         name = f"{r['cashier__first_name']} {r['cashier__last_name']}".strip() or r['cashier__username']
-        out.append({'operator': name, 'total': float(r['total']), 'count': r['count']})
+        seen_operator_ids.add(r['cashier_id'])
+        out.append({
+            'operator': name, 'total': float(r['total']), 'count': r['count'],
+            'refunded': float(refunded_by_operator.get(r['cashier_id'], ZERO)),
+        })
+    # A staff member who only PROCESSED refunds in this period (none of
+    # their own sales fall in range) still needs a row, or their
+    # refunded total would be invisible on this table.
+    for operator_id, refunded in refunded_by_operator.items():
+        if operator_id not in seen_operator_ids:
+            out.append({'operator': refund_names[operator_id], 'total': 0.0, 'count': 0, 'refunded': float(refunded)})
+    out.sort(key=lambda r: r['total'], reverse=True)
     return out
 
 
@@ -1187,13 +1341,21 @@ def get_target_progress():
         # Target period hasn't started yet -- nothing achieved, nothing
         # elapsed, but still report full remaining/days-left for display.
         achieved = ZERO
+        gross_achieved = ZERO
+        refunded = ZERO
         days_elapsed = 0
         days_left = total_days
     else:
         elapsed_end = min(today, target.end_date)
-        achieved = pos_sales_qs(target.start_date, elapsed_end).aggregate(
+        gross_achieved = pos_sales_qs(target.start_date, elapsed_end).aggregate(
             total=Coalesce(Sum('total_amount'), ZERO, output_field=DecimalField())
         )['total']
+        # NET of refunds recorded (by Refund.created_at) within the same
+        # elapsed window -- a refund against a sale counted toward an
+        # earlier target period still reduces how much of THIS target's
+        # progress is real, since "achieved" means money actually kept.
+        refunded = get_refund_total(target.start_date, elapsed_end)
+        achieved = gross_achieved - refunded
         days_elapsed = (elapsed_end - target.start_date).days + 1
         days_left = max(0, (target.end_date - today).days)
 
@@ -1214,6 +1376,8 @@ def get_target_progress():
         'end_date': target.end_date.isoformat(),
         'amount': float(amount),
         'achieved': float(achieved),
+        'gross_achieved': float(gross_achieved),
+        'refunded': float(refunded),
         'remaining': float(max(remaining, ZERO)),
         'pct_achieved': round(pct_achieved, 1),
         'days_elapsed': days_elapsed,

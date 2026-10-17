@@ -62,6 +62,7 @@ from .serializers import (
     PasswordResetRequestSerializer,
     PosQueueDismissedReportSerializer,
     PosQueueFailureAlertSerializer,
+    PosRefundCreateSerializer,
     PosRestockSerializer,
     PosUnlockSerializer,
     POSSaleCreateSerializer,
@@ -950,6 +951,88 @@ class CreditRepayView(APIView):
                 'outstanding_balance': str(customer.outstanding_balance()),
             },
             status=status.HTTP_201_CREATED,
+        )
+
+
+class PosRefundLookupView(APIView):
+    """GET /api/v1/pos/refunds/lookup/?sale_number=<...> — staff-only.
+    Normalizes the sale number the same way create_pos_refund() will
+    (trim/uppercase/add the 'POS-' prefix back if missing) so a barcode
+    scan or a hand-typed number without the prefix still finds the sale.
+    404 (not an empty list) for no match -- a sale number is unique, this
+    isn't a phone-style multi-match lookup like CustomerLookupView above.
+
+    Returns get_pos_sale_refund_info()'s shape directly (shop/views.py) --
+    the SAME helper create_pos_refund() uses internally for its own
+    allocation math, so what this shows as refundable can never drift
+    from what a refund request will actually be allowed to do."""
+
+    authentication_classes = [SessionAuthentication]
+    permission_classes = [IsStaffUser]
+
+    def get(self, request, *args, **kwargs):
+        from shop.models import POSSale
+        from shop.views import get_pos_sale_refund_info, normalize_sale_number
+
+        raw = request.query_params.get('sale_number', '')
+        sale_number = normalize_sale_number(raw)
+        if not sale_number:
+            return Response({'status': 'error', 'message': 'sale_number is required.'}, status=400)
+
+        try:
+            sale = POSSale.objects.select_related('cashier', 'customer').get(sale_number=sale_number)
+        except POSSale.DoesNotExist:
+            return Response(
+                {'status': 'error', 'message': 'Sale not found. Check the sale number and try again.'},
+                status=404,
+            )
+
+        return Response({'status': 'ok', **get_pos_sale_refund_info(sale)})
+
+
+class PosRefundCreateView(APIView):
+    """POST /api/v1/pos/refunds/ — staff-only, online-only (no offline
+    queueing for refunds, per this feature's own spec). Delegates entirely
+    to create_pos_refund() (shop/views.py), same thin-wrapper shape as
+    POSSaleView.post() around create_pos_sale() -- all the actual
+    validation, allocation math, stock movements, and credit-balance
+    handling live there, not here."""
+
+    authentication_classes = [SessionAuthentication]
+    permission_classes = [IsStaffUser]
+
+    def post(self, request, *args, **kwargs):
+        from shop.views import create_pos_refund
+
+        serializer = PosRefundCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        try:
+            operator_user = get_pos_operator(request)
+            refund, created = create_pos_refund(
+                sale_number=data['sale_number'],
+                selections=data['selections'],
+                method=data['method'],
+                reason=data['reason'],
+                note=data.get('note', ''),
+                operator_user=operator_user,
+                client_refund_id=data['client_refund_id'],
+            )
+        except POSSaleValidationError as e:
+            return Response({'status': 'error', 'message': e.message}, status=e.status)
+
+        return Response(
+            {
+                'status': 'ok',
+                'refund_number': refund.refund_number,
+                'sale_number': refund.sale.sale_number,
+                'total_amount': str(refund.total_amount),
+                'method': refund.method,
+                'reason': refund.reason,
+                'created_at': refund.created_at.isoformat(),
+            },
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
         )
 
 

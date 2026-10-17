@@ -15,7 +15,7 @@ from .models import InventoryMovement
 from .models import (
     Offer, Coupon, BundleItem, ProductVariant, ProductSellingUnit, InventoryMovement, POSSale, UserProfile,
     BusinessSettings, CreditTransaction, Customer, POSSalePayment, RevenueTarget, CostEntry, FarmAsset,
-    PurchaseBatch, POSSaleLine, CostCentreProduct, CropBatch,
+    PurchaseBatch, POSSaleLine, CostCentreProduct, CropBatch, Refund, RefundLine,
 )
 from .stock import get_stock_table_rows
 from .utils import format_money
@@ -476,7 +476,10 @@ class POSSaleLineInline(admin.TabularInline):
 
 @admin.register(POSSale)
 class POSSaleAdmin(admin.ModelAdmin):
-    list_display = ['sale_number', 'cashier', 'customer', 'payment_method', 'is_wholesale', 'coupon', 'discount_amount', 'round_off_amount', 'total_amount', 'created_at', 'receipt_link']
+    list_display = [
+        'sale_number', 'cashier', 'customer', 'payment_method', 'is_wholesale', 'coupon', 'discount_amount',
+        'round_off_amount', 'total_amount', 'refunded_display', 'created_at', 'receipt_link',
+    ]
     list_filter = ['payment_method', 'is_wholesale', 'cashier', 'coupon', 'created_at']
     search_fields = ['sale_number']
     date_hierarchy = 'created_at'
@@ -497,6 +500,61 @@ class POSSaleAdmin(admin.ModelAdmin):
         url = reverse('pos_receipt', args=[obj.sale_number])
         return format_html('<a href="{}" target="_blank">Receipt</a>', url)
     receipt_link.short_description = 'Receipt'
+
+    def refunded_display(self, obj):
+        # Sum of this sale's own Refund.total_amount rows -- not per-line,
+        # since a Refund's own amount is already the authoritative "how
+        # much actually went back" figure (see create_pos_refund()).
+        total = obj.refunds.aggregate(total=Sum('total_amount'))['total']
+        return format_money(total) if total else '—'
+    refunded_display.short_description = 'Refunded'
+
+
+class RefundLineInline(admin.TabularInline):
+    """Read-only -- written by create_pos_refund() itself, same spirit as
+    POSSaleLineInline above."""
+
+    model = RefundLine
+    extra = 0
+    readonly_fields = ['sale_line', 'product', 'variant', 'description', 'quantity', 'amount', 'disposition']
+    can_delete = False
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(Refund)
+class RefundAdmin(admin.ModelAdmin):
+    """Fully read-only -- no add/change/delete, same append-only spirit as
+    InventoryMovement/CreditTransaction/POSSale. A refund is created only
+    by create_pos_refund() (shop/views.py); editing or deleting one here
+    would silently desynchronize the stock movements/credit transaction it
+    already triggered, which nothing in this admin ever reverses."""
+
+    list_display = ['refund_number', 'sale', 'method', 'reason', 'total_amount', 'created_by', 'created_at', 'slip_link']
+    list_filter = ['method', 'reason', 'created_at']
+    search_fields = ['refund_number', 'sale__sale_number']
+    date_hierarchy = 'created_at'
+    ordering = ['-created_at']
+    inlines = [RefundLineInline]
+    readonly_fields = [
+        'refund_number', 'sale', 'created_by', 'method', 'reason', 'note', 'total_amount',
+        'client_refund_id', 'created_at',
+    ]
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def slip_link(self, obj):
+        url = reverse('pos_refund_slip', args=[obj.refund_number])
+        return format_html('<a href="{}" target="_blank">Slip</a>', url)
+    slip_link.short_description = 'Slip'
 
 
 class UserProfileInlineForm(forms.ModelForm):
@@ -579,12 +637,24 @@ class CreditTransactionAdmin(admin.ModelAdmin):
     """Viewable for reconciliation only — matches InventoryMovement's own
     append-only-ledger treatment: no add, no edit, no delete from here."""
 
-    list_display = ['customer', 'transaction_type', 'amount', 'related_pos_sale', 'recorded_by', 'created_at']
+    list_display = ['customer', 'type_display', 'amount', 'related_pos_sale', 'related_refund', 'recorded_by', 'created_at']
     list_filter = ['transaction_type', 'created_at']
-    search_fields = ['customer__name', 'customer__phone', 'related_pos_sale__sale_number']
+    search_fields = ['customer__name', 'customer__phone', 'related_pos_sale__sale_number', 'related_refund__refund_number']
     date_hierarchy = 'created_at'
     ordering = ['-created_at']
-    readonly_fields = ['customer', 'amount', 'transaction_type', 'related_pos_sale', 'recorded_by', 'created_at']
+    readonly_fields = ['customer', 'amount', 'transaction_type', 'related_pos_sale', 'related_refund', 'recorded_by', 'created_at']
+
+    def type_display(self, obj):
+        # A credit-refund's repayment-shaped row is money NOT actually
+        # received -- labelled distinctly here so reading this ledger by
+        # eye never mistakes it for a real repayment (see
+        # CreditTransaction.related_refund's own docstring; shop/
+        # pl_report.py relies on the same field to exclude it from
+        # cash_collected).
+        if obj.related_refund_id:
+            return 'Refund adjustment'
+        return obj.get_transaction_type_display()
+    type_display.short_description = 'Type'
 
     def has_add_permission(self, request):
         return False

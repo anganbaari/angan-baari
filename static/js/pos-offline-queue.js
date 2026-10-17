@@ -77,7 +77,11 @@ var POS_QUEUE_STORE = 'queuedSales';
 // cold-starting offline on the old v18 shell would otherwise compute
 // unrounded line totals that no longer match what the server (once
 // deployed) requires payments to sum to.
-var POS_SHELL_CACHE = 'pos-shell-v19';
+// v19 -> v20: templates/pos.html's logout-col gained a "Refund" link to
+// the new /pos/refund/ screen (static markup + CSS only, no new JS
+// dependency) -- an installed POS app cold-starting offline on the old
+// v19 shell would otherwise never show that link at all.
+var POS_SHELL_CACHE = 'pos-shell-v20';
 var POS_META_STORE = 'meta';
 var POS_OFFLINE_PIN_STORE = 'offlineOperators';
 var POS_CREDIT_CUSTOMER_STORE = 'creditCustomers';

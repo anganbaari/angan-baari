@@ -1,0 +1,600 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Refund — Angan Baari POS</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600&family=DM+Sans:wght@400;500;600;700&family=Noto+Sans+Devanagari:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        /* Same palette as templates/pos.html's own :root (sampled from the
+           POS mockups) -- kept consistent since this page is reached
+           directly from the POS screen, not meant to look like a
+           different app. Only the handful of tokens this page actually
+           uses are copied, not the full kiosk-specific set. */
+        :root {
+            --pos-bg: #F9F5E4;
+            --pos-text-green: #285917;
+            --pos-enter-orange: #CF7122;
+            --white: #ffffff;
+            --mist: #dfe3d8;
+            --text-muted: #70806b;
+            --danger: #b23b3b;
+        }
+        * { box-sizing: border-box; }
+        html, body {
+            margin: 0; font-family: 'DM Sans', 'Noto Sans Devanagari', sans-serif;
+            background: var(--pos-bg); color: var(--pos-text-green);
+        }
+        .wrap { max-width: 740px; margin: 0 auto; padding: 20px 16px 140px; }
+        h1 { font-family: 'Cormorant Garamond', serif; font-size: 1.9rem; margin: 0 0 4px; }
+        h3 { margin: 0 0 10px; font-size: 1.05rem; }
+        .back-link { display: inline-block; margin-bottom: 14px; color: var(--pos-text-green); font-weight: 700; text-decoration: none; }
+        .card { background: var(--white); border-radius: 14px; padding: 18px; margin-bottom: 16px; box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
+
+        .lookup-row { display: flex; gap: 10px; }
+        #saleNumberInput {
+            flex: 1; font-size: 1.25rem; padding: 14px 16px; border-radius: 10px;
+            border: 2px solid var(--mist); font-family: inherit; min-height: 54px; letter-spacing: 0.03em;
+        }
+        #lookupBtn {
+            min-height: 54px; min-width: 110px; padding: 0 20px; border-radius: 10px; border: none;
+            background: var(--pos-text-green); color: #fff; font-weight: 800; font-size: 1.05rem;
+            cursor: pointer; font-family: inherit;
+        }
+        #lookupError { color: var(--danger); font-weight: 700; margin-top: 10px; }
+
+        .sale-meta-row { display: flex; justify-content: space-between; gap: 10px; font-size: 0.95rem; margin-bottom: 4px; flex-wrap: wrap; }
+        .sale-meta-row span:first-child { color: var(--text-muted); font-weight: 600; }
+        .fully-refunded-banner {
+            background: var(--danger); color: #fff; font-weight: 800; padding: 12px;
+            border-radius: 10px; text-align: center; margin-bottom: 14px; font-size: 1rem;
+        }
+        #priorRefundsList { font-size: 0.85rem; color: var(--text-muted); margin-top: 10px; border-top: 1px dashed var(--mist); padding-top: 8px; }
+        #priorRefundsList .prior-refund-row { display: flex; justify-content: space-between; padding: 2px 0; }
+
+        .line-card { border: 1.5px solid var(--mist); border-radius: 10px; padding: 14px; margin-bottom: 10px; }
+        .line-card.line-done { opacity: 0.5; }
+        .line-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+        .line-name { font-weight: 800; font-size: 1.05rem; }
+        .line-sub { font-size: 0.8rem; color: var(--text-muted); margin-top: 2px; }
+        .line-amount { font-weight: 800; white-space: nowrap; font-size: 1.05rem; }
+
+        .checkbox-row { display: flex; align-items: center; gap: 12px; }
+        .checkbox-row input[type="checkbox"] { width: 28px; height: 28px; flex-shrink: 0; cursor: pointer; }
+
+        .qty-row { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
+        .qty-row button {
+            min-width: 48px; min-height: 48px; border-radius: 8px; border: none;
+            background: var(--pos-bg); font-size: 1.3rem; font-weight: 800; cursor: pointer;
+        }
+        .qty-row input {
+            width: 90px; text-align: center; font-size: 1.1rem; padding: 10px; border-radius: 8px;
+            border: 1.5px solid var(--mist); font-family: inherit; min-height: 48px;
+        }
+        .qty-row .qty-unit { font-size: 0.82rem; color: var(--text-muted); }
+
+        .disposition-row { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+        .disposition-row label {
+            display: flex; align-items: center; gap: 6px; font-size: 0.9rem; font-weight: 700;
+            min-height: 40px; padding: 0 10px; border-radius: 8px; border: 1.5px solid var(--mist); cursor: pointer;
+        }
+        .disposition-row input[type="radio"] { width: 20px; height: 20px; }
+        .restock-only-note { font-size: 0.8rem; color: var(--text-muted); margin-top: 10px; }
+
+        .method-grid, .reason-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+        .choice-btn {
+            min-height: 54px; border-radius: 10px; border: 2px solid var(--mist); background: #fff;
+            font-weight: 800; font-size: 0.95rem; cursor: pointer; font-family: inherit; color: var(--pos-text-green);
+        }
+        .choice-btn.selected { border-color: var(--pos-text-green); background: var(--pos-text-green); color: #fff; }
+
+        #noteInput {
+            width: 100%; min-height: 70px; border-radius: 10px; border: 1.5px solid var(--mist);
+            font-family: inherit; padding: 10px; font-size: 0.95rem; margin-top: 12px; resize: vertical;
+        }
+
+        .footer-bar {
+            position: fixed; left: 0; right: 0; bottom: 0; background: var(--pos-bg);
+            border-top: 2px solid var(--mist); padding: 14px 16px; box-shadow: 0 -4px 16px rgba(0,0,0,0.08);
+        }
+        .footer-bar-inner { max-width: 740px; margin: 0 auto; }
+        .total-row { display: flex; justify-content: space-between; font-size: 1.3rem; font-weight: 800; margin-bottom: 10px; }
+        #confirmRefundBtn {
+            width: 100%; min-height: 58px; border-radius: 12px; border: none; background: var(--pos-enter-orange);
+            color: #1a1a1a; font-weight: 800; font-size: 1.15rem; cursor: pointer; font-family: inherit;
+        }
+        #confirmRefundBtn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        /* Dim overlays -- plain rgba, no blur, instant/<=100ms, same
+           convention as templates/pos.html's own backdrops. */
+        .backdrop {
+            display: none; position: fixed; inset: 0; background: rgba(26,47,30,0.35);
+            align-items: center; justify-content: center; z-index: 400; transition: opacity 0.1s;
+        }
+        .backdrop.active { display: flex; }
+        .confirm-card, .success-card {
+            background: #fff; border-radius: 16px; padding: 26px; max-width: 360px; width: 90vw;
+            text-align: center; box-shadow: 0 16px 40px rgba(0,0,0,0.3);
+        }
+        .confirm-card p { font-size: 1.05rem; font-weight: 700; margin: 0 0 18px; }
+        .success-card h3 { font-family: 'Cormorant Garamond', serif; font-size: 1.3rem; margin: 0 0 6px; }
+        #successNumber { font-size: 0.85rem; color: var(--text-muted); font-weight: 700; margin: 0 0 16px; }
+        .confirm-actions, .success-actions { display: flex; gap: 10px; }
+        .confirm-actions button, .success-actions button {
+            flex: 1; padding: 13px 10px; border: none; border-radius: 12px; font-weight: 800;
+            font-size: 0.95rem; cursor: pointer; font-family: inherit;
+        }
+        #refundConfirmCancel { background: var(--mist); color: var(--pos-text-green); }
+        #refundConfirmYes { background: var(--pos-enter-orange); color: #1a1a1a; }
+        #printSlipBtn { background: var(--pos-text-green); color: #fff; }
+        #newRefundBtn { background: var(--pos-enter-orange); color: #1a1a1a; }
+
+        #toast {
+            position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px);
+            background: var(--pos-text-green); color: #fff; padding: 12px 22px; border-radius: 50px;
+            font-weight: 700; opacity: 0; pointer-events: none; transition: opacity 0.1s, transform 0.1s; z-index: 900;
+        }
+        #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+        @media (prefers-reduced-motion: reduce) {
+            .backdrop, #toast { transition-duration: 0.01ms !important; }
+        }
+    </style>
+</head>
+<body>
+    {% csrf_token %}
+    <div class="wrap">
+        <a href="{% url 'pos' %}" class="back-link">&laquo; Back to POS</a>
+        <h1>Refund / फिर्ता</h1>
+
+        <div class="card" id="lookupCard">
+            <div class="lookup-row">
+                <input type="text" id="saleNumberInput" placeholder="Scan or type sale number" autocomplete="off" autofocus>
+                <button type="button" id="lookupBtn">Find</button>
+            </div>
+            <div id="lookupError" style="display:none;"></div>
+        </div>
+
+        <div class="card" id="saleCard" style="display:none;"></div>
+        <div id="linesContainer"></div>
+
+        <div class="card" id="methodCard" style="display:none;">
+            <h3>Refund to</h3>
+            <div class="method-grid" id="methodGrid">
+                {% for value, label in method_choices %}
+                <button type="button" class="choice-btn" data-method="{{ value }}" style="display:none;">{{ label }}</button>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="card" id="reasonCard" style="display:none;">
+            <h3>Reason</h3>
+            <div class="reason-grid" id="reasonGrid">
+                {% for value, label in reason_choices %}
+                <button type="button" class="choice-btn" data-reason="{{ value }}">{{ label }}</button>
+                {% endfor %}
+            </div>
+            <textarea id="noteInput" placeholder="Note (required if &quot;Other&quot; is chosen)"></textarea>
+        </div>
+    </div>
+
+    <div class="footer-bar" id="footerBar" style="display:none;">
+        <div class="footer-bar-inner">
+            <div class="total-row"><span>Refund total</span><span id="refundTotalDisplay">Rs 0</span></div>
+            <button type="button" id="confirmRefundBtn" disabled>Refund Rs 0</button>
+        </div>
+    </div>
+
+    <div class="backdrop" id="confirmBackdrop">
+        <div class="confirm-card">
+            <p id="confirmText"></p>
+            <div class="confirm-actions">
+                <button type="button" id="refundConfirmCancel">Cancel</button>
+                <button type="button" id="refundConfirmYes">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="backdrop" id="successBackdrop">
+        <div class="success-card">
+            <h3>Refund complete</h3>
+            <p id="successNumber"></p>
+            <div class="success-actions">
+                <button type="button" id="printSlipBtn">Print refund slip</button>
+                <button type="button" id="newRefundBtn">New refund</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast"></div>
+
+    <script>
+        // ── Small shared helpers, same conventions as templates/pos.html ──
+        function getCookie(name) {
+            const match = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+            return match ? decodeURIComponent(match[2]) : null;
+        }
+        function apiFetch(path, options) {
+            options = options || {};
+            const headers = Object.assign({ 'X-CSRFToken': getCookie('csrftoken') }, options.headers || {});
+            return fetch(path, Object.assign({}, options, { headers }));
+        }
+        function formatMoney(amount) {
+            const n = parseFloat(amount);
+            if (isNaN(n)) return String(amount);
+            const rounded = Math.round(n * 100) / 100;
+            return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(2);
+        }
+        function generateUuid() {
+            return crypto.randomUUID ? crypto.randomUUID() :
+                'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+                    const r = Math.random() * 16 | 0;
+                    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+                });
+        }
+        function showToast(text) {
+            const toast = document.getElementById('toast');
+            toast.textContent = text;
+            toast.classList.add('show');
+            clearTimeout(showToast._t);
+            showToast._t = setTimeout(() => toast.classList.remove('show'), 2200);
+        }
+
+        // Mirrors _largest_remainder_shares() (shop/views.py) exactly, so a
+        // partial-quantity line's live preview amount always matches what
+        // create_pos_refund() will actually charge for the same selection
+        // (barring an actual race with another refund in between -- the
+        // server is always the final authority either way).
+        function largestRemainderShares(amountRupees, count) {
+            const amount = Math.round(amountRupees);
+            const base = Math.floor(amount / count);
+            const remainder = amount - base * count;
+            const shares = [];
+            for (let i = 0; i < count - remainder; i++) shares.push(base);
+            for (let i = 0; i < remainder; i++) shares.push(base + 1);
+            return shares;
+        }
+        function partialLineAmount(line, qty) {
+            const originalQty = Math.round(parseFloat(line.original_quantity));
+            const alreadyQty = Math.round(parseFloat(line.already_refunded_quantity));
+            if (qty <= 0 || originalQty <= 0) return 0;
+            const shares = largestRemainderShares(parseFloat(line.allocated_amount), originalQty);
+            let sum = 0;
+            for (let i = alreadyQty; i < alreadyQty + qty; i++) sum += (shares[i] || 0);
+            return sum;
+        }
+
+        let saleData = null;
+        // Keyed by sale_line_id -> { selected: bool, qty: number, disposition: 'restock'|'discard' }
+        let lineState = {};
+        let selectedMethod = null;
+        let selectedReason = null;
+        let clientRefundId = generateUuid();
+        let confirmOpenedAt = 0;
+
+        function resetPage() {
+            saleData = null;
+            lineState = {};
+            selectedMethod = null;
+            selectedReason = null;
+            clientRefundId = generateUuid();
+            document.getElementById('lookupCard').style.display = '';
+            document.getElementById('saleCard').style.display = 'none';
+            document.getElementById('linesContainer').innerHTML = '';
+            document.getElementById('methodCard').style.display = 'none';
+            document.getElementById('reasonCard').style.display = 'none';
+            document.getElementById('footerBar').style.display = 'none';
+            document.getElementById('noteInput').value = '';
+            document.querySelectorAll('.choice-btn').forEach(b => b.classList.remove('selected'));
+            const input = document.getElementById('saleNumberInput');
+            input.value = '';
+            input.focus();
+        }
+
+        async function lookupSale() {
+            const raw = document.getElementById('saleNumberInput').value;
+            const errorBox = document.getElementById('lookupError');
+            errorBox.style.display = 'none';
+            if (!raw || !raw.trim()) return;
+
+            try {
+                const response = await apiFetch('/api/v1/pos/refunds/lookup/?sale_number=' + encodeURIComponent(raw.trim()));
+                const data = await response.json();
+                if (!response.ok) {
+                    errorBox.textContent = data.message || 'Could not find that sale.';
+                    errorBox.style.display = '';
+                    return;
+                }
+                saleData = data;
+                lineState = {};
+                data.lines.forEach(line => {
+                    lineState[line.sale_line_id] = { selected: false, qty: 0, disposition: 'restock' };
+                });
+                selectedMethod = data.has_credit_line ? 'credit' : 'cash';
+                selectedReason = null;
+                renderSale();
+            } catch (err) {
+                errorBox.textContent = 'Could not reach the server. Check the connection and try again.';
+                errorBox.style.display = '';
+            }
+        }
+
+        function renderSale() {
+            document.getElementById('lookupCard').style.display = 'none';
+
+            const saleCard = document.getElementById('saleCard');
+            saleCard.style.display = '';
+            const paymentsHtml = saleData.payments.map(p =>
+                `<div class="sale-meta-row"><span>${p.method}</span><span>Rs ${formatMoney(p.amount)}</span></div>`
+            ).join('');
+            const priorRefundsHtml = saleData.refunds.length ? `
+                <div id="priorRefundsList">
+                    <strong>Earlier refunds on this sale</strong>
+                    ${saleData.refunds.map(r => `
+                        <div class="prior-refund-row">
+                            <span>${r.refund_number} (${r.method}, ${r.created_by})</span>
+                            <span>Rs ${formatMoney(r.amount)}</span>
+                        </div>`).join('')}
+                </div>` : '';
+            saleCard.innerHTML = `
+                ${saleData.fully_refunded ? '<div class="fully-refunded-banner">This sale has already been fully refunded.</div>' : ''}
+                <div class="sale-meta-row"><span>Sale No.</span><span>${saleData.sale_number}</span></div>
+                <div class="sale-meta-row"><span>Cashier</span><span>${saleData.cashier}</span></div>
+                ${saleData.customer_name ? `<div class="sale-meta-row"><span>Customer</span><span>${saleData.customer_name}</span></div>` : ''}
+                <div class="sale-meta-row"><span>Total</span><span>Rs ${formatMoney(saleData.total_amount)}</span></div>
+                ${Number(saleData.total_refunded) > 0 ? `<div class="sale-meta-row"><span>Already refunded</span><span>Rs ${formatMoney(saleData.total_refunded)}</span></div>` : ''}
+                <div style="margin-top:8px;border-top:1px dashed var(--mist);padding-top:8px;">
+                    ${paymentsHtml}
+                </div>
+                ${priorRefundsHtml}
+            `;
+
+            renderLines();
+
+            document.getElementById('methodCard').style.display = saleData.fully_refunded ? 'none' : '';
+            document.getElementById('reasonCard').style.display = saleData.fully_refunded ? 'none' : '';
+            document.getElementById('footerBar').style.display = saleData.fully_refunded ? 'none' : '';
+
+            document.querySelectorAll('#methodGrid .choice-btn').forEach(btn => {
+                const isCredit = btn.dataset.method === 'credit';
+                btn.style.display = (isCredit && !saleData.customer_id) ? 'none' : '';
+                btn.classList.toggle('selected', btn.dataset.method === selectedMethod);
+            });
+
+            updateFooter();
+        }
+
+        function lineDisplayUnit(line) {
+            return line.unit_label || '';
+        }
+
+        function renderLines() {
+            const container = document.getElementById('linesContainer');
+            container.innerHTML = saleData.lines.map(line => {
+                const state = lineState[line.sale_line_id];
+                const done = line.fully_refunded;
+                const dispositionOptions = line.disposition_options;
+
+                let selectorHtml = '';
+                let amountHtml = '';
+
+                if (line.is_partial) {
+                    const remaining = Math.round(parseFloat(line.remaining_quantity));
+                    amountHtml = `<span class="line-amount" id="line-amount-${line.sale_line_id}">Rs ${formatMoney(partialLineAmount(line, state.qty))}</span>`;
+                    selectorHtml = `
+                        <div class="qty-row">
+                            <button type="button" class="qty-dec" data-line="${line.sale_line_id}" ${done ? 'disabled' : ''}>&minus;</button>
+                            <input type="number" class="qty-input" data-line="${line.sale_line_id}" value="${state.qty}" min="0" max="${remaining}" ${done ? 'disabled' : ''}>
+                            <button type="button" class="qty-inc" data-line="${line.sale_line_id}" ${done ? 'disabled' : ''}>+</button>
+                            <span class="qty-unit">of ${remaining} ${lineDisplayUnit(line)} left</span>
+                        </div>
+                        ${dispositionHtml(line, state, dispositionOptions)}
+                    `;
+                } else {
+                    amountHtml = `<span class="line-amount" id="line-amount-${line.sale_line_id}">Rs ${formatMoney(line.remaining_amount)}</span>`;
+                    selectorHtml = `
+                        <div class="checkbox-row">
+                            <input type="checkbox" class="line-checkbox" data-line="${line.sale_line_id}" ${state.selected ? 'checked' : ''} ${done ? 'disabled' : ''}>
+                            <span>${done ? 'Already fully refunded' : 'Refund this item'}</span>
+                        </div>
+                        ${dispositionHtml(line, state, dispositionOptions)}
+                    `;
+                }
+
+                return `
+                    <div class="line-card ${done ? 'line-done' : ''}" id="line-card-${line.sale_line_id}">
+                        <div class="line-head">
+                            <div>
+                                <div class="line-name">${line.name}</div>
+                                <div class="line-sub">${line.original_quantity} ${lineDisplayUnit(line)} sold${line.combo_instance_id ? ' · part of a combo' : ''}</div>
+                            </div>
+                            ${amountHtml}
+                        </div>
+                        ${selectorHtml}
+                    </div>
+                `;
+            }).join('');
+
+            attachLineHandlers();
+        }
+
+        function dispositionHtml(line, state, options) {
+            if (options.length === 1) {
+                return `<div class="restock-only-note">Returns to stock — an animal can't be marked as discarded.</div>`;
+            }
+            return `
+                <div class="disposition-row">
+                    ${options.map(opt => `
+                        <label>
+                            <input type="radio" name="disposition-${line.sale_line_id}" value="${opt}" ${state.disposition === opt ? 'checked' : ''}>
+                            ${opt === 'restock' ? 'Back to stock' : 'Discard'}
+                        </label>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        function attachLineHandlers() {
+            document.querySelectorAll('.line-checkbox').forEach(cb => {
+                cb.addEventListener('change', () => {
+                    const id = cb.dataset.line;
+                    lineState[id].selected = cb.checked;
+                    updateFooter();
+                });
+            });
+            document.querySelectorAll('.qty-input').forEach(input => {
+                input.addEventListener('input', () => {
+                    const id = input.dataset.line;
+                    const max = parseInt(input.max, 10) || 0;
+                    let value = parseInt(input.value, 10);
+                    if (isNaN(value) || value < 0) value = 0;
+                    if (value > max) value = max;
+                    lineState[id].qty = value;
+                    const line = saleData.lines.find(l => String(l.sale_line_id) === String(id));
+                    document.getElementById('line-amount-' + id).textContent = 'Rs ' + formatMoney(partialLineAmount(line, value));
+                    updateFooter();
+                });
+            });
+            document.querySelectorAll('.qty-dec, .qty-inc').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const id = btn.dataset.line;
+                    const input = document.querySelector('.qty-input[data-line="' + id + '"]');
+                    const delta = btn.classList.contains('qty-inc') ? 1 : -1;
+                    input.value = Math.max(0, Math.min(parseInt(input.max, 10) || 0, (parseInt(input.value, 10) || 0) + delta));
+                    input.dispatchEvent(new Event('input'));
+                });
+            });
+            document.querySelectorAll('[name^="disposition-"]').forEach(radio => {
+                radio.addEventListener('change', () => {
+                    const id = radio.name.replace('disposition-', '');
+                    lineState[id].disposition = radio.value;
+                });
+            });
+        }
+
+        function activeSelections() {
+            return saleData.lines
+                .map(line => {
+                    const state = lineState[line.sale_line_id];
+                    const qty = line.is_partial ? state.qty : (state.selected ? Math.round(parseFloat(line.remaining_quantity)) : 0);
+                    return { line, state, qty };
+                })
+                .filter(entry => entry.qty > 0);
+        }
+
+        function computeRefundTotal() {
+            return activeSelections().reduce((sum, entry) => {
+                const amount = entry.line.is_partial
+                    ? partialLineAmount(entry.line, entry.qty)
+                    : parseFloat(entry.line.remaining_amount);
+                return sum + amount;
+            }, 0);
+        }
+
+        function updateFooter() {
+            const total = computeRefundTotal();
+            document.getElementById('refundTotalDisplay').textContent = 'Rs ' + formatMoney(total);
+            const btn = document.getElementById('confirmRefundBtn');
+            btn.textContent = 'Refund Rs ' + formatMoney(total);
+            btn.disabled = !(total > 0 && selectedMethod && selectedReason &&
+                (selectedReason !== 'other' || document.getElementById('noteInput').value.trim()));
+        }
+
+        document.getElementById('methodGrid').addEventListener('click', (e) => {
+            const btn = e.target.closest('.choice-btn');
+            if (!btn) return;
+            selectedMethod = btn.dataset.method;
+            document.querySelectorAll('#methodGrid .choice-btn').forEach(b => b.classList.toggle('selected', b === btn));
+            updateFooter();
+        });
+        document.getElementById('reasonGrid').addEventListener('click', (e) => {
+            const btn = e.target.closest('.choice-btn');
+            if (!btn) return;
+            selectedReason = btn.dataset.reason;
+            document.querySelectorAll('#reasonGrid .choice-btn').forEach(b => b.classList.toggle('selected', b === btn));
+            updateFooter();
+        });
+        document.getElementById('noteInput').addEventListener('input', updateFooter);
+
+        document.getElementById('lookupBtn').addEventListener('click', lookupSale);
+        document.getElementById('saleNumberInput').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') { e.preventDefault(); lookupSale(); }
+        });
+
+        // ── Confirmation dialog -- same plain-dim/no-blur/<=100ms/300ms
+        //    tap-ignore-window convention as templates/pos.html's
+        //    Full-cash confirmation (openFullCashConfirm()). ──
+        function openConfirm() {
+            const total = computeRefundTotal();
+            const methodLabel = document.querySelector('#methodGrid .choice-btn.selected').textContent.trim();
+            const saleRef = saleData.sale_number.startsWith('POS-') ? saleData.sale_number.slice(4) : saleData.sale_number;
+            document.getElementById('confirmText').textContent =
+                `Refund Rs ${formatMoney(total)} to ${methodLabel} for sale ${saleRef}?`;
+            confirmOpenedAt = Date.now();
+            document.getElementById('confirmBackdrop').classList.add('active');
+        }
+        function closeConfirm() {
+            document.getElementById('confirmBackdrop').classList.remove('active');
+        }
+        document.getElementById('confirmRefundBtn').addEventListener('click', () => {
+            if (document.getElementById('confirmRefundBtn').disabled) return;
+            openConfirm();
+        });
+        document.getElementById('refundConfirmCancel').addEventListener('click', closeConfirm);
+        document.getElementById('confirmBackdrop').addEventListener('click', (e) => {
+            if (e.target.id === 'confirmBackdrop') closeConfirm();
+        });
+
+        let refundInFlight = false;
+        document.getElementById('refundConfirmYes').addEventListener('click', async () => {
+            if (Date.now() - confirmOpenedAt < 300) return;
+            if (refundInFlight) return;
+            refundInFlight = true;
+            closeConfirm();
+
+            const selections = activeSelections().map(entry => ({
+                sale_line_id: entry.line.sale_line_id,
+                quantity: entry.qty,
+                disposition: entry.line.disposition_options.length === 1 ? 'restock' : entry.state.disposition,
+            }));
+
+            try {
+                const response = await apiFetch('/api/v1/pos/refunds/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        sale_number: saleData.sale_number,
+                        selections,
+                        method: selectedMethod,
+                        reason: selectedReason,
+                        note: document.getElementById('noteInput').value.trim(),
+                        client_refund_id: clientRefundId,
+                    }),
+                });
+                const data = await response.json();
+                if (!response.ok) {
+                    showToast(data.message || 'Could not process this refund. Nothing was charged.');
+                    refundInFlight = false;
+                    return;
+                }
+                document.getElementById('successNumber').textContent =
+                    `${data.refund_number} — Rs ${formatMoney(data.total_amount)}`;
+                document.getElementById('printSlipBtn').onclick = () => {
+                    window.open('/pos/refund/' + data.refund_number + '/', '_blank');
+                };
+                document.getElementById('successBackdrop').classList.add('active');
+            } catch (err) {
+                showToast('Could not reach the server. Nothing was charged -- please try again.');
+            } finally {
+                refundInFlight = false;
+            }
+        });
+
+        document.getElementById('newRefundBtn').addEventListener('click', () => {
+            document.getElementById('successBackdrop').classList.remove('active');
+            resetPage();
+        });
+    </script>
+</body>
+</html>

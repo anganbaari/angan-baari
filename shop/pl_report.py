@@ -38,11 +38,16 @@ from . import bs_calendar
 from .reports import LOCAL_TZ, ZERO, get_outstanding_credit_total, local_range_to_utc
 from .models import (
     CostCentreProduct, CostEntry, CreditTransaction, FarmAsset, InventoryMovement,
-    POSSale, POSSalePayment, Product, ProductOrder,
+    POSSale, POSSalePayment, Product, ProductOrder, Refund,
 )
 
 MONEY = DecimalField(max_digits=16, decimal_places=4)
 CENT = Decimal('0.01')
+# Money that actually left the till on a refund -- a credit-balance
+# refund is deliberately excluded (see build_pl()'s refund handling
+# below): it only reduces what a customer owes, no cash/eSewa/Khalti/
+# bank transfer ever moved.
+CASH_LIKE_REFUND_METHODS = ('cash', 'esewa', 'khalti', 'bank_transfer')
 
 
 def _q2(value):
@@ -179,8 +184,44 @@ def build_pl(date_from, date_to):
         retail=Sum(F('taxable_value') + F('exempt_value'), filter=Q(is_wholesale=False), output_field=MONEY),
         wholesale=Sum(F('taxable_value') + F('exempt_value'), filter=Q(is_wholesale=True), output_field=MONEY),
     )
-    retail_revenue = revenue_agg['retail'] or ZERO
-    wholesale_revenue = revenue_agg['wholesale'] or ZERO
+    gross_retail_revenue = revenue_agg['retail'] or ZERO
+    gross_wholesale_revenue = revenue_agg['wholesale'] or ZERO
+
+    # Refunds count in the period the REFUND happened (created_at), not
+    # the original sale's date -- a refund processed this month against a
+    # sale from last month reduces THIS month's revenue/cash, not last
+    # month's (which already closed, and whose own figures stay exactly
+    # as they were reported then). is_wholesale is read off the ORIGINAL
+    # sale (a refund has no wholesale flag of its own); the taxable/exempt
+    # split likewise uses the original sale's own ratio, since a Refund
+    # only ever stores one total_amount, never its own tax breakdown.
+    refund_qs = Refund.objects.filter(
+        created_at__gte=start_utc, created_at__lt=end_utc,
+    ).select_related('sale')
+    refund_retail_total = ZERO
+    refund_wholesale_total = ZERO
+    refund_taxable_total = ZERO
+    refund_exempt_total = ZERO
+    refund_cash_like_total = ZERO
+    for refund in refund_qs:
+        sale = refund.sale
+        if sale.is_wholesale:
+            refund_wholesale_total += refund.total_amount
+        else:
+            refund_retail_total += refund.total_amount
+        sale_total = Decimal(str(sale.total_amount))
+        if sale_total > 0:
+            taxable_ratio = Decimal(str(sale.taxable_value)) / sale_total
+        else:
+            taxable_ratio = ZERO
+        refund_taxable_portion = _q2(refund.total_amount * taxable_ratio)
+        refund_taxable_total += refund_taxable_portion
+        refund_exempt_total += (refund.total_amount - refund_taxable_portion)
+        if refund.method in CASH_LIKE_REFUND_METHODS:
+            refund_cash_like_total += refund.total_amount
+
+    retail_revenue = gross_retail_revenue - refund_retail_total
+    wholesale_revenue = gross_wholesale_revenue - refund_wholesale_total
     total_revenue = retail_revenue + wholesale_revenue
 
     payment_agg = POSSalePayment.objects.filter(sale_id__in=sale_ids).aggregate(
@@ -189,10 +230,18 @@ def build_pl(date_from, date_to):
     )
     cash_like = payment_agg['cash_like'] or ZERO
     credit_given = payment_agg['credit_given'] or ZERO
+    # related_refund__isnull=True excludes a credit-balance REFUND's own
+    # repayment-shaped CreditTransaction (see CreditTransaction.
+    # related_refund's docstring) -- no real cash/eSewa/Khalti/bank
+    # transfer moved for that row, it only reduced what the customer owes,
+    # so counting it here would overstate cash actually collected.
     repayments = CreditTransaction.objects.filter(
-        transaction_type='repayment', created_at__gte=start_utc, created_at__lt=end_utc,
+        transaction_type='repayment', related_refund__isnull=True,
+        created_at__gte=start_utc, created_at__lt=end_utc,
     ).aggregate(total=Sum('amount'))['total'] or ZERO
-    cash_collected = cash_like + repayments
+    # Cash-like refunds (not credit) reduce cash_collected -- that money
+    # genuinely left the till/wallet/bank this period.
+    cash_collected = cash_like + repayments - refund_cash_like_total
     credit_outstanding_now = get_outstanding_credit_total()
 
     # Website orders -- revenue excluded entirely (no stored price), just
@@ -365,10 +414,21 @@ def build_pl(date_from, date_to):
     return {
         'period': {'from': date_from, 'to': date_to},
         'revenue': {
+            # NET of refunds recorded in this same period (see above) --
+            # 'gross_total'/'refunds' are exposed alongside so these
+            # reconcile: gross_total - refunds.total == total.
             'retail': _q2(retail_revenue), 'wholesale': _q2(wholesale_revenue), 'total': _q2(total_revenue),
+            'gross_retail': _q2(gross_retail_revenue), 'gross_wholesale': _q2(gross_wholesale_revenue),
+            'gross_total': _q2(gross_retail_revenue + gross_wholesale_revenue),
             'sourced_products': _q2(sourced_revenue),
             'unmapped_farm_products': _q2(unmapped_farm_revenue),
             'sales_before_line_tracking': _q2(sales_without_lines_revenue),
+        },
+        'refunds': {
+            'total': _q2(refund_retail_total + refund_wholesale_total),
+            'retail': _q2(refund_retail_total), 'wholesale': _q2(refund_wholesale_total),
+            'taxable': _q2(refund_taxable_total), 'exempt': _q2(refund_exempt_total),
+            'cash_like': _q2(refund_cash_like_total),
         },
         'cash_vs_credit': {
             'cash_collected': _q2(cash_collected), 'credit_given': _q2(credit_given),

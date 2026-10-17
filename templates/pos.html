@@ -264,6 +264,14 @@
            colors are already claimed (Low Stock, Repay Credit, Offers,
            Stock OK) and logging out isn't an alert or a primary action. */
         .side-btn.logout-btn { background: #54606b; }
+        /* Plain link styled as a side-btn (not a <button>, since it just
+           navigates to /pos/refund/ -- no JS handler needed here at all).
+           Neutral slate like Logout, not a bright action color -- it's a
+           navigation link off this screen, not a primary POS action. */
+        .side-btn.refund-link-btn {
+            background: #6b5a3a; color: #fff; text-decoration: none; display: flex;
+            align-items: center; justify-content: center; font-size: 0.78rem;
+        }
 
         /* A single-line indicator, not a list -- deliberately has no content
            that can grow with the number of low-stock products, so it can
@@ -1049,8 +1057,11 @@
                 </div>
 
                 <div class="receipt-combined-row">
-                    <div class="logout-col" style="flex-direction: column; justify-content: center;">
+                    <div class="logout-col" style="flex-direction: column; justify-content: center; gap: 4px;">
                         <button type="button" class="side-btn logout-btn" id="logoutBtn">Logout</button>
+                        <a href="{% url 'pos_refund' %}" class="side-btn refund-link-btn" id="refundLinkBtn">
+                            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:3px;"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-1"/></svg>Refund
+                        </a>
                     </div>
 
                     <div class="reminder-card">
