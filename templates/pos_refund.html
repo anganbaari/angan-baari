@@ -182,6 +182,7 @@
     <div class="footer-bar" id="footerBar" style="display:none;">
         <div class="footer-bar-inner">
             <div class="total-row"><span>Refund total</span><span id="refundTotalDisplay">Rs 0</span></div>
+            <div id="confirmDisabledReason" style="display:none;font-size:0.85rem;font-weight:700;color:var(--danger);margin-bottom:8px;text-align:center;"></div>
             <button type="button" id="confirmRefundBtn" disabled>Refund Rs 0</button>
         </div>
     </div>
@@ -477,7 +478,18 @@
             return saleData.lines
                 .map(line => {
                     const state = lineState[line.sale_line_id];
-                    const qty = line.is_partial ? state.qty : (state.selected ? Math.round(parseFloat(line.remaining_quantity)) : 0);
+                    // NOT Math.round() -- a whole-line refund (variable_weight,
+                    // fixed_weight, or a combo component) must send the EXACT
+                    // remaining_quantity back to the server, which requires an
+                    // exact match to sale_line.quantity. remaining_quantity is
+                    // a WEIGHT (kg) for a variable_weight line, not a count --
+                    // rounding it to the nearest whole number was the bug: any
+                    // line under 0.5kg (e.g. 0.250kg) rounded to 0, silently
+                    // dropping a ticked checkbox out of the total, and any
+                    // line at/above 0.5kg rounded to a quantity that no longer
+                    // matched the line's own stored quantity at all, which the
+                    // server would then reject as "not a full-line refund".
+                    const qty = line.is_partial ? state.qty : (state.selected ? parseFloat(line.remaining_quantity) : 0);
                     return { line, state, qty };
                 })
                 .filter(entry => entry.qty > 0);
@@ -497,8 +509,18 @@
             document.getElementById('refundTotalDisplay').textContent = 'Rs ' + formatMoney(total);
             const btn = document.getElementById('confirmRefundBtn');
             btn.textContent = 'Refund Rs ' + formatMoney(total);
-            btn.disabled = !(total > 0 && selectedMethod && selectedReason &&
-                (selectedReason !== 'other' || document.getElementById('noteInput').value.trim()));
+
+            const noteFilled = document.getElementById('noteInput').value.trim();
+            let disabledReason = '';
+            if (!(total > 0)) disabledReason = 'Select at least one item to refund.';
+            else if (!selectedMethod) disabledReason = 'Choose a refund method.';
+            else if (!selectedReason) disabledReason = 'Choose a reason.';
+            else if (selectedReason === 'other' && !noteFilled) disabledReason = 'Add a note for "Other".';
+
+            btn.disabled = !!disabledReason;
+            const reasonBox = document.getElementById('confirmDisabledReason');
+            reasonBox.textContent = disabledReason;
+            reasonBox.style.display = disabledReason ? '' : 'none';
         }
 
         document.getElementById('methodGrid').addEventListener('click', (e) => {

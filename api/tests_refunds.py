@@ -21,7 +21,7 @@ from django.utils import timezone
 from rest_framework import status
 
 from shop.admin import RefundAdmin
-from shop.models import BundleItem, Coupon, Customer, InventoryMovement, Offer, Refund, RefundLine
+from shop.models import BundleItem, Coupon, Customer, InventoryMovement, Offer, Product, Refund, RefundLine
 from shop.views import (
     _largest_remainder_shares,
     allocate_sale_total_to_lines,
@@ -124,6 +124,93 @@ class RefundLookupApiTests(RefundTestBase):
         self.assertEqual(line['remaining_quantity'], '2.000')
         self.assertEqual(Decimal(line['allocated_amount']), Decimal('500'))
         self.assertEqual(response.data['payments'], [{'method': 'cash', 'amount': '500.00'}])
+
+
+class RefundLookupRefundableAmountTests(RefundTestBase):
+    """Regression coverage for a real bug: templates/pos_refund.html's
+    activeSelections() used Math.round(parseFloat(line.remaining_quantity))
+    to decide how much of a whole-line (variable_weight/fixed_weight/combo
+    component) to refund. For a weighed line under 0.5kg (e.g. the
+    0.250kg/Rs 20 case that was actually reported), that rounds the
+    quantity to 0, silently dropping a ticked line out of the refund
+    total -- and for a weighed line AT OR ABOVE 0.5kg, it sent a quantity
+    that no longer matched sale_line.quantity at all, which the server
+    correctly rejects as "not a full-line refund". The server-side
+    allocation itself (get_pos_sale_refund_info()/create_pos_refund(),
+    shop/views.py) was never the problem -- these tests pin that down by
+    checking the LOOKUP response's own numbers directly, independent of
+    the front end, and then exercising a real weighed-line refund
+    end-to-end through the API."""
+
+    def test_lookup_gives_positive_refundable_amount_for_a_weighed_line(self):
+        # The exact reported scenario: 0.250kg at a price that lands on a
+        # whole rupee (80/kg x 0.25kg = 20).
+        cauliflower = Product.objects.create(
+            name='Cauliflower', slug='refund-bug-cauliflower', category=self.category,
+            description='t', price=Decimal('80.00'), pricing_mode='variable_weight',
+        )
+        InventoryMovement.objects.create(
+            product=cauliflower, movement_type='harvest', source='admin', quantity=Decimal('10.000'),
+        )
+        sale = self.complete_sale(
+            cart=[{'product_id': cauliflower.id, 'qty': 1, 'weight': '0.250'}],
+            payments=[{'method': 'cash', 'amount': '20.00'}],
+        )
+        response = self.lookup(sale.sale_number)
+        self.assertEqual(response.status_code, 200)
+        line = response.data['lines'][0]
+        self.assertEqual(line['remaining_quantity'], '0.250')
+        self.assertFalse(line['is_partial'])
+        self.assertGreater(Decimal(line['allocated_amount']), Decimal('0'))
+        self.assertEqual(Decimal(line['allocated_amount']), Decimal('20'))
+        self.assertEqual(Decimal(line['remaining_amount']), Decimal('20'))
+
+    def test_lookup_gives_positive_refundable_amount_for_a_unit_line(self):
+        sale = self.complete_sale(
+            cart=[{'product_id': self.jar.id, 'qty': 3}], payments=[{'method': 'cash', 'amount': '750.00'}],
+        )
+        response = self.lookup(sale.sale_number)
+        line = response.data['lines'][0]
+        self.assertTrue(line['is_partial'])
+        self.assertGreater(Decimal(line['remaining_amount']), Decimal('0'))
+        self.assertEqual(Decimal(line['allocated_amount']), Decimal('750'))
+
+    def test_lookup_gives_positive_refundable_amount_for_an_animal_line(self):
+        sale = self.complete_sale(
+            cart=[{'product_id': self.goat.id, 'qty': 1, 'variant_id': self.goat_variant.id}],
+            payments=[{'method': 'cash', 'amount': str(self.goat_variant.total_price())}],
+        )
+        response = self.lookup(sale.sale_number)
+        line = response.data['lines'][0]
+        self.assertEqual(line['remaining_quantity'], '1.000')
+        self.assertFalse(line['is_partial'])
+        self.assertGreater(Decimal(line['remaining_amount']), Decimal('0'))
+        self.assertEqual(Decimal(line['remaining_amount']), self.goat_variant.total_price())
+
+    def test_refunding_a_sub_half_kg_weighed_line_succeeds_with_the_right_total(self):
+        """End-to-end: the server itself was always fine for this case
+        (confirmed above), but this pins down that a full-line refund of
+        a weighed line under 0.5kg actually completes and charges the
+        exact right amount, through the same endpoint the front end
+        calls -- the kind of test that would have caught the bug if the
+        server had ever sent a rounded quantity like the buggy front end
+        did."""
+        cauliflower = Product.objects.create(
+            name='Cauliflower 2', slug='refund-bug-cauliflower-2', category=self.category,
+            description='t', price=Decimal('80.00'), pricing_mode='variable_weight',
+        )
+        InventoryMovement.objects.create(
+            product=cauliflower, movement_type='harvest', source='admin', quantity=Decimal('10.000'),
+        )
+        sale = self.complete_sale(
+            cart=[{'product_id': cauliflower.id, 'qty': 1, 'weight': '0.250'}],
+            payments=[{'method': 'cash', 'amount': '20.00'}],
+        )
+        line = sale.lines.get()
+        response = self.post_refund(sale.sale_number, [{'sale_line_id': line.id, 'quantity': '0.250'}])
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(Decimal(response.data['total_amount']), Decimal('20.00'))
+        self.assertEqual(InventoryMovement.current_stock(cauliflower), Decimal('10.000'))  # 10 - 0.25 + 0.25
 
 
 # ─── Create refund: partial / whole-line rules ─────────────────
