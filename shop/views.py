@@ -2317,9 +2317,11 @@ def pos_refund_slip_view(request, refund_number):
     overall shape/conventions as pos_receipt_view() (BS date via
     bs_calendar.ad_to_bs(), format_money_display() for whole-rupee
     display, 80mm default / ?width=58 for a 58mm roll, cashier shown by
-    first name only) but for a Refund instead of a POSSale -- no barcode,
-    no QR row, no thank-you line (none of that was asked for here, see
-    templates/pos_refund_slip.html)."""
+    first name only, and now the SAME header/social-QR markup, via the
+    shared templates/_receipt_header.html / _receipt_social_qr.html
+    partials -- see those files' own comments) but for a Refund instead
+    of a POSSale -- still no barcode, no thank-you line (neither was
+    asked for here, see templates/pos_refund_slip.html)."""
     from django.utils import timezone
     from .models import BusinessSettings, Refund
     from .bs_calendar import ad_to_bs, BSDateOutOfRangeError
@@ -2341,14 +2343,27 @@ def pos_refund_slip_view(request, refund_number):
     cashier_name = refund.created_by.get_full_name() or refund.created_by.username
     cashier_first_name = cashier_name.split()[0] if cashier_name else ''
 
+    def line_detail(line):
+        # Weighed lines show the refunded weight with its unit (e.g.
+        # "0.25 kg"), same as the sale receipt's own per-line detail --
+        # "Qty: N" stays for everything else (fixed_quantity/fixed_weight).
+        if line.product.pricing_mode == 'variable_weight':
+            unit_label = line.product.weight_unit_label or 'kg'
+            return f'{format_quantity_display(line.quantity)} {unit_label}'
+        return f'Qty: {format_quantity_display(line.quantity)}'
+
     lines_display = [{
         'name': line.description,
-        'quantity': format_quantity_display(line.quantity),
+        'detail': line_detail(line),
         'amount': format_money_display(line.amount),
-    } for line in refund.lines.all()]
+    } for line in refund.lines.select_related('product').all()]
 
     def image_url(field):
         return field.url if field else ''
+
+    qr_website_url = image_url(business.qr_website)
+    qr_tiktok_url = image_url(business.qr_tiktok)
+    qr_facebook_url = image_url(business.qr_facebook)
 
     width_mm = 58 if request.GET.get('width') == '58' else 80
 
@@ -2358,6 +2373,7 @@ def pos_refund_slip_view(request, refund_number):
         'refund_number': refund.refund_number,
         'sale_number_display': sale_number_display,
         'logo_url': image_url(business.receipt_logo),
+        'flag_url': image_url(business.receipt_flag),
         'shop_phone_devanagari': to_devanagari_digits(business.shop_phone) if business.shop_phone else '',
         'pan_vat_devanagari': to_devanagari_digits(business.pan_vat_number) if business.pan_vat_number else '',
         'date_display': date_display,
@@ -2367,6 +2383,10 @@ def pos_refund_slip_view(request, refund_number):
         'total': format_money_display(refund.total_amount),
         'method_label': dict(Refund.METHOD_CHOICES).get(refund.method, refund.method),
         'reason_label': dict(Refund.REASON_CHOICES).get(refund.reason, refund.reason),
+        'qr_website_url': qr_website_url,
+        'qr_tiktok_url': qr_tiktok_url,
+        'qr_facebook_url': qr_facebook_url,
+        'has_any_social_qr': bool(qr_website_url or qr_tiktok_url or qr_facebook_url),
         'width_mm': width_mm,
     })
 

@@ -26,6 +26,7 @@
             font-family: 'Noto Sans Devanagari', 'Cormorant Garamond', serif;
             font-size: 23px; font-weight: 800; margin: 0; line-height: 1.1; word-break: break-word;
         }
+        .r-shop-name-en { font-size: 11px; font-weight: 600; margin: 0; }
 
         .r-center { text-align: center; }
         .r-refund-title {
@@ -55,6 +56,15 @@
         }
         .r-total-row span:first-child { font-family: 'Noto Sans Devanagari', 'DM Sans', sans-serif; }
 
+        /* flex-wrap:wrap -- same safety net as templates/pos_receipt.html's
+           own copy of this rule: invisible at 80mm, wraps a 3rd QR image
+           to a second line at 58mm instead of clipping against
+           .receipt's overflow:hidden. */
+        .r-social-qr-row { display: flex; flex-wrap: wrap; justify-content: center; margin: 4px 0; gap: 10px; }
+        .r-social-qr-col { flex: 0 0 auto; min-width: 0; }
+        .r-social-qr-col img { display: block; width: 78px; height: 78px; margin: 0 auto; object-fit: contain; filter: grayscale(1) contrast(1.3); }
+        .r-social-qr-caption { font-size: 9.5px; margin-top: 2px; text-align: center; }
+
         .print-btn-wrap { text-align: center; margin: 14px auto 0; width: {{ width_mm }}mm; max-width: 100%; }
         .print-btn-wrap button {
             width: 100%; padding: 12px; border: none; border-radius: 8px; background: #285917; color: #fff;
@@ -73,14 +83,8 @@
 <body>
     <div class="receipt-wrap">
         <div class="receipt">
-            <!-- Header: same logo/shop-name group as the receipt, no flag
-                 (this isn't the sale receipt, keeping it simpler). -->
-            <div class="r-header">
-                {% if logo_url %}<div class="r-header-side"><img src="{{ logo_url }}" alt=""></div>{% endif %}
-                <div class="r-header-center">
-                    {% if business.shop_name %}<p class="r-shop-name">{{ business.shop_name }}</p>{% endif %}
-                </div>
-            </div>
+            <!-- Header -- shared with templates/pos_receipt.html, see templates/_receipt_header.html -->
+            {% include '_receipt_header.html' %}
             {% if business.shop_address %}<p class="r-center" style="margin:4px 0 0;">{{ business.shop_address }}</p>{% endif %}
 
             <p class="r-refund-title">REFUND / फिर्ता</p>
@@ -115,7 +119,7 @@
                     <span class="r-item-name">{{ line.name }}</span>
                     <span class="r-item-amount">{{ line.amount }}</span>
                 </div>
-                <div class="r-item-detail">Qty: {{ line.quantity }}</div>
+                <div class="r-item-detail">{{ line.detail }}</div>
             </div>
             {% if not forloop.last %}<hr class="r-dash">{% endif %}
             {% endfor %}
@@ -127,6 +131,9 @@
             <hr class="r-dash">
             <div class="r-total-row"><span>कुल फिर्ता / Total refunded</span><span>रू/RS {{ total }}</span></div>
             <hr class="r-dash">
+
+            <!-- Social QR row -- shared with templates/pos_receipt.html, see templates/_receipt_social_qr.html -->
+            {% include '_receipt_social_qr.html' %}
         </div>
         <div class="print-btn-wrap">
             <button type="button" onclick="window.print()">Print</button>

@@ -1,0 +1,26 @@
+<!-- Shared by templates/pos_receipt.html and templates/pos_refund_slip.html
+     (POS Refund-slip-polish task) -- the Website/Tiktok/facebook QR row,
+     skipping any blank one, and skipping the whole row when all three
+     are blank. Deliberately does NOT include its own preceding <hr
+     class="r-dash"> -- both including pages already have one
+     unconditional dashed line right after their own Total row, and
+     adding a second one here would double it up for a page with no QR
+     images at all. Needs `has_any_social_qr`/`qr_website_url`/
+     `qr_tiktok_url`/`qr_facebook_url` in the including template's own
+     context; the including page must also define the matching CSS
+     (.r-social-qr-row/.r-social-qr-col/.r-social-qr-caption) itself --
+     see _receipt_header.html's own comment for why the CSS isn't shared
+     the same way the markup is. -->
+{% if has_any_social_qr %}
+<div class="r-social-qr-row">
+    {% if qr_website_url %}
+    <div class="r-social-qr-col"><img src="{{ qr_website_url }}" alt=""><div class="r-social-qr-caption">Website</div></div>
+    {% endif %}
+    {% if qr_tiktok_url %}
+    <div class="r-social-qr-col"><img src="{{ qr_tiktok_url }}" alt=""><div class="r-social-qr-caption">Tiktok</div></div>
+    {% endif %}
+    {% if qr_facebook_url %}
+    <div class="r-social-qr-col"><img src="{{ qr_facebook_url }}" alt=""><div class="r-social-qr-caption">facebook</div></div>
+    {% endif %}
+</div>
+{% endif %}

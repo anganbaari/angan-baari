@@ -21,7 +21,7 @@ from django.utils import timezone
 from rest_framework import status
 
 from shop.admin import RefundAdmin
-from shop.models import BundleItem, Coupon, Customer, InventoryMovement, Offer, Product, Refund, RefundLine
+from shop.models import BundleItem, BusinessSettings, Coupon, Customer, InventoryMovement, Offer, Product, Refund, RefundLine
 from shop.views import (
     _largest_remainder_shares,
     allocate_sale_total_to_lines,
@@ -576,6 +576,113 @@ class RefundSlipViewTests(RefundTestBase):
         response = self.client.get(reverse('pos_refund'))
         self.assertEqual(response.status_code, 200)
         self.assertIn(b'Refund', response.content)
+
+    def test_refund_slip_has_no_barcode_element(self):
+        """Refund-slip polish task: no barcode, and no JsBarcode script
+        at all -- unlike the sale receipt, which has both."""
+        sale = self.complete_sale(
+            cart=[{'product_id': self.jar.id, 'qty': 2}], payments=[{'method': 'cash', 'amount': '500.00'}],
+        )
+        line = sale.lines.get()
+        create_response = self.post_refund(sale.sale_number, [{'sale_line_id': line.id, 'quantity': '2'}])
+        response = self.client.get(reverse('pos_refund_slip', args=[create_response.data['refund_number']]))
+        content = response.content.decode()
+        self.assertNotIn('<svg', content)
+        self.assertNotIn('JsBarcode', content)
+        self.assertNotIn('jsbarcode', content)
+
+    def test_refund_slip_shows_weighed_line_with_kg_unit(self):
+        """Refund-slip polish task: a weighed line shows "<weight> kg",
+        not "Qty: <weight>" -- the same way the sale receipt shows a
+        weighed line's own detail with its unit."""
+        fruit = Product.objects.create(
+            name='Refund Slip Mango', slug='refund-slip-mango', category=self.category,
+            description='t', price=Decimal('80.00'), pricing_mode='variable_weight',
+        )
+        InventoryMovement.objects.create(product=fruit, movement_type='harvest', source='admin', quantity=Decimal('10.000'))
+        sale = self.complete_sale(
+            cart=[{'product_id': fruit.id, 'qty': 1, 'weight': '0.250'}],
+            payments=[{'method': 'cash', 'amount': '20.00'}],
+        )
+        line = sale.lines.get()
+        create_response = self.post_refund(sale.sale_number, [{'sale_line_id': line.id, 'quantity': '0.250'}])
+        self.assertEqual(create_response.status_code, 201, create_response.data)
+        response = self.client.get(reverse('pos_refund_slip', args=[create_response.data['refund_number']]))
+        content = response.content.decode()
+        self.assertIn('0.25 kg', content)
+        self.assertNotIn('Qty: 0.25', content)
+
+    def test_refund_slip_shows_unit_line_with_qty_prefix(self):
+        """Unit (fixed_quantity) lines keep the "Qty: N" style -- only
+        weighed lines switch to "<weight> <unit>"."""
+        sale = self.complete_sale(
+            cart=[{'product_id': self.jar.id, 'qty': 2}], payments=[{'method': 'cash', 'amount': '500.00'}],
+        )
+        line = sale.lines.get()
+        create_response = self.post_refund(sale.sale_number, [{'sale_line_id': line.id, 'quantity': '2'}])
+        response = self.client.get(reverse('pos_refund_slip', args=[create_response.data['refund_number']]))
+        content = response.content.decode()
+        self.assertIn('Qty: 2', content)
+
+    def test_refund_slip_shows_flag_and_qr_images_when_set_skips_blank_ones(self):
+        settings_row = BusinessSettings.get_solo()
+        settings_row.receipt_flag = 'business/flag-test.png'
+        settings_row.qr_website = 'business/website-qr-test.png'
+        settings_row.save()
+
+        sale = self.complete_sale(
+            cart=[{'product_id': self.jar.id, 'qty': 1}], payments=[{'method': 'cash', 'amount': '250.00'}],
+        )
+        line = sale.lines.get()
+        create_response = self.post_refund(sale.sale_number, [{'sale_line_id': line.id, 'quantity': '1'}])
+        response = self.client.get(reverse('pos_refund_slip', args=[create_response.data['refund_number']]))
+        content = response.content.decode()
+
+        self.assertIn('business/flag-test.png', content)
+        self.assertIn('<div class="r-social-qr-row">', content)
+        self.assertIn('business/website-qr-test.png', content)
+        self.assertIn('>Website<', content)
+        # Tiktok/facebook were never set -- skipped, not shown blank.
+        self.assertNotIn('>Tiktok<', content)
+        self.assertNotIn('>facebook<', content)
+
+    def test_refund_slip_width_58_renders_with_all_qr_images_set(self):
+        """?width=58 must still render cleanly even with all three QR
+        images set (the narrowest width, the most QR images -- the
+        combination most likely to overflow; see flex-wrap:wrap on
+        .r-social-qr-row in both this page's and the receipt's own CSS)."""
+        settings_row = BusinessSettings.get_solo()
+        settings_row.qr_website = 'business/website-qr-test.png'
+        settings_row.qr_tiktok = 'business/tiktok-qr-test.png'
+        settings_row.qr_facebook = 'business/facebook-qr-test.png'
+        settings_row.save()
+
+        sale = self.complete_sale(
+            cart=[{'product_id': self.jar.id, 'qty': 1}], payments=[{'method': 'cash', 'amount': '250.00'}],
+        )
+        line = sale.lines.get()
+        create_response = self.post_refund(sale.sale_number, [{'sale_line_id': line.id, 'quantity': '1'}])
+        response = self.client.get(
+            reverse('pos_refund_slip', args=[create_response.data['refund_number']]), {'width': '58'},
+        )
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertIn('width: 58mm', content)
+        self.assertIn('@page { size: 58mm auto; margin: 0; }', content)
+        self.assertIn('>Website<', content)
+        self.assertIn('>Tiktok<', content)
+        self.assertIn('>facebook<', content)
+
+    def test_refund_slip_skips_flag_and_qr_row_entirely_when_all_blank(self):
+        sale = self.complete_sale(
+            cart=[{'product_id': self.jar.id, 'qty': 1}], payments=[{'method': 'cash', 'amount': '250.00'}],
+        )
+        line = sale.lines.get()
+        create_response = self.post_refund(sale.sale_number, [{'sale_line_id': line.id, 'quantity': '1'}])
+        response = self.client.get(reverse('pos_refund_slip', args=[create_response.data['refund_number']]))
+        content = response.content.decode()
+        self.assertNotIn('<img src', content)
+        self.assertNotIn('<div class="r-social-qr-row">', content)
 
 
 # ─── Admin read-only enforcement ──────────────────────────────────

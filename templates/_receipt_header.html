@@ -1,0 +1,22 @@
+<!-- Shared by templates/pos_receipt.html and templates/pos_refund_slip.html
+     (POS Refund-slip-polish task) so the two pages' headers can never
+     drift apart -- logo, shop name (+ English), flag as ONE centred
+     group with a small fixed gap between whichever of them are actually
+     present. Needs `logo_url`, `business` (for business.shop_name/
+     business.shop_name_en), and `flag_url` in the including template's
+     own context -- each page's view builds these itself (pos_receipt_view()/
+     pos_refund_slip_view(), shop/views.py); this partial has no view
+     logic of its own. The including page must also define the matching
+     CSS classes (.r-header/.r-header-side/.r-header-center/.r-shop-name/
+     .r-shop-name-en) in its own <style> block -- these are two separate
+     self-contained print pages with no shared stylesheet, so the MARKUP
+     is shared here but the CSS rules are still duplicated in each page,
+     kept byte-identical between them by hand. -->
+<div class="r-header">
+    {% if logo_url %}<div class="r-header-side"><img src="{{ logo_url }}" alt=""></div>{% endif %}
+    <div class="r-header-center">
+        {% if business.shop_name %}<p class="r-shop-name">{{ business.shop_name }}</p>{% endif %}
+        {% if business.shop_name_en %}<p class="r-shop-name-en">{{ business.shop_name_en }}</p>{% endif %}
+    </div>
+    {% if flag_url %}<div class="r-header-side"><img src="{{ flag_url }}" alt=""></div>{% endif %}
+</div>
