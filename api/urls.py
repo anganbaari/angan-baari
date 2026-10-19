@@ -19,6 +19,7 @@ urlpatterns = [
     path('pos/queue/report-failed/', views.PosQueueFailureAlertView.as_view(), name='v1_pos_queue_report_failed'),
     path('pos/queue/report-dismissed/', views.PosQueueDismissedReportView.as_view(), name='v1_pos_queue_report_dismissed'),
     path('pos/refunds/lookup/', views.PosRefundLookupView.as_view(), name='v1_pos_refund_lookup'),
+    path('pos/refunds/recent/', views.PosRefundRecentListView.as_view(), name='v1_pos_refund_recent'),
     path('pos/refunds/', views.PosRefundCreateView.as_view(), name='v1_pos_refund_create'),
     path('pos/offers/', views.PosOffersListView.as_view(), name='v1_pos_offers_list'),
     path('pos/stock/', views.PosStockListView.as_view(), name='v1_pos_stock_list'),

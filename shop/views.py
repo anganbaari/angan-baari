@@ -2260,9 +2260,16 @@ def pos_receipt_view(request, sale_number):
     )
     cashier_first_name = data['cashier'].split()[0] if data['cashier'] else ''
 
+    # On-screen only (see templates/pos_receipt.html's own print-hiding
+    # rule for this) -- lets staff reach a refund's slip straight from
+    # the sale it was against, without first having to know/re-enter the
+    # refund number. Never shown in the printed receipt itself.
+    refunds = list(sale.refunds.all())
+
     return render(request, 'pos_receipt.html', {
         'business': business,
         'sale': sale,
+        'refunds': refunds,
         # Shown as-is (Latin characters) on the receipt -- no Devanagari
         # digit conversion for Sale No., unlike shop_phone/pan_vat_number
         # below.

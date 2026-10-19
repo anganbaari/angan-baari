@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django import forms
 from django.contrib import admin, messages
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
@@ -505,8 +507,18 @@ class POSSaleAdmin(admin.ModelAdmin):
         # Sum of this sale's own Refund.total_amount rows -- not per-line,
         # since a Refund's own amount is already the authoritative "how
         # much actually went back" figure (see create_pos_refund()).
-        total = obj.refunds.aggregate(total=Sum('total_amount'))['total']
-        return format_money(total) if total else '—'
+        # Linked to the slip only when there's exactly ONE refund on this
+        # sale -- with more than one, "the slip" is ambiguous (there'd be
+        # several), so it's left as plain text same as before; see each
+        # Refund's own row in the Refund admin (slip_link below) for that case.
+        refunds = list(obj.refunds.all())
+        if not refunds:
+            return '—'
+        total = sum((r.total_amount for r in refunds), Decimal('0'))
+        if len(refunds) == 1:
+            url = reverse('pos_refund_slip', args=[refunds[0].refund_number])
+            return format_html('<a href="{}" target="_blank">{}</a>', url, format_money(total))
+        return format_money(total)
     refunded_display.short_description = 'Refunded'
 
 

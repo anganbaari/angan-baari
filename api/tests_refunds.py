@@ -694,3 +694,166 @@ class RefundAdminTests(TestCase):
         self.assertFalse(admin_instance.has_add_permission(None))
         self.assertFalse(admin_instance.has_change_permission(None))
         self.assertFalse(admin_instance.has_delete_permission(None))
+
+
+# ─── "Make refund slips reachable later" follow-up ─────────────────
+# Previous-refunds list on the lookup card, the site-wide "Recent
+# refunds" endpoint, the sale receipt's screen-only "View refund
+# slip(s)" link, and the POSSaleAdmin "Refunded" column's slip link.
+
+class RefundLookupPreviousRefundsTests(RefundTestBase):
+    def test_lookup_refunds_list_is_empty_for_an_unrefunded_sale(self):
+        sale = self.complete_sale(
+            cart=[{'product_id': self.jar.id, 'qty': 1}], payments=[{'method': 'cash', 'amount': '250.00'}],
+        )
+        response = self.lookup(sale.sale_number)
+        self.assertEqual(response.data['refunds'], [])
+
+    def test_lookup_refunds_list_is_populated_after_a_refund(self):
+        sale = self.complete_sale(
+            cart=[{'product_id': self.jar.id, 'qty': 2}], payments=[{'method': 'cash', 'amount': '500.00'}],
+        )
+        line = sale.lines.get()
+        create_response = self.post_refund(sale.sale_number, [{'sale_line_id': line.id, 'quantity': '1'}])
+        self.assertEqual(create_response.status_code, 201, create_response.data)
+
+        response = self.lookup(sale.sale_number)
+        self.assertEqual(len(response.data['refunds']), 1)
+        row = response.data['refunds'][0]
+        self.assertEqual(row['refund_number'], create_response.data['refund_number'])
+        self.assertIn('created_at', row)
+        self.assertEqual(Decimal(row['amount']), Decimal('250.00'))
+        self.assertEqual(row['method'], 'cash')
+
+
+class RecentRefundsApiTests(RefundTestBase):
+    def test_recent_refunds_requires_staff(self):
+        self.client.logout()
+        response = self.client.get(reverse('v1_pos_refund_recent'))
+        self.assertIn(response.status_code, (status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN))
+
+    def test_recent_refunds_newest_first_capped_at_20(self):
+        refunds = []
+        for i in range(25):
+            sale = self.complete_sale(
+                cart=[{'product_id': self.jar.id, 'qty': 1}], payments=[{'method': 'cash', 'amount': '250.00'}],
+            )
+            line = sale.lines.get()
+            create_response = self.post_refund(sale.sale_number, [{'sale_line_id': line.id, 'quantity': '1'}])
+            self.assertEqual(create_response.status_code, 201, create_response.data)
+            refund = Refund.objects.get(refund_number=create_response.data['refund_number'])
+            when = timezone.now() + timedelta(minutes=i)  # strictly increasing -- #24 is newest
+            Refund.objects.filter(id=refund.id).update(created_at=when)
+            refunds.append(refund.refund_number)
+
+        response = self.client.get(reverse('v1_pos_refund_recent'))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 20)
+        # Newest first: the LAST sale created (#24, highest backdated
+        # timestamp) must be first in the response.
+        returned_numbers = [r['refund_number'] for r in response.data]
+        self.assertEqual(returned_numbers, list(reversed(refunds))[:20])
+        for row in response.data:
+            self.assertIn('sale_number', row)
+            self.assertIn('created_at', row)
+            self.assertIn('total_amount', row)
+            self.assertIn('method', row)
+            self.assertIn('created_by', row)
+
+
+class RefundSlipLinkResolutionTests(RefundTestBase):
+    def test_slip_link_resolves_200_for_staff_and_redirects_anonymous(self):
+        sale = self.complete_sale(
+            cart=[{'product_id': self.jar.id, 'qty': 1}], payments=[{'method': 'cash', 'amount': '250.00'}],
+        )
+        line = sale.lines.get()
+        create_response = self.post_refund(sale.sale_number, [{'sale_line_id': line.id, 'quantity': '1'}])
+        refund_number = create_response.data['refund_number']
+
+        self.client.logout()
+        anon = self.client.get(reverse('pos_refund_slip', args=[refund_number]))
+        self.assertEqual(anon.status_code, 302)
+
+        self.client.login(username='cashier', password='pw')
+        staff_response = self.client.get(reverse('pos_refund_slip', args=[refund_number]))
+        self.assertEqual(staff_response.status_code, 200)
+
+
+class SaleReceiptRefundLinkTests(RefundTestBase):
+    def test_no_refund_link_on_receipt_for_an_unrefunded_sale(self):
+        sale = self.complete_sale(
+            cart=[{'product_id': self.jar.id, 'qty': 1}], payments=[{'method': 'cash', 'amount': '250.00'}],
+        )
+        response = self.client.get(reverse('pos_receipt', args=[sale.sale_number]))
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        # The CLASS NAME alone always appears (it's defined in the
+        # <style> block regardless), so check for the actual rendered
+        # element, not just the bare string -- same false-positive this
+        # project has hit before matching a CSS rule instead of markup.
+        self.assertNotIn('<div class="refund-slip-links-wrap">', content)
+        self.assertNotIn('View refund slip', content)
+
+    def test_refund_link_appears_on_receipt_after_a_refund_and_is_print_hidden(self):
+        sale = self.complete_sale(
+            cart=[{'product_id': self.jar.id, 'qty': 1}], payments=[{'method': 'cash', 'amount': '250.00'}],
+        )
+        line = sale.lines.get()
+        create_response = self.post_refund(sale.sale_number, [{'sale_line_id': line.id, 'quantity': '1'}])
+        refund_number = create_response.data['refund_number']
+
+        response = self.client.get(reverse('pos_receipt', args=[sale.sale_number]))
+        content = response.content.decode()
+        self.assertIn('View refund slip', content)
+        self.assertIn(reverse('pos_refund_slip', args=[refund_number]), content)
+        # Same print-hiding mechanism as the Print button itself
+        # (.print-btn-wrap) -- the link's own wrapper class must be
+        # hidden under the SAME @media print block.
+        self.assertIn('.refund-slip-links-wrap { display: none; }', content)
+        print_block = content[content.index('@media print'):]
+        self.assertIn('.print-btn-wrap { display: none; }', print_block)
+        self.assertIn('.refund-slip-links-wrap { display: none; }', print_block)
+
+
+class POSSaleAdminRefundedLinkTests(RefundTestBase):
+    def test_refunded_column_links_to_slip_when_exactly_one_refund(self):
+        from shop.admin import POSSaleAdmin
+
+        sale = self.complete_sale(
+            cart=[{'product_id': self.jar.id, 'qty': 1}], payments=[{'method': 'cash', 'amount': '250.00'}],
+        )
+        line = sale.lines.get()
+        create_response = self.post_refund(sale.sale_number, [{'sale_line_id': line.id, 'quantity': '1'}])
+        refund_number = create_response.data['refund_number']
+
+        site = django_admin.AdminSite()
+        admin_instance = POSSaleAdmin(sale.__class__, site)
+        html = str(admin_instance.refunded_display(sale))
+        self.assertIn(reverse('pos_refund_slip', args=[refund_number]), html)
+        self.assertIn('<a ', html)
+
+    def test_refunded_column_is_plain_text_when_no_refund(self):
+        from shop.admin import POSSaleAdmin
+
+        sale = self.complete_sale(
+            cart=[{'product_id': self.jar.id, 'qty': 1}], payments=[{'method': 'cash', 'amount': '250.00'}],
+        )
+        site = django_admin.AdminSite()
+        admin_instance = POSSaleAdmin(sale.__class__, site)
+        self.assertEqual(admin_instance.refunded_display(sale), '—')
+
+    def test_refunded_column_is_plain_text_when_more_than_one_refund(self):
+        from shop.admin import POSSaleAdmin
+
+        sale = self.complete_sale(
+            cart=[{'product_id': self.jar.id, 'qty': 4}], payments=[{'method': 'cash', 'amount': '1000.00'}],
+        )
+        line = sale.lines.get()
+        self.post_refund(sale.sale_number, [{'sale_line_id': line.id, 'quantity': '1'}])
+        self.post_refund(sale.sale_number, [{'sale_line_id': line.id, 'quantity': '1'}])
+
+        site = django_admin.AdminSite()
+        admin_instance = POSSaleAdmin(sale.__class__, site)
+        html = str(admin_instance.refunded_display(sale))
+        self.assertNotIn('<a ', html)
+        self.assertIn('500', html)  # 2 x 250 refunded

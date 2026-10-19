@@ -51,7 +51,12 @@
             border-radius: 10px; text-align: center; margin-bottom: 14px; font-size: 1rem;
         }
         #priorRefundsList { font-size: 0.85rem; color: var(--text-muted); margin-top: 10px; border-top: 1px dashed var(--mist); padding-top: 8px; }
-        #priorRefundsList .prior-refund-row { display: flex; justify-content: space-between; padding: 2px 0; }
+        /* Shared by #priorRefundsList (per-sale, on the lookup card) and
+           #recentRefundsList (site-wide, in its own card) -- same row
+           shape either way. */
+        .prior-refund-row { display: flex; justify-content: space-between; gap: 10px; padding: 3px 0; flex-wrap: wrap; }
+        .prior-refund-row a { color: var(--pos-text-green); font-weight: 700; margin-left: 8px; }
+        #recentRefundsCard { font-size: 0.85rem; color: var(--text-muted); }
 
         .line-card { border: 1.5px solid var(--mist); border-radius: 10px; padding: 14px; margin-bottom: 10px; }
         .line-card.line-done { opacity: 0.5; }
@@ -129,6 +134,10 @@
         #refundConfirmYes { background: var(--pos-enter-orange); color: #1a1a1a; }
         #printSlipBtn { background: var(--pos-text-green); color: #fff; }
         #newRefundBtn { background: var(--pos-enter-orange); color: #1a1a1a; }
+        /* A real <a href>, not just a JS-driven button -- stays usable
+           even if the tab #printSlipBtn originally opened was closed, so
+           a closed tab is never the only way back to the slip. */
+        #openSlipLink { display: block; margin-top: 14px; font-weight: 700; color: var(--pos-text-green); }
 
         #toast {
             position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px);
@@ -145,8 +154,16 @@
 <body>
     {% csrf_token %}
     <div class="wrap">
-        <a href="{% url 'pos' %}" class="back-link">&laquo; Back to POS</a>
+        <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;">
+            <a href="{% url 'pos' %}" class="back-link">&laquo; Back to POS</a>
+            <a href="#" class="back-link" id="recentRefundsToggle">Recent refunds</a>
+        </div>
         <h1>Refund / फिर्ता</h1>
+
+        <div class="card" id="recentRefundsCard" style="display:none;">
+            <h3>Recent refunds (last 20)</h3>
+            <div id="recentRefundsList">Loading…</div>
+        </div>
 
         <div class="card" id="lookupCard">
             <div class="lookup-row">
@@ -205,6 +222,7 @@
                 <button type="button" id="printSlipBtn">Print refund slip</button>
                 <button type="button" id="newRefundBtn">New refund</button>
             </div>
+            <a href="#" id="openSlipLink" target="_blank">Open slip</a>
         </div>
     </div>
 
@@ -233,6 +251,16 @@
                     const r = Math.random() * 16 | 0;
                     return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
                 });
+        }
+        function formatDateTime(iso) {
+            try {
+                return new Date(iso).toLocaleString();
+            } catch (e) {
+                return iso;
+            }
+        }
+        function slipUrl(refundNumber) {
+            return '/pos/refund/' + refundNumber + '/';
         }
         function showToast(text) {
             const toast = document.getElementById('toast');
@@ -331,11 +359,11 @@
             ).join('');
             const priorRefundsHtml = saleData.refunds.length ? `
                 <div id="priorRefundsList">
-                    <strong>Earlier refunds on this sale</strong>
+                    <strong>Previous refunds</strong>
                     ${saleData.refunds.map(r => `
                         <div class="prior-refund-row">
-                            <span>${r.refund_number} (${r.method}, ${r.created_by})</span>
-                            <span>Rs ${formatMoney(r.amount)}</span>
+                            <span>${r.refund_number} — ${formatDateTime(r.created_at)} (${r.method})</span>
+                            <span>Rs ${formatMoney(r.amount)}<a href="${slipUrl(r.refund_number)}" target="_blank">Reprint slip</a></span>
                         </div>`).join('')}
                 </div>` : '';
             saleCard.innerHTML = `
@@ -544,6 +572,43 @@
             if (e.key === 'Enter') { e.preventDefault(); lookupSale(); }
         });
 
+        // ── Recent refunds (last 20, site-wide) -- a simple show/hide
+        //    toggle, loaded once and cached for the rest of this page
+        //    load (staff reopening it repeatedly shouldn't re-fetch every
+        //    time; a fresh page load always gets fresh data either way). ──
+        let recentRefundsLoaded = false;
+        async function loadRecentRefunds() {
+            const list = document.getElementById('recentRefundsList');
+            try {
+                const response = await apiFetch('/api/v1/pos/refunds/recent/');
+                const data = await response.json();
+                if (!response.ok) {
+                    list.textContent = 'Could not load recent refunds.';
+                    return;
+                }
+                list.innerHTML = data.length ? data.map(r => `
+                    <div class="prior-refund-row">
+                        <span>${r.refund_number} — sale ${r.sale_number.replace(/^POS-/, '')} — ${formatDateTime(r.created_at)} (${r.method})</span>
+                        <span>Rs ${formatMoney(r.total_amount)}<a href="${slipUrl(r.refund_number)}" target="_blank">Reprint slip</a></span>
+                    </div>
+                `).join('') : '<p>No refunds yet.</p>';
+                recentRefundsLoaded = true;
+            } catch (err) {
+                list.textContent = 'Could not reach the server.';
+            }
+        }
+        document.getElementById('recentRefundsToggle').addEventListener('click', (e) => {
+            e.preventDefault();
+            const card = document.getElementById('recentRefundsCard');
+            const isShowing = card.style.display !== 'none';
+            if (isShowing) {
+                card.style.display = 'none';
+                return;
+            }
+            card.style.display = '';
+            if (!recentRefundsLoaded) loadRecentRefunds();
+        });
+
         // ── Confirmation dialog -- same plain-dim/no-blur/<=100ms/300ms
         //    tap-ignore-window convention as templates/pos.html's
         //    Full-cash confirmation (openFullCashConfirm()). ──
@@ -603,8 +668,12 @@
                 document.getElementById('successNumber').textContent =
                     `${data.refund_number} — Rs ${formatMoney(data.total_amount)}`;
                 document.getElementById('printSlipBtn').onclick = () => {
-                    window.open('/pos/refund/' + data.refund_number + '/', '_blank');
+                    window.open(slipUrl(data.refund_number), '_blank');
                 };
+                // A real, persistent link (not just the button's JS handler
+                // above) -- stays usable even after that tab is closed, so
+                // a closed tab is never the only way back to the slip.
+                document.getElementById('openSlipLink').href = slipUrl(data.refund_number);
                 document.getElementById('successBackdrop').classList.add('active');
             } catch (err) {
                 showToast('Could not reach the server. Nothing was charged -- please try again.');

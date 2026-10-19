@@ -110,12 +110,22 @@
             font-family: inherit; font-weight: 700; cursor: pointer; font-size: 14px;
         }
 
+        /* On-screen only -- hidden in print output the same way
+           .print-btn-wrap itself is (see the @media print block below).
+           Only rendered at all when this sale has a refund. */
+        .refund-slip-links-wrap {
+            text-align: center; margin: 10px auto 0; width: {{ width_mm }}mm; max-width: 100%;
+            font-size: 13px; color: #333;
+        }
+        .refund-slip-links-wrap a { color: #285917; font-weight: 700; text-decoration: underline; margin: 0 4px; }
+
         @page { size: {{ width_mm }}mm auto; margin: 0; }
         @media print {
             html, body { background: #fff; }
             .receipt-wrap { padding: 0; }
             .receipt { width: {{ width_mm }}mm; margin: 0; padding: 4px 6px; box-shadow: none; }
             .print-btn-wrap { display: none; }
+            .refund-slip-links-wrap { display: none; }
         }
     </style>
 </head>
@@ -206,6 +216,12 @@
         <div class="print-btn-wrap">
             <button type="button" onclick="window.print()">Print</button>
         </div>
+        {% if refunds %}
+        <div class="refund-slip-links-wrap">
+            View refund slip{{ refunds|length|pluralize }}:
+            {% for r in refunds %}<a href="{% url 'pos_refund_slip' r.refund_number %}" target="_blank">{{ r.refund_number }}</a>{% if not forloop.last %} ·{% endif %}{% endfor %}
+        </div>
+        {% endif %}
     </div>
 
     <script src="{% static 'js/vendor/jsbarcode.min.js' %}"></script>

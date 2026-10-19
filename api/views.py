@@ -1036,6 +1036,30 @@ class PosRefundCreateView(APIView):
         )
 
 
+class PosRefundRecentListView(APIView):
+    """GET /api/v1/pos/refunds/recent/ — staff-only. The last 20 refunds
+    site-wide (not scoped to any one sale), newest first -- backs the
+    refund screen's own "Recent refunds" section (templates/pos_refund.html),
+    for reprinting a slip without first having to know/re-enter which
+    sale it was against."""
+
+    authentication_classes = [SessionAuthentication]
+    permission_classes = [IsStaffUser]
+
+    def get(self, request, *args, **kwargs):
+        from shop.models import Refund
+
+        refunds = Refund.objects.select_related('sale', 'created_by').order_by('-created_at')[:20]
+        return Response([{
+            'refund_number': r.refund_number,
+            'sale_number': r.sale.sale_number,
+            'created_at': r.created_at.isoformat(),
+            'total_amount': str(r.total_amount),
+            'method': r.method,
+            'created_by': r.created_by.get_full_name() or r.created_by.username,
+        } for r in refunds])
+
+
 # ─── WEBSITE ORDERS (public, guest checkout) ───────────────────
 
 class OrderCreateView(APIView):
