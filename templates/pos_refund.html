@@ -241,12 +241,28 @@
         /* Overrides .card's own 16px -- the 150px cap above is the box
            itself; this is just the gap before whatever comes next, kept
            small so it doesn't eat further into .refund-layout's budget
-           for no visual benefit. */
-        #recentRefundsCard { margin-bottom: 8px; }
-        #priorRefundsList { margin-top: 10px; border-top: 1px dashed var(--mist); padding-top: 8px; }
+           for no visual benefit. padding-top:0 -- that padding now lives
+           on the sticky title below instead, so position:sticky's top:0
+           lands flush with the box's own top edge rather than below
+           leftover box padding (which is what let scrolled rows show
+           through behind the title before). */
+        #recentRefundsCard { margin-bottom: 8px; padding-top: 0; }
+        #priorRefundsList { margin-top: 10px; border-top: 1px dashed var(--mist); padding-top: 0; }
+        /* Opaque background flush with the box's true top edge (see the
+           padding-top:0 above), a solid 1px line under it, and rounded
+           top corners matching the box's own 14px so that opaque
+           background can't visually poke out past them. No left/right
+           padding of its own -- each box's existing left/right padding
+           (kept as-is) already lines the title up with its rows exactly,
+           same as before. */
         #recentRefundsCard h3, #priorRefundsList strong {
-            position: sticky; top: 0; z-index: 1; display: block; background: var(--white);
+            position: sticky; top: 0; z-index: 1; display: block; margin: 0;
+            background: var(--white); padding-bottom: 6px;
+            border-bottom: 1px solid var(--mist);
+            border-top-left-radius: 14px; border-top-right-radius: 14px;
         }
+        #recentRefundsCard h3 { padding-top: 18px; }
+        #priorRefundsList strong { padding-top: 8px; }
         /* Shared by #priorRefundsList (per-sale, on the lookup card) and
            #recentRefundsList (site-wide, in its own card) -- same row
            shape either way. */
