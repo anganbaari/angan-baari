@@ -23,6 +23,16 @@
             --mist: #dfe3d8;
             --text-muted: #70806b;
             --danger: #b23b3b;
+            /* Real rendered header/footer heights, kept in sync at
+               runtime by syncShellHeights() (a ResizeObserver on both
+               elements, so header wrap/unwrap, footer show/hide, and the
+               disabled-reason line appearing/wrapping all update these
+               immediately) -- see that function's own comment for why a
+               hardcoded guess isn't used instead. 0px until the first
+               measurement lands, which is harmless (.wrap briefly reads
+               as the full 100dvh for an instant, never shorter). */
+            --hdr-h: 0px;
+            --ftr-h: 0px;
         }
         * { box-sizing: border-box; }
 
@@ -30,10 +40,7 @@
            (phone included, per this task's point 6): header and footer
            are normal flex children (no longer position:fixed -- nothing
            needs the old padding-bottom-reserved-for-a-fixed-footer hack
-           any more), and the middle area (.wrap) is the one flex child
-           that stretches to fill whatever's left and scrolls INTERNALLY
-           if its content doesn't fit. 100dvh with a 100vh fallback, per
-           spec. ── */
+           any more). 100dvh with a 100vh fallback, per spec. ── */
         html, body {
             height: 100vh; margin: 0; font-family: 'DM Sans', 'Noto Sans Devanagari', sans-serif;
             background: var(--pos-bg); color: var(--pos-text-green); overflow: hidden;
@@ -86,44 +93,69 @@
             .pos-header-right { flex: 1 1 100%; justify-content: flex-start; }
         }
 
-        /* ── Middle area (.wrap) -- the ONE thing that scrolls, and only
-           when it actually has to (see the 1024px+ height-filling chain
-           below, which is designed so this scrollbar normally never
-           fires once a sale is loaded -- the item list and, as a last
-           resort, the right-hand panel absorb the overflow first). In
-           the pre-sale lookup state there's no two-column split to
-           delegate to, so this is deliberately the scroll container for
-           that state too (point 5). ── */
+        /* ── Middle area (.wrap) -- below 768px this is still the single
+           flexible/auto-scrolling fallback it always was (flex-grow
+           against body's remaining space, scrolling internally -- phone
+           layout is unchanged by this fix). From 768px up it switches to
+           an EXPLICIT height via calc(100dvh - var(--hdr-h) - var(--ftr-h))
+           instead: header + main + footer now sum to exactly 100dvh by
+           construction, with nothing else able to add height, so the
+           DOCUMENT itself provably cannot grow past the viewport
+           regardless of what any descendant's own flex-shrink does.
+           (Found by testing: the previous flex-grow-distribution version
+           of this rule left room for a real bug -- #recentRefundsCard
+           never actually got the flex-shrink override it needed, since
+           .card's own flex-shrink:0 rule was never overridden for that
+           one property, so its full natural height stayed protected and
+           .wrap's own content silently overflowed past what the flex
+           algorithm had assigned it. A hard calc() height removes that
+           class of bug entirely -- .wrap's size no longer depends on any
+           child's flex-shrink value at all.) .wrap itself is overflow:
+           hidden at this width -- per this task's spec, the ONLY thing
+           that scrolls when content doesn't fit is the history box
+           (#recentRefundsCard / #priorRefundsList, both capped below) and,
+           below 1024px where there's no two-column grid to delegate to,
+           .refund-layout itself as a single last-resort scroller. ── */
         .wrap {
             flex: 1 1 auto; min-height: 0; overflow-y: auto;
             display: flex; flex-direction: column;
             margin: 0 auto; width: 100%; padding: 16px;
         }
-        @media (min-width: 768px) { .wrap { max-width: 720px; padding: 18px 24px; } }
+        @media (min-width: 768px) {
+            .wrap {
+                max-width: 720px; padding: 18px 24px;
+                flex: none; height: calc(100dvh - var(--hdr-h) - var(--ftr-h)); overflow: hidden;
+            }
+        }
         @media (min-width: 1024px) {
             .wrap { max-width: 1140px; }
             .refund-layout { display: grid; grid-template-columns: 1fr 400px; gap: 20px; }
-            /* Height-filling chain: .refund-layout is a flex item of
-               .wrap (flex:1 1 auto below, declared unconditionally so it
-               applies whether .refund-layout is a grid -- here -- or a
-               plain block at narrower widths), so it gets a DEFINITE
-               height once visible. .refund-col-main repeats the same
-               trick one level down: the sale-summary card keeps its
-               natural (compact) height, #linesContainer takes whatever
-               is left and scrolls internally first. .refund-col-side
-               mirrors it as the last-resort scroller for a very short
-               screen where method+reason+note alone don't fit. */
+            /* Height-filling chain: .refund-layout now has a DEFINITE
+               height (flex:1 1 0 against .wrap's own hard calc() height,
+               below), so .refund-col-main/.refund-col-side can each take
+               height:100% of it. .refund-col-main repeats the same trick
+               one level down: the sale-summary card keeps its natural
+               (compact, now safely bounded -- see #priorRefundsList's own
+               cap) height, #linesContainer takes whatever is left and
+               scrolls internally first -- the preferred, more granular
+               last-resort scroller once there IS a two-column grid to
+               delegate to (.refund-layout itself switches to overflow:
+               hidden below, since its children now handle it instead).
+               .refund-col-side mirrors it as the last-resort scroller for
+               a very short screen where method+reason+note alone don't
+               fit. */
+            .refund-layout { overflow: hidden; }
             .refund-col-main { height: 100%; min-height: 0; display: flex; flex-direction: column; }
-            #saleCard { flex: 0 0 auto; }
+            #saleCard { flex: 0 0 auto; min-height: 0; }
             #linesContainer { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
             .refund-col-side { height: 100%; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; }
         }
-        /* flex-shrink:0 -- the sale summary / item list / right panel get
-           priority over the "Recent refunds" history panel above them in
-           .wrap's flex column (see #recentRefundsCard's own flex-shrink:1
-           below, which is what actually gives way first when the two
-           compete for the same limited height). */
-        .refund-layout { flex: 1 0 auto; min-height: 0; }
+        /* Unconditional base: below 1024px (but >=768px, where .wrap
+           itself no longer scrolls -- see above) this IS the last-resort
+           scroller for the whole stacked main column. At 1024px+ it's
+           overridden to overflow:hidden (above), delegating to its own
+           grid children instead. */
+        .refund-layout { flex: 1 1 0; min-height: 0; overflow-y: auto; }
         #linesContainer { overflow-y: auto; } /* no-op below 1024px -- no height constraint to scroll against until the rule above gives it one */
 
         h3 { margin: 0 0 10px; font-size: 1.05rem; }
@@ -133,7 +165,7 @@
            is a little smaller than before to leave room. Below 481px
            the buttons wrap to their own full-width row (two equal
            halves), title stays on its own line above them. ── */
-        .title-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; flex: 0 0 auto; }
+        .title-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-bottom: 8px; flex: 0 0 auto; }
         .title-row h1 { font-family: 'Cormorant Garamond', serif; font-size: 1.5rem; margin: 0; }
         .link-row { display: flex; gap: 8px; }
         .back-link {
@@ -175,8 +207,8 @@
            default .card, this being the one card that's always visible
            alongside the (potentially long) item list and needs to give
            up as much vertical room as it can. */
-        #saleCard { padding: 12px 16px; }
-        #saleCard .sale-meta-row { margin-bottom: 2px; }
+        #saleCard { padding: 8px 16px; margin-bottom: 8px; }
+        #saleCard .sale-meta-row { margin-bottom: 1px; }
         .sale-meta-row { display: flex; justify-content: space-between; gap: 10px; font-size: 0.95rem; margin-bottom: 4px; flex-wrap: wrap; }
         .sale-meta-row span:first-child { color: var(--text-muted); font-weight: 600; }
         /* Small polish: "cash" -> "Cash" etc. -- display only, the
@@ -187,54 +219,41 @@
             background: var(--danger); color: #fff; font-weight: 800; padding: 12px;
             border-radius: 10px; text-align: center; margin-bottom: 14px; font-size: 1rem;
         }
-        #priorRefundsList { font-size: 0.85rem; color: var(--text-muted); margin-top: 10px; border-top: 1px dashed var(--mist); padding-top: 8px; }
+        /* Refund-history scroll cap -- both the "Recent refunds" panel
+           (site-wide, its own card) and the "Previous refunds" list
+           nested inside the sale summary card. max-height:150px caps the
+           WHOLE box (title included) at roughly 4 visible rows; the
+           title itself is position:sticky so it stays pinned at the top
+           of that same scrollable box while the rows beneath it scroll
+           -- not a separate non-scrolling element above it, which is
+           what let a flex-shrink cascade bug (see .wrap's own comment
+           above) go unnoticed before: capping only the INNER list left
+           the OUTER card's own height unbounded, still able to push
+           .wrap's content past what the flex algorithm had assigned it.
+           flex:none (Row 2 of the fixed-shell spec) -- this box never
+           grows to claim extra space and never shrinks below its own
+           (already capped) natural size either; .refund-layout (Row 3)
+           is what actually absorbs any remaining deficit or surplus. */
+        #recentRefundsCard, #priorRefundsList {
+            font-size: 0.85rem; color: var(--text-muted);
+            flex: none; max-height: 150px; overflow-y: auto;
+        }
+        /* Overrides .card's own 16px -- the 150px cap above is the box
+           itself; this is just the gap before whatever comes next, kept
+           small so it doesn't eat further into .refund-layout's budget
+           for no visual benefit. */
+        #recentRefundsCard { margin-bottom: 8px; }
+        #priorRefundsList { margin-top: 10px; border-top: 1px dashed var(--mist); padding-top: 8px; }
+        #recentRefundsCard h3, #priorRefundsList strong {
+            position: sticky; top: 0; z-index: 1; display: block; background: var(--white);
+        }
         /* Shared by #priorRefundsList (per-sale, on the lookup card) and
            #recentRefundsList (site-wide, in its own card) -- same row
            shape either way. */
         .prior-refund-row { display: flex; justify-content: space-between; gap: 10px; padding: 3px 0; flex-wrap: wrap; }
         .prior-refund-row a { color: var(--pos-text-green); font-weight: 700; margin-left: 8px; }
-        /* flex-shrink left at its default (1), NOT 0 -- found by testing
-           that a fixed max-height cap on the list ALONE wasn't enough:
-           at a short viewport (720-768px tall) the card's own capped-but-
-           still-~250px natural height (title + up to 170px of rows +
-           padding) could still out-compete .refund-layout (flex-shrink:0
-           now, see above) for .wrap's limited vertical space, squeezing
-           the item list / right panel into needing their OWN scrollbars
-           -- exactly backwards from "the sale summary card, the item
-           list card and the right-hand panel must get the remaining
-           height first". display:flex + overflow:hidden here (rather
-           than a plain block card) is what lets this card's OWN rendered
-           height actually shrink below its capped-list's natural size
-           when .wrap is tight, instead of the content simply spilling
-           out of a flex-shrunk box: the heading is a protected
-           (flex:0 0 auto) sibling above the list, and the list itself
-           (min-height:0, flex:1 1 auto below) is what actually gives up
-           visible rows first, scrolling more rather than the page
-           growing or the higher-priority panels losing their fit. */
-        #recentRefundsCard {
-            font-size: 0.85rem; color: var(--text-muted);
-            min-height: 0; display: flex; flex-direction: column; overflow: hidden;
-        }
-        #recentRefundsCard h3 { flex: 0 0 auto; }
-        /* Refund-history scroll cap -- both the "Recent refunds" panel's
-           own list and the "Previous refunds" list nested inside the
-           sale summary card. Capped to roughly 4 rows so an open history
-           panel can never squeeze the item list card / right-hand panel
-           out of their own share of the available height (what used to
-           happen: an uncapped list of up to 20 refunds could grow tall
-           enough to starve .refund-layout, forcing THOSE to show their
-           own scrollbars instead). The heading/title stays outside this
-           element entirely, so it's always visible without needing
-           position:sticky -- only the rows beneath it scroll. */
-        .history-scroll-list { max-height: min(25vh, 170px); overflow-y: auto; }
-        /* Lets the list shrink below its own max-height cap specifically
-           when #recentRefundsCard itself is being flex-shrunk (see
-           above) -- #priorRefundsList's own copy of this class doesn't
-           need this (saleCard is flex:0 0 auto / protected, so its
-           content is never flex-shrunk the same way). */
-        #recentRefundsCard .history-scroll-list { flex: 1 1 auto; min-height: 0; }
 
-        .line-card { border: 1.5px solid var(--mist); border-radius: 10px; padding: 14px; margin-bottom: 10px; }
+        .line-card { border: 1.5px solid var(--mist); border-radius: 10px; padding: 8px; margin-bottom: 6px; }
         .line-card.line-done { opacity: 0.5; }
         .line-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
         .line-name { font-weight: 800; font-size: 1.05rem; }
@@ -247,18 +266,22 @@
         .checkbox-row { display: flex; align-items: center; gap: 12px; min-height: 44px; cursor: pointer; }
         .checkbox-row input[type="checkbox"] { width: 24px; height: 24px; flex-shrink: 0; cursor: pointer; }
 
-        .qty-row { display: flex; align-items: center; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+        .qty-row { display: flex; align-items: center; gap: 10px; margin-top: 4px; flex-wrap: wrap; }
         .qty-row button {
-            min-width: 48px; min-height: 48px; border-radius: 8px; border: none;
+            /* 44px, not 48 -- the same tap-target floor used everywhere
+               else on this page (.back-link, .checkbox-row, the
+               disposition-row/choice-btn labels), not a separate larger
+               minimum. */
+            min-width: 44px; min-height: 44px; border-radius: 8px; border: none;
             background: var(--pos-bg); font-size: 1.3rem; font-weight: 800; cursor: pointer;
         }
         .qty-row input {
-            width: 90px; text-align: center; font-size: 1.1rem; padding: 10px; border-radius: 8px;
-            border: 1.5px solid var(--mist); font-family: inherit; min-height: 48px;
+            width: 90px; text-align: center; font-size: 1.1rem; padding: 8px; border-radius: 8px;
+            border: 1.5px solid var(--mist); font-family: inherit; min-height: 44px;
         }
         .qty-row .qty-unit { font-size: 0.82rem; color: var(--text-muted); }
 
-        .disposition-row { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+        .disposition-row { display: flex; gap: 10px; margin-top: 4px; flex-wrap: wrap; }
         .disposition-row label {
             display: flex; align-items: center; gap: 6px; font-size: 0.9rem; font-weight: 700;
             min-height: 44px; padding: 0 10px; border-radius: 8px; border: 1.5px solid var(--mist); cursor: pointer;
@@ -270,8 +293,8 @@
            its total natural height stays around ~300px at 1280px wide
            (per spec), well short of needing its own scroll in the
            ordinary case. */
-        .refund-col-side .card { padding: 14px 16px; margin-bottom: 10px; }
-        .refund-col-side h3 { margin: 0 0 6px; font-size: 0.95rem; }
+        .refund-col-side .card { padding: 12px 16px; margin-bottom: 8px; }
+        .refund-col-side h3 { margin: 0 0 4px; font-size: 0.95rem; }
 
         .choice-btn {
             border-radius: 10px; border: 2px solid var(--mist); background: #fff;
@@ -305,8 +328,8 @@
             font-family: inherit; padding: 10px; font-size: 0.9rem; margin-top: 10px; resize: vertical;
         }
         #addNoteToggle {
-            display: block; margin-top: 8px; border: none; background: none; color: var(--pos-text-green);
-            font-weight: 700; font-size: 0.85rem; cursor: pointer; font-family: inherit; padding: 6px 0;
+            display: block; margin-top: 4px; border: none; background: none; color: var(--pos-text-green);
+            font-weight: 700; font-size: 0.85rem; cursor: pointer; font-family: inherit; padding: 2px 0;
             text-align: left;
         }
 
@@ -460,7 +483,7 @@
 
         <div class="card" id="recentRefundsCard" style="display:none;">
             <h3>Recent refunds (last 20)</h3>
-            <div id="recentRefundsList" class="history-scroll-list">Loading…</div>
+            <div id="recentRefundsList">Loading…</div>
         </div>
 
         <div class="card" id="lookupCard">
@@ -603,6 +626,35 @@
             clearTimeout(showToast._t);
             showToast._t = setTimeout(() => toast.classList.remove('show'), 2200);
         }
+
+        // ── Fixed-shell height sync -- keeps --hdr-h/--ftr-h (used by
+        //    .wrap's calc(100dvh - var(--hdr-h) - var(--ftr-h)) height at
+        //    768px+, see that rule's own comment) exactly equal to the
+        //    header's and footer's REAL rendered heights at all times.
+        //    A hardcoded guess can't do this reliably: the header wraps
+        //    to a taller multi-row layout at <=1024px, and the footer's
+        //    own height changes whenever #confirmDisabledReason shows/
+        //    wraps or #footerBar itself is shown/hidden (fully_refunded).
+        //    ResizeObserver fires on ANY of those -- content change,
+        //    display toggle, or a plain window resize -- so there's no
+        //    need to separately hook every place that could change
+        //    either element's size. offsetHeight is 0 for a display:none
+        //    footer, which is exactly correct: .wrap should reclaim that
+        //    space when there's no footer to clear. ──
+        function syncShellHeights() {
+            const header = document.querySelector('.pos-header');
+            const footer = document.getElementById('footerBar');
+            document.documentElement.style.setProperty('--hdr-h', header.offsetHeight + 'px');
+            document.documentElement.style.setProperty('--ftr-h', footer.offsetHeight + 'px');
+        }
+        if (window.ResizeObserver) {
+            const shellHeightObserver = new ResizeObserver(syncShellHeights);
+            shellHeightObserver.observe(document.querySelector('.pos-header'));
+            shellHeightObserver.observe(document.getElementById('footerBar'));
+        } else {
+            window.addEventListener('resize', syncShellHeights);
+        }
+        syncShellHeights();
 
         // ── Header clock -- same "MM/DD (DayName)" / "HH:MM" format as
         //    templates/pos.html's own tickClock(), via the shared
@@ -797,13 +849,11 @@
             const priorRefundsHtml = saleData.refunds.length ? `
                 <div id="priorRefundsList">
                     <strong>Previous refunds</strong>
-                    <div class="history-scroll-list">
-                        ${saleData.refunds.map(r => `
-                            <div class="prior-refund-row">
-                                <span>${r.refund_number} — ${formatDateTime(r.created_at)} (${r.method})</span>
-                                <span>Rs ${formatMoney(r.amount)}<a href="${slipUrl(r.refund_number)}" target="_blank">Reprint slip</a></span>
-                            </div>`).join('')}
-                    </div>
+                    ${saleData.refunds.map(r => `
+                        <div class="prior-refund-row">
+                            <span>${r.refund_number} — ${formatDateTime(r.created_at)} (${r.method})</span>
+                            <span>Rs ${formatMoney(r.amount)}<a href="${slipUrl(r.refund_number)}" target="_blank">Reprint slip</a></span>
+                        </div>`).join('')}
                 </div>` : '';
             saleCard.innerHTML = `
                 ${saleData.fully_refunded ? '<div class="fully-refunded-banner">This sale has already been fully refunded.</div>' : ''}
@@ -812,7 +862,7 @@
                 ${saleData.customer_name ? `<div class="sale-meta-row"><span>Customer</span><span>${saleData.customer_name}</span></div>` : ''}
                 <div class="sale-meta-row"><span>Total</span><span>Rs ${formatMoney(saleData.total_amount)}</span></div>
                 ${Number(saleData.total_refunded) > 0 ? `<div class="sale-meta-row"><span>Already refunded</span><span>Rs ${formatMoney(saleData.total_refunded)}</span></div>` : ''}
-                <div style="margin-top:8px;border-top:1px dashed var(--mist);padding-top:8px;">
+                <div style="margin-top:6px;border-top:1px dashed var(--mist);padding-top:6px;">
                     ${paymentsHtml}
                 </div>
                 ${priorRefundsHtml}

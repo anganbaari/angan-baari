@@ -591,19 +591,37 @@ class RefundSlipViewTests(RefundTestBase):
         self.assertIn('id="posDate"', content)
         self.assertIn('id="posTime"', content)
 
-    def test_recent_refunds_history_has_capped_scroll_class(self):
-        """History-scroll task: the "Recent refunds" panel's list carries
-        .history-scroll-list (max-height: min(25vh, 170px);
-        overflow-y: auto;) so an open 20-row history can never squeeze
+    def test_recent_refunds_history_has_capped_scroll_height(self):
+        """Fixed-shell history-scroll task: #recentRefundsCard and
+        #priorRefundsList are both capped at max-height:150px with their
+        own overflow-y:auto, so an open 20-row history can never squeeze
         the item list / right-hand panel out of their own share of the
-        available height -- the title stays outside this element, not
-        part of the scroll."""
+        available height. The title inside each is position:sticky so it
+        stays pinned at the top of that same scrollable box rather than
+        living outside it (capping only an inner list while leaving the
+        outer card's own height unbounded was exactly the bug this
+        replaced)."""
         response = self.client.get(reverse('pos_refund'))
         content = response.content.decode()
-        self.assertIn('.history-scroll-list { max-height: min(25vh, 170px); overflow-y: auto; }', content)
-        recent_list_start = content.index('id="recentRefundsList"')
-        recent_list_tag = content[recent_list_start:recent_list_start + 80]
-        self.assertIn('class="history-scroll-list"', recent_list_tag)
+        self.assertIn('#recentRefundsCard, #priorRefundsList {', content)
+        self.assertIn('flex: none; max-height: 150px; overflow-y: auto;', content)
+        self.assertIn('#recentRefundsCard h3, #priorRefundsList strong {', content)
+        self.assertIn('position: sticky;', content)
+
+    def test_wrap_uses_explicit_calc_height_at_768px_and_up(self):
+        """Fixed-shell history-scroll task: .wrap's height is an explicit
+        calc(100dvh - var(--hdr-h) - var(--ftr-h)) from 768px up, with
+        --hdr-h/--ftr-h kept in sync with the real header/footer heights
+        by JS (syncShellHeights(), a ResizeObserver) -- not a flex-grow
+        distribution that depends on every descendant's own flex-shrink
+        being correctly overridden."""
+        response = self.client.get(reverse('pos_refund'))
+        content = response.content.decode()
+        self.assertIn('--hdr-h: 0px;', content)
+        self.assertIn('--ftr-h: 0px;', content)
+        self.assertIn('height: calc(100dvh - var(--hdr-h) - var(--ftr-h));', content)
+        self.assertIn('function syncShellHeights()', content)
+        self.assertIn("new ResizeObserver(syncShellHeights)", content)
 
     def test_cancel_button_uses_the_same_red_as_pos_low_stock_indicator(self):
         """Refund-page-polish task: Cancel is filled, red/white, using the
