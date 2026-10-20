@@ -3,19 +3,6 @@
 Read this fully before making changes. This file exists so you don't have to
 re-derive architecture decisions that were already made deliberately.
 
-## ⚠️ Known bug — fix before anything else
-
-`shop/models.py`, inside `InventoryMovement.clean()`:
-```python
-from django.ce.exceptions import ValidationError   # WRONG — django.ce doesn't exist
-```
-Should be `from django.core.exceptions import ValidationError`. As written,
-`clean()` throws `ModuleNotFoundError` on every call, which means every POS
-sale (`pos_create_sale` always calls `full_clean()`) currently fails with a
-generic "could not complete this sale" error, no matter what's in the cart.
-Website checkout is unaffected — it never calls `full_clean()`. Fix this
-first, it's one line, no migration needed.
-
 ## What this is
 
 Angan Baari (आँगन बारी) — organic farm e-commerce site + POS system, for a
@@ -68,6 +55,13 @@ doesn't use, so new packages silently never reach the running site.
 PythonAnywhere after pulling. Say so explicitly when proposing a model
 change — don't assume it happens automatically.**
 
+Latest migration as of this writing: `0049_credittransaction_related_refund`.
+Don't treat this as a goalpost — just confirm the real latest with
+`python manage.py showmigrations shop | tail` before assuming it's current.
+
+Full test suite: `python manage.py test` (560 passing as of this writing).
+Same caveat — re-run it rather than trusting this number once it's old.
+
 ## Architecture decisions already made (don't relitigate these)
 
 - **No REST API layer between POS and website.** Same Django project, same
@@ -86,8 +80,7 @@ change — don't assume it happens automatically.**
   adjustment_remove. `source`: admin/abms/website/pos. `current_stock()` is
   always derived by summing the ledger, never stored directly.
   `clean()` enforces (a) quantity must be exactly 1 for `fixed_weight`
-  products, (b) stock can never go negative — see the bug note above, this
-  currently can't run due to the import typo.
+  products, (b) stock can never go negative.
 - **`create_inventory_movements_from_snapshot()` has two modes:**
   `strict=False` (website: never raises, bad lines silently skipped, no
   `full_clean()` call — matches the site's existing best-effort email
@@ -174,15 +167,8 @@ Endpoints:
   `cancel_token` itself is never echoed back in either response. This
   reuses the token already generated on `ProductOrder` and already
   emailed via `send_order_received_email` — no new secret was introduced.
-
-17/17 tests pass locally (`python manage.py test api`). Manually verified
-in production via the DRF browsable API on 2026-09-27: category list
-matches local exactly (13/13), product list matches (32/32, including the
-fixed_weight Goat variant case), a POS sale POST correctly recomputed
-total and deducted stock, idempotent resubmission returned the same
-`sale_number`, a stock-insufficient sale correctly returned 409, guest
-order creation worked with no auth, and the order token gate correctly
-limited/expanded fields as designed.
+- `GET /api/v1/pos/refunds/lookup/?sale_number=` / `POST /api/v1/pos/refunds/`
+  / `GET /api/v1/pos/refunds/recent/` — staff-only. See "Refunds" below.
 
 **Gotcha:** DRF's `SessionAuthentication` does its own CSRF check
 independent of Django's middleware. `pos.html`'s JS is now actually
@@ -622,6 +608,118 @@ customer lookup, offers/combos, and coupon gating.
   correct, but not a substitute for seeing Background Sync actually fire
   on a real OS while the app isn't in the foreground.
 
+## POS pricing
+
+`price_pos_cart_line()` (`shop/views.py`) is the **single place** every POS
+cart line's price is computed — called once per line from `create_pos_sale()`
+no matter the pricing mode, so there's one function to get right, not one
+per mode. For a `variable_weight` line specifically: the line amount is
+rounded to a whole rupee (`ROUND_HALF_UP`) **after** any single-product offer
+discount is applied, and **before** a combo override replaces it (a
+combo-priced line's fixed share is never itself rounded again). `fixed_weight`
+(animal) and `fixed_quantity` lines are never rounded this way — their prices
+are already whole-rupee in practice.
+
+`templates/pos.html`'s JS mirrors this with matching **integer** arithmetic
+(`roundVariableWeightLineTotal()` — paisa × milli-kg, never a bare float
+multiply), specifically so the browser's rounded line total always agrees
+with the server's. This matters because `create_pos_sale()` still enforces
+the existing strict rule that payment lines must sum to **exactly** the
+server-recomputed total — a browser/server rounding mismatch would make an
+otherwise-valid sale get rejected. The order-level round-off (whole sale
+total rounded to the nearest rupee, leftover paisa recorded in
+`POSSale.round_off_amount`) is unchanged and still runs afterward — it mainly
+now only ever fires for a percentage coupon's fractional discount, since
+every line going into it is already whole-rupee. The printed receipt never
+shows a "Round off" row at all (see "Receipts" below).
+
+## Receipts
+
+Printable sale receipt: `GET /pos/receipt/<sale_number>/` (`pos_receipt_view`,
+`templates/pos_receipt.html`) — staff-only (`@staff_member_required`), 80mm
+by default, `?width=58` switches to a 58mm roll. **58mm is implemented and
+covered by tests, but not yet verified on a real thermal printer** — same
+"needs real hardware" caveat as the offline-PWA work above.
+
+Header (logo + shop name + English name + flag, one centred group — see
+`templates/_receipt_header.html`, shared with the refund slip), address,
+phone/PAN, and the social-QR row (Website/Tiktok/facebook — see
+`templates/_receipt_social_qr.html`, also shared) all come straight from the
+`BusinessSettings` singleton: `shop_name`, `shop_name_en`, `receipt_logo`,
+`receipt_flag`, `qr_website`, `qr_tiktok`, `qr_facebook`, `receipt_footer`,
+`pan_vat_number`. Any blank image is skipped, not shown broken.
+
+The sale receipt has a Code128 barcode (JsBarcode, vendored — see "Stack")
+encoding the **full** `sale_number`. The refund slip (`templates/
+pos_refund_slip.html`) must **never** have one — it was explicitly asked for
+and deliberately left out; don't add it back without being asked again.
+Displayed Sale No. always strips the `POS-` prefix (the barcode still
+encodes the untouched original). All dates are shown in B.S. There is no
+"Round off" row anywhere on the receipt — Subtotal/कर स. मूल्य/Total are
+made to agree exactly instead (see "POS pricing" above for why that's now
+the common case for an ordinary sale).
+
+## Refunds
+
+Staff-only screens: lookup/process at `/pos/refund/` (`templates/
+pos_refund.html`), printable slip at `/pos/refund/<refund_number>/`
+(`templates/pos_refund_slip.html`, no barcode — see "Receipts"). Backed by
+`create_pos_refund()` (`shop/views.py`), the sole entry point, mirroring
+`create_pos_sale()`'s own shape — idempotent on a client-generated
+`client_refund_id`, same pattern as `client_sale_id`.
+
+**What can be refunded, and how:** a plain `fixed_quantity` line (not part of
+a combo) can be partially refunded, one base unit at a time. **Everything
+else is whole-line-only** — a `variable_weight` (weighed) line, a
+`fixed_weight` animal, and each component of a combo, regardless of its own
+pricing mode. (A weighed line's amount is in kg, not a count — there is no
+"refund half the weight" option.)
+
+**Stock, per refunded line:** "Back to stock" appends one `return`
+`InventoryMovement`; "Discard" appends a `return` **and** a `waste` movement
+of the same quantity (net stock effect zero, waste still recorded). The
+ledger stays append-only either way — a refund never edits or deletes the
+original sale's movements, it only adds new rows.
+
+**Money:** a credit-balance refund records a `CreditTransaction`
+(`transaction_type='repayment'`) with `related_refund` set, which reduces
+`Customer.outstanding_balance()` like any repayment but is **excluded from
+`shop/pl_report.py`'s `cash_collected`** — no real money moved. Cash/eSewa/
+Khalti/bank-transfer refunds, by contrast, do reduce `cash_collected`. Every
+report that nets sales against refunds (`shop/reports.py`'s `get_summary`/
+`get_run_rate`/`get_insight_strip`/`get_sales_trend`/`get_target_progress`,
+`shop/pl_report.py`'s revenue, `shop/batch_report.py`'s per-batch revenue)
+counts a refund in **the period the refund happened** (`Refund.created_at`),
+never the original sale's own date — a refund can legitimately make a
+period's net sales negative if it has no gross sale of its own that day.
+`shop/pl_report.py`'s per-cost-centre breakdown (`farm_cost_centres`) is
+**not** netted against refunds — only the top-level revenue figure is (a
+known, accepted gap, not an oversight).
+
+`GET /api/v1/pos/refunds/recent/` lists the last 20 refunds site-wide,
+newest first, for reprinting a slip without knowing which sale it was
+against.
+
+**No time limit and no cashier-match rule** — any staff login can refund any
+sale, any age, in full or in the allowed partial unit. This was a deliberate
+scope decision, not an oversight.
+
+**Gotchas learned building this:**
+
+- Never round a whole-line refund quantity with `Math.round()` in JS — a
+  weighed line's `remaining_quantity` is a weight, and `Math.round(0.25)` is
+  `0`, which silently dropped a ticked line out of the refund total and
+  blocked the refund entirely. Send the exact float back; it must match
+  `sale_line.quantity` exactly for a whole-line refund anyway.
+- A test asserting a UI element is **absent** must match the actual rendered
+  opening tag (e.g. `'<div class="refund-slip-links-wrap">'`), never just the
+  bare class name — that string is always present in the page's own
+  `<style>` block regardless of whether the element itself renders.
+- `shop/batch_report.py`'s `_fifo_simulate()` returns **five** values (added
+  `movement_pool_draws`, for attributing a refund back to the pool it was
+  originally sold from) — every caller must unpack all five, including
+  `next_batch_cost_per_kg()`.
+
 ## Reports dashboard
 
 Staff-only, owner/manager role only (not every staff login) read-only
@@ -820,6 +918,15 @@ exactly this shape was caught by `QueryCountTests` in
   used elsewhere
 - Barcode label printing (`generate_barcodes` command + `/pos/labels/`
   view) — drafted, confirm whether merged before assuming it's live
+- `shop/pl_report.py`'s per-cost-centre revenue breakdown
+  (`farm_cost_centres`) is not netted against refunds — only the top-level
+  revenue figure is (see "Refunds" above)
+- `BusinessSettings.pan_vat_number` currently holds a placeholder value,
+  not the real PAN/VAT number — update it in admin once the real number is
+  available (this is business data, not something the code itself can
+  verify or flag)
+- Receipt/slip `?width=58` (58mm thermal roll) is implemented and tested,
+  but not yet verified on real thermal printer hardware — see "Receipts"
 
 ## Frontend conventions
 
@@ -845,14 +952,20 @@ exactly this shape was caught by `QueryCountTests` in
 
 - `shop/models.py` — Category, Product, ProductVariant, NewsletterSubscriber,
   ContactMessage, ProductOrder, Review, Wishlist, Offer, BundleItem, Coupon,
-  InventoryMovement, POSSale, RevenueTarget
+  InventoryMovement, POSSale, POSSaleLine, CreditTransaction, BusinessSettings,
+  Refund, RefundLine, RevenueTarget
 - `shop/views.py` — all view logic: cart (session-based), save-for-later,
   wishlist, checkout, coupon/offer application, POS (`pos_view`,
   `pos_service_worker`), the Reports dashboard shell (`dashboard_view`),
-  the shared `create_inventory_movements_from_snapshot()`
-  and `create_pos_sale()` helpers
+  the shared `create_inventory_movements_from_snapshot()`,
+  `create_pos_sale()` / `price_pos_cart_line()` (see "POS pricing"), and
+  `create_pos_refund()` (see "Refunds") helpers
 - `shop/reports.py` — all Reports dashboard aggregation logic (read-only —
   see the "Reports dashboard" section above)
+- `shop/pl_report.py` — Profit & Loss aggregation (read-only; see "Refunds"
+  above for how it handles credit-balance refunds)
+- `shop/batch_report.py` — per-crop-batch FIFO cost/revenue attribution
+  (read-only; see "Refunds" above for `_fifo_simulate()`'s 5-value return)
 - `shop/bs_calendar.py` — Bikram Sambat ↔ A.D. conversion, the
   server-side source of truth (tested in `shop/tests_bs_calendar.py`);
   see "Reports dashboard" above for why this exists alongside
@@ -868,6 +981,12 @@ exactly this shape was caught by `QueryCountTests` in
 - `shop/signals.py` — connected in `apps.py`'s `ready()`
 - `shop/sitemaps.py` — SEO sitemaps
 - `templates/pos.html` — the POS screen
+- `templates/pos_receipt.html` / `templates/pos_refund.html` /
+  `templates/pos_refund_slip.html` — see "Receipts" and "Refunds" above
+- `static/js/pos-offline-queue.js` — offline sale queue + `POS_SHELL_CACHE`
+  (see "POS-PWA" above)
+- `static/js/vendor/jsbarcode.min.js` — vendored barcode rendering for the
+  sale receipt only (never the refund slip — see "Receipts" above)
 - Auth views in `shop/auth_views.py`, under `account/` URLs
 
 ## Project knowledge system

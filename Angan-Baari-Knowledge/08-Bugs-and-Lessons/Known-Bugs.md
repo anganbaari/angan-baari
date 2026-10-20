@@ -1,5 +1,39 @@
 # Known Bugs
 
+## Refund screen rounded a weighed line's quantity to zero (found 2026-10-20)
+
+`templates/pos_refund.html`'s `activeSelections()` computed how much of a
+whole-line refund (variable-weight, fixed-weight animal, or combo
+component) to send back to the server as
+`Math.round(parseFloat(line.remaining_quantity))`.
+
+**Impact:** for a `variable_weight` line, `remaining_quantity` is a
+**weight** in kg, not a count. `Math.round(0.25)` is `0` — so a ticked
+checkbox on a sub-0.5kg line (the reported case: 0.250kg, Rs 20) silently
+dropped that line's amount out of the refund total, leaving "Refund total"
+stuck at Rs 0 and the confirm button permanently disabled, with no
+indication why. A weighed line at or above 0.5kg had the opposite
+problem: the rounded quantity no longer matched `sale_line.quantity`
+exactly, which the server correctly rejected as "not a full-line
+refund." Fixed-weight animals and combo components that happened to be
+`fixed_quantity` were unaffected (their quantities are always whole
+numbers already).
+
+**Status:** fixed — removed the `Math.round()`, sending the exact
+`parseFloat(remaining_quantity)` value back (matches
+`sale_line.quantity` exactly, as a whole-line refund requires). Also
+added a visible "why is this disabled" message above the confirm button,
+since the original bug's worst symptom was a disabled button with zero
+explanation. Covered by a standalone Node reproduction script (no JS
+test runner in this repo) plus server-side regression tests confirming
+the lookup endpoint reports a positive refundable amount for a weighed
+line and that refunding one actually completes.
+
+**Lesson:** never apply `Math.round()` (or any rounding meant for a
+*count*) to a value that might be a *weight* — check what unit a field is
+actually in before reusing a rounding helper written for a different
+field. See [[Refunds]].
+
 ## `InventoryMovement.quantity` only supported 2 decimal places (found 2026-10-01)
 
 `shop/models.py`'s `InventoryMovement.quantity` was `decimal_places=2`, but
