@@ -591,6 +591,34 @@ class RefundSlipViewTests(RefundTestBase):
         self.assertIn('id="posDate"', content)
         self.assertIn('id="posTime"', content)
 
+    def test_cancel_button_uses_the_same_red_as_pos_low_stock_indicator(self):
+        """Refund-page-polish task: Cancel is filled, red/white, using the
+        same red as the POS screen's own "Low Stock" indicator (#b23b3b
+        -- --danger in both templates), not an ad-hoc colour, and keeps
+        its outlined-green look nowhere else."""
+        response = self.client.get(reverse('pos_refund'))
+        content = response.content.decode()
+        self.assertIn('--danger: #b23b3b;', content)
+        cancel_rule_start = content.index('#cancelRefundBtn {')
+        cancel_rule = content[cancel_rule_start:cancel_rule_start + 400]
+        self.assertIn('background: var(--danger)', cancel_rule)
+        self.assertIn('color: #fff', cancel_rule)
+
+        # Cross-check against the POS screen's own colour for the same red.
+        pos_response = self.client.get(reverse('pos'))
+        self.assertIn('#b23b3b', pos_response.content.decode())
+
+    def test_top_nav_buttons_are_styled_as_buttons(self):
+        """Refund-page-polish task: "Back to POS" and "Recent refunds"
+        look like real buttons (rounded, outlined, >=44px tall), not
+        plain text links."""
+        response = self.client.get(reverse('pos_refund'))
+        content = response.content.decode()
+        self.assertIn('class="link-row"', content)
+        self.assertEqual(content.count('class="back-link"'), 2)
+        self.assertIn('min-height: 44px', content)
+        self.assertIn('border: 2px solid var(--pos-text-green)', content)
+
     def test_refund_page_success_box_has_back_to_pos_link(self):
         """Refund-page-polish task: the "Refund complete" success box has
         a Back to POS button/link, in addition to Print refund slip and

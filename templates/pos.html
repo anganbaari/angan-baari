@@ -1658,11 +1658,23 @@
             syncWholesaleModeToOperator();
         }
 
+        // posUnlockedTabMarker (sessionStorage, tab-scoped) -- survives a
+        // same-tab navigation/reload but is gone the moment this tab is
+        // actually closed (or a fresh tab/window opens /pos/ instead).
+        // Used below at init to tell "resuming the same tab" apart from
+        // "closing the tab... must lock again" (explicitly required even
+        // within the idle window) -- purely a client-side hint for
+        // whether it's even worth asking the server to resume; the
+        // server (PosOperatorStatusView) independently re-validates the
+        // actual unlock every time regardless, so tampering with this
+        // value client-side can never grant more than the server already
+        // allows, only cause an unnecessary PIN prompt.
         function setLocked(locked) {
             isUnlocked = !locked;
             document.getElementById('posBody').classList.toggle('locked', locked);
             renderHeaderStatus();
             if (locked) {
+                try { sessionStorage.removeItem('posUnlockedTabMarker'); } catch (err) {}
                 clearTimeout(idleTimer);
                 showReceiptView(); // the lock banner overlays the receipt table, per the mockup
                 document.getElementById('lockPinInput').value = '';
@@ -1671,6 +1683,7 @@
                 document.getElementById('lockBanner').classList.add('active');
                 document.getElementById('lockPinInput').focus();
             } else {
+                try { sessionStorage.setItem('posUnlockedTabMarker', '1'); } catch (err) {}
                 document.getElementById('lockBanner').classList.remove('active');
                 resetIdleTimer();
             }
@@ -4839,14 +4852,39 @@
         });
 
         // ══════════════════════════════════════════════════════════════
-        // Init — always start locked; there's no way to read prior
-        // session-unlock state without a round trip, so a fresh PIN entry
-        // is required on every page load, even if the session cookie
-        // still technically has an operator set server-side.
+        // Init — resume unlocked, with no PIN re-entry, ONLY when both:
+        // (a) this is the SAME browser tab that was already unlocked
+        // (posUnlockedTabMarker, sessionStorage -- gone if the tab was
+        // actually closed, even within the idle window: "closing the
+        // tab... must lock again" per CLAUDE.md's PIN-lock navigation
+        // fix), and (b) the server (PosOperatorStatusView) independently
+        // confirms the session's own unlock is still present AND still
+        // fresh within its own idle window -- the real authority either
+        // way, so (a) on its own (even if tampered with client-side) can
+        // never grant more than the server already allows; a resumed
+        // session falls back to the PIN screen exactly like before this
+        // change the instant either check disagrees. A connectivity
+        // failure also falls back to the PIN screen, same as always --
+        // auto-resume is never trusted on a client-only basis offline.
         // ══════════════════════════════════════════════════════════════
         showReceiptView();
         renderReceipt();
-        setLocked(true);
+        (async () => {
+            let tabWasUnlocked = false;
+            try { tabWasUnlocked = sessionStorage.getItem('posUnlockedTabMarker') === '1'; } catch (err) {}
+            if (tabWasUnlocked) {
+                try {
+                    const response = await apiFetch('/api/v1/pos/operator-status/');
+                    const data = await response.json();
+                    if (response.ok && data.unlocked) {
+                        currentOperator = data;
+                        setLocked(false);
+                        return;
+                    }
+                } catch (err) { /* offline -- fall through to locked */ }
+            }
+            setLocked(true);
+        })();
         loadStockData();
         refreshCreditCustomerCacheQuietly();
     </script>

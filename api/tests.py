@@ -2474,6 +2474,110 @@ class PosUnlockApiTests(ApiTestBase):
         self.assertEqual(fresh.data['attempts_remaining'], 6)
 
 
+class PosOperatorStatusApiTests(ApiTestBase):
+    """GET /api/v1/pos/operator-status/ — the PIN-lock navigation fix:
+    lets templates/pos.html and templates/pos_refund.html confirm whether
+    this session is still PIN-unlocked (and, if so, refresh its idle
+    timestamp) without going through PosUnlockView's own PIN check at
+    all. Added so that navigating /pos/ <-> /pos/refund/ within the idle
+    window doesn't force a fresh PIN entry on every /pos/ load -- see
+    CLAUDE.md's PIN-lock section for the full design."""
+
+    def setUp(self):
+        super().setUp()
+        self.pin_holder = User.objects.create_user('priya2', password='pw', is_staff=True, first_name='Priya')
+        from shop.models import UserProfile
+        self.profile = UserProfile.objects.create(user=self.pin_holder, role='cashier')
+        self.profile.set_pin('4471')
+        self.profile.save()
+
+    def test_unlocked_false_before_any_pin_unlock(self):
+        self.client.login(username='cashier', password='pw')
+        response = self.client.get(reverse('v1_pos_operator_status'))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertFalse(response.data['unlocked'])
+
+    def test_unlocked_true_right_after_a_real_pin_unlock(self):
+        self.client.login(username='cashier', password='pw')
+        unlock = self.client.post(reverse('v1_pos_unlock'), {'pin': '4471'}, format='json')
+        self.assertEqual(unlock.status_code, status.HTTP_200_OK, unlock.data)
+
+        response = self.client.get(reverse('v1_pos_operator_status'))
+        self.assertTrue(response.data['unlocked'])
+        self.assertEqual(response.data['id'], self.pin_holder.id)
+        self.assertEqual(response.data['name'], 'Priya')
+        self.assertEqual(response.data['role'], 'cashier')
+
+    def test_a_fresh_check_refreshes_the_idle_timestamp(self):
+        self.client.login(username='cashier', password='pw')
+        self.client.post(reverse('v1_pos_unlock'), {'pin': '4471'}, format='json')
+        first_ts = self.client.session['pos_operator_unlocked_at']
+
+        response = self.client.get(reverse('v1_pos_operator_status'))
+        self.assertTrue(response.data['unlocked'])
+        second_ts = self.client.session['pos_operator_unlocked_at']
+        self.assertGreaterEqual(second_ts, first_ts)
+
+    def test_stale_idle_timestamp_reports_locked_and_clears_the_session(self):
+        """Mirrors templates/pos.html's own 20-minute IDLE_LIMIT_MS --
+        PosOperatorStatusView.IDLE_SECONDS. A session whose last unlock
+        is older than that must report unlocked:false, exactly as if the
+        client-side idle timer had already fired and called /lock/."""
+        self.client.login(username='cashier', password='pw')
+        self.client.post(reverse('v1_pos_unlock'), {'pin': '4471'}, format='json')
+        session = self.client.session
+        session['pos_operator_unlocked_at'] = (
+            timezone.now() - timedelta(seconds=20 * 60 + 5)
+        ).isoformat()
+        session.save()
+
+        response = self.client.get(reverse('v1_pos_operator_status'))
+        self.assertFalse(response.data['unlocked'])
+        self.assertIsNone(self.client.session.get('pos_operator_id'))
+        self.assertIsNone(self.client.session.get('pos_operator_unlocked_at'))
+
+    def test_fresh_idle_timestamp_still_within_window_reports_unlocked(self):
+        self.client.login(username='cashier', password='pw')
+        self.client.post(reverse('v1_pos_unlock'), {'pin': '4471'}, format='json')
+        session = self.client.session
+        session['pos_operator_unlocked_at'] = (
+            timezone.now() - timedelta(seconds=19 * 60)
+        ).isoformat()
+        session.save()
+
+        response = self.client.get(reverse('v1_pos_operator_status'))
+        self.assertTrue(response.data['unlocked'])
+
+    def test_deactivated_operator_reports_locked(self):
+        self.client.login(username='cashier', password='pw')
+        self.client.post(reverse('v1_pos_unlock'), {'pin': '4471'}, format='json')
+        self.pin_holder.is_active = False
+        self.pin_holder.save()
+
+        response = self.client.get(reverse('v1_pos_operator_status'))
+        self.assertFalse(response.data['unlocked'])
+
+    def test_requires_staff_session(self):
+        anon = APIClient()
+        response = anon.get(reverse('v1_pos_operator_status'))
+        self.assertNotEqual(response.status_code, status.HTTP_200_OK)
+
+        self.client.login(username='shopper', password='pw')
+        response = self.client.get(reverse('v1_pos_operator_status'))
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_lock_then_status_reports_locked(self):
+        """Confirms PosLockView's own behaviour is untouched by this
+        addition -- an explicit lock still clears the session the same
+        way, and this view reports it correctly afterwards."""
+        self.client.login(username='cashier', password='pw')
+        self.client.post(reverse('v1_pos_unlock'), {'pin': '4471'}, format='json')
+        self.client.post(reverse('v1_pos_lock'))
+
+        response = self.client.get(reverse('v1_pos_operator_status'))
+        self.assertFalse(response.data['unlocked'])
+
+
 class OrderApiTests(ApiTestBase):
     def test_guest_can_create_order(self):
         payload = {

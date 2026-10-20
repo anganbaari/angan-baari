@@ -87,7 +87,14 @@ var POS_QUEUE_STORE = 'queuedSales';
 // now shows a C/S badge merged from that same response -- an installed
 // POS app cold-starting offline on the old v20 shell would otherwise
 // keep re-fetching stock on every cart-chip tap and never show the badge.
-var POS_SHELL_CACHE = 'pos-shell-v21';
+// v21 -> v22: PIN-lock navigation fix -- pos.html's init no longer
+// unconditionally locks; it now calls the new
+// /api/v1/pos/operator-status/ endpoint (plus a sessionStorage
+// same-tab marker) to resume unlocked across /pos/ <-> /pos/refund/
+// navigation within the idle window. An installed app cold-starting
+// offline on the old v21 shell would keep running pos.html's previous
+// always-lock-on-load logic instead.
+var POS_SHELL_CACHE = 'pos-shell-v22';
 var POS_META_STORE = 'meta';
 var POS_OFFLINE_PIN_STORE = 'offlineOperators';
 var POS_CREDIT_CUSTOMER_STORE = 'creditCustomers';

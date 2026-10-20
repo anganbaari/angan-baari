@@ -841,6 +841,69 @@ class PosLockView(APIView):
         return Response({'status': 'ok'})
 
 
+class PosOperatorStatusView(APIView):
+    """GET /api/v1/pos/operator-status/ — lets a page confirm whether this
+    session is still PIN-unlocked, without going through unlock/'s own PIN
+    check. Added for the "PIN re-asked on every /pos/ <-> /pos/refund/
+    navigation" fix: templates/pos.html used to force setLocked(true)
+    unconditionally on every load, ignoring that the session's
+    pos_operator_id (set by PosUnlockView) already survives navigation on
+    its own. pos.html and templates/pos_refund.html now call this instead
+    of assuming either "always locked" or "always still unlocked".
+
+    Enforces its own idle window (IDLE_SECONDS, mirroring pos.html's
+    client-side IDLE_LIMIT_MS) against pos_operator_unlocked_at -- a
+    timestamp PosUnlockView already wrote but that nothing previously read
+    back. A fresh, valid check refreshes that timestamp (the check itself
+    is "the terminal is in active use" evidence), which is what lets
+    activity on /pos/refund/ (which has no PIN UI of its own -- it just
+    calls this on load and periodically on activity) keep the SAME idle
+    clock alive for /pos/ to resume from later, rather than two
+    independent client timers that could drift apart.
+
+    Deliberately does NOT touch PosUnlockView's own PIN-matching logic,
+    and does NOT change what get_pos_operator() (actual sale/refund/
+    repayment creation) accepts -- that function still has no idle-
+    staleness check of its own, same as before this view existed. Adding
+    one there would change already-shipped sale/refund API behaviour,
+    which was out of scope for what this fix asked for.
+    """
+
+    authentication_classes = [SessionAuthentication]
+    permission_classes = [IsStaffUser]
+
+    IDLE_SECONDS = 20 * 60  # mirrors templates/pos.html's IDLE_LIMIT_MS (20 * 60 * 1000)
+
+    def get(self, request, *args, **kwargs):
+        operator_id = request.session.get('pos_operator_id')
+        unlocked_at_raw = request.session.get('pos_operator_unlocked_at')
+        if not operator_id or not unlocked_at_raw:
+            return Response({'unlocked': False})
+
+        unlocked_at = parse_datetime(unlocked_at_raw)
+        if not unlocked_at or (timezone.now() - unlocked_at).total_seconds() > self.IDLE_SECONDS:
+            request.session.pop('pos_operator_id', None)
+            request.session.pop('pos_operator_unlocked_at', None)
+            return Response({'unlocked': False})
+
+        try:
+            profile = UserProfile.objects.select_related('user').get(
+                user_id=operator_id, user__is_staff=True, user__is_active=True,
+            )
+        except UserProfile.DoesNotExist:
+            request.session.pop('pos_operator_id', None)
+            request.session.pop('pos_operator_unlocked_at', None)
+            return Response({'unlocked': False})
+
+        request.session['pos_operator_unlocked_at'] = timezone.now().isoformat()
+        return Response({
+            'unlocked': True,
+            'id': profile.user.id,
+            'name': profile.user.get_full_name() or profile.user.username,
+            'role': profile.role,
+        })
+
+
 class CustomerLookupView(APIView):
     """GET /api/v1/pos/customers/lookup/?phone=<number> — the checkout-time
     lookup staff use to find a credit customer. phone isn't unique (shared

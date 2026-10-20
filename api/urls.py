@@ -12,6 +12,7 @@ urlpatterns = [
     path('sales/', views.POSSaleView.as_view(), name='v1_sale_list_create'),
     path('pos/unlock/', views.PosUnlockView.as_view(), name='v1_pos_unlock'),
     path('pos/lock/', views.PosLockView.as_view(), name='v1_pos_lock'),
+    path('pos/operator-status/', views.PosOperatorStatusView.as_view(), name='v1_pos_operator_status'),
     path('pos/customers/lookup/', views.CustomerLookupView.as_view(), name='v1_pos_customer_lookup'),
     path('pos/customers/', views.CustomerListCreateView.as_view(), name='v1_pos_customer_create'),
     path('pos/credit/repay/', views.CreditRepayView.as_view(), name='v1_pos_credit_repay'),

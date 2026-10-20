@@ -94,11 +94,19 @@
 
         h1 { font-family: 'Cormorant Garamond', serif; font-size: 1.9rem; margin: 0 0 4px; }
         h3 { margin: 0 0 10px; font-size: 1.05rem; }
-        .link-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+        /* Top buttons -- real buttons (outlined, dark-green, same family
+           as the footer's secondary/Cancel styling), not plain text
+           links, so they read as actions rather than incidental copy.
+           flex:1 with a shared row + min-width:0/no-wrap-via-ellipsis
+           keeps both fitting side by side at 375px without wrapping. */
+        .link-row { display: flex; gap: 10px; margin-bottom: 14px; }
         .back-link {
-            display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px;
-            color: var(--pos-text-green); font-weight: 700; text-decoration: none;
+            flex: 1 1 0; display: flex; align-items: center; justify-content: center;
+            min-height: 44px; padding: 0 10px; border-radius: 10px; border: 2px solid var(--pos-text-green);
+            background: #fff; color: var(--pos-text-green); font-weight: 700; font-size: 0.9rem;
+            text-decoration: none; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         }
+        .back-link:active { background: #eaf1e6; }
         .card { background: var(--white); border-radius: 14px; padding: 18px; margin-bottom: 16px; box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
 
         .lookup-row { display: flex; gap: 10px; }
@@ -190,36 +198,60 @@
             border-top: 2px solid var(--mist); padding: 14px 16px calc(14px + env(safe-area-inset-bottom));
             box-shadow: 0 -4px 16px rgba(0,0,0,0.08);
         }
+        /* <=480px: a 2-column grid (narrow left column for Cancel, wide
+           right column for Total+Confirm) instead of flexbox wrapping --
+           this is what lets the total sit directly above JUST the
+           Confirm side of the row (not spanning the whole bar) while
+           Cancel stays alone at the bottom-left, exactly as asked, with
+           no extra markup needed (same elements, re-placed via
+           grid-column/grid-row). >=481px switches to a single flex row:
+           Cancel alone on the left (margin-right:auto pushes everything
+           after it to the right), Total immediately next to Confirm as
+           one right-aligned group. */
         .footer-bar-inner {
-            margin: 0 auto; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px;
+            margin: 0 auto;
+            display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto auto;
+            column-gap: 14px; row-gap: 6px; align-items: center;
         }
         @media (min-width: 768px) { .footer-bar-inner { max-width: 720px; } }
         @media (min-width: 1024px) { .footer-bar-inner { max-width: 1100px; } }
 
         .footer-total-group {
-            order: 1; flex: 1 1 100%; display: flex; justify-content: space-between; align-items: baseline;
+            grid-column: 2; grid-row: 1; display: flex; justify-content: flex-end; align-items: baseline; gap: 8px;
         }
         .footer-total-group .total-label { font-size: 0.85rem; font-weight: 700; color: var(--text-muted); }
         .footer-total-group .total-value { font-size: 1.3rem; font-weight: 800; }
         #confirmDisabledReason {
-            order: 2; flex: 1 1 100%; font-size: 0.85rem; font-weight: 700; color: var(--danger); text-align: center;
+            grid-column: 2; grid-row: 2; font-size: 0.85rem; font-weight: 700; color: var(--danger); text-align: right;
         }
+        /* Filled red/white, same red as the POS "Low Stock" indicator
+           (--danger, #b23b3b in both templates) -- a destructive action,
+           styled like one, not the outlined-green secondary look used
+           elsewhere on this page. */
         #cancelRefundBtn {
-            order: 3; flex: 0 0 auto; min-width: 104px; min-height: 48px; padding: 0 16px; border-radius: 12px;
-            border: 2px solid var(--pos-text-green); background: #fff; color: var(--pos-text-green);
+            grid-column: 1; grid-row: 3; align-self: end;
+            flex: 0 0 auto; min-width: 104px; min-height: 48px; padding: 0 16px; border-radius: 12px;
+            border: none; background: var(--danger); color: #fff;
             font-weight: 800; font-size: 0.92rem; cursor: pointer; font-family: inherit;
         }
         #confirmRefundBtn {
-            order: 4; flex: 1 1 auto; min-height: 54px; border-radius: 12px; border: none;
+            grid-column: 2; grid-row: 3;
+            min-height: 54px; border-radius: 12px; border: none;
             background: var(--pos-enter-orange); color: #1a1a1a; font-weight: 800; font-size: 1.1rem;
             cursor: pointer; font-family: inherit;
         }
         #confirmRefundBtn:disabled, #cancelRefundBtn:disabled { opacity: 0.45; cursor: not-allowed; }
         @media (min-width: 481px) {
-            .footer-total-group { order: 2; flex: 1 1 auto; justify-content: flex-start; gap: 10px; }
-            #cancelRefundBtn { order: 1; }
+            .footer-bar-inner { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
+            /* Explicit order, independent of DOM order -- Cancel alone on
+               the far left (margin-right:auto pushes the Total+Confirm
+               pair to the right as a group), Total immediately to the
+               left of Confirm, disabled-reason wrapping to its own full
+               row underneath. */
+            #cancelRefundBtn { order: 1; margin-right: auto; }
+            .footer-total-group { order: 2; flex: 0 1 auto; justify-content: flex-end; }
             #confirmRefundBtn { order: 3; flex: 0 0 auto; min-width: 220px; }
-            #confirmDisabledReason { order: 4; flex: 1 1 100%; }
+            #confirmDisabledReason { order: 4; flex: 1 1 100%; text-align: center; }
         }
 
         /* Dim overlays -- plain rgba, no blur, instant/<=100ms, same
@@ -464,6 +496,69 @@
         }
         tickRefundHeaderClock();
         setInterval(tickRefundHeaderClock, 1000);
+
+        // ── PIN-lock navigation fix: this page has no PIN-entry UI of its
+        //    own -- it only ever worked because request.session's
+        //    pos_operator_id (set by templates/pos.html's PIN unlock)
+        //    already survives navigation, with no lock/idle concept of
+        //    its own layered on top. That's now added here, mirroring
+        //    pos.html's own 20-minute idle window (IDLE_LIMIT_MS) and
+        //    sharing the SAME server-side timestamp
+        //    (pos_operator_unlocked_at, PosOperatorStatusView in
+        //    api/views.py) rather than two independent client clocks
+        //    that could drift apart: activity here refreshes that one
+        //    timestamp (at most once a minute, not on every keystroke),
+        //    so time spent on this page counts toward the same idle
+        //    budget /pos/ itself uses, and returning to /pos/ afterwards
+        //    resumes unlocked rather than re-prompting for a PIN. If
+        //    this page is ever left truly idle for the full window, or
+        //    the server-side session is otherwise no longer unlocked
+        //    (deactivated operator, explicit Logout, idle-locked from
+        //    the POS screen itself), it sends the user to /pos/, where
+        //    the existing PIN screen appears -- this page can't show a
+        //    PIN screen itself. ──
+        const IDLE_LIMIT_MS = 20 * 60 * 1000; // mirrors templates/pos.html's own IDLE_LIMIT_MS
+        const IDLE_PING_INTERVAL_MS = 60 * 1000;
+        let idleRedirectTimer = null;
+        let lastOperatorPingAt = 0;
+
+        function redirectToPosLocked() {
+            window.location.href = "{% url 'pos' %}";
+        }
+
+        async function pingOperatorStatus() {
+            try {
+                const response = await apiFetch('/api/v1/pos/operator-status/');
+                const data = await response.json();
+                if (!response.ok || !data.unlocked) redirectToPosLocked();
+            } catch (err) {
+                // Offline -- can't confirm either way. Let the page carry
+                // on as it already did before this change: an actual
+                // refund attempt while genuinely locked is still rejected
+                // server-side by get_pos_operator(), unaffected by any of
+                // this.
+            }
+        }
+
+        function onRefundPageActivity() {
+            clearTimeout(idleRedirectTimer);
+            idleRedirectTimer = setTimeout(async () => {
+                try { await apiFetch('/api/v1/pos/lock/', { method: 'POST' }); } catch (err) {}
+                redirectToPosLocked();
+            }, IDLE_LIMIT_MS);
+
+            const now = Date.now();
+            if (now - lastOperatorPingAt > IDLE_PING_INTERVAL_MS) {
+                lastOperatorPingAt = now;
+                pingOperatorStatus();
+            }
+        }
+        ['click', 'keydown', 'input'].forEach(evt => document.addEventListener(evt, onRefundPageActivity));
+        // Runs once immediately on load too (lastOperatorPingAt starts at
+        // 0, so the interval check above always fires the first time),
+        // confirming the terminal is actually unlocked before staff work
+        // with this page at all.
+        onRefundPageActivity();
 
         // Mirrors _largest_remainder_shares() (shop/views.py) exactly, so a
         // partial-quantity line's live preview amount always matches what
