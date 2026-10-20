@@ -1,4 +1,5 @@
 {% load static %}
+{% load storefront_tags %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -272,7 +273,7 @@
                   </div>
                 </div>
                 <div class="hc-connector-solo" aria-hidden="true"></div>
-                <div class="hc-cta-box"><a href="{% url 'shop' %}" class="hc-cta"><i class="fas fa-leaf"></i><span>Order</span><span>Now</span></a></div>
+                <div class="hc-cta-box"><a href="{% storefront_link 'shop' %}" class="hc-cta"><i class="fas fa-leaf"></i><span>Order</span><span>Now</span></a></div>
             </nav>
  
             <!-- Hamburger Button (mobile only) -->
@@ -329,7 +330,7 @@
  
         <!-- Drawer CTA -->
         <div class="drawer-cta">
-            <a href="{% url 'shop' %}" class="drawer-order-btn">
+            <a href="{% storefront_link 'shop' %}" class="drawer-order-btn">
                 <i class="fas fa-leaf"></i> Place an Order
             </a>
         </div>
@@ -376,7 +377,7 @@
                 <p class="slide-sub">शुद्घ, ताजा र अर्गानिक उत्पादनको फरक स्वाद लिनुहोस्।</p>
                 <div class="slide-actions">
                     <a href="#delivery" class="btn-hero-primary">Shop Now</a>
-                    <a href="{% url 'shop' %}" class="btn-hero-ghost">Place an Order</a>
+                    <a href="{% storefront_link 'shop' %}" class="btn-hero-ghost">Place an Order</a>
                 </div>
             </div>
         </div>
@@ -691,15 +692,15 @@
                            target="_blank" rel="noopener noreferrer">
                             <i class="fab fa-whatsapp"></i> <span class="btn-label">WhatsApp</span>
                         </a>
-                        <a href="{% url 'shop' %}" class="btn-shop-icon" aria-label="Visit our shop">
+                        <a href="{% storefront_link 'shop' %}" class="btn-shop-icon" aria-label="Visit our shop">
                             <i class="fas fa-store"></i>
                         </a>
-                        <a href="/products/honey/" class="btn-details" aria-label="View Honey details">
+                        <a href="{% storefront_link 'product' 'honey' %}" class="btn-details" aria-label="View Honey details">
                             <i class="fas fa-info-circle"></i>
                         </a>
                     </div>
                 </div>
-                <a href="/products/honey/" class="shop-card-link" aria-label="View Pure Angan Baari Gold Honey details"></a>
+                <a href="{% storefront_link 'product' 'honey' %}" class="shop-card-link" aria-label="View Pure Angan Baari Gold Honey details"></a>
             </div>
  
             <!-- ── FRUITS ── -->
@@ -718,15 +719,15 @@
                            target="_blank" rel="noopener noreferrer">
                             <i class="fab fa-whatsapp"></i> <span class="btn-label">WhatsApp</span>
                         </a>
-                        <a href="{% url 'shop' %}" class="btn-shop-icon" aria-label="Visit our shop">
+                        <a href="{% storefront_link 'shop' %}" class="btn-shop-icon" aria-label="Visit our shop">
                             <i class="fas fa-store"></i>
                         </a>
-                        <a href="/products/mangoes/" class="btn-details" aria-label="View Mangoes details">
+                        <a href="{% storefront_link 'product' 'mangoes' %}" class="btn-details" aria-label="View Mangoes details">
                             <i class="fas fa-info-circle"></i>
                         </a>
                     </div>
                 </div>
-                <a href="/products/mangoes/" class="shop-card-link" aria-label="View Mangoes details"></a>
+                <a href="{% storefront_link 'product' 'mangoes' %}" class="shop-card-link" aria-label="View Mangoes details"></a>
             </div>
  
             <div class="shop-card" data-cat="fruits" data-aos="fade-right" data-aos-delay="60">
@@ -744,15 +745,15 @@
                            target="_blank" rel="noopener noreferrer">
                             <i class="fab fa-whatsapp"></i> <span class="btn-label">WhatsApp</span>
                         </a>
-                        <a href="{% url 'shop' %}" class="btn-shop-icon" aria-label="Visit our shop">
+                        <a href="{% storefront_link 'shop' %}" class="btn-shop-icon" aria-label="Visit our shop">
                             <i class="fas fa-store"></i>
                         </a>
-                        <a href="/products/litchi/" class="btn-details" aria-label="View Litchi details">
+                        <a href="{% storefront_link 'product' 'litchi' %}" class="btn-details" aria-label="View Litchi details">
                             <i class="fas fa-info-circle"></i>
                         </a>
                     </div>
                 </div>
-                <a href="/products/litchi/" class="shop-card-link" aria-label="View Litchi details"></a>
+                <a href="{% storefront_link 'product' 'litchi' %}" class="shop-card-link" aria-label="View Litchi details"></a>
             </div>
  
             <div class="shop-card" data-cat="fruits" data-aos="fade-left" data-aos-delay="120">
@@ -770,15 +771,15 @@
                            target="_blank" rel="noopener noreferrer">
                             <i class="fab fa-whatsapp"></i> <span class="btn-label">WhatsApp</span>
                         </a>
-                        <a href="{% url 'shop' %}" class="btn-shop-icon" aria-label="Visit our shop">
+                        <a href="{% storefront_link 'shop' %}" class="btn-shop-icon" aria-label="Visit our shop">
                             <i class="fas fa-store"></i>
                         </a>
-                        <a href="/products/jackfruit/" class="btn-details" aria-label="View Jackfruit details">
+                        <a href="{% storefront_link 'product' 'jackfruit' %}" class="btn-details" aria-label="View Jackfruit details">
                             <i class="fas fa-info-circle"></i>
                         </a>
                     </div>
                 </div>
-                <a href="/products/jackfruit/" class="shop-card-link" aria-label="View Jackfruit details"></a>
+                <a href="{% storefront_link 'product' 'jackfruit' %}" class="shop-card-link" aria-label="View Jackfruit details"></a>
             </div>
  
             <div class="shop-card" data-cat="fruits" data-aos="fade-left" data-aos-delay="0">
@@ -796,15 +797,15 @@
                            target="_blank" rel="noopener noreferrer">
                             <i class="fab fa-whatsapp"></i> <span class="btn-label">WhatsApp</span>
                         </a>
-                        <a href="{% url 'shop' %}" class="btn-shop-icon" aria-label="Visit our shop">
+                        <a href="{% storefront_link 'shop' %}" class="btn-shop-icon" aria-label="Visit our shop">
                             <i class="fas fa-store"></i>
                         </a>
-                        <a href="/products/papaya/" class="btn-details" aria-label="View Papaya details">
+                        <a href="{% storefront_link 'product' 'papaya' %}" class="btn-details" aria-label="View Papaya details">
                             <i class="fas fa-info-circle"></i>
                         </a>
                     </div>
                 </div>
-                <a href="/products/papaya/" class="shop-card-link" aria-label="View Papaya details"></a>
+                <a href="{% storefront_link 'product' 'papaya' %}" class="shop-card-link" aria-label="View Papaya details"></a>
             </div>
  
             <div class="shop-card" data-cat="fruits" data-aos="fade-right" data-aos-delay="60">
@@ -822,15 +823,15 @@
                            target="_blank" rel="noopener noreferrer">
                             <i class="fab fa-whatsapp"></i> <span class="btn-label">WhatsApp</span>
                         </a>
-                        <a href="{% url 'shop' %}" class="btn-shop-icon" aria-label="Visit our shop">
+                        <a href="{% storefront_link 'shop' %}" class="btn-shop-icon" aria-label="Visit our shop">
                             <i class="fas fa-store"></i>
                         </a>
-                        <a href="/products/banana/" class="btn-details" aria-label="View Banana details">
+                        <a href="{% storefront_link 'product' 'banana' %}" class="btn-details" aria-label="View Banana details">
                             <i class="fas fa-info-circle"></i>
                         </a>
                     </div>
                 </div>
-                <a href="/products/banana/" class="shop-card-link" aria-label="View Bananas details"></a>
+                <a href="{% storefront_link 'product' 'banana' %}" class="shop-card-link" aria-label="View Bananas details"></a>
             </div>
  
             <div class="shop-card" data-cat="fruits" data-aos="fade-right" data-aos-delay="120">
@@ -848,15 +849,15 @@
                            target="_blank" rel="noopener noreferrer">
                             <i class="fab fa-whatsapp"></i> <span class="btn-label">WhatsApp</span>
                         </a>
-                        <a href="{% url 'shop' %}" class="btn-shop-icon" aria-label="Visit our shop">
+                        <a href="{% storefront_link 'shop' %}" class="btn-shop-icon" aria-label="Visit our shop">
                             <i class="fas fa-store"></i>
                         </a>
-                        <a href="/products/lemons/" class="btn-details" aria-label="View Lemons details">
+                        <a href="{% storefront_link 'product' 'lemons' %}" class="btn-details" aria-label="View Lemons details">
                             <i class="fas fa-info-circle"></i>
                         </a>
                     </div>
                 </div>
-                <a href="/products/lemons/" class="shop-card-link" aria-label="View Lemons details"></a>
+                <a href="{% storefront_link 'product' 'lemons' %}" class="shop-card-link" aria-label="View Lemons details"></a>
             </div>
  
             <!-- ── VEGETABLES ── -->
@@ -875,15 +876,15 @@
                            target="_blank" rel="noopener noreferrer">
                             <i class="fab fa-whatsapp"></i> <span class="btn-label">WhatsApp</span>
                         </a>
-                        <a href="{% url 'shop' %}" class="btn-shop-icon" aria-label="Visit our shop">
+                        <a href="{% storefront_link 'shop' %}" class="btn-shop-icon" aria-label="Visit our shop">
                             <i class="fas fa-store"></i>
                         </a>
-                        <a href="/products/vegetables/" class="btn-details" aria-label="View Vegetables details">
+                        <a href="{% storefront_link 'product' 'vegetables' %}" class="btn-details" aria-label="View Vegetables details">
                             <i class="fas fa-info-circle"></i>
                         </a>
                     </div>
                 </div>
-                <a href="/products/vegetables/" class="shop-card-link" aria-label="View Seasonal Vegetables details"></a>
+                <a href="{% storefront_link 'product' 'vegetables' %}" class="shop-card-link" aria-label="View Seasonal Vegetables details"></a>
             </div>
  
             <div class="shop-card hidden" data-cat="vegetables" data-aos="fade-left" data-aos-delay="60">
@@ -901,15 +902,15 @@
                            target="_blank" rel="noopener noreferrer">
                             <i class="fab fa-whatsapp"></i> <span class="btn-label">WhatsApp</span>
                         </a>
-                        <a href="{% url 'shop' %}" class="btn-shop-icon" aria-label="Visit our shop">
+                        <a href="{% storefront_link 'shop' %}" class="btn-shop-icon" aria-label="Visit our shop">
                             <i class="fas fa-store"></i>
                         </a>
-                        <a href="/products/mushroom/" class="btn-details" aria-label="View Mushroom details">
+                        <a href="{% storefront_link 'product' 'mushroom' %}" class="btn-details" aria-label="View Mushroom details">
                             <i class="fas fa-info-circle"></i>
                         </a>
                     </div>
                 </div>
-                <a href="/products/mushroom/" class="shop-card-link" aria-label="View Mushrooms details"></a>
+                <a href="{% storefront_link 'product' 'mushroom' %}" class="shop-card-link" aria-label="View Mushrooms details"></a>
             </div>
 
  
@@ -929,15 +930,15 @@
                            target="_blank" rel="noopener noreferrer">
                             <i class="fab fa-whatsapp"></i> <span class="btn-label">WhatsApp</span>
                         </a>
-                        <a href="{% url 'shop' %}" class="btn-shop-icon" aria-label="Visit our shop">
+                        <a href="{% storefront_link 'shop' %}" class="btn-shop-icon" aria-label="Visit our shop">
                             <i class="fas fa-store"></i>
                         </a>
-                        <a href="/products/goats/" class="btn-details" aria-label="View Goats details">
+                        <a href="{% storefront_link 'product' 'goats' %}" class="btn-details" aria-label="View Goats details">
                             <i class="fas fa-info-circle"></i>
                         </a>
                     </div>
                 </div>
-                <a href="/products/goats/" class="shop-card-link" aria-label="View Goats details"></a>
+                <a href="{% storefront_link 'product' 'goats' %}" class="shop-card-link" aria-label="View Goats details"></a>
             </div>
  
             <div class="shop-card hidden" data-cat="animals" data-aos="fade-left" data-aos-delay="60">
@@ -955,15 +956,15 @@
                            target="_blank" rel="noopener noreferrer">
                             <i class="fab fa-whatsapp"></i> <span class="btn-label">WhatsApp</span>
                         </a>
-                        <a href="{% url 'shop' %}" class="btn-shop-icon" aria-label="Visit our shop">
+                        <a href="{% storefront_link 'shop' %}" class="btn-shop-icon" aria-label="Visit our shop">
                             <i class="fas fa-store"></i>
                         </a>
-                        <a href="/products/local-chickens/" class="btn-details" aria-label="View Local Chickens details">
+                        <a href="{% storefront_link 'product' 'local-chickens' %}" class="btn-details" aria-label="View Local Chickens details">
                             <i class="fas fa-info-circle"></i>
                         </a>
                     </div>
                 </div>
-                <a href="/products/local-chickens/" class="shop-card-link" aria-label="View Free-range Hens details"></a>
+                <a href="{% storefront_link 'product' 'local-chickens' %}" class="shop-card-link" aria-label="View Free-range Hens details"></a>
             </div>
  
             <!-- ── PICKLES ── -->
@@ -982,15 +983,15 @@
                            target="_blank" rel="noopener noreferrer">
                             <i class="fab fa-whatsapp"></i> <span class="btn-label">WhatsApp</span>
                         </a>
-                        <a href="{% url 'shop' %}" class="btn-shop-icon" aria-label="Visit our shop">
+                        <a href="{% storefront_link 'shop' %}" class="btn-shop-icon" aria-label="Visit our shop">
                             <i class="fas fa-store"></i>
                         </a>
-                        <a href="/products/mango-pickles/" class="btn-details" aria-label="View Mango Pickles details">
+                        <a href="{% storefront_link 'product' 'mango-pickles' %}" class="btn-details" aria-label="View Mango Pickles details">
                             <i class="fas fa-info-circle"></i>
                         </a>
                     </div>
                 </div>
-                <a href="/products/mango-pickles/" class="shop-card-link" aria-label="View Homemade Mango Pickle details"></a>
+                <a href="{% storefront_link 'product' 'mango-pickles' %}" class="shop-card-link" aria-label="View Homemade Mango Pickle details"></a>
             </div>
  
         </div>
@@ -1035,7 +1036,7 @@
                             <div class="carousel-3d-scene" id="miniShopScene">
                                 <div class="carousel-3d" id="miniShopRing">
                                     {% for product in featured_products %}
-                                    <a href="{% url 'shop' %}" class="ring-card">
+                                    <a href="{% storefront_link 'shop' %}" class="ring-card">
                                         <div class="ring-card-inner">
                                             <div class="ring-card-img">
                                                 {% if product.main_image %}
@@ -1065,7 +1066,7 @@
                             <div class="carousel-3d-scene carousel-3d-scene-row2" id="miniShopScene2">
                                 <div class="carousel-3d" id="miniShopRing2">
                                     {% for product in featured_products %}
-                                    <a href="{% url 'shop' %}" class="ring-card">
+                                    <a href="{% storefront_link 'shop' %}" class="ring-card">
                                         <div class="ring-card-inner">
                                             <div class="ring-card-img">
                                                 {% if product.main_image %}
@@ -1090,7 +1091,7 @@
                             </div>
                         {% endif %}
 
-                        <a href="{% url 'shop' %}" class="fs-shop-btn">
+                        <a href="{% storefront_link 'shop' %}" class="fs-shop-btn">
                             <i class="fas fa-store"></i>
                             <span>View Full Shop</span>
                             <i class="fas fa-arrow-right fs-shop-btn-arrow"></i>
@@ -2249,7 +2250,7 @@
     ============================================================ -->
 
     <!-- Floating Shop button -->
-    <a href="{% url 'shop' %}" class="float-shop" aria-label="Visit our online shop" title="Shop Now">
+    <a href="{% storefront_link 'shop' %}" class="float-shop" aria-label="Visit our online shop" title="Shop Now">
         <i class="fas fa-shopping-bag"></i>
         <span class="float-shop-tooltip">Visit Our Shop</span>
     </a>

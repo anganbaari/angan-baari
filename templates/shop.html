@@ -1,4 +1,5 @@
 {% load static %}
+{% load storefront_tags %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -606,11 +607,11 @@
                     <div class="hc-connector" style="left:504px" aria-hidden="true"></div>
 
                     <ul class="hc-nav" id="hcNavApp">
-                      <li class="hc-cell"><a class="hc-link active" href="{% url 'shop' %}" data-target="shop-cell">
+                      <li class="hc-cell"><a class="hc-link active" href="{% storefront_link 'shop' %}" data-target="shop-cell">
                         <svg viewBox="0 0 24 24"><path d="M4.5 9h15l-1.4 10.2a2 2 0 01-2 1.8H7.9a2 2 0 01-2-1.8L4.5 9z"/><path d="M8.5 9V7a3.5 3.5 0 017 0v2"/></svg>
                         <span class="hc-label">Shop</span><span class="hc-ping"></span></a></li>
 
-                      <li class="hc-cell"><a class="hc-link" href="{% url 'cart' %}" data-target="cart-cell">
+                      <li class="hc-cell"><a class="hc-link" href="{% storefront_link 'cart' %}" data-target="cart-cell">
                         <svg viewBox="0 0 24 24"><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2.5 3h2.4l2.1 11.2a2 2 0 002 1.6h8.6a2 2 0 002-1.6L21 7H6.2"/></svg>
                         <span class="hc-label">Cart</span><span class="hc-ping"></span>
                         {% with total_qty=request.session.cart.values|length %}
@@ -623,11 +624,11 @@
                         <span class="hc-label">Offers</span><span class="hc-ping"></span></a></li>
 
                       {% if user.is_authenticated %}
-                      <li class="hc-cell"><a class="hc-link" href="{% url 'profile' %}" data-target="profile-cell">
+                      <li class="hc-cell"><a class="hc-link" href="{% storefront_link 'profile' %}" data-target="profile-cell">
                         <svg viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.5"/><path d="M4.5 20c0-4 3.4-7 7.5-7s7.5 3 7.5 7"/></svg>
                         <span class="hc-label">{{ user.first_name }}</span><span class="hc-ping"></span></a></li>
                       {% else %}
-                      <li class="hc-cell"><a class="hc-link" href="{% url 'login' %}" data-target="login-cell">
+                      <li class="hc-cell"><a class="hc-link" href="{% storefront_link 'login' %}" data-target="login-cell">
                         <svg viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.5"/><path d="M4.5 20c0-4 3.4-7 7.5-7s7.5 3 7.5 7"/></svg>
                         <span class="hc-label">Login</span><span class="hc-ping"></span></a></li>
                       {% endif %}
@@ -682,15 +683,15 @@
             <button class="drawer-close" id="drawerClose"><i class="fas fa-times"></i></button>
         </div>
         <div class="drawer-section">
-            <a href="{% url 'shop' %}" class="drawer-link revealed {% if not selected_category %}active{% endif %}">
+            <a href="{% storefront_link 'shop' %}" class="drawer-link revealed {% if not selected_category %}active{% endif %}">
                 <i class="fas fa-th-large"></i> All Products <span class="drawer-cat-count">{{ total_count }}</span>
             </a>
             {% for cat in cat_tree %}
-            <a href="{% url 'shop' %}?cat={{ cat.obj.id }}" class="drawer-link revealed {% if selected_category.id == cat.obj.id %}active{% endif %}">
+            <a href="{% storefront_link 'category' cat.obj.id %}" class="drawer-link revealed {% if selected_category.id == cat.obj.id %}active{% endif %}">
                 <i class="fas {{ cat.obj.icon }}"></i> {{ cat.obj.name }} <span class="drawer-cat-count">{{ cat.count }}</span>
             </a>
             {% if cat.children %}{% for sub in cat.children %}
-            <a href="{% url 'shop' %}?cat={{ sub.obj.id }}" class="drawer-link revealed {% if selected_category.id == sub.obj.id %}active{% endif %}" style="padding-left:28px;font-size:0.83rem;">
+            <a href="{% storefront_link 'category' sub.obj.id %}" class="drawer-link revealed {% if selected_category.id == sub.obj.id %}active{% endif %}" style="padding-left:28px;font-size:0.83rem;">
                 <i class="fas fa-circle" style="font-size:0.35rem;vertical-align:middle;"></i> {{ sub.obj.name }} <span class="drawer-cat-count">{{ sub.count }}</span>
             </a>
             {% endfor %}{% endif %}
@@ -707,7 +708,7 @@
                 <span class="sidebar-title">Categories</span>
                 <ul class="cat-list" id="catList">
                     <li>
-                        <a class="{% if not selected_category %}active{% endif %}" href="{% url 'shop' %}">
+                        <a class="{% if not selected_category %}active{% endif %}" href="{% storefront_link 'shop' %}">
                             <i class="fas fa-th-large" style="color:#4a7c59;width:14px;"></i>
                             All Products
                             <span class="cat-count">{{ total_count }}</span>
@@ -716,7 +717,7 @@
                     {% for cat in cat_tree %}
                     <li class="cat-l1">
                         <a class="cat-toggle {% if selected_category.id == cat.obj.id %}active{% endif %}"
-                           href="{% url 'shop' %}?cat={{ cat.obj.id }}"
+                           href="{% storefront_link 'category' cat.obj.id %}"
                            data-toggle="l1-{{ cat.obj.id }}">
                             <i class="fas {{ cat.obj.icon }}" style="width:14px;"></i>
                             {{ cat.obj.name }}
@@ -729,7 +730,7 @@
                             {% for sub in cat.children %}
                             <li class="cat-l2">
                                 <a class="cat-toggle {% if selected_category.id == sub.obj.id %}active{% endif %}"
-                                   href="{% url 'shop' %}?cat={{ sub.obj.id }}"
+                                   href="{% storefront_link 'category' sub.obj.id %}"
                                    data-toggle="l2-{{ sub.obj.id }}">
                                     <i class="fas fa-leaf" style="width:12px;font-size:0.7rem;"></i>
                                     {{ sub.obj.name }}
@@ -742,7 +743,7 @@
                                     {% for subsub in sub.children %}
                                     <li class="cat-l3">
                                         <a class="{% if selected_category.id == subsub.obj.id %}active{% endif %}"
-                                           href="{% url 'shop' %}?cat={{ subsub.obj.id }}">
+                                           href="{% storefront_link 'category' subsub.obj.id %}">
                                             <i class="fas fa-circle" style="width:10px;font-size:0.35rem;vertical-align:middle;"></i>
                                             {{ subsub.obj.name }}
                                             <span class="cat-count">{{ subsub.count }}</span>
@@ -799,7 +800,7 @@
                      data-cat="{{ product.category }}"
                      data-name="{{ product.name|lower }}"
                      data-price="{{ product.price|default:0 }}"
-                     onclick="window.location='{% url 'product_detail' product.slug %}'">
+                     onclick="window.location='{% storefront_link 'product' product.slug %}'">
                     <div class="p-card-img">
                         {% if product.main_image %}
                         <img src="{{ product.main_image.url }}" alt="{{ product.name }}" loading="lazy">
@@ -856,7 +857,7 @@
                         </select>
                         {% endif %}
                         <div class="p-card-actions" onclick="event.stopPropagation()">
-                            <a href="{% url 'product_detail' product.slug %}" class="btn-detail">
+                            <a href="{% storefront_link 'product' product.slug %}" class="btn-detail">
                                 <i class="fas fa-eye"></i> View
                             </a>
                             {% if product.is_available %}
@@ -934,11 +935,11 @@
             <div class="hc-connector" style="left:504px" aria-hidden="true"></div>
 
             <ul class="hc-nav" id="hcNavAppMobile">
-              <li class="hc-cell"><a class="hc-link active" href="{% url 'shop' %}" data-target="shop-cell">
+              <li class="hc-cell"><a class="hc-link active" href="{% storefront_link 'shop' %}" data-target="shop-cell">
                 <svg viewBox="0 0 24 24"><path d="M4.5 9h15l-1.4 10.2a2 2 0 01-2 1.8H7.9a2 2 0 01-2-1.8L4.5 9z"/><path d="M8.5 9V7a3.5 3.5 0 017 0v2"/></svg>
                 <span class="hc-label">Shop</span><span class="hc-ping"></span></a></li>
 
-              <li class="hc-cell"><a class="hc-link" href="{% url 'cart' %}" data-target="cart-cell">
+              <li class="hc-cell"><a class="hc-link" href="{% storefront_link 'cart' %}" data-target="cart-cell">
                 <svg viewBox="0 0 24 24"><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2.5 3h2.4l2.1 11.2a2 2 0 002 1.6h8.6a2 2 0 002-1.6L21 7H6.2"/></svg>
                 <span class="hc-label">Cart</span><span class="hc-ping"></span>
                 {% with total_qty=request.session.cart.values|length %}
@@ -951,11 +952,11 @@
                 <span class="hc-label">Offers</span><span class="hc-ping"></span></a></li>
 
               {% if user.is_authenticated %}
-              <li class="hc-cell"><a class="hc-link" href="{% url 'profile' %}" data-target="profile-cell">
+              <li class="hc-cell"><a class="hc-link" href="{% storefront_link 'profile' %}" data-target="profile-cell">
                 <svg viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.5"/><path d="M4.5 20c0-4 3.4-7 7.5-7s7.5 3 7.5 7"/></svg>
                 <span class="hc-label">{{ user.first_name }}</span><span class="hc-ping"></span></a></li>
               {% else %}
-              <li class="hc-cell"><a class="hc-link" href="{% url 'login' %}" data-target="login-cell">
+              <li class="hc-cell"><a class="hc-link" href="{% storefront_link 'login' %}" data-target="login-cell">
                 <svg viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.5"/><path d="M4.5 20c0-4 3.4-7 7.5-7s7.5 3 7.5 7"/></svg>
                 <span class="hc-label">Login</span><span class="hc-ping"></span></a></li>
               {% endif %}

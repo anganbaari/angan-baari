@@ -1,4 +1,5 @@
 {% load static %}
+{% load storefront_tags %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -201,11 +202,11 @@
                     <div class="hc-connector" style="left:504px" aria-hidden="true"></div>
 
                     <ul class="hc-nav" id="hcNavApp">
-                      <li class="hc-cell"><a class="hc-link" href="{% url 'shop' %}" data-target="shop-cell">
+                      <li class="hc-cell"><a class="hc-link" href="{% storefront_link 'shop' %}" data-target="shop-cell">
                         <svg viewBox="0 0 24 24"><path d="M4.5 9h15l-1.4 10.2a2 2 0 01-2 1.8H7.9a2 2 0 01-2-1.8L4.5 9z"/><path d="M8.5 9V7a3.5 3.5 0 017 0v2"/></svg>
                         <span class="hc-label">Shop</span><span class="hc-ping"></span></a></li>
 
-                      <li class="hc-cell"><a class="hc-link active" href="{% url 'cart' %}" data-target="cart-cell">
+                      <li class="hc-cell"><a class="hc-link active" href="{% storefront_link 'cart' %}" data-target="cart-cell">
                         <svg viewBox="0 0 24 24"><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2.5 3h2.4l2.1 11.2a2 2 0 002 1.6h8.6a2 2 0 002-1.6L21 7H6.2"/></svg>
                         <span class="hc-label">Cart</span><span class="hc-ping"></span>
                         <span id="cartBadgeDesktop" class="hc-cart-badge" style="display:{% if count > 0 %}flex{% else %}none{% endif %};">{{ count }}</span>
@@ -216,11 +217,11 @@
                         <span class="hc-label">Offers</span><span class="hc-ping"></span></a></li>
 
                       {% if user.is_authenticated %}
-                      <li class="hc-cell"><a class="hc-link" href="{% url 'profile' %}" data-target="profile-cell">
+                      <li class="hc-cell"><a class="hc-link" href="{% storefront_link 'profile' %}" data-target="profile-cell">
                         <svg viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.5"/><path d="M4.5 20c0-4 3.4-7 7.5-7s7.5 3 7.5 7"/></svg>
                         <span class="hc-label">{{ user.first_name }}</span><span class="hc-ping"></span></a></li>
                       {% else %}
-                      <li class="hc-cell"><a class="hc-link" href="{% url 'login' %}" data-target="login-cell">
+                      <li class="hc-cell"><a class="hc-link" href="{% storefront_link 'login' %}" data-target="login-cell">
                         <svg viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.5"/><path d="M4.5 20c0-4 3.4-7 7.5-7s7.5 3 7.5 7"/></svg>
                         <span class="hc-label">Login</span><span class="hc-ping"></span></a></li>
                       {% endif %}
@@ -323,10 +324,10 @@
                     <span>Total</span>
                     <span class="amount" id="summaryTotalAmount">Rs. {{ total|floatformat:2 }}</span>
                 </div>
-                <a href="{% url 'checkout' %}" class="btn-checkout">
+                <a href="{% storefront_link 'checkout' %}" class="btn-checkout">
                     <i class="fas fa-lock"></i> Proceed to Checkout
                 </a>
-                <a href="{% url 'shop' %}" class="btn-continue">← Continue Shopping</a>
+                <a href="{% storefront_link 'shop' %}" class="btn-continue">← Continue Shopping</a>
 
                 <div class="trust-strip">
                     <div class="trust-item"><i class="fas fa-leaf"></i> Fresh, farm-picked quality</div>
@@ -340,7 +341,7 @@
             <div class="empty-badge"><i class="fas fa-basket-shopping"></i></div>
             <h2>Your cart is empty</h2>
             <p>Let's fill it with something fresh from the farm.</p>
-            <a href="{% url 'shop' %}" class="btn-browse">
+            <a href="{% storefront_link 'shop' %}" class="btn-browse">
                 <i class="fas fa-leaf"></i> Browse Products
             </a>
         </div>
@@ -478,11 +479,11 @@
             <div class="hc-connector" style="left:504px" aria-hidden="true"></div>
 
             <ul class="hc-nav" id="hcNavAppMobile">
-              <li class="hc-cell"><a class="hc-link" href="{% url 'shop' %}" data-target="shop-cell">
+              <li class="hc-cell"><a class="hc-link" href="{% storefront_link 'shop' %}" data-target="shop-cell">
                 <svg viewBox="0 0 24 24"><path d="M4.5 9h15l-1.4 10.2a2 2 0 01-2 1.8H7.9a2 2 0 01-2-1.8L4.5 9z"/><path d="M8.5 9V7a3.5 3.5 0 017 0v2"/></svg>
                 <span class="hc-label">Shop</span><span class="hc-ping"></span></a></li>
 
-              <li class="hc-cell"><a class="hc-link active" href="{% url 'cart' %}" data-target="cart-cell">
+              <li class="hc-cell"><a class="hc-link active" href="{% storefront_link 'cart' %}" data-target="cart-cell">
                 <svg viewBox="0 0 24 24"><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2.5 3h2.4l2.1 11.2a2 2 0 002 1.6h8.6a2 2 0 002-1.6L21 7H6.2"/></svg>
                 <span class="hc-label">Cart</span><span class="hc-ping"></span>
                 <span id="cartBadgeMobile" class="hc-cart-badge" style="display:{% if count > 0 %}flex{% else %}none{% endif %};">{{ count }}</span>
@@ -493,11 +494,11 @@
                 <span class="hc-label">Offers</span><span class="hc-ping"></span></a></li>
 
               {% if user.is_authenticated %}
-              <li class="hc-cell"><a class="hc-link" href="{% url 'profile' %}" data-target="profile-cell">
+              <li class="hc-cell"><a class="hc-link" href="{% storefront_link 'profile' %}" data-target="profile-cell">
                 <svg viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.5"/><path d="M4.5 20c0-4 3.4-7 7.5-7s7.5 3 7.5 7"/></svg>
                 <span class="hc-label">{{ user.first_name }}</span><span class="hc-ping"></span></a></li>
               {% else %}
-              <li class="hc-cell"><a class="hc-link" href="{% url 'login' %}" data-target="login-cell">
+              <li class="hc-cell"><a class="hc-link" href="{% storefront_link 'login' %}" data-target="login-cell">
                 <svg viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.5"/><path d="M4.5 20c0-4 3.4-7 7.5-7s7.5 3 7.5 7"/></svg>
                 <span class="hc-label">Login</span><span class="hc-ping"></span></a></li>
               {% endif %}

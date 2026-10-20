@@ -593,20 +593,24 @@ class RefundSlipViewTests(RefundTestBase):
 
     def test_recent_refunds_history_has_capped_scroll_height(self):
         """Fixed-shell history-scroll task: #recentRefundsCard and
-        #priorRefundsList are both capped at max-height:150px with their
-        own overflow-y:auto, so an open 20-row history can never squeeze
-        the item list / right-hand panel out of their own share of the
-        available height. The title inside each is position:sticky so it
-        stays pinned at the top of that same scrollable box rather than
-        living outside it (capping only an inner list while leaving the
-        outer card's own height unbounded was exactly the bug this
-        replaced)."""
+        #priorRefundsList are both capped at max-height:150px, so an open
+        20-row history can never squeeze the item list / right-hand panel
+        out of their own share of the available height. Each is a
+        two-part flex column (overflow:hidden on the outer box, so its
+        own rounded corners clip cleanly) -- .history-title (flex:none,
+        never scrolls) and .history-rows (flex:1 1 auto, min-height:0,
+        overflow-y:auto -- the only thing that actually scrolls, with the
+        only scrollbar). Not position:sticky any more: an opaque sticky
+        title sitting below the box's own top padding let rows scroll
+        underneath/behind it (a real bug found by testing), which this
+        two-part structure sidesteps entirely rather than patching around."""
         response = self.client.get(reverse('pos_refund'))
         content = response.content.decode()
         self.assertIn('#recentRefundsCard, #priorRefundsList {', content)
-        self.assertIn('flex: none; max-height: 150px; overflow-y: auto;', content)
-        self.assertIn('#recentRefundsCard h3, #priorRefundsList strong {', content)
-        self.assertIn('position: sticky;', content)
+        self.assertIn('flex: none; max-height: 150px; overflow: hidden;', content)
+        self.assertIn('.history-title {', content)
+        self.assertIn('.history-rows { flex: 1 1 auto; min-height: 0; overflow-y: auto; }', content)
+        self.assertNotIn('position: sticky', content)
 
     def test_wrap_uses_explicit_calc_height_at_768px_and_up(self):
         """Fixed-shell history-scroll task: .wrap's height is an explicit

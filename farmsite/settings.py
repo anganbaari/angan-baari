@@ -71,6 +71,15 @@ API_V1_CORS_ALLOWED_ORIGINS = [
 # reset link can only point at one place. No trailing slash.
 FRONTEND_BASE_URL = os.getenv('FRONTEND_BASE_URL', 'https://angan-baari-shop.vercel.app')
 
+# Storefront links switch (Phase 1 -- links only, no redirects): when set,
+# shop/templatetags/storefront_tags.py's {% storefront_link %} tag points
+# Shop/Cart/Checkout/Login/Signup/Profile/product-card links at this
+# instead of the existing Django pages. Read the same way as
+# FRONTEND_BASE_URL above, but defaults to empty -- unset, every one of
+# those links behaves exactly as it does today (the Django page). No
+# trailing slash, same convention as FRONTEND_BASE_URL.
+STOREFRONT_URL = os.getenv('STOREFRONT_URL', '')
+
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework.authentication.TokenAuthentication',
@@ -94,6 +103,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'shop.context_processors.storefront_url',
             ],
         },
     },
