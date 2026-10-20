@@ -11,9 +11,12 @@
            POS mockups) -- kept consistent since this page is reached
            directly from the POS screen, not meant to look like a
            different app. Only the handful of tokens this page actually
-           uses are copied, not the full kiosk-specific set. */
+           uses are copied, not the full kiosk-specific set. --pos-header-line
+           and --pos-clock-bg were added for the header reuse below. */
         :root {
             --pos-bg: #F9F5E4;
+            --pos-clock-bg: #F6EBCF;
+            --pos-header-line: #4E7438;
             --pos-text-green: #285917;
             --pos-enter-orange: #CF7122;
             --white: #ffffff;
@@ -26,10 +29,76 @@
             margin: 0; font-family: 'DM Sans', 'Noto Sans Devanagari', sans-serif;
             background: var(--pos-bg); color: var(--pos-text-green);
         }
-        .wrap { max-width: 740px; margin: 0 auto; padding: 20px 16px 140px; }
+
+        /* ── Header -- copied from templates/pos.html's own .pos-header
+           (same classes, sizes, spacing, and the matching <=1024px wrap
+           breakpoint) so this page still looks like it was reached from
+           inside the POS kiosk shell. Copied rather than pulled into a
+           shared include because this task's scope keeps
+           templates/pos.html itself untouched -- only the
+           operator-name/lock-instruction pieces are left out (both are
+           POS-session concepts this page has no equivalent for), and the
+           RETAIL tag is a plain static label here, not the
+           wholesale-mode toggle button it is in pos.html. ── */
+        .pos-header {
+            display: flex; align-items: center; gap: 18px; background: var(--pos-bg);
+            border-bottom: 8px solid var(--pos-header-line); padding: 10px 24px;
+            position: relative; overflow: hidden;
+        }
+        .pos-clock { background: var(--pos-clock-bg); border: 1.5px solid #e6d2a0; border-radius: 10px; padding: 6px 14px; text-align: center; min-width: 90px; box-shadow: 0 2px 6px rgba(26,47,30,0.08); }
+        .pos-clock .pos-date { font-size: 0.78rem; font-weight: 700; color: var(--pos-text-green); }
+        .pos-clock .pos-time { font-size: 1.15rem; font-weight: 800; color: var(--pos-text-green); }
+        .pos-brand { display: flex; align-items: center; gap: 10px; }
+        .pos-brand img.logo { width: 46px; height: 46px; object-fit: contain; }
+        .pos-brand .brand-text h1 { margin: 0; font-family: 'Noto Sans Devanagari', 'Cormorant Garamond', serif; font-weight: 800; font-size: 2rem; color: var(--pos-text-green); line-height: 1.1; }
+        .pos-brand .brand-text span { display: block; margin-left: 4px; font-size: 0.72rem; color: var(--pos-text-green); font-weight: 600; letter-spacing: 0.03em; }
+        .pos-brand img.flag { width: 34px; height: auto; margin-left: 6px; }
+        .pos-header-divider { width: 1.5px; align-self: stretch; background: var(--mist); }
+        .pos-header-right { flex: 1; display: flex; align-items: center; justify-content: flex-end; }
+        .pos-header-mode-label {
+            display: inline-block; font-family: 'DM Sans', sans-serif; border-radius: 8px; padding: 6px 14px;
+            font-weight: 800; font-size: 0.82rem; letter-spacing: 0.06em;
+            background: #dcecd4; color: var(--pos-text-green);
+        }
+        @media (max-width: 1024px) {
+            .pos-header { flex-wrap: wrap; padding: 8px 14px; gap: 10px; }
+            .pos-clock { min-width: 72px; padding: 4px 9px; }
+            .pos-clock .pos-time { font-size: 1rem; }
+            .pos-brand img.logo { width: 36px; height: 36px; }
+            .pos-brand .brand-text h1 { font-size: 1.5rem; }
+            .pos-brand .brand-text span { font-size: 0.68rem; }
+            .pos-brand img.flag { width: 26px; }
+            .pos-header-divider { display: none; }
+            .pos-header-right { flex: 1 1 100%; justify-content: flex-start; }
+        }
+
+        /* ── Page content wrap -- mobile-first: fluid/full-width with 16px
+           gutters by default (phone 375-480), centred at 720px from
+           tablet (768px) up, and widened to a 1100px two-column layout
+           from laptop (1024px) up -- see .refund-layout below. Bottom
+           padding clears the fixed footer bar (tallest on a 375px phone,
+           where it can wrap to three rows) plus the phone's safe-area
+           inset. ── */
+        .wrap { margin: 0 auto; padding: 20px 16px calc(210px + env(safe-area-inset-bottom)); }
+        @media (min-width: 768px) {
+            .wrap { max-width: 720px; padding: 28px 24px calc(210px + env(safe-area-inset-bottom)); }
+        }
+        @media (min-width: 1024px) {
+            .wrap { max-width: 1100px; }
+            .refund-layout { display: grid; grid-template-columns: 1fr 360px; gap: 24px; align-items: start; }
+            /* Sticky right column: method/reason/note stay visible while
+               the left column's item list scrolls past it on a sale with
+               many lines. */
+            .refund-col-side { position: sticky; top: 20px; }
+        }
+
         h1 { font-family: 'Cormorant Garamond', serif; font-size: 1.9rem; margin: 0 0 4px; }
         h3 { margin: 0 0 10px; font-size: 1.05rem; }
-        .back-link { display: inline-block; margin-bottom: 14px; color: var(--pos-text-green); font-weight: 700; text-decoration: none; }
+        .link-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+        .back-link {
+            display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px;
+            color: var(--pos-text-green); font-weight: 700; text-decoration: none;
+        }
         .card { background: var(--white); border-radius: 14px; padding: 18px; margin-bottom: 16px; box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
 
         .lookup-row { display: flex; gap: 10px; }
@@ -46,6 +115,10 @@
 
         .sale-meta-row { display: flex; justify-content: space-between; gap: 10px; font-size: 0.95rem; margin-bottom: 4px; flex-wrap: wrap; }
         .sale-meta-row span:first-child { color: var(--text-muted); font-weight: 600; }
+        /* Small polish: "cash" -> "Cash" etc. -- display only, the
+           underlying payment method value sent/stored anywhere is
+           untouched. */
+        .method-label { text-transform: capitalize; }
         .fully-refunded-banner {
             background: var(--danger); color: #fff; font-weight: 800; padding: 12px;
             border-radius: 10px; text-align: center; margin-bottom: 14px; font-size: 1rem;
@@ -65,10 +138,13 @@
         .line-sub { font-size: 0.8rem; color: var(--text-muted); margin-top: 2px; }
         .line-amount { font-weight: 800; white-space: nowrap; font-size: 1.05rem; }
 
-        .checkbox-row { display: flex; align-items: center; gap: 12px; }
-        .checkbox-row input[type="checkbox"] { width: 28px; height: 28px; flex-shrink: 0; cursor: pointer; }
+        /* A <label>, not a plain <div> -- tapping anywhere on the row
+           (not just the 24px checkbox itself) toggles it, natively, no
+           JS needed, so the real tap target is the full 44px row. */
+        .checkbox-row { display: flex; align-items: center; gap: 12px; min-height: 44px; cursor: pointer; }
+        .checkbox-row input[type="checkbox"] { width: 24px; height: 24px; flex-shrink: 0; cursor: pointer; }
 
-        .qty-row { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
+        .qty-row { display: flex; align-items: center; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
         .qty-row button {
             min-width: 48px; min-height: 48px; border-radius: 8px; border: none;
             background: var(--pos-bg); font-size: 1.3rem; font-weight: 800; cursor: pointer;
@@ -82,9 +158,9 @@
         .disposition-row { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
         .disposition-row label {
             display: flex; align-items: center; gap: 6px; font-size: 0.9rem; font-weight: 700;
-            min-height: 40px; padding: 0 10px; border-radius: 8px; border: 1.5px solid var(--mist); cursor: pointer;
+            min-height: 44px; padding: 0 10px; border-radius: 8px; border: 1.5px solid var(--mist); cursor: pointer;
         }
-        .disposition-row input[type="radio"] { width: 20px; height: 20px; }
+        .disposition-row input[type="radio"] { width: 24px; height: 24px; }
         .restock-only-note { font-size: 0.8rem; color: var(--text-muted); margin-top: 10px; }
 
         .method-grid, .reason-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
@@ -99,17 +175,52 @@
             font-family: inherit; padding: 10px; font-size: 0.95rem; margin-top: 12px; resize: vertical;
         }
 
+        /* ── Footer bar -- fixed at every width (thumb-reachable on a
+           kiosk/phone till regardless of screen size). Layout is
+           mobile-first via flexbox `order`: at <=480px it's three stacked
+           rows (total; disabled-reason if any; Cancel+Confirm sharing the
+           last row, Cancel fixed-width, Confirm filling the rest); from
+           481px up, Cancel/Total/Confirm share one row (Cancel - Total -
+           Confirm, left to right) and the disabled-reason (if any) drops
+           to its own full-width row underneath. padding-bottom adds the
+           phone safe-area inset so the bar never sits under a home
+           indicator/gesture bar. ── */
         .footer-bar {
             position: fixed; left: 0; right: 0; bottom: 0; background: var(--pos-bg);
-            border-top: 2px solid var(--mist); padding: 14px 16px; box-shadow: 0 -4px 16px rgba(0,0,0,0.08);
+            border-top: 2px solid var(--mist); padding: 14px 16px calc(14px + env(safe-area-inset-bottom));
+            box-shadow: 0 -4px 16px rgba(0,0,0,0.08);
         }
-        .footer-bar-inner { max-width: 740px; margin: 0 auto; }
-        .total-row { display: flex; justify-content: space-between; font-size: 1.3rem; font-weight: 800; margin-bottom: 10px; }
+        .footer-bar-inner {
+            margin: 0 auto; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px;
+        }
+        @media (min-width: 768px) { .footer-bar-inner { max-width: 720px; } }
+        @media (min-width: 1024px) { .footer-bar-inner { max-width: 1100px; } }
+
+        .footer-total-group {
+            order: 1; flex: 1 1 100%; display: flex; justify-content: space-between; align-items: baseline;
+        }
+        .footer-total-group .total-label { font-size: 0.85rem; font-weight: 700; color: var(--text-muted); }
+        .footer-total-group .total-value { font-size: 1.3rem; font-weight: 800; }
+        #confirmDisabledReason {
+            order: 2; flex: 1 1 100%; font-size: 0.85rem; font-weight: 700; color: var(--danger); text-align: center;
+        }
+        #cancelRefundBtn {
+            order: 3; flex: 0 0 auto; min-width: 104px; min-height: 48px; padding: 0 16px; border-radius: 12px;
+            border: 2px solid var(--pos-text-green); background: #fff; color: var(--pos-text-green);
+            font-weight: 800; font-size: 0.92rem; cursor: pointer; font-family: inherit;
+        }
         #confirmRefundBtn {
-            width: 100%; min-height: 58px; border-radius: 12px; border: none; background: var(--pos-enter-orange);
-            color: #1a1a1a; font-weight: 800; font-size: 1.15rem; cursor: pointer; font-family: inherit;
+            order: 4; flex: 1 1 auto; min-height: 54px; border-radius: 12px; border: none;
+            background: var(--pos-enter-orange); color: #1a1a1a; font-weight: 800; font-size: 1.1rem;
+            cursor: pointer; font-family: inherit;
         }
-        #confirmRefundBtn:disabled { opacity: 0.4; cursor: not-allowed; }
+        #confirmRefundBtn:disabled, #cancelRefundBtn:disabled { opacity: 0.45; cursor: not-allowed; }
+        @media (min-width: 481px) {
+            .footer-total-group { order: 2; flex: 1 1 auto; justify-content: flex-start; gap: 10px; }
+            #cancelRefundBtn { order: 1; }
+            #confirmRefundBtn { order: 3; flex: 0 0 auto; min-width: 220px; }
+            #confirmDisabledReason { order: 4; flex: 1 1 100%; }
+        }
 
         /* Dim overlays -- plain rgba, no blur, instant/<=100ms, same
            convention as templates/pos.html's own backdrops. */
@@ -125,14 +236,29 @@
         .confirm-card p { font-size: 1.05rem; font-weight: 700; margin: 0 0 18px; }
         .success-card h3 { font-family: 'Cormorant Garamond', serif; font-size: 1.3rem; margin: 0 0 6px; }
         #successNumber { font-size: 0.85rem; color: var(--text-muted); font-weight: 700; margin: 0 0 16px; }
-        .confirm-actions, .success-actions { display: flex; gap: 10px; }
-        .confirm-actions button, .success-actions button {
+        .confirm-actions { display: flex; gap: 10px; }
+        .confirm-actions button {
             flex: 1; padding: 13px 10px; border: none; border-radius: 12px; font-weight: 800;
             font-size: 0.95rem; cursor: pointer; font-family: inherit;
         }
         #refundConfirmCancel { background: var(--mist); color: var(--pos-text-green); }
         #refundConfirmYes { background: var(--pos-enter-orange); color: #1a1a1a; }
+        #keepEditingBtn { background: var(--mist); color: var(--pos-text-green); }
+        #cancelRefundYesBtn { background: var(--danger); color: #fff; }
+
+        /* Success actions -- stacked, not a row, so three buttons always
+           wrap cleanly regardless of viewport width (the card itself is
+           capped at 360px/90vw either way, so a row never had much room
+           to work with). Each at least 44px tall per the task's tap
+           target rule. */
+        .success-actions { display: flex; flex-direction: column; gap: 10px; }
+        .success-actions button, .success-actions a {
+            min-height: 46px; padding: 12px 10px; border: none; border-radius: 12px; font-weight: 800;
+            font-size: 0.95rem; cursor: pointer; font-family: inherit; text-decoration: none;
+            display: flex; align-items: center; justify-content: center; text-align: center;
+        }
         #printSlipBtn { background: var(--pos-text-green); color: #fff; }
+        #backToPosBtn { background: #fff; color: var(--pos-text-green); border: 2px solid var(--pos-text-green); }
         #newRefundBtn { background: var(--pos-enter-orange); color: #1a1a1a; }
         /* A real <a href>, not just a JS-driven button -- stays usable
            even if the tab #printSlipBtn originally opened was closed, so
@@ -153,8 +279,28 @@
 </head>
 <body>
     {% csrf_token %}
+
+    <div class="pos-header">
+        <div class="pos-clock">
+            <div class="pos-date" id="posDate">--/-- (--)</div>
+            <div class="pos-time" id="posTime">--:--</div>
+        </div>
+        <div class="pos-brand">
+            <img class="logo" src="{% static 'images/logo-icon.png' %}" alt="">
+            <div class="brand-text">
+                <h1>आँगन बारी</h1>
+                <span>Angan Baari</span>
+            </div>
+            <img class="flag" src="https://upload.wikimedia.org/wikipedia/commons/9/9b/Flag_of_Nepal.svg" alt="Nepal">
+        </div>
+        <div class="pos-header-divider"></div>
+        <div class="pos-header-right">
+            <span class="pos-header-mode-label">RETAIL</span>
+        </div>
+    </div>
+
     <div class="wrap">
-        <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;">
+        <div class="link-row">
             <a href="{% url 'pos' %}" class="back-link">&laquo; Back to POS</a>
             <a href="#" class="back-link" id="recentRefundsToggle">Recent refunds</a>
         </div>
@@ -173,34 +319,43 @@
             <div id="lookupError" style="display:none;"></div>
         </div>
 
-        <div class="card" id="saleCard" style="display:none;"></div>
-        <div id="linesContainer"></div>
-
-        <div class="card" id="methodCard" style="display:none;">
-            <h3>Refund to</h3>
-            <div class="method-grid" id="methodGrid">
-                {% for value, label in method_choices %}
-                <button type="button" class="choice-btn" data-method="{{ value }}" style="display:none;">{{ label }}</button>
-                {% endfor %}
+        <div class="refund-layout">
+            <div class="refund-col-main">
+                <div class="card" id="saleCard" style="display:none;"></div>
+                <div id="linesContainer"></div>
             </div>
-        </div>
+            <div class="refund-col-side">
+                <div class="card" id="methodCard" style="display:none;">
+                    <h3>Refund to</h3>
+                    <div class="method-grid" id="methodGrid">
+                        {% for value, label in method_choices %}
+                        <button type="button" class="choice-btn" data-method="{{ value }}" style="display:none;">{{ label }}</button>
+                        {% endfor %}
+                    </div>
+                </div>
 
-        <div class="card" id="reasonCard" style="display:none;">
-            <h3>Reason</h3>
-            <div class="reason-grid" id="reasonGrid">
-                {% for value, label in reason_choices %}
-                <button type="button" class="choice-btn" data-reason="{{ value }}">{{ label }}</button>
-                {% endfor %}
+                <div class="card" id="reasonCard" style="display:none;">
+                    <h3>Reason</h3>
+                    <div class="reason-grid" id="reasonGrid">
+                        {% for value, label in reason_choices %}
+                        <button type="button" class="choice-btn" data-reason="{{ value }}">{{ label }}</button>
+                        {% endfor %}
+                    </div>
+                    <textarea id="noteInput" placeholder="Note (required if &quot;Other&quot; is chosen)"></textarea>
+                </div>
             </div>
-            <textarea id="noteInput" placeholder="Note (required if &quot;Other&quot; is chosen)"></textarea>
         </div>
     </div>
 
     <div class="footer-bar" id="footerBar" style="display:none;">
         <div class="footer-bar-inner">
-            <div class="total-row"><span>Refund total</span><span id="refundTotalDisplay">Rs 0</span></div>
-            <div id="confirmDisabledReason" style="display:none;font-size:0.85rem;font-weight:700;color:var(--danger);margin-bottom:8px;text-align:center;"></div>
-            <button type="button" id="confirmRefundBtn" disabled>Refund Rs 0</button>
+            <div class="footer-total-group">
+                <span class="total-label">Refund total</span>
+                <span class="total-value" id="refundTotalDisplay">Rs 0</span>
+            </div>
+            <div id="confirmDisabledReason" style="display:none;"></div>
+            <button type="button" id="cancelRefundBtn">Cancel / रद्द</button>
+            <button type="button" id="confirmRefundBtn" disabled>Confirm refund</button>
         </div>
     </div>
 
@@ -214,12 +369,27 @@
         </div>
     </div>
 
+    <!-- Cancel-the-whole-refund confirmation -- only shown when something
+         would actually be lost (see hasUnsavedRefundWork()); same plain
+         overlay/no-blur/<=100ms/300ms-tap-ignore convention as the refund
+         confirmation above. -->
+    <div class="backdrop" id="cancelConfirmBackdrop">
+        <div class="confirm-card">
+            <p>Cancel this refund? This will clear the looked-up sale, selected items, and any method/reason/note entered.</p>
+            <div class="confirm-actions">
+                <button type="button" id="keepEditingBtn">Keep editing</button>
+                <button type="button" id="cancelRefundYesBtn">Cancel refund</button>
+            </div>
+        </div>
+    </div>
+
     <div class="backdrop" id="successBackdrop">
         <div class="success-card">
             <h3>Refund complete</h3>
             <p id="successNumber"></p>
             <div class="success-actions">
                 <button type="button" id="printSlipBtn">Print refund slip</button>
+                <a href="{% url 'pos' %}" id="backToPosBtn">Back to POS</a>
                 <button type="button" id="newRefundBtn">New refund</button>
             </div>
             <a href="#" id="openSlipLink" target="_blank">Open slip</a>
@@ -228,6 +398,15 @@
 
     <div id="toast"></div>
 
+    <!-- BS calendar conversion for the header's date chip, shared with
+         the Reports dashboard (static/js/bs-calendar.js) rather than
+         copying templates/pos.html's own inline NEPALI_CALENDAR_DATA
+         table a fourth time -- see CLAUDE.md's "Reports dashboard"
+         section on why that table already exists in three places and
+         shouldn't gain a fourth copy where reuse is possible. This file
+         carries no server-side authority either way, same as its other
+         consumer. -->
+    <script src="{% static 'js/bs-calendar.js' %}?v=1"></script>
     <script>
         // ── Small shared helpers, same conventions as templates/pos.html ──
         function getCookie(name) {
@@ -270,6 +449,22 @@
             showToast._t = setTimeout(() => toast.classList.remove('show'), 2200);
         }
 
+        // ── Header clock -- same "MM/DD (DayName)" / "HH:MM" format as
+        //    templates/pos.html's own tickClock(), via the shared
+        //    BsCalendar helper (see the <script src> above) instead of a
+        //    fourth copy of the day-length table. ──
+        function tickRefundHeaderClock() {
+            const now = new Date();
+            document.getElementById('posTime').textContent =
+                String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+            const bs = BsCalendar.adToBs(now);
+            const dayName = BsCalendar.DAY_NAMES[now.getDay()];
+            document.getElementById('posDate').textContent =
+                String(bs.month).padStart(2, '0') + '/' + String(bs.day).padStart(2, '0') + ' (' + dayName + ')';
+        }
+        tickRefundHeaderClock();
+        setInterval(tickRefundHeaderClock, 1000);
+
         // Mirrors _largest_remainder_shares() (shop/views.py) exactly, so a
         // partial-quantity line's live preview amount always matches what
         // create_pos_refund() will actually charge for the same selection
@@ -301,6 +496,7 @@
         let selectedReason = null;
         let clientRefundId = generateUuid();
         let confirmOpenedAt = 0;
+        let cancelConfirmOpenedAt = 0;
 
         function resetPage() {
             saleData = null;
@@ -355,7 +551,7 @@
             const saleCard = document.getElementById('saleCard');
             saleCard.style.display = '';
             const paymentsHtml = saleData.payments.map(p =>
-                `<div class="sale-meta-row"><span>${p.method}</span><span>Rs ${formatMoney(p.amount)}</span></div>`
+                `<div class="sale-meta-row"><span class="method-label">${p.method}</span><span>Rs ${formatMoney(p.amount)}</span></div>`
             ).join('');
             const priorRefundsHtml = saleData.refunds.length ? `
                 <div id="priorRefundsList">
@@ -423,10 +619,10 @@
                 } else {
                     amountHtml = `<span class="line-amount" id="line-amount-${line.sale_line_id}">Rs ${formatMoney(line.remaining_amount)}</span>`;
                     selectorHtml = `
-                        <div class="checkbox-row">
+                        <label class="checkbox-row">
                             <input type="checkbox" class="line-checkbox" data-line="${line.sale_line_id}" ${state.selected ? 'checked' : ''} ${done ? 'disabled' : ''}>
                             <span>${done ? 'Already fully refunded' : 'Refund this item'}</span>
-                        </div>
+                        </label>
                         ${dispositionHtml(line, state, dispositionOptions)}
                     `;
                 }
@@ -536,7 +732,6 @@
             const total = computeRefundTotal();
             document.getElementById('refundTotalDisplay').textContent = 'Rs ' + formatMoney(total);
             const btn = document.getElementById('confirmRefundBtn');
-            btn.textContent = 'Refund Rs ' + formatMoney(total);
 
             const noteFilled = document.getElementById('noteInput').value.trim();
             let disabledReason = '';
@@ -633,11 +828,48 @@
             if (e.target.id === 'confirmBackdrop') closeConfirm();
         });
 
+        // ── Cancel this refund -- resets everything client-side and never
+        //    calls the server. "Entered" is judged by what would actually
+        //    be annoying to redo: a ticked/quantified line, a chosen
+        //    reason, or a typed note. Re-typing a sale number is cheap, so
+        //    saleData existing on its own does NOT count -- looking up a
+        //    sale and immediately hitting Cancel resets instantly, no
+        //    dialog. ──
+        function hasUnsavedRefundWork() {
+            return activeSelections().length > 0
+                || !!selectedReason
+                || !!document.getElementById('noteInput').value.trim();
+        }
+        document.getElementById('cancelRefundBtn').addEventListener('click', () => {
+            if (document.getElementById('cancelRefundBtn').disabled) return;
+            if (hasUnsavedRefundWork()) {
+                cancelConfirmOpenedAt = Date.now();
+                document.getElementById('cancelConfirmBackdrop').classList.add('active');
+            } else {
+                resetPage();
+            }
+        });
+        document.getElementById('keepEditingBtn').addEventListener('click', () => {
+            document.getElementById('cancelConfirmBackdrop').classList.remove('active');
+        });
+        document.getElementById('cancelConfirmBackdrop').addEventListener('click', (e) => {
+            if (e.target.id === 'cancelConfirmBackdrop') document.getElementById('cancelConfirmBackdrop').classList.remove('active');
+        });
+        document.getElementById('cancelRefundYesBtn').addEventListener('click', () => {
+            if (Date.now() - cancelConfirmOpenedAt < 300) return;
+            document.getElementById('cancelConfirmBackdrop').classList.remove('active');
+            resetPage();
+        });
+
         let refundInFlight = false;
         document.getElementById('refundConfirmYes').addEventListener('click', async () => {
             if (Date.now() - confirmOpenedAt < 300) return;
             if (refundInFlight) return;
             refundInFlight = true;
+            // Disabled for the duration of the request -- a half-sent
+            // refund (server may have already received it) must never be
+            // abandonable via Cancel while its outcome is still unknown.
+            document.getElementById('cancelRefundBtn').disabled = true;
             closeConfirm();
 
             const selections = activeSelections().map(entry => ({
@@ -663,6 +895,7 @@
                 if (!response.ok) {
                     showToast(data.message || 'Could not process this refund. Nothing was charged.');
                     refundInFlight = false;
+                    document.getElementById('cancelRefundBtn').disabled = false;
                     return;
                 }
                 document.getElementById('successNumber').textContent =
@@ -679,6 +912,7 @@
                 showToast('Could not reach the server. Nothing was charged -- please try again.');
             } finally {
                 refundInFlight = false;
+                document.getElementById('cancelRefundBtn').disabled = false;
             }
         });
 

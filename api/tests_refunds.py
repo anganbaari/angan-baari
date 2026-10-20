@@ -577,6 +577,47 @@ class RefundSlipViewTests(RefundTestBase):
         self.assertEqual(response.status_code, 200)
         self.assertIn(b'Refund', response.content)
 
+    def test_refund_page_header_matches_pos_page_header(self):
+        """Refund-page-polish task: the page header reuses pos.html's own
+        brand markup (logo, Devanagari shop name, English name, flag) and
+        RETAIL tag, rather than looking like a different app."""
+        response = self.client.get(reverse('pos_refund'))
+        content = response.content.decode()
+        self.assertIn('class="pos-header"', content)
+        self.assertIn('class="pos-brand"', content)
+        self.assertIn('आँगन बारी', content)
+        self.assertIn('Angan Baari', content)
+        self.assertIn('RETAIL', content)
+        self.assertIn('id="posDate"', content)
+        self.assertIn('id="posTime"', content)
+
+    def test_refund_page_success_box_has_back_to_pos_link(self):
+        """Refund-page-polish task: the "Refund complete" success box has
+        a Back to POS button/link, in addition to Print refund slip and
+        New refund, so staff aren't stuck without a way back to the
+        till screen."""
+        response = self.client.get(reverse('pos_refund'))
+        content = response.content.decode()
+        self.assertIn('id="backToPosBtn"', content)
+        self.assertIn(reverse('pos'), content)
+        # Order: Print refund slip, then Back to POS, then New refund.
+        print_pos = content.index('id="printSlipBtn"')
+        back_pos = content.index('id="backToPosBtn"')
+        new_pos = content.index('id="newRefundBtn"')
+        self.assertLess(print_pos, back_pos)
+        self.assertLess(back_pos, new_pos)
+
+    def test_refund_page_has_cancel_button_and_confirm_dialog(self):
+        """Refund-page-polish task: a Cancel button exists in the footer,
+        plus its own confirmation dialog markup (separate from the
+        refund-confirmation dialog)."""
+        response = self.client.get(reverse('pos_refund'))
+        content = response.content.decode()
+        self.assertIn('id="cancelRefundBtn"', content)
+        self.assertIn('id="cancelConfirmBackdrop"', content)
+        self.assertIn('id="keepEditingBtn"', content)
+        self.assertIn('id="cancelRefundYesBtn"', content)
+
     def test_refund_slip_has_no_barcode_element(self):
         """Refund-slip polish task: no barcode, and no JsBarcode script
         at all -- unlike the sale receipt, which has both."""
