@@ -222,47 +222,50 @@
         /* Refund-history scroll cap -- both the "Recent refunds" panel
            (site-wide, its own card) and the "Previous refunds" list
            nested inside the sale summary card. max-height:150px caps the
-           WHOLE box (title included) at roughly 4 visible rows; the
-           title itself is position:sticky so it stays pinned at the top
-           of that same scrollable box while the rows beneath it scroll
-           -- not a separate non-scrolling element above it, which is
-           what let a flex-shrink cascade bug (see .wrap's own comment
-           above) go unnoticed before: capping only the INNER list left
-           the OUTER card's own height unbounded, still able to push
-           .wrap's content past what the flex algorithm had assigned it.
-           flex:none (Row 2 of the fixed-shell spec) -- this box never
+           WHOLE box (title included) at roughly 4 visible rows.
+           Two-part flex column, not a position:sticky title inside one
+           scrolling box: overflow:hidden here on the OUTER box (so its
+           own rounded corners clip cleanly, and nothing can render
+           outside the 150px cap), with .history-title (flex:0 0 auto,
+           never scrolls) and .history-rows (flex:1 1 auto, min-height:0,
+           overflow-y:auto -- the only thing that actually scrolls, with
+           the only scrollbar) as its two children. flex:none on the
+           outer box itself (Row 2 of the fixed-shell spec) -- it never
            grows to claim extra space and never shrinks below its own
            (already capped) natural size either; .refund-layout (Row 3)
            is what actually absorbs any remaining deficit or surplus. */
         #recentRefundsCard, #priorRefundsList {
             font-size: 0.85rem; color: var(--text-muted);
-            flex: none; max-height: 150px; overflow-y: auto;
+            flex: none; max-height: 150px; overflow: hidden;
+            display: flex; flex-direction: column; padding: 0;
         }
-        /* Overrides .card's own 16px -- the 150px cap above is the box
-           itself; this is just the gap before whatever comes next, kept
-           small so it doesn't eat further into .refund-layout's budget
-           for no visual benefit. padding-top:0 -- that padding now lives
-           on the sticky title below instead, so position:sticky's top:0
-           lands flush with the box's own top edge rather than below
-           leftover box padding (which is what let scrolled rows show
-           through behind the title before). */
-        #recentRefundsCard { margin-bottom: 8px; padding-top: 0; }
-        #priorRefundsList { margin-top: 10px; border-top: 1px dashed var(--mist); padding-top: 0; }
-        /* Opaque background flush with the box's true top edge (see the
-           padding-top:0 above), a solid 1px line under it, and rounded
-           top corners matching the box's own 14px so that opaque
-           background can't visually poke out past them. No left/right
-           padding of its own -- each box's existing left/right padding
-           (kept as-is) already lines the title up with its rows exactly,
-           same as before. */
-        #recentRefundsCard h3, #priorRefundsList strong {
-            position: sticky; top: 0; z-index: 1; display: block; margin: 0;
-            background: var(--white); padding-bottom: 6px;
-            border-bottom: 1px solid var(--mist);
-            border-top-left-radius: 14px; border-top-right-radius: 14px;
+        /* padding-bottom:18px restores what .card's own padding used to
+           give this box on that one side (left/right/bottom were kept
+           as-is by an earlier pass; "padding: 0" above only zeroed what
+           this structural change needed to move elsewhere -- top, onto
+           .history-title, and left/right, onto .history-title/.history-
+           rows below -- bottom stays on the box itself since nothing
+           else needs to own it). */
+        #recentRefundsCard { margin-bottom: 8px; padding-bottom: 18px; }
+        #priorRefundsList { margin-top: 10px; border-top: 1px dashed var(--mist); }
+        /* Flat (the outer box's own rounded corners clip it -- see
+           overflow:hidden above), full width with no gaps, solid light
+           ash grey (no existing variable is this close a match -- --mist
+           is a pale sage/green, not a neutral grey). Each box's own
+           left/right padding moved here (recentRefundsCard was 18px via
+           .card; priorRefundsList had none, flush with its own rows) so
+           the title still lines up exactly with .history-rows below it,
+           same as before this structural change. */
+        .history-title {
+            flex: 0 0 auto; margin: 0;
+            background: #e6e6e1;
+            padding: 6px 0; font-size: 0.8125rem; line-height: 1.2;
+            border-bottom: 1px solid var(--mist); border-radius: 0;
         }
-        #recentRefundsCard h3 { padding-top: 18px; }
-        #priorRefundsList strong { padding-top: 8px; }
+        #recentRefundsCard .history-title { padding-left: 18px; padding-right: 18px; }
+        #priorRefundsList .history-title { padding-left: 0; padding-right: 0; }
+        .history-rows { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+        #recentRefundsCard .history-rows { padding: 0 18px; }
         /* Shared by #priorRefundsList (per-sale, on the lookup card) and
            #recentRefundsList (site-wide, in its own card) -- same row
            shape either way. */
@@ -498,8 +501,8 @@
         </div>
 
         <div class="card" id="recentRefundsCard" style="display:none;">
-            <h3>Recent refunds (last 20)</h3>
-            <div id="recentRefundsList">Loading…</div>
+            <h3 class="history-title">Recent refunds (last 20)</h3>
+            <div id="recentRefundsList" class="history-rows">Loading…</div>
         </div>
 
         <div class="card" id="lookupCard">
@@ -864,12 +867,14 @@
             ).join('');
             const priorRefundsHtml = saleData.refunds.length ? `
                 <div id="priorRefundsList">
-                    <strong>Previous refunds</strong>
-                    ${saleData.refunds.map(r => `
-                        <div class="prior-refund-row">
-                            <span>${r.refund_number} — ${formatDateTime(r.created_at)} (${r.method})</span>
-                            <span>Rs ${formatMoney(r.amount)}<a href="${slipUrl(r.refund_number)}" target="_blank">Reprint slip</a></span>
-                        </div>`).join('')}
+                    <strong class="history-title">Previous refunds</strong>
+                    <div class="history-rows">
+                        ${saleData.refunds.map(r => `
+                            <div class="prior-refund-row">
+                                <span>${r.refund_number} — ${formatDateTime(r.created_at)} (${r.method})</span>
+                                <span>Rs ${formatMoney(r.amount)}<a href="${slipUrl(r.refund_number)}" target="_blank">Reprint slip</a></span>
+                            </div>`).join('')}
+                    </div>
                 </div>` : '';
             saleCard.innerHTML = `
                 ${saleData.fully_refunded ? '<div class="fully-refunded-banner">This sale has already been fully refunded.</div>' : ''}
