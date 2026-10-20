@@ -619,6 +619,54 @@ class RefundSlipViewTests(RefundTestBase):
         self.assertIn('min-height: 44px', content)
         self.assertIn('border: 2px solid var(--pos-text-green)', content)
 
+    def test_title_row_has_title_and_both_nav_buttons_together(self):
+        """Fixed-shell-layout task: "Refund / फिर्ता" and the two nav
+        buttons share one .title-row (title left, buttons right of the
+        same row from 481px up; CSS handles the <=480px wrap to a
+        second row -- see the .title-row/.link-row rules)."""
+        response = self.client.get(reverse('pos_refund'))
+        content = response.content.decode()
+        title_row_start = content.index('class="title-row"')
+        title_row_chunk = content[title_row_start:title_row_start + 600]
+        self.assertIn('Refund / फिर्ता', title_row_chunk)
+        self.assertIn('class="link-row"', title_row_chunk)
+        self.assertIn('id="recentRefundsToggle"', title_row_chunk)
+
+    def test_method_grid_has_the_four_payment_buttons_in_one_container(self):
+        """Fixed-shell-layout task: cash/eSewa/Khalti/Bank live in one
+        #methodGrid container, one row of equal-width buttons. "Bank
+        Transfer" is shortened to "Bank" on screen only -- the
+        data-method value sent to the server stays bank_transfer."""
+        response = self.client.get(reverse('pos_refund'))
+        content = response.content.decode()
+        grid_start = content.index('id="methodGrid"')
+        grid_end = content.index('</div>', grid_start)
+        grid_chunk = content[grid_start:grid_end]
+        self.assertIn('data-method="cash"', grid_chunk)
+        self.assertIn('data-method="esewa"', grid_chunk)
+        self.assertIn('data-method="khalti"', grid_chunk)
+        self.assertIn('data-method="bank_transfer"', grid_chunk)
+        self.assertIn('>Bank<', grid_chunk)
+        self.assertNotIn('>Bank Transfer<', grid_chunk)
+
+    def test_note_container_is_hidden_by_default_with_an_add_note_toggle(self):
+        """Fixed-shell-layout task: the note textarea is wrapped in
+        #noteContainer, hidden by default (shown automatically only when
+        "Other" is picked, or on demand via #addNoteToggle -- both
+        client-side, see pos_refund.html's updateNoteVisibility())."""
+        response = self.client.get(reverse('pos_refund'))
+        content = response.content.decode()
+        # Hidden via the stylesheet (#noteContainer { display: none; }),
+        # not an inline style -- JS only ever sets an explicit 'block' or
+        # 'none' afterwards (see updateNoteVisibility()'s own comment
+        # about why an inline '' wouldn't actually show it again).
+        self.assertIn('#noteContainer { display: none; }', content)
+        self.assertIn('id="addNoteToggle"', content)
+        self.assertIn('+ Add note', content)
+        note_container_start = content.index('id="noteContainer"')
+        note_container_chunk = content[note_container_start:note_container_start + 200]
+        self.assertIn('id="noteInput"', note_container_chunk)
+
     def test_refund_page_success_box_has_back_to_pos_link(self):
         """Refund-page-polish task: the "Refund complete" success box has
         a Back to POS button/link, in addition to Print refund slip and

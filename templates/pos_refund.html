@@ -25,10 +25,23 @@
             --danger: #b23b3b;
         }
         * { box-sizing: border-box; }
+
+        /* ── Fixed shell -- the PAGE itself never scrolls, at any width
+           (phone included, per this task's point 6): header and footer
+           are normal flex children (no longer position:fixed -- nothing
+           needs the old padding-bottom-reserved-for-a-fixed-footer hack
+           any more), and the middle area (.wrap) is the one flex child
+           that stretches to fill whatever's left and scrolls INTERNALLY
+           if its content doesn't fit. 100dvh with a 100vh fallback, per
+           spec. ── */
         html, body {
-            margin: 0; font-family: 'DM Sans', 'Noto Sans Devanagari', sans-serif;
-            background: var(--pos-bg); color: var(--pos-text-green);
+            height: 100vh; margin: 0; font-family: 'DM Sans', 'Noto Sans Devanagari', sans-serif;
+            background: var(--pos-bg); color: var(--pos-text-green); overflow: hidden;
         }
+        @supports (height: 100dvh) {
+            html, body { height: 100dvh; }
+        }
+        body { display: flex; flex-direction: column; }
 
         /* ── Header -- copied from templates/pos.html's own .pos-header
            (same classes, sizes, spacing, and the matching <=1024px wrap
@@ -41,6 +54,7 @@
            RETAIL tag is a plain static label here, not the
            wholesale-mode toggle button it is in pos.html. ── */
         .pos-header {
+            flex: 0 0 auto;
             display: flex; align-items: center; gap: 18px; background: var(--pos-bg);
             border-bottom: 8px solid var(--pos-header-line); padding: 10px 24px;
             position: relative; overflow: hidden;
@@ -72,46 +86,77 @@
             .pos-header-right { flex: 1 1 100%; justify-content: flex-start; }
         }
 
-        /* ── Page content wrap -- mobile-first: fluid/full-width with 16px
-           gutters by default (phone 375-480), centred at 720px from
-           tablet (768px) up, and widened to a 1100px two-column layout
-           from laptop (1024px) up -- see .refund-layout below. Bottom
-           padding clears the fixed footer bar (tallest on a 375px phone,
-           where it can wrap to three rows) plus the phone's safe-area
-           inset. ── */
-        .wrap { margin: 0 auto; padding: 20px 16px calc(210px + env(safe-area-inset-bottom)); }
-        @media (min-width: 768px) {
-            .wrap { max-width: 720px; padding: 28px 24px calc(210px + env(safe-area-inset-bottom)); }
+        /* ── Middle area (.wrap) -- the ONE thing that scrolls, and only
+           when it actually has to (see the 1024px+ height-filling chain
+           below, which is designed so this scrollbar normally never
+           fires once a sale is loaded -- the item list and, as a last
+           resort, the right-hand panel absorb the overflow first). In
+           the pre-sale lookup state there's no two-column split to
+           delegate to, so this is deliberately the scroll container for
+           that state too (point 5). ── */
+        .wrap {
+            flex: 1 1 auto; min-height: 0; overflow-y: auto;
+            display: flex; flex-direction: column;
+            margin: 0 auto; width: 100%; padding: 16px;
         }
+        @media (min-width: 768px) { .wrap { max-width: 720px; padding: 18px 24px; } }
         @media (min-width: 1024px) {
-            .wrap { max-width: 1100px; }
-            .refund-layout { display: grid; grid-template-columns: 1fr 360px; gap: 24px; align-items: start; }
-            /* Sticky right column: method/reason/note stay visible while
-               the left column's item list scrolls past it on a sale with
-               many lines. */
-            .refund-col-side { position: sticky; top: 20px; }
+            .wrap { max-width: 1140px; }
+            .refund-layout { display: grid; grid-template-columns: 1fr 400px; gap: 20px; }
+            /* Height-filling chain: .refund-layout is a flex item of
+               .wrap (flex:1 1 auto below, declared unconditionally so it
+               applies whether .refund-layout is a grid -- here -- or a
+               plain block at narrower widths), so it gets a DEFINITE
+               height once visible. .refund-col-main repeats the same
+               trick one level down: the sale-summary card keeps its
+               natural (compact) height, #linesContainer takes whatever
+               is left and scrolls internally first. .refund-col-side
+               mirrors it as the last-resort scroller for a very short
+               screen where method+reason+note alone don't fit. */
+            .refund-col-main { height: 100%; min-height: 0; display: flex; flex-direction: column; }
+            #saleCard { flex: 0 0 auto; }
+            #linesContainer { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+            .refund-col-side { height: 100%; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; }
         }
+        .refund-layout { flex: 1 1 auto; min-height: 0; }
+        #linesContainer { overflow-y: auto; } /* no-op below 1024px -- no height constraint to scroll against until the rule above gives it one */
 
-        h1 { font-family: 'Cormorant Garamond', serif; font-size: 1.9rem; margin: 0 0 4px; }
         h3 { margin: 0 0 10px; font-size: 1.05rem; }
-        /* Top buttons -- real buttons (outlined, dark-green, same family
-           as the footer's secondary/Cancel styling), not plain text
-           links, so they read as actions rather than incidental copy.
-           flex:1 with a shared row + min-width:0/no-wrap-via-ellipsis
-           keeps both fitting side by side at 375px without wrapping. */
-        .link-row { display: flex; gap: 10px; margin-bottom: 14px; }
+
+        /* ── Title row -- "Refund / फिर्ता" on the left, the two nav
+           buttons on the right of the SAME row from 481px up; the title
+           is a little smaller than before to leave room. Below 481px
+           the buttons wrap to their own full-width row (two equal
+           halves), title stays on its own line above them. ── */
+        .title-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; flex: 0 0 auto; }
+        .title-row h1 { font-family: 'Cormorant Garamond', serif; font-size: 1.5rem; margin: 0; }
+        .link-row { display: flex; gap: 8px; }
         .back-link {
             flex: 1 1 0; display: flex; align-items: center; justify-content: center;
-            min-height: 44px; padding: 0 10px; border-radius: 10px; border: 2px solid var(--pos-text-green);
-            background: #fff; color: var(--pos-text-green); font-weight: 700; font-size: 0.9rem;
+            min-height: 44px; padding: 0 12px; border-radius: 10px; border: 2px solid var(--pos-text-green);
+            background: #fff; color: var(--pos-text-green); font-weight: 700; font-size: 0.8125rem;
             text-decoration: none; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         }
         .back-link:active { background: #eaf1e6; }
-        .card { background: var(--white); border-radius: 14px; padding: 18px; margin-bottom: 16px; box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
+        @media (max-width: 480px) {
+            .link-row { flex: 1 1 100%; }
+            .back-link { min-height: 42px; }
+        }
+
+        .card { background: var(--white); border-radius: 14px; padding: 18px; margin-bottom: 16px; box-shadow: 0 4px 16px rgba(0,0,0,0.08); flex-shrink: 0; }
 
         .lookup-row { display: flex; gap: 10px; }
         #saleNumberInput {
-            flex: 1; font-size: 1.25rem; padding: 14px 16px; border-radius: 10px;
+            /* min-width:0 is load-bearing: a flex item's default
+               min-width is "auto", which for an <input> resolves to its
+               intrinsic content width (tied to its default `size`
+               attribute), not 0 -- without this override, flex:1 never
+               actually shrinks the input below ~250px, pushing
+               #lookupBtn (min-width:110px) off the right edge of the
+               viewport at 375px. Found by testing (a real, pre-existing
+               bug this fixed-shell task's explicit no-horizontal-overflow
+               check finally exposed). */
+            flex: 1; min-width: 0; font-size: 1.25rem; padding: 14px 16px; border-radius: 10px;
             border: 2px solid var(--mist); font-family: inherit; min-height: 54px; letter-spacing: 0.03em;
         }
         #lookupBtn {
@@ -121,6 +166,12 @@
         }
         #lookupError { color: var(--danger); font-weight: 700; margin-top: 10px; }
 
+        /* Compact sale summary -- reduced padding/row-gap vs. the
+           default .card, this being the one card that's always visible
+           alongside the (potentially long) item list and needs to give
+           up as much vertical room as it can. */
+        #saleCard { padding: 12px 16px; }
+        #saleCard .sale-meta-row { margin-bottom: 2px; }
         .sale-meta-row { display: flex; justify-content: space-between; gap: 10px; font-size: 0.95rem; margin-bottom: 4px; flex-wrap: wrap; }
         .sale-meta-row span:first-child { color: var(--text-muted); font-weight: 600; }
         /* Small polish: "cash" -> "Cash" etc. -- display only, the
@@ -137,7 +188,7 @@
            shape either way. */
         .prior-refund-row { display: flex; justify-content: space-between; gap: 10px; padding: 3px 0; flex-wrap: wrap; }
         .prior-refund-row a { color: var(--pos-text-green); font-weight: 700; margin-left: 8px; }
-        #recentRefundsCard { font-size: 0.85rem; color: var(--text-muted); }
+        #recentRefundsCard { font-size: 0.85rem; color: var(--text-muted); flex-shrink: 0; }
 
         .line-card { border: 1.5px solid var(--mist); border-radius: 10px; padding: 14px; margin-bottom: 10px; }
         .line-card.line-done { opacity: 0.5; }
@@ -171,50 +222,71 @@
         .disposition-row input[type="radio"] { width: 24px; height: 24px; }
         .restock-only-note { font-size: 0.8rem; color: var(--text-muted); margin-top: 10px; }
 
-        .method-grid, .reason-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+        /* Right-hand panel (method/reason/note) -- tightened padding so
+           its total natural height stays around ~300px at 1280px wide
+           (per spec), well short of needing its own scroll in the
+           ordinary case. */
+        .refund-col-side .card { padding: 14px 16px; margin-bottom: 10px; }
+        .refund-col-side h3 { margin: 0 0 6px; font-size: 0.95rem; }
+
         .choice-btn {
-            min-height: 54px; border-radius: 10px; border: 2px solid var(--mist); background: #fff;
-            font-weight: 800; font-size: 0.95rem; cursor: pointer; font-family: inherit; color: var(--pos-text-green);
+            border-radius: 10px; border: 2px solid var(--mist); background: #fff;
+            font-weight: 800; cursor: pointer; font-family: inherit; color: var(--pos-text-green);
         }
         .choice-btn.selected { border-color: var(--pos-text-green); background: var(--pos-text-green); color: #fff; }
 
+        /* Refund-to: one dense row of equal-width buttons. auto-fit with
+           a sensible minimum means a 5th (credit) button either joins
+           that same row when there's room, or wraps to a second row on
+           its own when there isn't -- no JS needed to decide which;
+           hidden buttons (credit, when the sale has no customer) don't
+           participate in the layout at all. */
+        .method-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(78px, 1fr)); gap: 8px; }
+        .method-grid .choice-btn { min-height: 46px; font-size: 0.8rem; padding: 0 4px; }
+
+        /* Reason: 3 chips per row (2 rows for 5 reasons), smaller text
+           that's allowed to wrap onto a second line inside the chip --
+           values/labels sent to the server are untouched, only the grid
+           and font size changed. */
+        .reason-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+        .reason-grid .choice-btn { min-height: 44px; font-size: 0.8125rem; line-height: 1.15; padding: 4px 6px; white-space: normal; }
+
+        /* Note -- hidden by default (see updateNoteVisibility()); shown
+           automatically and required when "Other" is the chosen reason,
+           or on demand via the "+ Add note" toggle for any other reason
+           (optional in that case). */
+        #noteContainer { display: none; }
         #noteInput {
-            width: 100%; min-height: 70px; border-radius: 10px; border: 1.5px solid var(--mist);
-            font-family: inherit; padding: 10px; font-size: 0.95rem; margin-top: 12px; resize: vertical;
+            width: 100%; min-height: 60px; border-radius: 10px; border: 1.5px solid var(--mist);
+            font-family: inherit; padding: 10px; font-size: 0.9rem; margin-top: 10px; resize: vertical;
+        }
+        #addNoteToggle {
+            display: block; margin-top: 8px; border: none; background: none; color: var(--pos-text-green);
+            font-weight: 700; font-size: 0.85rem; cursor: pointer; font-family: inherit; padding: 6px 0;
+            text-align: left;
         }
 
-        /* ── Footer bar -- fixed at every width (thumb-reachable on a
-           kiosk/phone till regardless of screen size). Layout is
-           mobile-first via flexbox `order`: at <=480px it's three stacked
-           rows (total; disabled-reason if any; Cancel+Confirm sharing the
-           last row, Cancel fixed-width, Confirm filling the rest); from
-           481px up, Cancel/Total/Confirm share one row (Cancel - Total -
-           Confirm, left to right) and the disabled-reason (if any) drops
-           to its own full-width row underneath. padding-bottom adds the
-           phone safe-area inset so the bar never sits under a home
-           indicator/gesture bar. ── */
+        /* ── Footer bar -- a normal flex child now (not position:fixed --
+           see the fixed-shell comment at the top), always visible at the
+           bottom of the column without needing scroll-compensation
+           padding anywhere else. Layout unchanged from the previous
+           polish pass: <=480px is a 2-column grid (Cancel bottom-left
+           alone, Total directly above Confirm on the right); >=481px is
+           one flex row (Cancel far-left, Total+Confirm grouped on the
+           right). padding-bottom keeps the phone safe-area inset. ── */
         .footer-bar {
-            position: fixed; left: 0; right: 0; bottom: 0; background: var(--pos-bg);
+            flex: 0 0 auto;
+            background: var(--pos-bg);
             border-top: 2px solid var(--mist); padding: 14px 16px calc(14px + env(safe-area-inset-bottom));
             box-shadow: 0 -4px 16px rgba(0,0,0,0.08);
         }
-        /* <=480px: a 2-column grid (narrow left column for Cancel, wide
-           right column for Total+Confirm) instead of flexbox wrapping --
-           this is what lets the total sit directly above JUST the
-           Confirm side of the row (not spanning the whole bar) while
-           Cancel stays alone at the bottom-left, exactly as asked, with
-           no extra markup needed (same elements, re-placed via
-           grid-column/grid-row). >=481px switches to a single flex row:
-           Cancel alone on the left (margin-right:auto pushes everything
-           after it to the right), Total immediately next to Confirm as
-           one right-aligned group. */
         .footer-bar-inner {
             margin: 0 auto;
             display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto auto;
             column-gap: 14px; row-gap: 6px; align-items: center;
         }
         @media (min-width: 768px) { .footer-bar-inner { max-width: 720px; } }
-        @media (min-width: 1024px) { .footer-bar-inner { max-width: 1100px; } }
+        @media (min-width: 1024px) { .footer-bar-inner { max-width: 1140px; } }
 
         .footer-total-group {
             grid-column: 2; grid-row: 1; display: flex; justify-content: flex-end; align-items: baseline; gap: 8px;
@@ -255,7 +327,8 @@
         }
 
         /* Dim overlays -- plain rgba, no blur, instant/<=100ms, same
-           convention as templates/pos.html's own backdrops. */
+           convention as templates/pos.html's own backdrops. max-height
+           + internal scroll so a dialog never overflows a short screen. */
         .backdrop {
             display: none; position: fixed; inset: 0; background: rgba(26,47,30,0.35);
             align-items: center; justify-content: center; z-index: 400; transition: opacity 0.1s;
@@ -263,6 +336,7 @@
         .backdrop.active { display: flex; }
         .confirm-card, .success-card {
             background: #fff; border-radius: 16px; padding: 26px; max-width: 360px; width: 90vw;
+            max-height: 90vh; overflow-y: auto;
             text-align: center; box-shadow: 0 16px 40px rgba(0,0,0,0.3);
         }
         .confirm-card p { font-size: 1.05rem; font-weight: 700; margin: 0 0 18px; }
@@ -270,7 +344,7 @@
         #successNumber { font-size: 0.85rem; color: var(--text-muted); font-weight: 700; margin: 0 0 16px; }
         .confirm-actions { display: flex; gap: 10px; }
         .confirm-actions button {
-            flex: 1; padding: 13px 10px; border: none; border-radius: 12px; font-weight: 800;
+            flex: 1; min-height: 44px; padding: 13px 10px; border: none; border-radius: 12px; font-weight: 800;
             font-size: 0.95rem; cursor: pointer; font-family: inherit;
         }
         #refundConfirmCancel { background: var(--mist); color: var(--pos-text-green); }
@@ -332,11 +406,13 @@
     </div>
 
     <div class="wrap">
-        <div class="link-row">
-            <a href="{% url 'pos' %}" class="back-link">&laquo; Back to POS</a>
-            <a href="#" class="back-link" id="recentRefundsToggle">Recent refunds</a>
+        <div class="title-row">
+            <h1>Refund / फिर्ता</h1>
+            <div class="link-row">
+                <a href="{% url 'pos' %}" class="back-link">&laquo; Back to POS</a>
+                <a href="#" class="back-link" id="recentRefundsToggle">Recent refunds</a>
+            </div>
         </div>
-        <h1>Refund / फिर्ता</h1>
 
         <div class="card" id="recentRefundsCard" style="display:none;">
             <h3>Recent refunds (last 20)</h3>
@@ -361,7 +437,7 @@
                     <h3>Refund to</h3>
                     <div class="method-grid" id="methodGrid">
                         {% for value, label in method_choices %}
-                        <button type="button" class="choice-btn" data-method="{{ value }}" style="display:none;">{{ label }}</button>
+                        <button type="button" class="choice-btn" data-method="{{ value }}" style="display:none;">{% if value == 'bank_transfer' %}Bank{% else %}{{ label }}{% endif %}</button>
                         {% endfor %}
                     </div>
                 </div>
@@ -373,7 +449,10 @@
                         <button type="button" class="choice-btn" data-reason="{{ value }}">{{ label }}</button>
                         {% endfor %}
                     </div>
-                    <textarea id="noteInput" placeholder="Note (required if &quot;Other&quot; is chosen)"></textarea>
+                    <div id="noteContainer">
+                        <textarea id="noteInput" placeholder="Note (required if &quot;Other&quot; is chosen)"></textarea>
+                    </div>
+                    <button type="button" id="addNoteToggle">+ Add note</button>
                 </div>
             </div>
         </div>
@@ -592,6 +671,26 @@
         let clientRefundId = generateUuid();
         let confirmOpenedAt = 0;
         let cancelConfirmOpenedAt = 0;
+        // Whether the note field has been revealed -- forced true whenever
+        // selectedReason is 'other' (required case), otherwise only true
+        // once the user explicitly taps "+ Add note" (optional case). See
+        // updateNoteVisibility().
+        let noteRevealed = false;
+
+        function updateNoteVisibility() {
+            // Explicit 'block', not '' -- #noteContainer's CSS default is
+            // display:none, so clearing the inline style with '' would
+            // just fall back to that stylesheet rule and never actually
+            // show it (found by testing: this was exactly that bug).
+            const shouldShow = noteRevealed || selectedReason === 'other';
+            document.getElementById('noteContainer').style.display = shouldShow ? 'block' : 'none';
+            document.getElementById('addNoteToggle').style.display = shouldShow ? 'none' : 'block';
+        }
+        document.getElementById('addNoteToggle').addEventListener('click', () => {
+            noteRevealed = true;
+            updateNoteVisibility();
+            document.getElementById('noteInput').focus();
+        });
 
         function resetPage() {
             saleData = null;
@@ -599,6 +698,7 @@
             selectedMethod = null;
             selectedReason = null;
             clientRefundId = generateUuid();
+            noteRevealed = false;
             document.getElementById('lookupCard').style.display = '';
             document.getElementById('saleCard').style.display = 'none';
             document.getElementById('linesContainer').innerHTML = '';
@@ -606,6 +706,7 @@
             document.getElementById('reasonCard').style.display = 'none';
             document.getElementById('footerBar').style.display = 'none';
             document.getElementById('noteInput').value = '';
+            updateNoteVisibility();
             document.querySelectorAll('.choice-btn').forEach(b => b.classList.remove('selected'));
             const input = document.getElementById('saleNumberInput');
             input.value = '';
@@ -633,6 +734,7 @@
                 });
                 selectedMethod = data.has_credit_line ? 'credit' : 'cash';
                 selectedReason = null;
+                noteRevealed = false;
                 renderSale();
             } catch (err) {
                 errorBox.textContent = 'Could not reach the server. Check the connection and try again.';
@@ -682,6 +784,7 @@
                 btn.classList.toggle('selected', btn.dataset.method === selectedMethod);
             });
 
+            updateNoteVisibility();
             updateFooter();
         }
 
@@ -853,6 +956,7 @@
             if (!btn) return;
             selectedReason = btn.dataset.reason;
             document.querySelectorAll('#reasonGrid .choice-btn').forEach(b => b.classList.toggle('selected', b === btn));
+            updateNoteVisibility();
             updateFooter();
         });
         document.getElementById('noteInput').addEventListener('input', updateFooter);
