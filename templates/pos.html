@@ -406,8 +406,34 @@
         .product-btn:hover { box-shadow: 0 4px 14px rgba(26,47,30,0.1); }
         .product-btn img { width: 100%; height: 90px; object-fit: cover; border-radius: 8px; margin-bottom: 8px; background: var(--cream); display: block; }
         .product-btn .pname { font-size: 0.83rem; font-weight: 600; color: var(--forest); margin-bottom: 2px; line-height: 1.25; }
-        .product-btn .pprice { font-size: 0.76rem; color: var(--moss); font-weight: 700; }
         .product-btn.unavailable { opacity: 0.5; cursor: default; }
+        /* Price (left) + C/S stock badge (right) share ONE row via flex,
+           rather than the badge being absolutely-positioned over the
+           bottom-right corner -- .pprice is the only thing already there
+           (a left-aligned, full-width block, the last element in the
+           card), and its text length varies with the price string, so an
+           overlaid badge could collide with a long price on a narrow
+           (150px) card. Sharing the row means the two can never overlap:
+           price takes whatever space is left and truncates with an
+           ellipsis instead. Doesn't add a row or change card height --
+           same two-line stack (image, name) plus this one footer row as
+           before. */
+        .product-btn .pcard-footer { display: flex; justify-content: space-between; align-items: flex-end; gap: 6px; }
+        .product-btn .pprice {
+            font-size: 0.76rem; color: var(--moss); font-weight: 700;
+            flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        /* C/S = "Current Stock" -- label over value, right-aligned, small.
+           Reuses the Stock tab's own low-stock colour (--pos-has-low's
+           #b23b3b, see .stock-col.stock-has-low) for low/zero stock;
+           normal stock uses the same --moss as the price text next to it. */
+        .cs-badge {
+            flex: 0 0 auto; display: flex; flex-direction: column; align-items: flex-end;
+            line-height: 1.15; padding-left: 4px;
+        }
+        .cs-badge .cs-label { font-size: 0.58rem; font-weight: 700; color: var(--text-muted); letter-spacing: 0.02em; }
+        .cs-badge .cs-value { font-size: 0.74rem; font-weight: 800; color: var(--moss); }
+        .cs-badge.cs-badge-low .cs-label, .cs-badge.cs-badge-low .cs-value { color: #b23b3b; }
 
         /* ── Stock view ── */
         #stockView { display: none; flex-direction: column; flex: 1; min-height: 0; }
@@ -1431,6 +1457,14 @@
         let wholesaleMode = false;
         let currentView = 'receipt'; // 'receipt' | 'shopping' | 'stock' | 'repay'
         let stockData = []; // [{product_id, name, current_stock, low_stock_threshold, is_low, restock_method, last_restocked_at, is_available}] — see loadStockData()
+        // C/S badge support: {product_id: stockData row}, rebuilt every
+        // time loadStockData() succeeds -- merges the ONE stock/ response
+        // already fetched by product_id, no per-product request. Stays
+        // false until the FIRST successful fetch, so the badge can tell
+        // "never loaded yet" apart from "loaded and genuinely zero" --
+        // see formatCsBadge() below.
+        let stockByProductId = {};
+        let stockLoadedOnce = false;
         let isUnlocked = false;
         let currentOperator = null; // { id, name, staff_number, role }
         let clientSaleId = null;
@@ -1766,7 +1800,15 @@
             document.getElementById('stockView').style.display = 'none';
             document.getElementById('repayView').style.display = 'none';
             renderCategoryRow();
-            loadStockData(); // fresh every time the Stock box comes back into view, not a cached value
+            // Deliberately NOT loadStockData() here -- this is called on
+            // every return to the cart (most commonly tapping the "N items
+            // · Rs X" cart-indicator chip), which used to re-fetch stock on
+            // every single tap for no reason (see "POS speed fix" --
+            // CLAUDE.md/Angan-Baari-Knowledge). Stock is kept fresh at
+            // init, when the Stock tab itself opens, and after a sale
+            // completes/queues/syncs (resetPostSaleState() /
+            // replayQueueAndRefreshStock() below) -- redisplaying the cart
+            // doesn't need a new fetch on top of those.
         }
 
         function showShoppingView() {
@@ -1821,8 +1863,66 @@
             } catch (err) {
                 return; // transient network error -- keep whatever stockData already had rather than wiping it
             }
+            stockByProductId = {};
+            stockData.forEach(row => { stockByProductId[row.product_id] = row; });
+            stockLoadedOnce = true; // only ever set on an actual successful fetch, see its own declaration
             renderStockBox();
             if (currentView === 'stock') renderStockTable();
+            applyStockBadgesToGrid(); // update any already-rendered product cards in place -- no new request
+        }
+
+        // C/S ("Current Stock") badge -- bottom-right of each product
+        // card, merged from the SAME stock/ response loadStockData()
+        // already fetched (see stockByProductId above), never a
+        // per-product request. Returns null (render no badge at all)
+        // before the first successful stock fetch, or for a product this
+        // response genuinely has nothing for -- never a guessed/stale
+        // number. fixed_weight products aren't in the stock/ response at
+        // all (they're tracked per-animal, see shop/stock.py's own
+        // docstring) -- for those this instead counts the SAME
+        // `variants` array the price label above already reads from the
+        // page's own embedded PRODUCTS data, with no fetch involved.
+        function formatCsBadge(product) {
+            if (product.pricing_mode === 'fixed_weight') {
+                const count = (product.variants || []).length;
+                return { text: String(count), low: count <= 0 };
+            }
+            if (!stockLoadedOnce) return null;
+            const row = stockByProductId[product.id];
+            if (!row) return null;
+            const unit = product.pricing_mode === 'variable_weight' ? (' ' + (product.weight_unit_label || 'kg')) : '';
+            const text = formatStockQty(row.current_stock) + unit;
+            // Zero stock always reads as "low" (same red), even in the
+            // edge case of a threshold of 0 where the strict is_low
+            // (current_stock < threshold) rule wouldn't itself catch it --
+            // per the explicit "zero stock shows the same colour" rule.
+            const low = row.is_low || Number(row.current_stock) <= 0;
+            return { text, low };
+        }
+
+        function csBadgeHtml(product) {
+            const badge = formatCsBadge(product);
+            const lowClass = badge && badge.low ? ' cs-badge-low' : '';
+            const inner = badge ? `<span class="cs-label">C/S</span><span class="cs-value">${badge.text}</span>` : '';
+            return `<div class="cs-badge${lowClass}">${inner}</div>`;
+        }
+
+        // Called whenever fresh stock data lands (loadStockData()) --
+        // updates badges on whatever product cards are ALREADY rendered,
+        // in place, without rebuilding the grid (no image re-fetch/
+        // flicker, no lost scroll position). renderGrid() itself also
+        // calls csBadgeHtml() directly when it builds a card from
+        // scratch, so a freshly-rendered card is never stale either.
+        function applyStockBadgesToGrid() {
+            document.querySelectorAll('#productGrid .product-btn[data-id]').forEach(btn => {
+                const product = PRODUCTS.find(p => p.id == btn.dataset.id);
+                if (!product) return;
+                const badgeEl = btn.querySelector('.cs-badge');
+                if (!badgeEl) return;
+                const badge = formatCsBadge(product);
+                badgeEl.classList.toggle('cs-badge-low', !!(badge && badge.low));
+                badgeEl.innerHTML = badge ? `<span class="cs-label">C/S</span><span class="cs-value">${badge.text}</span>` : '';
+            });
         }
 
         // A single-line indicator, not a list -- the itemized low-stock
@@ -2100,7 +2200,10 @@
                 return `<div class="product-btn" data-id="${p.id}">
                     ${imgHtml}
                     <div class="pname">${p.name}</div>
-                    <div class="pprice">${priceLabel}</div>
+                    <div class="pcard-footer">
+                        <div class="pprice">${priceLabel}</div>
+                        ${csBadgeHtml(p)}
+                    </div>
                 </div>`;
             }).join('');
             grid.querySelectorAll('.product-btn').forEach(btn => {
@@ -4183,6 +4286,11 @@
             renderReceipt();
             updateCartIndicator();
             showReceiptView();
+            // Every outcome that reaches this function (success or queued)
+            // just changed stock -- showReceiptView() no longer fetches on
+            // its own (see that function's own comment), so this is the
+            // one explicit refresh for "after a sale completes or queues."
+            loadStockData();
             posReloadIfUpdatePending();
         }
 
@@ -4210,6 +4318,18 @@
                 const reg = await navigator.serviceWorker.ready;
                 if ('sync' in reg) await reg.sync.register('pos-replay-queue');
             } catch (err) { /* unsupported/denied -- the listeners below still cover it */ }
+        }
+
+        // Thin wrapper around pos-offline-queue.js's own posReplayQueue()
+        // -- that file's replay BEHAVIOUR is untouched; this just reacts to
+        // its existing return shape (`result.synced`, already documented)
+        // to cover "after a sale ... is synced" (a queued sale replaying
+        // successfully in the background) without re-fetching stock on
+        // every single replay attempt that finds nothing new to sync.
+        async function replayQueueAndRefreshStock() {
+            const result = await posReplayQueue();
+            if (result.synced && result.synced.length) loadStockData();
+            return result;
         }
 
         async function renderQueueBox() {
@@ -4314,7 +4434,7 @@
                 retryBtn.addEventListener('click', async () => {
                     await posQueueUpdate(retryBtn.dataset.id, { status: 'pending' });
                     showToast('Retrying…');
-                    await posReplayQueue();
+                    await replayQueueAndRefreshStock();
                     await renderQueueBox();
                     openQueuePanel();
                 });
@@ -4436,7 +4556,7 @@
 
         window.addEventListener('online', async () => {
             await updateOfflineBanner();
-            await posReplayQueue();
+            await replayQueueAndRefreshStock();
             await renderQueueBox();
             renderCouponRow();
             refreshCreditCustomerCacheQuietly(); // "refresh whenever the till is online" -- not awaited, non-blocking
@@ -4445,7 +4565,7 @@
         document.addEventListener('visibilitychange', async () => {
             if (!document.hidden) {
                 await updateOfflineBanner();
-                await posReplayQueue();
+                await replayQueueAndRefreshStock();
                 await renderQueueBox();
                 renderCouponRow();
             }
@@ -4460,7 +4580,7 @@
         setInterval(async () => {
             if (document.hidden) return;
             await updateOfflineBanner();
-            await posReplayQueue();
+            await replayQueueAndRefreshStock();
             await renderQueueBox();
         }, 60000);
 
@@ -4545,7 +4665,7 @@
         // reliably happen just from reopening the installed app from the
         // home screen -- a fresh load is the one moment iOS is guaranteed
         // to give this code a chance to run.
-        posReplayQueue().then(renderQueueBox);
+        replayQueueAndRefreshStock().then(renderQueueBox);
 
         // ══════════════════════════════════════════════════════════════
         // Repay credit — a full view (repayView), same currentView toggle

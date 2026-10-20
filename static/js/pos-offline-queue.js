@@ -81,7 +81,13 @@ var POS_QUEUE_STORE = 'queuedSales';
 // the new /pos/refund/ screen (static markup + CSS only, no new JS
 // dependency) -- an installed POS app cold-starting offline on the old
 // v19 shell would otherwise never show that link at all.
-var POS_SHELL_CACHE = 'pos-shell-v20';
+// v20 -> v21: POS speed fix + C/S stock badge. templates/pos.html no
+// longer fetches stock/ from showReceiptView() (only at init, Stock-tab
+// open, and after a sale completes/queues/syncs), and each product card
+// now shows a C/S badge merged from that same response -- an installed
+// POS app cold-starting offline on the old v20 shell would otherwise
+// keep re-fetching stock on every cart-chip tap and never show the badge.
+var POS_SHELL_CACHE = 'pos-shell-v21';
 var POS_META_STORE = 'meta';
 var POS_OFFLINE_PIN_STORE = 'offlineOperators';
 var POS_CREDIT_CUSTOMER_STORE = 'creditCustomers';

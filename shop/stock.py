@@ -10,6 +10,10 @@ to them the way they do for everything else (including eggs, which are
 fixed_quantity, not fixed_weight, and so stay in this table normally).
 """
 
+from decimal import Decimal
+
+from django.db.models import Case, DecimalField, F, Max, Sum, When
+
 from .models import InventoryMovement, Product
 
 # Movement types that count as "this product was restocked" for
@@ -34,24 +38,57 @@ def get_stock_table_rows():
     most urgent restock need is at the very top), then everything else
     alphabetically by name (case-insensitive).
     """
-    products = Product.objects.exclude(pricing_mode='fixed_weight')
+    products = list(Product.objects.exclude(pricing_mode='fixed_weight'))
+    product_ids = [p.id for p in products]
+
+    # Bulk equivalent of calling InventoryMovement.current_stock(product)
+    # once per product -- same signed-quantity rule (INCREASE_TYPES add,
+    # everything else subtracts), computed in the DB instead of fetching
+    # every row and summing in Python per product. variant__isnull=True
+    # matches current_stock()'s own default call (variant=None) exactly --
+    # correct here since every product in `products` is non-fixed_weight,
+    # which never has variant-scoped movements.
+    signed_quantity = Case(
+        When(movement_type__in=InventoryMovement.INCREASE_TYPES, then=F('quantity')),
+        default=-F('quantity'),
+        # max_digits wider than InventoryMovement.quantity's own 8 -- this
+        # is the OUTPUT field Django uses to interpret the SUM() aggregate
+        # below, which can need a few more digits than any single row once
+        # many movements add up; decimal_places stays 3, matching the
+        # model field's own scale exactly.
+        output_field=DecimalField(max_digits=14, decimal_places=3),
+    )
+    stock_by_product = {
+        row['product_id']: row['total'] or Decimal('0')
+        for row in (
+            InventoryMovement.objects
+            .filter(product_id__in=product_ids, variant__isnull=True)
+            .values('product_id')
+            .annotate(total=Sum(signed_quantity))
+        )
+    }
+
+    # Bulk equivalent of the old per-product
+    # "order_by('-created_at', '-id').first()" lookup -- Max('created_at')
+    # gives the identical TIMESTAMP VALUE (the only part ever read: see
+    # `last_movement.created_at` below), since the old query's '-id'
+    # tiebreak only ever mattered for picking between two rows that
+    # already share the exact same created_at -- same value either way.
+    last_restocked_by_product = {
+        row['product_id']: row['latest']
+        for row in (
+            InventoryMovement.objects
+            .filter(product_id__in=product_ids, movement_type__in=RESTOCK_MOVEMENT_TYPES)
+            .values('product_id')
+            .annotate(latest=Max('created_at'))
+        )
+    }
 
     rows = []
     for product in products:
-        current_stock = InventoryMovement.current_stock(product)
+        current_stock = stock_by_product.get(product.id, Decimal('0'))
         threshold = product.low_stock_threshold
         is_low = current_stock < threshold
-
-        # -id as a tiebreaker: two movements recorded in the same
-        # request-handling instant can share an identical created_at
-        # (auto_now_add's resolution), and id is the one field guaranteed
-        # to break the tie in actual insertion order.
-        last_movement = (
-            InventoryMovement.objects
-            .filter(product=product, movement_type__in=RESTOCK_MOVEMENT_TYPES)
-            .order_by('-created_at', '-id')
-            .first()
-        )
 
         rows.append({
             'product_id': product.id,
@@ -61,7 +98,7 @@ def get_stock_table_rows():
             'is_low': is_low,
             'origin': product.origin,
             'restock_method': 'Own farm' if product.origin == 'farm' else 'Outsourced',
-            'last_restocked_at': last_movement.created_at if last_movement else None,
+            'last_restocked_at': last_restocked_by_product.get(product.id),
             'is_available': product.is_available,
         })
 

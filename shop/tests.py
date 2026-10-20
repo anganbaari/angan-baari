@@ -387,6 +387,70 @@ class StockTableTests(TestCase):
         relevant_order = [pid for pid in ids_in_order if pid in {low_a.id, low_b.id, normal_a.id, normal_z.id}]
         self.assertEqual(relevant_order, [low_a.id, low_b.id, normal_a.id, normal_z.id])
 
+    def test_query_count_is_a_small_constant_regardless_of_product_count(self):
+        """POS speed fix: get_stock_table_rows() used to run 1 + 2*N
+        queries (current_stock() plus a last-restocked lookup, PER
+        product) -- now 2 bulk aggregates replace both, so the total stays
+        a small constant (3: the product list, the stock aggregate, the
+        restock aggregate) no matter how many products exist."""
+        for i in range(30):
+            product = Product.objects.create(
+                name=f'Query Count Product {i}', slug=f'query-count-product-{i}', category=self.category,
+                description='test', price=Decimal('10.00'), pricing_mode='fixed_quantity',
+            )
+            InventoryMovement.objects.create(product=product, movement_type='harvest', source='admin', quantity=Decimal('10'))
+
+        with self.assertNumQueries(3):
+            rows = get_stock_table_rows()
+        self.assertGreaterEqual(len(rows), 30)
+
+    def test_bulk_aggregates_match_the_old_per_product_computation(self):
+        """Equivalence check for the bulk rewrite: build a product with a
+        mixed history (harvest, purchase, sale, waste, return,
+        adjustment_add, adjustment_remove -- every signed-quantity type)
+        and confirm get_stock_table_rows()'s bulk-computed current_stock/
+        last_restocked_at match what the OLD per-product approach
+        (InventoryMovement.current_stock() + a direct
+        order_by('-created_at', '-id').first() lookup) would have
+        produced for the exact same ledger."""
+        product = Product.objects.create(
+            name='Mixed Ledger Product', slug='stock-test-mixed-ledger', category=self.category,
+            description='test', price=Decimal('30.00'), pricing_mode='variable_weight', low_stock_threshold=5,
+        )
+        InventoryMovement.objects.create(product=product, movement_type='harvest', source='admin', quantity=Decimal('50'))
+        InventoryMovement.objects.create(product=product, movement_type='purchase', source='admin', quantity=Decimal('10'))
+        InventoryMovement.objects.create(product=product, movement_type='sale', source='pos', quantity=Decimal('8'))
+        InventoryMovement.objects.create(product=product, movement_type='waste', source='admin', quantity=Decimal('2'))
+        InventoryMovement.objects.create(product=product, movement_type='return', source='pos', quantity=Decimal('1'))
+        InventoryMovement.objects.create(product=product, movement_type='adjustment_add', source='admin', quantity=Decimal('3'))
+        InventoryMovement.objects.create(product=product, movement_type='adjustment_remove', source='admin', quantity=Decimal('4'))
+
+        # A second, unrelated product in the same catalog -- proves the
+        # bulk GROUP BY doesn't leak one product's totals into another's.
+        other = Product.objects.create(
+            name='Other Ledger Product', slug='stock-test-other-ledger', category=self.category,
+            description='test', price=Decimal('5.00'), pricing_mode='fixed_quantity',
+        )
+        InventoryMovement.objects.create(product=other, movement_type='harvest', source='admin', quantity=Decimal('999'))
+
+        expected_stock = InventoryMovement.current_stock(product)  # the old per-product helper, still correct
+        expected_last_restocked = (
+            InventoryMovement.objects
+            .filter(product=product, movement_type__in=('harvest', 'purchase', 'adjustment_add'))
+            .order_by('-created_at', '-id').first().created_at
+        )
+
+        row = next(r for r in get_stock_table_rows() if r['product_id'] == product.id)
+        # 50 (harvest) + 10 (purchase) - 8 (sale) - 2 (waste) + 1 (return)
+        # + 3 (adjustment_add) - 4 (adjustment_remove) = 50.
+        self.assertEqual(row['current_stock'], Decimal('50'))
+        self.assertEqual(row['current_stock'], expected_stock)
+        self.assertEqual(row['last_restocked_at'], expected_last_restocked)
+        self.assertFalse(row['is_low'])  # 50, threshold 5 -- not low
+
+        other_row = next(r for r in get_stock_table_rows() if r['product_id'] == other.id)
+        self.assertEqual(other_row['current_stock'], Decimal('999'))
+
 
 class LowStockSignalTests(TestCase):
     """notify_on_low_stock_crossing() in shop/signals.py -- a one-time
