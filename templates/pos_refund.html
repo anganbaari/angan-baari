@@ -118,7 +118,12 @@
             #linesContainer { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
             .refund-col-side { height: 100%; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; }
         }
-        .refund-layout { flex: 1 1 auto; min-height: 0; }
+        /* flex-shrink:0 -- the sale summary / item list / right panel get
+           priority over the "Recent refunds" history panel above them in
+           .wrap's flex column (see #recentRefundsCard's own flex-shrink:1
+           below, which is what actually gives way first when the two
+           compete for the same limited height). */
+        .refund-layout { flex: 1 0 auto; min-height: 0; }
         #linesContainer { overflow-y: auto; } /* no-op below 1024px -- no height constraint to scroll against until the rule above gives it one */
 
         h3 { margin: 0 0 10px; font-size: 1.05rem; }
@@ -188,7 +193,46 @@
            shape either way. */
         .prior-refund-row { display: flex; justify-content: space-between; gap: 10px; padding: 3px 0; flex-wrap: wrap; }
         .prior-refund-row a { color: var(--pos-text-green); font-weight: 700; margin-left: 8px; }
-        #recentRefundsCard { font-size: 0.85rem; color: var(--text-muted); flex-shrink: 0; }
+        /* flex-shrink left at its default (1), NOT 0 -- found by testing
+           that a fixed max-height cap on the list ALONE wasn't enough:
+           at a short viewport (720-768px tall) the card's own capped-but-
+           still-~250px natural height (title + up to 170px of rows +
+           padding) could still out-compete .refund-layout (flex-shrink:0
+           now, see above) for .wrap's limited vertical space, squeezing
+           the item list / right panel into needing their OWN scrollbars
+           -- exactly backwards from "the sale summary card, the item
+           list card and the right-hand panel must get the remaining
+           height first". display:flex + overflow:hidden here (rather
+           than a plain block card) is what lets this card's OWN rendered
+           height actually shrink below its capped-list's natural size
+           when .wrap is tight, instead of the content simply spilling
+           out of a flex-shrunk box: the heading is a protected
+           (flex:0 0 auto) sibling above the list, and the list itself
+           (min-height:0, flex:1 1 auto below) is what actually gives up
+           visible rows first, scrolling more rather than the page
+           growing or the higher-priority panels losing their fit. */
+        #recentRefundsCard {
+            font-size: 0.85rem; color: var(--text-muted);
+            min-height: 0; display: flex; flex-direction: column; overflow: hidden;
+        }
+        #recentRefundsCard h3 { flex: 0 0 auto; }
+        /* Refund-history scroll cap -- both the "Recent refunds" panel's
+           own list and the "Previous refunds" list nested inside the
+           sale summary card. Capped to roughly 4 rows so an open history
+           panel can never squeeze the item list card / right-hand panel
+           out of their own share of the available height (what used to
+           happen: an uncapped list of up to 20 refunds could grow tall
+           enough to starve .refund-layout, forcing THOSE to show their
+           own scrollbars instead). The heading/title stays outside this
+           element entirely, so it's always visible without needing
+           position:sticky -- only the rows beneath it scroll. */
+        .history-scroll-list { max-height: min(25vh, 170px); overflow-y: auto; }
+        /* Lets the list shrink below its own max-height cap specifically
+           when #recentRefundsCard itself is being flex-shrunk (see
+           above) -- #priorRefundsList's own copy of this class doesn't
+           need this (saleCard is flex:0 0 auto / protected, so its
+           content is never flex-shrunk the same way). */
+        #recentRefundsCard .history-scroll-list { flex: 1 1 auto; min-height: 0; }
 
         .line-card { border: 1.5px solid var(--mist); border-radius: 10px; padding: 14px; margin-bottom: 10px; }
         .line-card.line-done { opacity: 0.5; }
@@ -416,7 +460,7 @@
 
         <div class="card" id="recentRefundsCard" style="display:none;">
             <h3>Recent refunds (last 20)</h3>
-            <div id="recentRefundsList">Loading…</div>
+            <div id="recentRefundsList" class="history-scroll-list">Loading…</div>
         </div>
 
         <div class="card" id="lookupCard">
@@ -753,11 +797,13 @@
             const priorRefundsHtml = saleData.refunds.length ? `
                 <div id="priorRefundsList">
                     <strong>Previous refunds</strong>
-                    ${saleData.refunds.map(r => `
-                        <div class="prior-refund-row">
-                            <span>${r.refund_number} — ${formatDateTime(r.created_at)} (${r.method})</span>
-                            <span>Rs ${formatMoney(r.amount)}<a href="${slipUrl(r.refund_number)}" target="_blank">Reprint slip</a></span>
-                        </div>`).join('')}
+                    <div class="history-scroll-list">
+                        ${saleData.refunds.map(r => `
+                            <div class="prior-refund-row">
+                                <span>${r.refund_number} — ${formatDateTime(r.created_at)} (${r.method})</span>
+                                <span>Rs ${formatMoney(r.amount)}<a href="${slipUrl(r.refund_number)}" target="_blank">Reprint slip</a></span>
+                            </div>`).join('')}
+                    </div>
                 </div>` : '';
             saleCard.innerHTML = `
                 ${saleData.fully_refunded ? '<div class="fully-refunded-banner">This sale has already been fully refunded.</div>' : ''}

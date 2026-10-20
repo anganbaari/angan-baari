@@ -591,6 +591,20 @@ class RefundSlipViewTests(RefundTestBase):
         self.assertIn('id="posDate"', content)
         self.assertIn('id="posTime"', content)
 
+    def test_recent_refunds_history_has_capped_scroll_class(self):
+        """History-scroll task: the "Recent refunds" panel's list carries
+        .history-scroll-list (max-height: min(25vh, 170px);
+        overflow-y: auto;) so an open 20-row history can never squeeze
+        the item list / right-hand panel out of their own share of the
+        available height -- the title stays outside this element, not
+        part of the scroll."""
+        response = self.client.get(reverse('pos_refund'))
+        content = response.content.decode()
+        self.assertIn('.history-scroll-list { max-height: min(25vh, 170px); overflow-y: auto; }', content)
+        recent_list_start = content.index('id="recentRefundsList"')
+        recent_list_tag = content[recent_list_start:recent_list_start + 80]
+        self.assertIn('class="history-scroll-list"', recent_list_tag)
+
     def test_cancel_button_uses_the_same_red_as_pos_low_stock_indicator(self):
         """Refund-page-polish task: Cancel is filled, red/white, using the
         same red as the POS screen's own "Low Stock" indicator (#b23b3b
