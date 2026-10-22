@@ -80,6 +80,13 @@ FRONTEND_BASE_URL = os.getenv('FRONTEND_BASE_URL', 'https://angan-baari-shop.ver
 # trailing slash, same convention as FRONTEND_BASE_URL.
 STOREFRONT_URL = os.getenv('STOREFRONT_URL', '')
 
+# Where `python manage.py backup_db` writes its gzip-compressed daily
+# backups (shop/management/commands/backup_db.py) -- read the same
+# env-driven way as FRONTEND_BASE_URL/STOREFRONT_URL above. Defaults to
+# ~/backups (expanded at the point of use, not here, so this stays a
+# plain string -- see that command's own backup_dir() helper).
+BACKUP_DIR = os.getenv('BACKUP_DIR', '')
+
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework.authentication.TokenAuthentication',
