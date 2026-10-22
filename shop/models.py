@@ -117,6 +117,10 @@ class Product(models.Model):
         related_name='products'
     )
     description = models.TextField()
+    tagline = models.CharField(
+        max_length=90, blank=True, default='',
+        help_text='Short punchline shown on the home page card (one line).',
+    )
     detail_description = models.TextField(blank=True)
     season = models.CharField(max_length=100, blank=True)
     farming_method = models.CharField(max_length=200, blank=True)

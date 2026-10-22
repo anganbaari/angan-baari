@@ -77,3 +77,29 @@ class HomeCategorySectionsTests(TestCase):
         card_start = content.index('Test Goat')
         card_chunk = content[card_start:card_start + 600]
         self.assertNotIn('shop-price', card_chunk)
+
+    def test_card_shows_tagline_or_else_truncated_description(self):
+        """Short-punchline-cards task: Product.tagline, when set, is shown
+        as-is; when blank, the card falls back to the description's first
+        sentence cut to ~90 chars (first_sentence|truncatechars:90,
+        shop/templatetags/storefront_tags.py) instead."""
+        cat = Category.objects.create(name='Punchline Test Category', order=53)
+        self.make_product(
+            'Test Tagline Product', 'test-tagline-product', cat,
+            tagline='Short and punchy.',
+            description='This should never appear because the tagline wins. Second sentence.',
+        )
+        long_sentence = 'A' * 120 + '.'
+        self.make_product(
+            'Test Fallback Product', 'test-fallback-product', cat,
+            tagline='', description=f'{long_sentence} This second sentence must not appear either.',
+        )
+
+        response = self.client.get(reverse('home'))
+        content = response.content.decode()
+
+        self.assertIn('Short and punchy.', content)
+        self.assertNotIn('This should never appear', content)
+
+        self.assertIn('A' * 89 + '…', content)
+        self.assertNotIn('This second sentence must not appear', content)

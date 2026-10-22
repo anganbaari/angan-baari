@@ -1,3 +1,5 @@
+import re
+
 from django import template
 from django.conf import settings
 from django.urls import reverse
@@ -49,3 +51,19 @@ def storefront_link(kind, arg=None):
         return base + storefront_path
 
     raise ValueError(f'storefront_link: unknown kind {kind!r}')
+
+
+@register.filter
+def first_sentence(text):
+    """The first sentence of a block of text (up to and including the
+    first '.', '!' or '?'), or the whole text unchanged if none of those
+    appear. Used for the database-driven home-page cards' short-line
+    fallback when Product.tagline is blank: {{ product.description|
+    first_sentence|truncatechars:90 }} (templates/index.html) -- chained
+    with Django's own built-in truncatechars filter for the "~90
+    characters, ellipsis" part, since there's no single built-in filter
+    that does both steps at once."""
+    if not text:
+        return text
+    match = re.search(r'[^.!?]*[.!?]', text.strip())
+    return match.group(0).strip() if match else text.strip()

@@ -99,7 +99,7 @@ class ProductAdmin(admin.ModelAdmin):
 
     fieldsets = (
         (None, {
-            'fields': ('name', 'slug', 'category', 'description', 'detail_description')
+            'fields': ('name', 'slug', 'category', 'description', 'tagline', 'detail_description')
         }),
         ('Pricing & cart behaviour', {
             'fields': ('price', 'price_unit', 'pricing_mode', 'weight_step', 'weight_unit_label', 'fixed_weight'),

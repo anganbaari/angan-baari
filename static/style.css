@@ -2267,20 +2267,27 @@ ul { list-style: none; }
     margin-bottom: 10px;
 }
 
-/* Price line -- database-driven shop-cards only (home page "category
-   sections from the database" task); the hand-written Fruits/Honey/
-   Pickles cards have no price of their own, so this is new rather than
-   reused from .rc-price (the ring-card carousel's own price style),
-   which is scoped tightly to that small dark-overlay card and unstyled
-   outside it -- .shop-body's larger light card needed its own sizing. */
-.shop-price {
-    font-family: var(--font-accent);
-    font-size: 0.95rem;
-    font-weight: 700;
-    color: var(--forest);
-    margin-bottom: 6px;
+/* Punchline -- database-driven shop-cards only (home page "short
+   punchline cards" task). Product.tagline if set, else the description's
+   first sentence, truncated server-side to ~90 chars
+   (shop/templatetags/storefront_tags.py's first_sentence filter +
+   Django's built-in truncatechars) -- this clamp is a second, CSS-level
+   safety net (long Devanagari text can still wrap past 90 *characters*
+   onto more than 2 *lines* at card width), so the card's height stays
+   close to the hand-written Fruits cards' regardless. Same base look as
+   .shop-body p (font-size/color/line-height), just capped at 2 lines
+   instead of flexing to fill the remaining card height. */
+.shop-punchline {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    font-size: 0.86rem;
+    color: var(--text-muted);
+    line-height: 1.6;
+    margin-bottom: 16px;
 }
-.shop-price span { font-size: 0.72rem; font-weight: 500; color: var(--gold); }
 
 /* Stock line — replaces the old floating badge */
 .shop-stock-text {
