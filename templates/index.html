@@ -651,12 +651,14 @@
             <button class="shop-tab" data-cat="honey">
                 <i class="fas fa-jar"></i><span>Honey</span>
             </button>
-            <button class="shop-tab" data-cat="animals">
-                <i class="fas fa-paw"></i><span>Animals</span>
-            </button>
             <button class="shop-tab" data-cat="pickles">
                 <i class="fas fa-pepper-hot"></i><span>Pickles</span>
             </button>
+            {% for section in other_category_sections %}
+            <button class="shop-tab" data-cat="cat-{{ section.category.id }}">
+                <i class="fas {{ section.category.icon|default:'fa-box' }}"></i><span>{{ section.category.name }}</span>
+            </button>
+            {% endfor %}
             <button class="shop-tab" data-cat="all">
                 <i class="fas fa-border-all"></i><span>All</span>
             </button>
@@ -914,59 +916,6 @@
             </div>
 
  
-            <!-- ── ANIMALS ── -->
-            <div class="shop-card hidden" data-cat="animals" data-aos="fade-right" data-aos-delay="0">
-                <div class="shop-img-wrap">
-                    <img src="https://ik.imagekit.io/anganbaari/angan-baari/site-images/goat1_eP_rCj1X6Q.jpg" alt="Healthy locally raised organic goat" loading="lazy">
-                </div>
-                <div class="shop-body">
-                    <div class="shop-meta"><i class="fas fa-paw"></i> Animals &middot; Free-range</div>
-                    <h3>Goats</h3>
-                    <div class="shop-title-rule"></div>
-                    <p>उत्कृष्ट मासु र प्रजनन्का लागि स्वस्थ लोकल बाख्राहरू: अर्गानिक दाना र विशेष रेखदेखमा पालिएका।</p>
-                    <div class="shop-cta-row">
-                        <a class="btn-whatsapp"
-                           href="https://wa.me/9779821025084?text=Hello%20Angan%20Baari!%20I%20would%20like%20to%20enquire%20about%20*Goats*.%20Please%20let%20me%20know%20availability%20and%20pricing."
-                           target="_blank" rel="noopener noreferrer">
-                            <i class="fab fa-whatsapp"></i> <span class="btn-label">WhatsApp</span>
-                        </a>
-                        <a href="{% storefront_link 'shop' %}" class="btn-shop-icon" aria-label="Visit our shop">
-                            <i class="fas fa-store"></i>
-                        </a>
-                        <a href="{% storefront_link 'product' 'goats' %}" class="btn-details" aria-label="View Goats details">
-                            <i class="fas fa-info-circle"></i>
-                        </a>
-                    </div>
-                </div>
-                <a href="{% storefront_link 'product' 'goats' %}" class="shop-card-link" aria-label="View Goats details"></a>
-            </div>
- 
-            <div class="shop-card hidden" data-cat="animals" data-aos="fade-left" data-aos-delay="60">
-                <div class="shop-img-wrap">
-                    <img src="https://ik.imagekit.io/anganbaari/angan-baari/site-images/localbhale1_hnIyaEUfe.jpg" alt="Free-range hens from our farm" loading="lazy">
-                </div>
-                <div class="shop-body">
-                    <div class="shop-meta"><i class="fas fa-paw"></i> Animals &middot; Free-range</div>
-                    <h3>Free-range Hens</h3>
-                    <div class="shop-title-rule"></div>
-                    <p>खुला मैदानमा चरेका, पोषिला र स्वस्थ Local कुखुरा: शत-प्रतिशत प्राकृतिक र Healthy रोजाइ।</p>
-                    <div class="shop-cta-row">
-                        <a class="btn-whatsapp"
-                           href="https://wa.me/9779821025084?text=Hello%20Angan%20Baari!%20I%20would%20like%20to%20enquire%20about%20*Free-range%20Hens*.%20Please%20let%20me%20know%20availability%20and%20pricing."
-                           target="_blank" rel="noopener noreferrer">
-                            <i class="fab fa-whatsapp"></i> <span class="btn-label">WhatsApp</span>
-                        </a>
-                        <a href="{% storefront_link 'shop' %}" class="btn-shop-icon" aria-label="Visit our shop">
-                            <i class="fas fa-store"></i>
-                        </a>
-                        <a href="{% storefront_link 'product' 'local-chickens' %}" class="btn-details" aria-label="View Local Chickens details">
-                            <i class="fas fa-info-circle"></i>
-                        </a>
-                    </div>
-                </div>
-                <a href="{% storefront_link 'product' 'local-chickens' %}" class="shop-card-link" aria-label="View Free-range Hens details"></a>
-            </div>
- 
             <!-- ── PICKLES ── -->
             <div class="shop-card hidden" data-cat="pickles" data-aos="fade-left" data-aos-delay="0">
                 <div class="shop-img-wrap">
@@ -993,7 +942,51 @@
                 </div>
                 <a href="{% storefront_link 'product' 'mango-pickles' %}" class="shop-card-link" aria-label="View Homemade Mango Pickle details"></a>
             </div>
- 
+
+            <!-- ── OTHER CATEGORIES (database-driven) -- Step 2 of the
+                 "home page: category sections from the database" task.
+                 Fruits/Vegetables/Honey/Pickles above stay hand-written;
+                 everything else (any top-level Category with at least one
+                 available product, elsewhere/order/name) is generated
+                 here, reusing this exact shop-card markup/classes so it
+                 behaves identically to the tabs above -- same shared
+                 .shop-tab/.shop-card filtering JS (static/script.js),
+                 same hidden-by-default convention (only "Fruits" starts
+                 active). data-cat="cat-<id>" matches the tab added above
+                 for this same category. ── -->
+            {% for section in other_category_sections %}
+            {% for product in section.products %}
+            <div class="shop-card hidden" data-cat="cat-{{ section.category.id }}" data-aos="fade-right" data-aos-delay="0">
+                <div class="shop-img-wrap">
+                    <img src="{{ product.main_image.url }}" alt="{{ product.name }}" loading="lazy">
+                </div>
+                <div class="shop-body">
+                    <div class="shop-meta"><i class="fas {{ section.category.icon|default:'fa-box' }}"></i> {{ section.category.name }}</div>
+                    <h3>{{ product.name }}</h3>
+                    {% if not product.is_fixed_weight and product.price and product.price > 0 %}
+                    <div class="shop-price">Rs. {{ product.price }}<span>/{{ product.price_unit|default:"unit"|cut:"per " }}</span></div>
+                    {% endif %}
+                    <div class="shop-title-rule"></div>
+                    {% if product.description %}<p>{{ product.description }}</p>{% endif %}
+                    <div class="shop-cta-row">
+                        <a class="btn-whatsapp"
+                           href="https://wa.me/9779821025084?text=Hello%20Angan%20Baari!%20I%20would%20like%20to%20enquire%20about%20*{{ product.name|urlencode }}*.%20Please%20let%20me%20know%20availability%20and%20pricing."
+                           target="_blank" rel="noopener noreferrer">
+                            <i class="fab fa-whatsapp"></i> <span class="btn-label">WhatsApp</span>
+                        </a>
+                        <a href="{% storefront_link 'category' section.category.id %}" class="btn-shop-icon" aria-label="View all {{ section.category.name }}">
+                            <i class="fas fa-store"></i>
+                        </a>
+                        <a href="{% storefront_link 'product' product.slug %}" class="btn-details" aria-label="View {{ product.name }} details">
+                            <i class="fas fa-info-circle"></i>
+                        </a>
+                    </div>
+                </div>
+                <a href="{% storefront_link 'product' product.slug %}" class="shop-card-link" aria-label="View {{ product.name }} details"></a>
+            </div>
+            {% endfor %}
+            {% endfor %}
+
         </div>
     </section>
  

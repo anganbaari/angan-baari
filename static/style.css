@@ -2266,7 +2266,22 @@ ul { list-style: none; }
     background: var(--gold);
     margin-bottom: 10px;
 }
- 
+
+/* Price line -- database-driven shop-cards only (home page "category
+   sections from the database" task); the hand-written Fruits/Honey/
+   Pickles cards have no price of their own, so this is new rather than
+   reused from .rc-price (the ring-card carousel's own price style),
+   which is scoped tightly to that small dark-overlay card and unstyled
+   outside it -- .shop-body's larger light card needed its own sizing. */
+.shop-price {
+    font-family: var(--font-accent);
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--forest);
+    margin-bottom: 6px;
+}
+.shop-price span { font-size: 0.72rem; font-weight: 500; color: var(--gold); }
+
 /* Stock line — replaces the old floating badge */
 .shop-stock-text {
     display: inline-flex;

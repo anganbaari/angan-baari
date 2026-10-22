@@ -13,12 +13,56 @@ from .emails import (
     send_resend_email,
 )
 
+# Home-page category sections (Step 2 of the "home page: category sections
+# from the database" task) -- Category has no slug field (checked:
+# shop/models.py only gives it name/parent/icon/order), so these are
+# matched by the exact stored `name` string instead.
+#
+# HOME_EXCLUDED_CATEGORIES: top-level categories already covered by the
+# hand-written Fruits/Honey/Pickles/Vegetables sections further up
+# index.html, so the DB-driven loop below must not duplicate them. The
+# real stored names are Nepali, not the English labels used in
+# conversation: 'फलफूल' (Fruits), 'मह' (Honey), 'अचार' (Pickles),
+# 'तरकारी' (Vegetables).
+HOME_EXCLUDED_CATEGORIES = ['फलफूल', 'मह', 'अचार', 'तरकारी']
+
+# Categories to hide from the home page later (e.g. while still being set
+# up) without touching the exclusion list above, which is specifically
+# "already covered elsewhere on this page". Empty for now.
+HOME_HIDDEN_CATEGORIES = []
+
+
 def home(request):
-    from .models import Product
+    from .models import Category, Product
     featured_products = Product.objects.public().filter(
         is_available=True
     ).exclude(main_image='').order_by('?')[:6]
-    return render(request, 'index.html', {'featured_products': featured_products})
+
+    # One entry per other top-level category that has at least one
+    # available product (including products filed under its
+    # subcategories) -- Category.Meta.ordering is already ['order',
+    # 'name'], so the queryset's own default order is exactly what's
+    # asked for (Category.order then name); a category with none shows no
+    # section at all (handled by just not appending it here).
+    skip_names = set(HOME_EXCLUDED_CATEGORIES) | set(HOME_HIDDEN_CATEGORIES)
+    other_category_sections = []
+    for category in Category.objects.filter(parent=None).exclude(name__in=skip_names):
+        subcategory_ids = category.subcategories.values_list('id', flat=True)
+        products = list(
+            Product.objects.public()
+            .filter(category_id__in=[category.id, *subcategory_ids], is_available=True)
+            .exclude(main_image='')
+            .select_related('category')
+            .prefetch_related('variants')
+            .order_by('name')
+        )
+        if products:
+            other_category_sections.append({'category': category, 'products': products})
+
+    return render(request, 'index.html', {
+        'featured_products': featured_products,
+        'other_category_sections': other_category_sections,
+    })
 
 def contact(request):
     if request.method == 'POST':
