@@ -153,7 +153,7 @@ def cancel_order(request, token):
     if request.method == 'POST':
         order.status = 'cancelled'
         order.save()
-        create_order_inventory_movements(order, 'return')
+        ensure_order_cancellation_stock_returned(order)
         send_order_cancelled_email(order)
         return render(request, 'cancel.html', {
             'order': order,
@@ -625,6 +625,31 @@ def create_order_inventory_movements(order, movement_type):
         related_order=order, note=f"Order {order.order_number}",
     )
 
+
+def ensure_order_cancellation_stock_returned(order):
+    """Idempotent: returns this order's stock ('return' movements) unless
+    it's already been returned, or there was never a 'sale' movement to
+    return in the first place (e.g. every line was invalid at checkout).
+
+    Called from THREE places that can each independently set
+    status='cancelled' on the same order — the profile-page cancel
+    (api.views.OrderCancelView), the emailed cancel-token link
+    (cancel_order() below), and a plain status change in Django admin
+    (shop/signals.py's return_stock_when_order_cancelled, reacting to
+    ANY ProductOrder save with status='cancelled' — previously admin had
+    no such reaction at all, so cancelling there silently never returned
+    stock). The idempotency check here is what makes it safe for all
+    three to call this without ever double-returning the same order's
+    stock, regardless of which path (or combination of paths) cancels
+    it."""
+    from .models import InventoryMovement
+
+    if not InventoryMovement.objects.filter(related_order=order, movement_type='sale').exists():
+        return
+    if InventoryMovement.objects.filter(related_order=order, movement_type='return').exists():
+        return
+    create_order_inventory_movements(order, 'return')
+
 def create_inventory_movements_from_snapshot(cart_snapshot, movement_type, source,
                                                related_order=None, related_pos_sale=None, note=None,
                                                strict=False):
@@ -979,12 +1004,21 @@ def resolve_automatic_offer(product):
     (None, None) if no live offer covers this product at all. The
     returned discounted_price is only used to pick a winner; the actual
     line price is still computed by price_pos_cart_line() with that
-    offer's id, so weight/qty/variant-specific pricing stays exact."""
+    offer's id, so weight/qty/variant-specific pricing stays exact --
+    including for a selling-unit (ProductSellingUnit) line, where that
+    real price is the unit's own price, not `product.price` at all (same
+    as the POS: resolve_pos_offer_discount() discounts whatever price
+    it's given, independent of `product.price`). This function doesn't
+    gate eligibility on `product.price` being set for that same reason —
+    a product priced *only* through its selling units (or a fixed_weight
+    product with no flat price, pricing coming entirely from
+    ProductVariant rows) must still be able to win an offer here; only
+    the *ranking* below falls back to treating a blank/zero
+    `product.price` as 0 for comparison purposes, never as a reason to
+    skip offers for that product altogether."""
+    from decimal import Decimal
     from .models import Offer
     from django.utils import timezone
-
-    if not product.price or product.price <= 0:
-        return None, None
 
     now = timezone.now()
     best_offer, best_price = None, None
@@ -999,11 +1033,15 @@ def resolve_automatic_offer(product):
     return best_offer, best_price
 
 
-def quote_cart_line(*, product, qty, weight, variant_id, user_is_authenticated):
+def quote_cart_line(*, product, qty, weight, variant_id, unit_id, user_is_authenticated):
     """Public (non-POS, non-wholesale) pricing for one cart line — used by
     CartQuoteView and OrderCreateView (api/views.py). Reuses
     price_pos_cart_line() for the actual line math so the rupee rounding
-    exactly matches the POS; never trusts any price from the caller.
+    exactly matches the POS, including for a `unit_id` (ProductSellingUnit)
+    line — price_pos_cart_line() already prices one by the unit's own
+    independent price (never base price x factor) and applies an offer
+    discount to THAT price, exactly the same way the POS does; nothing
+    extra was needed here to get that behaviour.
 
     Offer pricing is only ever applied when `user_is_authenticated` is
     True (the owner's "offer prices apply only to authenticated
@@ -1011,18 +1049,38 @@ def quote_cart_line(*, product, qty, weight, variant_id, user_is_authenticated):
     `final_price`, but `offer_available` is still reported so the caller
     can tell a guest "log in to get this price" without exposing it.
 
+    Raises POSSaleValidationError (never swallowed here, unlike the
+    narrower try/except around the offer-specific repricing below) for
+    anything that makes the line un-priceable at all: an invalid/
+    unavailable variant or selling unit (price_pos_cart_line()'s own
+    checks), or — website/API-only, deliberately NOT added to
+    price_pos_cart_line() itself so POS is completely unaffected, since
+    its own weight control only ever produces step-aligned values
+    client-side and has never needed this check — a variable_weight line
+    whose weight is below one weight_step or isn't a whole multiple of
+    it. Callers (CartQuoteView, OrderCreateView) catch this and report it
+    as this specific line's error rather than failing the whole request.
+
     Returns a dict (normal_price, final_price, discount, offer_id,
     offer_title, offer_available — all Decimal except the ids/title/bool)
-    or None if this line can't be priced at all (e.g. a fixed_weight
-    product whose chosen variant is no longer available) — the caller
-    decides whether to skip or report the line."""
-    try:
-        normal_price, _, _ = price_pos_cart_line(
-            product=product, qty=qty, weight=weight, variant_id=variant_id, unit_id=None,
-            is_wholesale=False, price_override=None, is_single_offer_line=False, offer_id=None,
-        )
-    except POSSaleValidationError:
-        return None
+    on success."""
+    if product.pricing_mode == 'variable_weight':
+        from decimal import Decimal, InvalidOperation
+        try:
+            weight_decimal = Decimal(str(weight))
+        except (InvalidOperation, TypeError, ValueError):
+            raise POSSaleValidationError(f'{product.name}: a valid weight is required.')
+        step = Decimal(str(product.weight_step or '0.50'))
+        unit_label = product.weight_unit_label or 'kg'
+        if weight_decimal < step:
+            raise POSSaleValidationError(f'{product.name}: weight must be at least {step}{unit_label}.')
+        if weight_decimal % step != 0:
+            raise POSSaleValidationError(f'{product.name}: weight must be a multiple of {step}{unit_label}.')
+
+    normal_price, _, unit = price_pos_cart_line(
+        product=product, qty=qty, weight=weight, variant_id=variant_id, unit_id=unit_id,
+        is_wholesale=False, price_override=None, is_single_offer_line=False, offer_id=None,
+    )
 
     offer, _ = resolve_automatic_offer(product)
     final_price = normal_price
@@ -1030,7 +1088,7 @@ def quote_cart_line(*, product, qty, weight, variant_id, user_is_authenticated):
     if offer is not None and user_is_authenticated:
         try:
             final_price, _, _ = price_pos_cart_line(
-                product=product, qty=qty, weight=weight, variant_id=variant_id, unit_id=None,
+                product=product, qty=qty, weight=weight, variant_id=variant_id, unit_id=unit_id,
                 is_wholesale=False, price_override=None, is_single_offer_line=True, offer_id=offer.id,
             )
             offer_applied = offer
@@ -1044,6 +1102,12 @@ def quote_cart_line(*, product, qty, weight, variant_id, user_is_authenticated):
         'offer_id': offer_applied.id if offer_applied else None,
         'offer_title': offer_applied.title if offer_applied else None,
         'offer_available': offer is not None,
+        # Handed back rather than re-derived by the caller -- same reason
+        # price_pos_cart_line() itself returns it (see that function's own
+        # docstring): so cart_snapshot/the quote response can record the
+        # selling unit's id/display name without a second query.
+        'selling_unit_id': unit.id if unit else None,
+        'selling_unit_name': unit.get_name_display() if unit else None,
     }
 
 

@@ -1,6 +1,6 @@
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
-from .models import InventoryMovement
+from .models import InventoryMovement, ProductOrder
 
 
 @receiver(post_save, sender=InventoryMovement)
@@ -83,3 +83,27 @@ def sync_availability_from_stock(sender, instance, **kwargs):
     else:
         product.is_available = InventoryMovement.current_stock(product) > 0
         product.save(update_fields=['is_available'])
+
+
+@receiver(post_save, sender=ProductOrder)
+def return_stock_when_order_cancelled(sender, instance, created, **kwargs):
+    """Covers the one cancellation path that previously did nothing at
+    all to stock: changing an order's status to Cancelled directly in
+    Django admin (OrderAdmin has no custom save_model, and
+    list_editable=['status'] lets this happen with a plain model save,
+    same as any other field edit there). The other two cancellation
+    paths -- the profile-page cancel (api.views.OrderCancelView) and the
+    emailed cancel-token link (cancel_order(), shop/views.py) -- already
+    call ensure_order_cancellation_stock_returned() themselves right
+    after their own order.save(), so this signal ALSO fires for those
+    (every ProductOrder save reaches this handler, not just admin's).
+    That's deliberate, not a bug to guard against with extra plumbing:
+    ensure_order_cancellation_stock_returned() is itself idempotent (it
+    checks for an existing 'return' movement before creating one), so
+    this signal and those two explicit calls can both run for the same
+    cancellation without ever double-returning stock, regardless of
+    which path (or combination) triggered it."""
+    if instance.status != 'cancelled':
+        return
+    from .views import ensure_order_cancellation_stock_returned
+    ensure_order_cancellation_stock_returned(instance)

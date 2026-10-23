@@ -2997,7 +2997,18 @@ class ProfileOrderApiTests(ProfileApiTestBase):
             user=self.owner if user is None else user,
         )
         defaults.update(kwargs)
-        return ProductOrder.objects.create(**defaults)
+        order = ProductOrder.objects.create(**defaults)
+        if order.cart_snapshot:
+            # A real order always gets its 'sale' movements at creation
+            # time (OrderCreateView.post()) -- this fixture bypasses that
+            # view, so it has to create them itself for anything that
+            # exercises cancellation: ensure_order_cancellation_stock_
+            # returned() (shop/views.py) now deliberately does nothing
+            # for an order with no 'sale' movement at all (Part B's
+            # "do nothing if the order has no sale movements" rule).
+            from shop.views import create_order_inventory_movements
+            create_order_inventory_movements(order, 'sale')
+        return order
 
     def test_list_requires_auth(self):
         response = self.client.get(reverse('v1_profile_orders'))

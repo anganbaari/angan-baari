@@ -30,6 +30,7 @@ from shop.views import (
     create_inventory_movements_from_snapshot,
     create_order_inventory_movements,
     create_pos_sale,
+    ensure_order_cancellation_stock_returned,
     format_weight,
     get_pos_operator,
     quote_cart_line,
@@ -1234,13 +1235,18 @@ class PublicOffersListView(APIView):
 class CartQuoteView(APIView):
     """POST /api/v1/cart/quote/ — public; token auth optional (see
     _authenticate_optional above). Body: {"lines": [{"product_id": ...,
-    "weight": ..., "quantity": ..., "variant_id": ...}, ...]}. Never
-    trusts any price from the caller — every line is priced here via
-    quote_cart_line() (shop/views.py), which reuses price_pos_cart_line()
-    so the rupee rounding exactly matches the POS. Offer prices apply
-    only when the caller is authenticated (the owner's rule); a guest
-    gets normal prices plus `login_required_for_offers` when at least
-    one line would have gotten an offer price if logged in."""
+    "weight": ..., "quantity": ..., "variant_id": ..., "selling_unit_id":
+    ...}, ...]}. Never trusts any price from the caller — every line is
+    priced here via quote_cart_line() (shop/views.py), which reuses
+    price_pos_cart_line() so the rupee rounding exactly matches the POS,
+    including for a `selling_unit_id` line (ProductSellingUnit's own
+    independent price). Offer prices apply only when the caller is
+    authenticated (the owner's rule); a guest gets normal prices plus
+    `login_required_for_offers` when at least one line would have gotten
+    an offer price if logged in. A line with an invalid/unavailable
+    selling unit, or (variable_weight) an invalid weight, gets a per-line
+    `error` instead of a price -- never raises, never fails other lines
+    in the same request."""
 
     authentication_classes = []
     permission_classes = [permissions.AllowAny]
@@ -1272,13 +1278,15 @@ class CartQuoteView(APIView):
                 qty = 1
             weight = line.get('weight')
             variant_id = line.get('variant_id')
+            selling_unit_id = line.get('selling_unit_id')
 
-            quote = quote_cart_line(
-                product=product, qty=qty, weight=weight, variant_id=variant_id,
-                user_is_authenticated=user is not None,
-            )
-            if quote is None:
-                result_lines.append({'product_id': product.id, 'error': 'Could not price this line.'})
+            try:
+                quote = quote_cart_line(
+                    product=product, qty=qty, weight=weight, variant_id=variant_id, unit_id=selling_unit_id,
+                    user_is_authenticated=user is not None,
+                )
+            except POSSaleValidationError as exc:
+                result_lines.append({'product_id': product.id, 'error': str(exc)})
                 continue
 
             if quote['offer_available'] and user is None:
@@ -1295,6 +1303,8 @@ class CartQuoteView(APIView):
                 'weight': weight,
                 'quantity': qty,
                 'variant_id': variant_id,
+                'selling_unit_id': quote['selling_unit_id'],
+                'selling_unit_name': quote['selling_unit_name'],
                 'normal_price': str(quote['normal_price']),
                 'final_price': str(quote['final_price']),
                 'discount': str(quote['discount']),
@@ -1339,7 +1349,19 @@ class OrderCreateView(APIView):
     ONLY way an order becomes "that user's order" for
     GET /api/v1/profile/orders/ -- there is deliberately no email-match
     fallback. A guest order (or one placed before this field existed)
-    just has user=None, same as always."""
+    just has user=None, same as always.
+
+    An optional `selling_unit_id` per line (fixed_quantity products only)
+    prices that line by the ProductSellingUnit's own price instead of
+    the base price -- see quote_cart_line()/price_pos_cart_line()
+    (shop/views.py), which already supported this for the POS; nothing
+    new was needed there. A selling unit that doesn't belong to the
+    product, is unavailable, or (variable_weight lines) a weight below
+    one weight_step/not a whole multiple of it, rejects just that one
+    line -- reported additively in the response's `errors` list, cart
+    and order creation proceed with whatever lines DID price
+    successfully (same "one bad line never loses the whole order"
+    philosophy this view already had for a missing product id)."""
 
     authentication_classes = []
     permission_classes = [permissions.AllowAny]
@@ -1353,6 +1375,7 @@ class OrderCreateView(APIView):
 
         items_desc = []
         cart_snapshot = []
+        line_errors = []
         subtotal = Decimal('0')
         total_discount = Decimal('0')
         total = Decimal('0')
@@ -1368,31 +1391,48 @@ class OrderCreateView(APIView):
                 qty = 1
             weight = line.get('weight')
             variant_id = line.get('variant_id')
+            selling_unit_id = line.get('selling_unit_id')
+
+            # A selling unit that doesn't belong to this product/is
+            # unavailable, or (variable_weight) a weight below one
+            # weight_step or not a whole multiple of it, REJECTS the
+            # line outright -- same "bad line, not a bad order" handling
+            # as a missing product above, just reported in `line_errors`
+            # (additive) instead of silently vanishing, since unlike a
+            # bad product id this is something the shopper could actually
+            # fix and retry.
+            try:
+                quote = quote_cart_line(
+                    product=product, qty=qty, weight=weight, variant_id=variant_id, unit_id=selling_unit_id,
+                    user_is_authenticated=user is not None,
+                )
+            except POSSaleValidationError as exc:
+                line_errors.append({'product_id': product.id, 'error': str(exc)})
+                continue
 
             snapshot_line = {
                 'product_id': product.id, 'weight': weight, 'qty': qty, 'variant_id': variant_id,
+                'unit_id': quote['selling_unit_id'],  # read by create_inventory_movements_from_snapshot() for stock deduction -- untouched, existing key name
+                'selling_unit_id': quote['selling_unit_id'],
+                'selling_unit_name': quote['selling_unit_name'],
+                'normal_price': str(quote['normal_price']),
+                'final_price': str(quote['final_price']),
+                'discount': str(quote['discount']),
+                'offer_id': quote['offer_id'],
+                'offer_title': quote['offer_title'],
             }
-            quote = quote_cart_line(
-                product=product, qty=qty, weight=weight, variant_id=variant_id,
-                user_is_authenticated=user is not None,
-            )
-            if quote is not None:
-                snapshot_line.update({
-                    'normal_price': str(quote['normal_price']),
-                    'final_price': str(quote['final_price']),
-                    'discount': str(quote['discount']),
-                    'offer_id': quote['offer_id'],
-                    'offer_title': quote['offer_title'],
-                })
-                subtotal += quote['normal_price']
-                total_discount += quote['discount']
-                total += quote['final_price']
+            subtotal += quote['normal_price']
+            total_discount += quote['discount']
+            total += quote['final_price']
 
             cart_snapshot.append(snapshot_line)
             items_desc.append(f"{product.name} ({weight}kg) x{qty}" if weight else f"{product.name} x{qty}")
 
         if not cart_snapshot:
-            return Response({'status': 'error', 'message': 'No valid items in cart.'}, status=400)
+            return Response(
+                {'status': 'error', 'message': 'No valid items in cart.', 'errors': line_errors},
+                status=400,
+            )
 
         order = ProductOrder.objects.create(
             name=data['name'],
@@ -1417,6 +1457,7 @@ class OrderCreateView(APIView):
                 'pricing_summary': {
                     'subtotal': str(subtotal), 'total_discount': str(total_discount), 'total': str(total),
                 },
+                'errors': line_errors,
             },
             status=status.HTTP_201_CREATED,
         )
@@ -1724,7 +1765,7 @@ class OrderCancelView(APIView):
 
         order.status = 'cancelled'
         order.save()
-        create_order_inventory_movements(order, 'return')
+        ensure_order_cancellation_stock_returned(order)
         send_order_cancelled_email(order)
 
         return Response({'status': 'ok', 'order': OrderHistorySerializer(order).data})

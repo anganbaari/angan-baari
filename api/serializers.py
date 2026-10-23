@@ -59,7 +59,9 @@ class ProductSerializer(serializers.ModelSerializer):
         # Only pricing_mode='fixed_quantity' products can carry
         # ProductSellingUnit rows at all (see that model's own docstring) --
         # most such products have none, meaning "just the plain price_unit/
-        # quantity stepper", same as before this field existed.
+        # quantity stepper", same as before this field existed. Only
+        # is_available=True units are listed -- an unavailable one was
+        # never included even before `price` was added here.
         if obj.pricing_mode != 'fixed_quantity':
             return []
         return [
@@ -69,6 +71,7 @@ class ProductSerializer(serializers.ModelSerializer):
                 'label': unit.get_name_display(),
                 'factor': str(unit.quantity_in_base_units),
                 'is_default': unit.is_default,
+                'price': str(unit.price),
             }
             for unit in obj.selling_units.filter(is_available=True)
         ]
