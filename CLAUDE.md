@@ -27,8 +27,10 @@ There are **two separate systems** — do not conflate them:
 - SQLite locally **and in production** (Postgres migration deliberately
   deferred until the POS needs concurrent writes — don't "helpfully" migrate)
 - Hosted on PythonAnywhere
-- Server-rendered Django templates only — no React/Next.js in this project
-  (considered and explicitly rejected)
+- Server-rendered Django templates only **in this repo** — no React/Next.js
+  here (POS/admin/dashboard stay Django templates; that decision is
+  unchanged). The public storefront itself is now a *separate* Next.js
+  project on Vercel, not in this repo — see "Storefront" below.
 - Images: ImageKit CDN (`shop/imagekit_storage.py`, custom Storage backend)
 - Email: Resend API (`shop/emails.py`), not Django's SMTP backend
 - Admin notifications: Telegram bot
@@ -55,11 +57,11 @@ doesn't use, so new packages silently never reach the running site.
 PythonAnywhere after pulling. Say so explicitly when proposing a model
 change — don't assume it happens automatically.**
 
-Latest migration as of this writing: `0049_credittransaction_related_refund`.
+Latest migration as of this writing: `0050_product_tagline`.
 Don't treat this as a goalpost — just confirm the real latest with
 `python manage.py showmigrations shop | tail` before assuming it's current.
 
-Full test suite: `python manage.py test` (560 passing as of this writing).
+Full test suite: `python manage.py test` (596 passing as of this writing).
 Same caveat — re-run it rather than trusting this number once it's old.
 
 ## Architecture decisions already made (don't relitigate these)
@@ -125,6 +127,15 @@ Same caveat — re-run it rather than trusting this number once it's old.
   offers are automatic per-product or per-category discounts, or combo
   bundles with a fixed total price. Both check `is_live()` against
   `is_active` + date range; coupons additionally check `max_uses`.
+- **Staying on SQLite — Postgres/Supabase re-evaluated and still rejected
+  (2026-10-23).** Specifically considered Supabase (free-tier Postgres
+  hosting) and rejected for now: PythonAnywhere's free tier can't reach
+  an external Postgres host at all, and even on a paid tier, a Supabase
+  database physically far from the PythonAnywhere server would add
+  network latency to every single query — the opposite of what a
+  database migration should buy here. Revisit only together with moving
+  Django itself to a host in the same region as the database (Singapore
+  or Mumbai), not as a standalone swap. See the vault's Decision-Log.
 
 ## REST API (v1)
 
@@ -134,9 +145,10 @@ Framework in a new `api/` app (`api/serializers.py`, `api/views.py`,
 
 **Additive only** — the existing server-rendered website and POS
 (`templates/pos.html`, vanilla JS) are untouched and still work exactly as
-before. Nothing currently calls this API in production — it exists in
-parallel, for future use, starting with a planned Next.js
-product-browsing frontend.
+before. The Next.js storefront on Vercel (see "Storefront" below) now
+calls this API in production — public browsing/guest-checkout plus the
+token-authed auth/profile/wishlist/order-history endpoints for logged-in
+shoppers. ("Planned" in an earlier version of this file; it's live now.)
 
 Endpoints:
 
@@ -174,7 +186,61 @@ Endpoints:
 independent of Django's middleware. `pos.html`'s JS is now actually
 pointed at this API (see "POS-PWA (Phase 1)" below) — it keeps sending
 its existing `X-CSRFToken` header (via `apiFetch()`) on every call, which
-is load-bearing, not optional.
+is load-bearing, not optional. Doesn't apply to the storefront's own
+`TokenAuthentication`-authed calls below — those never go through
+Django's session/CSRF machinery at all.
+
+## Storefront (Next.js on Vercel)
+
+The public shop is a **separate Next.js project**, not in this repo,
+deployed on Vercel at `https://angan-baari-shop.vercel.app`. Like ABMS
+(see "What this is" above), it's a genuinely separate hosted system that
+only talks to this Django project through `/api/v1/` — the one other
+legitimate REST API boundary in this project.
+
+- CORS: `ApiV1CorsMiddleware` (`api/middleware.py`) +
+  `API_V1_CORS_ALLOWED_ORIGINS` (`farmsite/settings.py`, env-driven;
+  defaults to `localhost:3000` plus the Vercel URL above).
+- Auth split by endpoint, not global: `products`/`categories`/
+  order-create are public (`AllowAny`, no auth at all); the storefront's
+  own authenticated calls (`auth/*`, `profile/*`, `wishlist/*`,
+  `orders/<id>/`, `coupons/`) use DRF `TokenAuthentication` — no CSRF
+  (see the Gotcha above). POS/dashboard/reports stay on
+  `SessionAuthentication` + staff-only, unaffected.
+- **Links-only switch (Phase 1, no redirects):** `STOREFRONT_URL` setting
+  (env-driven, default empty = unchanged Django behaviour) +
+  `shop/templatetags/storefront_tags.py`'s `{% storefront_link %}` tag.
+  When set, Shop/Category/Product/Cart/Checkout/Login/Signup/Profile
+  links across `index.html`, `shop.html`, `cart.html`, `checkout.html`,
+  `product_detail.html`, and `auth/{login,signup,profile}.html` point at
+  Vercel instead of the Django page. Offers, Home/logo, POS, admin, the
+  Reports dashboard, `/cancel/<token>/`, and the legacy
+  `/account/reset-password/<token>/` flow deliberately stay on Django
+  regardless of `STOREFRONT_URL` — Vercel has no equivalent route for any
+  of these. Full routing table:
+  `Angan-Baari-Knowledge/02-Architecture/Storefront-and-Vercel.md`.
+
+## Home page
+
+`templates/index.html`'s product grid is a hybrid: the Fruits/Honey/
+Pickles/Vegetables tabs and cards are hand-written; every other top-level
+`Category` with at least one available product is generated from the
+database by `home()` (`shop/views.py`) into the **same shared** tab/card
+grid — `static/script.js`'s tab/card filtering is page-wide, not scoped
+per section, so a database-driven section can't be visually separate from
+the hand-written ones. `HOME_EXCLUDED_CATEGORIES` (already covered by
+name above — never duplicate) and `HOME_HIDDEN_CATEGORIES` (hidden for
+now, e.g. still being set up) are both in `shop/views.py`, matched
+against the real Nepali `Category.name` strings, not English labels.
+
+Every card (hand-written or database-driven) shows image, category, name,
+and one punchline line — `Product.tagline` (migration
+`0050_product_tagline`) if set, else the trimmed first sentence of
+`description` (`first_sentence` filter,
+`shop/templatetags/storefront_tags.py`, chained with Django's own
+`truncatechars:90`). **No card shows a price at all** — removed in favor
+of the punchline, for every product regardless of pricing mode
+(fixed-weight included).
 
 ## POS-PWA (Phase 1 + 2 + 3 + 4 — PWA shell, offline sale queue, offline-first cold start, offline PIN unlock, offline offers/coupons/credit-lookup)
 
@@ -899,6 +965,34 @@ per row. If you extend this module: anything reading a related manager
 exactly this shape was caught by `QueryCountTests` in
 `api/tests_reports.py` and fixed by prefetching `selling_units`.
 
+## Backups
+
+`python manage.py backup_db` (`shop/management/commands/backup_db.py`) —
+a consistent copy via sqlite3's own online backup API, `PRAGMA
+integrity_check`, gzip to `BACKUP_DIR` (env-driven, default `~/backups`),
+retention: newest 14 overall + newest 8 Sunday ones kept. `python
+manage.py restore_check` verifies a backup's integrity + key-table row
+counts, read-only, never touches the live database. Both report success/
+failure via `send_telegram()` (`shop/emails.py`).
+
+**On-demand trigger, not a scheduled task** — PythonAnywhere's free tier
+has none. `shop/middleware.py`'s `OnDemandBackupMiddleware` (registered
+right after `AuthenticationMiddleware`) runs `backup_db` once,
+synchronously, from inside the first authenticated-staff GET to `/pos/*`
+or `/admin/*` after the newest backup turns 20 hours old (or none
+exists). Deliberately **not** a background thread — uwsgi on
+PythonAnywhere's free tier may not run threads reliably. Throttled to one
+filesystem check per 10 minutes per worker process, mutex'd by an atomic
+lock file in `BACKUP_DIR` (ignored if older than 10 minutes — an
+abandoned lock from a crashed worker), skipped with one Telegram warning
+per day if the live db exceeds 100MB (needs a real scheduled task past
+that size), and wrapped in try/except throughout — a backup failure never
+raises to the user or slows the page beyond the backup itself.
+`BACKUP_ON_DEMAND` setting (env-driven, default `True`) turns it off.
+**This means the production backup depends on a staff member actually
+opening `/pos/` or `/admin/` at least once a day.** Restore steps and the
+off-server-copy gap: `Angan-Baari-Knowledge/02-Architecture/Backups.md`.
+
 ## Deferred work (known, intentional, not yet built)
 
 - Local Egg / Vermicompost inventory bridge from ABMS (hook into ABMS's
@@ -927,6 +1021,19 @@ exactly this shape was caught by `QueryCountTests` in
   verify or flag)
 - Receipt/slip `?width=58` (58mm thermal roll) is implemented and tested,
   but not yet verified on real thermal printer hardware — see "Receipts"
+- No public `/api/v1/offers/` endpoint, and no Offers page on the Vercel
+  storefront — `pos/offers/` is staff-only POS internal, not the same
+  thing (see "Storefront" above)
+- Two separate password-reset systems exist, don't assume only one: the
+  legacy Django flow (`shop/auth_views.py`, `/account/reset-password/
+  <token>/`) and the API flow Vercel actually uses (`POST /api/v1/auth/
+  password-reset/` + `password-reset-confirm/`, `api/views.py`)
+- `shop/emails.py`'s order-received/cancel-link emails still hard-code
+  the PythonAnywhere domain (`anganbaari.pythonanywhere.com`), not
+  Vercel — intentional for now, since `/cancel/<token>/` has no Vercel
+  route (see "Storefront" above)
+- The production db backup depends on a staff member actually opening
+  `/pos/` or `/admin/` at least once a day — see "Backups" above
 
 ## Frontend conventions
 
@@ -980,6 +1087,11 @@ exactly this shape was caught by `QueryCountTests` in
 - `shop/imagekit_storage.py` — custom Django Storage backend for ImageKit
 - `shop/signals.py` — connected in `apps.py`'s `ready()`
 - `shop/sitemaps.py` — SEO sitemaps
+- `shop/middleware.py` — `OnDemandBackupMiddleware` (see "Backups" above)
+- `shop/management/commands/backup_db.py` / `restore_check.py` — see
+  "Backups" above
+- `shop/templatetags/storefront_tags.py` — `{% storefront_link %}` tag +
+  `first_sentence` filter (see "Storefront" and "Home page" above)
 - `templates/pos.html` — the POS screen
 - `templates/pos_receipt.html` / `templates/pos_refund.html` /
   `templates/pos_refund_slip.html` — see "Receipts" and "Refunds" above
@@ -1020,3 +1132,7 @@ rule.
   above first
 - Whether a drafted-but-unmerged feature (barcode label printing) actually
   made it into the codebase before building on top of it
+- Whether a new/changed `Product` field (e.g. `tagline`) needs exposing
+  in `api/serializers.py` too — the Vercel storefront only ever sees
+  whatever that serializer returns, so a model field invisible there
+  silently never reaches Vercel, with no error anywhere to notice it by

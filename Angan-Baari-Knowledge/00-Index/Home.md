@@ -12,12 +12,12 @@ See `03-Decisions/Decision-Log.md` for the promotion rule between these three.
 ## Sections
 
 - [[Project-Overview]] · [[Current-State]] · [[Roadmap]] — `01-Project/`
-- [[System-Architecture]] · [[Django]] · [[ABMS]] · [[POS]] · [[Inventory]] · [[REST-API]] · [[Refunds]] · [[Receipts-and-Pricing]] — `02-Architecture/`
+- [[System-Architecture]] · [[Django]] · [[ABMS]] · [[POS]] · [[Inventory]] · [[REST-API]] · [[Storefront-and-Vercel]] · [[Refunds]] · [[Receipts-and-Pricing]] — `02-Architecture/`
 - [[Architecture-Decisions]] · [[Decision-Log]] — `03-Decisions/`
-- [[Reports-Dashboard]] — `04-Features/`
+- [[Reports-Dashboard]] · [[Home-Page-Sections]] — `04-Features/`
 - [[Inventory-Rules]] — `05-Inventory/`
 - [[ABMS-Integration]] — `06-API/`
-- [[Deployment-Workflow]] — `07-Deployment/`
+- [[Deployment-Workflow]] · [[Backups]] — `07-Deployment/`
 - [[Known-Bugs]] · [[Frontend-Lessons]] — `08-Bugs-and-Lessons/`
 - `09-Session-Notes/` — dated notes worth keeping beyond claude-mem's automatic capture
 - [[Key-Files]] · [[Frontend-Conventions]] — `10-Reference/`

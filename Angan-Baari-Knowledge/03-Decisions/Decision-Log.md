@@ -14,6 +14,65 @@ Before adding something to `CLAUDE.md`, ask: *"Would this still be useful and co
 
 ---
 
+## 2026-10-23 — On-demand backups instead of a scheduled task
+
+PythonAnywhere's free tier has no scheduled-task feature, so the daily
+`backup_db` run is triggered opportunistically by
+`shop/middleware.py`'s `OnDemandBackupMiddleware` from inside an
+ordinary staff `/pos/` or `/admin/` request, instead of a cron job.
+Deliberately synchronous, not a background thread — uwsgi on the free
+tier may not run threads reliably, so "the one triggering request runs a
+little slower" was accepted over any approach that depends on
+background execution. Throttled (10 min/process), lock-filed (mutex
+across simultaneous requests), and size-capped (100MB, since an
+in-request backup past that size would be too slow/risky) — see
+[[Backups]] for the full mechanics and the accepted consequence: the
+backup depends on a staff member opening a staff page at least once a
+day.
+
+## 2026-10-22/23 — Database-driven home page category sections
+
+`templates/index.html`'s category sections (Fruits/Honey/Pickles/
+Vegetables hand-written, everything else generated from `Category` rows)
+were built to join the **same** shared tab/card grid rather than form a
+separate section, after discovering `static/script.js`'s filtering is
+one page-wide system, not scoped per section — see
+[[Home-Page-Sections]] for the full reasoning. Alongside this,
+`Product.tagline` (migration `0050_product_tagline`) was added and every
+card's price was replaced with a one-line punchline (tagline, or a
+trimmed first sentence of the description) — a deliberate content
+change, not a side effect of the database-driven work.
+
+## 2026-10-21 — Storefront links switch (Phase 1, links only, no redirects)
+
+Rather than redirect Django pages to the new Next.js storefront on
+Vercel outright, `STOREFRONT_URL` + `{% storefront_link %}`
+(`shop/templatetags/storefront_tags.py`) only change the **destination
+of specific links** on specific Django pages (Shop/Cart/Checkout/Login/
+Signup/Profile/product links), leaving every Django page itself fully
+functional either way. Chosen so the switch could be tested and rolled
+out incrementally, link by link, without a hard cutover moment where the
+old pages stop working. Offers, POS, admin, the dashboard, and two
+token-specific routes (`/cancel/<token>/`, the legacy password-reset
+flow) were excluded because Vercel has no equivalent for any of them —
+see [[Storefront-and-Vercel]] for the full routing table.
+
+## 2026-10-23 — Staying on SQLite; Supabase specifically re-evaluated and rejected
+
+Revisited the standing "Postgres deferred until concurrent writes are
+needed" decision specifically against Supabase (free-tier managed
+Postgres), since it's a common reason to reconsider. Still rejected, for
+two independent reasons: PythonAnywhere's **free tier cannot reach an
+external Postgres host at all**, so this would also force a paid-tier
+upgrade; and even on a paid tier, a Supabase database physically distant
+from the PythonAnywhere server would add network latency to **every**
+query, which is a straightforward regression, not a tradeoff, for an app
+that currently pays zero network cost per query (SQLite is a local
+file). The decision going forward: revisit Postgres only together with
+moving Django itself to a host in the same region as the database
+(Singapore or Mumbai) — a Postgres migration and a hosting migration
+bundled as one decision, not two independent ones.
+
 ## 2026-10-20 — Whole-rupee POS line pricing (line-level rounding, "Option B")
 
 Variable-weight POS cart lines now round to the nearest whole rupee

@@ -15,6 +15,7 @@ Each of these was made deliberately. If the codebase seems to contradict one, tr
 - **Cart/saved-for-later are session-based**, keyed by `line_key` (plain id / `{id}_{weight}` / `{id}_v{variant_id}`). `Wishlist` is a real DB model (needs to persist across devices).
 - **Coupons vs Offers are two separate discount systems** — coupons are code-entry order-level (one per order, `max_uses`); offers are automatic per-product/category or fixed-price bundles. Both gate on `is_live()`.
 - **SQLite retained in production deliberately** — Postgres migration deferred until concurrent writes are actually needed. Don't "helpfully" migrate.
-- **No React/Next.js anywhere in this project** — considered and explicitly rejected.
+- **No React/Next.js in this repo** — POS/admin/dashboard stay Django templates, that's unchanged. The public storefront itself is now a separate Next.js project on Vercel, not in this repo — see [[Storefront-and-Vercel]].
+- **Staying on SQLite — Postgres/Supabase re-evaluated and still rejected (2026-10-23).** PythonAnywhere's free tier can't reach an external Postgres host at all, and even paid, a Supabase database far from the PythonAnywhere server would add latency to every query. Revisit only together with moving Django to a host in the database's own region (Singapore/Mumbai). See [[Decision-Log]].
 
 See [[Decision-Log]] for dated entries going forward.
