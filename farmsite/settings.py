@@ -40,6 +40,10 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    # Needs request.user already resolved (AuthenticationMiddleware above),
+    # since it only acts on authenticated staff GETs to /pos/ or /admin/ --
+    # see shop/middleware.py for the on-demand daily backup it runs.
+    'shop.middleware.OnDemandBackupMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -86,6 +90,14 @@ STOREFRONT_URL = os.getenv('STOREFRONT_URL', '')
 # ~/backups (expanded at the point of use, not here, so this stays a
 # plain string -- see that command's own backup_dir() helper).
 BACKUP_DIR = os.getenv('BACKUP_DIR', '')
+
+# PythonAnywhere's free tier has no scheduled tasks, so shop/middleware.py's
+# OnDemandBackupMiddleware opportunistically runs backup_db once a day from
+# inside an ordinary staff /pos/ or /admin/ request instead. Env-driven, same
+# pattern as the other settings above; default True, set to '0'/'false'/'no'
+# to disable (e.g. once a real scheduled task exists and this would just be
+# redundant).
+BACKUP_ON_DEMAND = os.getenv('BACKUP_ON_DEMAND', 'true').strip().lower() in ('1', 'true', 'yes')
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
