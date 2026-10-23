@@ -2983,14 +2983,18 @@ class ProfileApiTestBase(ApiTestBase):
 
 class ProfileOrderApiTests(ProfileApiTestBase):
     """GET /api/v1/profile/orders/, POST /api/v1/orders/<pk>/cancel/,
-    POST /api/v1/orders/<pk>/reorder/ -- ProductOrder has no User FK, so
-    ownership here is the same email-match profile() itself uses."""
+    POST /api/v1/orders/<pk>/reorder/ -- ownership is by ProductOrder.user
+    only (added for the account-linking bug fix), never by email: this
+    project has no email-verification step, so an account's email is
+    never trusted as proof it's the same person who placed a given
+    order (see api/views.py's OrderCreateView docstring)."""
 
-    def make_order(self, email=None, **kwargs):
+    def make_order(self, user=None, email=None, **kwargs):
         defaults = dict(
             name='Test Customer', email=email or self.owner.email, phone='9800000000',
             address='Bhulka Danda', product_interest='Mango x1', status='pending',
             cart_snapshot=[{'product_id': self.jar.id, 'weight': None, 'qty': 1, 'variant_id': None}],
+            user=self.owner if user is None else user,
         )
         defaults.update(kwargs)
         return ProductOrder.objects.create(**defaults)
@@ -3001,7 +3005,7 @@ class ProfileOrderApiTests(ProfileApiTestBase):
 
     def test_list_returns_only_my_orders(self):
         mine = self.make_order()
-        self.make_order(email=self.other.email)  # someone else's -- must not appear
+        self.make_order(user=self.other, email=self.other.email)  # someone else's -- must not appear
 
         self.authenticate_as_owner()
         response = self.client.get(reverse('v1_profile_orders'))
@@ -3045,7 +3049,7 @@ class ProfileOrderApiTests(ProfileApiTestBase):
         self.assertEqual(order.status, 'pending')
 
     def test_cannot_cancel_someone_elses_order(self):
-        order = self.make_order(email=self.other.email)
+        order = self.make_order(user=self.other, email=self.other.email)
         self.authenticate_as_owner()
         response = self.client.post(reverse('v1_order_cancel', args=[order.id]))
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
@@ -3081,7 +3085,7 @@ class ProfileOrderApiTests(ProfileApiTestBase):
         self.assertEqual(jar_line['qty'], 2)
 
     def test_reorder_someone_elses_order_404s(self):
-        order = self.make_order(email=self.other.email, cart_snapshot=[
+        order = self.make_order(user=self.other, email=self.other.email, cart_snapshot=[
             {'product_id': self.jar.id, 'weight': None, 'qty': 1, 'variant_id': None},
         ])
         self.authenticate_as_owner()

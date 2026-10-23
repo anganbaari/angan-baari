@@ -414,6 +414,22 @@ class ProductOrder(models.Model):
                    'used by the "Reorder" button. Orders placed before this field existed have '
                    'no snapshot, so they won\'t show a working Reorder button.'
     )
+    user = models.ForeignKey(
+        'auth.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='orders',
+        help_text="Set only when the order was placed with a valid API token (POST /api/v1/orders/). "
+                  "Deliberately NOT matched by email -- this project has no email-verification step, "
+                  "so an unverified email is never trusted as proof of account ownership. Orders "
+                  "placed before this field existed (or placed as a guest) have user=None; "
+                  "GET /api/v1/profile/orders/ only ever shows orders with a matching `user`, never "
+                  "an email match -- link an old order to its real account by hand in admin."
+    )
+    hidden_by_customer = models.BooleanField(
+        default=False,
+        help_text="Customer tapped 'Remove from history' on a Delivered/Cancelled order "
+                  "(POST /api/v1/profile/orders/<id>/hide/). Only hides it from "
+                  "GET /api/v1/profile/orders/ -- never deletes the order or its inventory "
+                  "movements, and it still shows (and is still editable) in Django admin."
+    )
 
     def save(self, *args, **kwargs):
         if not self.order_number:

@@ -38,6 +38,10 @@ class ProductSerializer(serializers.ModelSerializer):
     locked_total_price = serializers.SerializerMethodField()
     main_image = serializers.SerializerMethodField()
     images = serializers.SerializerMethodField()
+    selling_units = serializers.SerializerMethodField()
+    base_unit_label = serializers.SerializerMethodField()
+    min_quantity = serializers.SerializerMethodField()
+    step_quantity = serializers.SerializerMethodField()
 
     class Meta:
         model = Product
@@ -48,7 +52,44 @@ class ProductSerializer(serializers.ModelSerializer):
             'weight_step', 'fixed_weight', 'weight_unit_label',
             'variants', 'starting_price', 'starting_weight_label',
             'locked_total_price', 'created_at',
+            'selling_units', 'base_unit_label', 'min_quantity', 'step_quantity',
         ]
+
+    def get_selling_units(self, obj):
+        # Only pricing_mode='fixed_quantity' products can carry
+        # ProductSellingUnit rows at all (see that model's own docstring) --
+        # most such products have none, meaning "just the plain price_unit/
+        # quantity stepper", same as before this field existed.
+        if obj.pricing_mode != 'fixed_quantity':
+            return []
+        return [
+            {
+                'id': unit.id,
+                'name': unit.name,
+                'label': unit.get_name_display(),
+                'factor': str(unit.quantity_in_base_units),
+                'is_default': unit.is_default,
+            }
+            for unit in obj.selling_units.filter(is_available=True)
+        ]
+
+    def get_base_unit_label(self, obj):
+        return obj.price_unit or None
+
+    def get_min_quantity(self, obj):
+        # No stored "minimum quantity" field exists anywhere -- a
+        # fixed_quantity line's minimum is always 1, enforced in code
+        # (price_pos_cart_line()/resolve_cart_line(), shop/views.py), not
+        # data. None for every other pricing_mode, where "minimum" isn't a
+        # meaningful concept (variable_weight uses weight_step instead).
+        return 1 if obj.pricing_mode == 'fixed_quantity' else None
+
+    def get_step_quantity(self, obj):
+        # Same value as the existing `weight_step` field -- exposed again
+        # under this name only for a caller that wants a pricing_mode-
+        # agnostic "step_quantity" key without checking pricing_mode first
+        # (null for every mode but variable_weight, where it's meaningful).
+        return str(obj.weight_step) if obj.pricing_mode == 'variable_weight' else None
 
     def get_variants(self, obj):
         # Only fixed_weight products (goat/chicken) carry variant rows —
@@ -222,6 +263,22 @@ class OrderStatusSerializer(serializers.ModelSerializer):
         fields = ['id', 'order_number', 'status', 'ordered_at', 'product_interest']
 
 
+def _compute_order_pricing_summary(cart_snapshot):
+    """Shared by OrderDetailSerializer and OrderHistorySerializer below.
+    Additive, computed from cart_snapshot — never stored separately (see
+    OrderCreateView, api/views.py: "no migration -- cart_snapshot is
+    already a JSONField, new keys on an existing structure"). None for an
+    order placed before per-line pricing existed (no 'final_price' key on
+    any line yet)."""
+    lines = cart_snapshot or []
+    if not any('final_price' in line for line in lines):
+        return None
+    subtotal = sum((Decimal(line.get('normal_price', '0')) for line in lines), Decimal('0'))
+    total_discount = sum((Decimal(line.get('discount', '0')) for line in lines), Decimal('0'))
+    total = sum((Decimal(line.get('final_price', '0')) for line in lines), Decimal('0'))
+    return {'subtotal': str(subtotal), 'total_discount': str(total_discount), 'total': str(total)}
+
+
 class OrderDetailSerializer(serializers.ModelSerializer):
     """Full order detail — only returned once the caller has already proved
     ownership by presenting the order's own cancel_token (the same secret
@@ -244,17 +301,7 @@ class OrderDetailSerializer(serializers.ModelSerializer):
         return obj.can_cancel()
 
     def get_pricing_summary(self, obj):
-        """Additive, computed from cart_snapshot — never stored separately
-        (see OrderCreateView: "avoid a migration if the data can live in
-        the existing cart_snapshot JSON"). None for an order placed before
-        this field existed (no 'final_price' key on any line yet)."""
-        lines = obj.cart_snapshot or []
-        if not any('final_price' in line for line in lines):
-            return None
-        subtotal = sum((Decimal(line.get('normal_price', '0')) for line in lines), Decimal('0'))
-        total_discount = sum((Decimal(line.get('discount', '0')) for line in lines), Decimal('0'))
-        total = sum((Decimal(line.get('final_price', '0')) for line in lines), Decimal('0'))
-        return {'subtotal': str(subtotal), 'total_discount': str(total_discount), 'total': str(total)}
+        return _compute_order_pricing_summary(obj.cart_snapshot)
 
 
 # ─── AUTH (token-based, cross-origin) ──────────────────────────
@@ -344,19 +391,28 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
 
 class OrderHistorySerializer(serializers.ModelSerializer):
     """One row of 'my orders' — deliberately excludes cancel_token (cancel
-    ownership here is proven by the caller's auth token + email match, not
-    by presenting the token, unlike the anonymous OrderDetailSerializer
-    flow) and excludes name/phone (already known to the logged-in caller)."""
+    ownership here is proven by the caller's auth token + a matching
+    ProductOrder.user, not by presenting the token, unlike the anonymous
+    OrderDetailSerializer flow) and excludes name/phone (already known to
+    the logged-in caller). Ownership is by `user` only, never by email --
+    this project has no email-verification step, so an account's email is
+    never trusted as proof it's the same person who placed a given order.
+
+    `cart_snapshot`/`pricing_summary` were added alongside the Part A fix
+    so the profile page can show per-line final prices and order totals,
+    not just the status-only summary this serializer originally had."""
 
     status_display = serializers.CharField(source='get_status_display', read_only=True)
     can_cancel = serializers.SerializerMethodField()
     has_cart_snapshot = serializers.SerializerMethodField()
+    pricing_summary = serializers.SerializerMethodField()
 
     class Meta:
         model = ProductOrder
         fields = [
             'id', 'order_number', 'ordered_at', 'status', 'status_display',
             'product_interest', 'address', 'can_cancel', 'has_cart_snapshot',
+            'cart_snapshot', 'pricing_summary',
         ]
 
     def get_can_cancel(self, obj):
@@ -364,6 +420,9 @@ class OrderHistorySerializer(serializers.ModelSerializer):
 
     def get_has_cart_snapshot(self, obj):
         return bool(obj.cart_snapshot)
+
+    def get_pricing_summary(self, obj):
+        return _compute_order_pricing_summary(obj.cart_snapshot)
 
 
 class WishlistItemSerializer(serializers.ModelSerializer):

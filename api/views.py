@@ -1329,7 +1329,17 @@ class OrderCreateView(APIView):
     with). Authentication is optional and never blocking — an invalid or
     expired token is treated as a guest (_authenticate_optional above),
     exactly like CartQuoteView, so a bad/stale token can never break
-    guest checkout."""
+    guest checkout.
+
+    Account linking (bug fix): when the request carries a valid token,
+    order.user is set to that account -- ProductOrder has no email-
+    verification step anywhere in this project, so an account's email is
+    never trusted as proof it's the same person who typed a given email
+    into this checkout form (they can legitimately differ). This is the
+    ONLY way an order becomes "that user's order" for
+    GET /api/v1/profile/orders/ -- there is deliberately no email-match
+    fallback. A guest order (or one placed before this field existed)
+    just has user=None, same as always."""
 
     authentication_classes = []
     permission_classes = [permissions.AllowAny]
@@ -1343,6 +1353,9 @@ class OrderCreateView(APIView):
 
         items_desc = []
         cart_snapshot = []
+        subtotal = Decimal('0')
+        total_discount = Decimal('0')
+        total = Decimal('0')
         for line in data['cart']:
             try:
                 product = Product.objects.public().get(id=line.get('product_id'), is_available=True)
@@ -1371,6 +1384,9 @@ class OrderCreateView(APIView):
                     'offer_id': quote['offer_id'],
                     'offer_title': quote['offer_title'],
                 })
+                subtotal += quote['normal_price']
+                total_discount += quote['discount']
+                total += quote['final_price']
 
             cart_snapshot.append(snapshot_line)
             items_desc.append(f"{product.name} ({weight}kg) x{qty}" if weight else f"{product.name} x{qty}")
@@ -1386,6 +1402,7 @@ class OrderCreateView(APIView):
             product_interest=', '.join(items_desc),
             message=data.get('message', ''),
             cart_snapshot=cart_snapshot,
+            user=user,
         )
         create_order_inventory_movements(order, 'sale')
 
@@ -1395,7 +1412,12 @@ class OrderCreateView(APIView):
             pass
 
         return Response(
-            {'status': 'ok', 'order_number': order.order_number, 'id': order.id},
+            {
+                'status': 'ok', 'order_number': order.order_number, 'id': order.id,
+                'pricing_summary': {
+                    'subtotal': str(subtotal), 'total_discount': str(total_discount), 'total': str(total),
+                },
+            },
             status=status.HTTP_201_CREATED,
         )
 
@@ -1612,39 +1634,82 @@ class PasswordResetConfirmView(APIView):
 
 
 # ─── PROFILE PAGE (token-authenticated) ─────────────────────────
-# Backs the Next.js Profile page (Phase 4). ProductOrder has no User FK, so
-# "my orders" is matched by email the same way profile()'s own query does;
-# Coupon has no per-user relation either, so /coupons/ is the same global
+# Backs the Next.js Profile page (Phase 4). "My orders" is matched by the
+# `user` FK on ProductOrder (added for the account-linking bug fix below),
+# never by email -- this project has no email-verification step, so an
+# account's email is never trusted as proof it's the same person who
+# placed a given order (see OrderCreateView's docstring). Coupon has no
+# per-user relation either, so /coupons/ is the same global
 # get_live_coupons() list the public offers() page and the traditional
 # profile page's "My Coupons" section already show everyone.
 
 class ProfileOrderListView(generics.ListAPIView):
-    """GET /api/v1/profile/orders/ -- same email-match ProductOrder query
-    profile() uses, same ordering (newest first)."""
+    """GET /api/v1/profile/orders/ -- orders linked to this account via
+    `user` only (set at creation time by OrderCreateView when the request
+    carried a valid token). An order placed before that field existed, or
+    placed as a guest, has user=None and will never appear here -- link it
+    to the right account by hand in admin if needed (no email-match
+    fallback is used or intended). Excludes anything the customer has
+    hidden via POST .../hide/ (hidden_by_customer=True) -- still a real
+    row in the database and still visible in admin, just not here."""
 
     serializer_class = OrderHistorySerializer
     authentication_classes = [TokenAuthentication]
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        return ProductOrder.objects.filter(email=self.request.user.email).order_by('-ordered_at')
+        return ProductOrder.objects.filter(
+            user=self.request.user, hidden_by_customer=False,
+        ).order_by('-ordered_at')
+
+
+class OrderHideView(APIView):
+    """POST /api/v1/profile/orders/<pk>/hide/ -- "remove from history" for
+    the customer's own Delivered/Cancelled orders. Ownership is by `user`
+    only (see ProfileOrderListView) -- a pk belonging to another account's
+    order 404s, same as it not existing. Only ever sets
+    hidden_by_customer=True: never deletes the order, its
+    InventoryMovement rows, or anything else. Restricted to Delivered/
+    Cancelled orders -- hiding a still-pending/confirmed order would make
+    an order a customer is actively waiting on disappear from their own
+    view, which isn't what "history" cleanup means here."""
+
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk, *args, **kwargs):
+        order = get_object_or_404(ProductOrder, pk=pk, user=request.user)
+
+        if order.status not in ('delivered', 'cancelled'):
+            return Response(
+                {'status': 'error', 'message': 'Only Delivered or Cancelled orders can be removed from history.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        order.hidden_by_customer = True
+        order.save(update_fields=['hidden_by_customer'])
+        return Response({'status': 'ok'})
 
 
 class OrderCancelView(APIView):
     """POST /api/v1/orders/<pk>/cancel/ -- ownership proven by the caller's
-    token + email match (same scoping as ProfileOrderListView), not by the
-    emailed cancel_token -- that flow stays at the existing
-    /cancel/<token>/ page and OrderDetailView's ?token= gate, both untouched.
-    A pk belonging to another user's order 404s, same as it not existing --
-    this view never reveals whether the id exists at all to a non-owner.
-    Mirrors cancel_order()'s two rejection states from cancel.html: already
+    token + a matching ProductOrder.user (same scoping as
+    ProfileOrderListView; previously matched by email, changed as part of
+    the account-linking bug fix -- see OrderCreateView's docstring for
+    why email was never safe to rely on here), not by the emailed
+    cancel_token -- that flow stays at the existing /cancel/<token>/ page
+    and OrderDetailView's ?token= gate, both untouched. A pk belonging to
+    another user's order (or one with no `user` linked at all, e.g. a
+    pre-fix or guest order) 404s, same as it not existing -- this view
+    never reveals whether the id exists at all to a non-owner. Mirrors
+    cancel_order()'s two rejection states from cancel.html: already
     cancelled, and the 30-minute window expired."""
 
     authentication_classes = [TokenAuthentication]
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request, pk, *args, **kwargs):
-        order = get_object_or_404(ProductOrder, pk=pk, email=request.user.email)
+        order = get_object_or_404(ProductOrder, pk=pk, user=request.user)
 
         if order.status == 'cancelled':
             return Response(
@@ -1673,13 +1738,14 @@ class OrderReorderView(APIView):
     fixed_weight -- each listing is one unique animal, unlikely to still be
     around -- snap variable_weight to the nearest step) and hands back
     resolved product+weight+qty per line for the frontend to call its own
-    addItem(product, {weight, qty}) with, instead of mutating a cart here."""
+    addItem(product, {weight, qty}) with, instead of mutating a cart here.
+    Ownership by `user`, not email -- see OrderCancelView above."""
 
     authentication_classes = [TokenAuthentication]
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request, pk, *args, **kwargs):
-        order = get_object_or_404(ProductOrder, pk=pk, email=request.user.email)
+        order = get_object_or_404(ProductOrder, pk=pk, user=request.user)
 
         if not order.cart_snapshot:
             return Response(

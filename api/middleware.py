@@ -38,6 +38,7 @@ POST_ALLOWED_PATHS = {
 POST_ALLOWED_PATH_PATTERNS = (
     re.compile(r'^/api/v1/orders/\d+/cancel/$'),
     re.compile(r'^/api/v1/orders/\d+/reorder/$'),
+    re.compile(r'^/api/v1/profile/orders/\d+/hide/$'),
 )
 
 # PATCH is allowed cross-origin only here — same per-request

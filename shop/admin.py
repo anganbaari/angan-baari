@@ -186,9 +186,23 @@ class ContactAdmin(admin.ModelAdmin):
 
 @admin.register(ProductOrder)
 class OrderAdmin(admin.ModelAdmin):
-    list_display = ['order_number', 'name', 'email', 'product_interest', 'status', 'ordered_at']
-    list_filter = ['status']
+    # `user` is normally set automatically by POST /api/v1/orders/ (a
+    # valid token at checkout time) -- shown as a column so it's obvious
+    # at a glance which orders are actually linked to an account, and
+    # kept editable (with autocomplete) on the order's own change page
+    # specifically so an old, pre-fix order (placed before this field
+    # existed, or as a guest) can be linked to the right account by hand.
+    # Deliberately NOT in list_editable -- a one-off manual fix belongs on
+    # the order's own change page, not a changelist column easy to
+    # bulk-edit by mistake. `hidden_by_customer` is only ever set by the
+    # customer's own "remove from history" action
+    # (POST /api/v1/profile/orders/<id>/hide/) -- shown here purely so the
+    # owner can see which orders customers have hidden, never meant to be
+    # toggled from admin.
+    list_display = ['order_number', 'name', 'email', 'user', 'product_interest', 'status', 'ordered_at', 'hidden_by_customer']
+    list_filter = ['status', 'hidden_by_customer']
     list_editable = ['status']
+    autocomplete_fields = ['user']
     actions = ['mark_confirmed', 'mark_delivered']
 
     def mark_confirmed(self, request, queryset):

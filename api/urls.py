@@ -42,6 +42,7 @@ urlpatterns = [
         name='v1_auth_password_reset_confirm',
     ),
     path('profile/orders/', views.ProfileOrderListView.as_view(), name='v1_profile_orders'),
+    path('profile/orders/<int:pk>/hide/', views.OrderHideView.as_view(), name='v1_profile_order_hide'),
     path('profile/', views.ProfileUpdateView.as_view(), name='v1_profile_update'),
     path('profile/change-password/', views.ChangePasswordView.as_view(), name='v1_profile_change_password'),
     path('wishlist/', views.WishlistListView.as_view(), name='v1_wishlist_list'),
