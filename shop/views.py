@@ -3152,11 +3152,21 @@ def offers(request):
 
 def add_to_cart_offer(request, product_id):
     """Add to cart with a discounted price from offers page. Offer pricing is
-    a login-only perk — regular (non-offer) shopping stays open to everyone."""
+    a login-only perk — regular (non-offer) shopping stays open to everyone.
+
+    The price is always recomputed here from a currently-live Offer in the
+    database — any `offer_price` the client posts is ignored outright (it
+    used to be trusted as-is, which let a tampered form value add an item at
+    any price). Same principle as resolve_pos_offer_discount() (the POS
+    path, shop/views.py), re-implemented independently here rather than
+    shared with it, since that function is POS-specific (raises
+    POSSaleValidationError) and this view has its own error-response style
+    to match instead."""
     if not request.user.is_authenticated:
         return redirect(f"{reverse('login')}?next={reverse('offers')}")
 
-    from .models import Product
+    from .models import Offer, Product
+    from django.utils import timezone
     try:
         product = Product.objects.public().get(id=product_id)
     except Product.DoesNotExist:
@@ -3169,19 +3179,32 @@ def add_to_cart_offer(request, product_id):
     mode = product.pricing_mode
     base_price = str(fixed_total) if fixed_total is not None else str(product.price)
 
-    offer_price = request.POST.get('offer_price', None)
-    price_to_use = offer_price if offer_price else base_price
+    # Find a currently-live, non-combo offer that actually includes this
+    # product -- same membership rule resolve_pos_offer_discount() uses
+    # (`product in offer.get_products()`), just not shared with it.
+    now = timezone.now()
+    offer_price = None
+    for offer in Offer.objects.filter(
+        is_active=True, start_date__lte=now, end_date__gte=now,
+    ).exclude(discount_type='combo'):
+        if product in offer.get_products():
+            offer_price = offer.discounted_price(base_price)
+            break
+
+    if offer_price is None:
+        if is_ajax(request):
+            return JsonResponse({'status': 'error', 'message': 'This offer is no longer available.'}, status=400)
+        return redirect('offers')
+
+    price_to_use = str(offer_price)
 
     if line_key in cart:
         if mode != 'fixed_weight':
             cart[line_key]['qty'] = int(cart[line_key].get('qty', 0) or 0) + qty_to_add
-        try:
-            if offer_price and float(offer_price) < float(cart[line_key].get('price', 0) or 0):
-                cart[line_key]['price'] = price_to_use
-                cart[line_key]['original_price'] = base_price
-                cart[line_key]['is_offer'] = True
-        except (TypeError, ValueError):
-            pass
+        if float(offer_price) < float(cart[line_key].get('price', 0) or 0):
+            cart[line_key]['price'] = price_to_use
+            cart[line_key]['original_price'] = base_price
+            cart[line_key]['is_offer'] = True
     else:
         cart[line_key] = {
             'product_id': product_id,
@@ -3193,7 +3216,7 @@ def add_to_cart_offer(request, product_id):
             'slug': product.slug,
             'qty': 1 if mode == 'fixed_weight' else qty_to_add,
             'weight': weight_str,
-            'is_offer': bool(offer_price),
+            'is_offer': True,
             'pricing_mode': mode,
             'weight_step': str(product.weight_step) if mode == 'variable_weight' else None,
             'weight_unit_label': product.weight_unit_label if mode == 'variable_weight' else None,
