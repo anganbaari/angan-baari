@@ -204,6 +204,14 @@ class OrderCreateSerializer(serializers.Serializer):
     cart = serializers.ListField(child=serializers.DictField(), allow_empty=False)
 
 
+class CartQuoteInputSerializer(serializers.Serializer):
+    """Input-shape validation only for POST /api/v1/cart/quote/ — same
+    loose per-line dict shape as OrderCreateSerializer.cart above (no
+    price field; the server is the only source of any price)."""
+
+    lines = serializers.ListField(child=serializers.DictField(), allow_empty=False)
+
+
 class OrderStatusSerializer(serializers.ModelSerializer):
     """The no-proof-of-ownership default — excludes name/email/phone/
     address/cancel_token, since a plain integer id alone is guessable and
@@ -222,17 +230,31 @@ class OrderDetailSerializer(serializers.ModelSerializer):
     echoed back here."""
 
     can_cancel = serializers.SerializerMethodField()
+    pricing_summary = serializers.SerializerMethodField()
 
     class Meta:
         model = ProductOrder
         fields = [
             'id', 'order_number', 'name', 'email', 'phone', 'address',
             'product_interest', 'message', 'status', 'ordered_at',
-            'cart_snapshot', 'can_cancel',
+            'cart_snapshot', 'can_cancel', 'pricing_summary',
         ]
 
     def get_can_cancel(self, obj):
         return obj.can_cancel()
+
+    def get_pricing_summary(self, obj):
+        """Additive, computed from cart_snapshot — never stored separately
+        (see OrderCreateView: "avoid a migration if the data can live in
+        the existing cart_snapshot JSON"). None for an order placed before
+        this field existed (no 'final_price' key on any line yet)."""
+        lines = obj.cart_snapshot or []
+        if not any('final_price' in line for line in lines):
+            return None
+        subtotal = sum((Decimal(line.get('normal_price', '0')) for line in lines), Decimal('0'))
+        total_discount = sum((Decimal(line.get('discount', '0')) for line in lines), Decimal('0'))
+        total = sum((Decimal(line.get('final_price', '0')) for line in lines), Decimal('0'))
+        return {'subtotal': str(subtotal), 'total_discount': str(total_discount), 'total': str(total)}
 
 
 # ─── AUTH (token-based, cross-origin) ──────────────────────────

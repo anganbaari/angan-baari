@@ -15,6 +15,7 @@ _SIMPLE_LINKS = {
     'login': ('login', '/login'),
     'signup': ('signup', '/signup'),
     'profile': ('profile', '/profile'),
+    'offers': ('offers', '/offers'),
 }
 
 
@@ -27,10 +28,13 @@ def storefront_link(kind, arg=None):
     Returns the Next.js storefront's own URL when STOREFRONT_URL is set
     (Phase 1 of the storefront links switch -- see that setting's own
     comment in farmsite/settings.py), otherwise the existing Django page's
-    URL, completely unchanged from before this tag existed. Deliberately
-    does NOT cover Offers, Home/logo, or About/Contact -- those stay on
-    Django regardless of STOREFRONT_URL (the Next.js shop has no /offers
-    route yet), so templates keep using {% url %} for those directly.
+    URL, completely unchanged from before this tag existed. 'offers' was
+    added once the storefront had a public GET /api/v1/offers/ to build
+    its own /offers page from (see api/views.py's PublicOffersListView) --
+    the Django offers page (templates/offers.html) itself stays reachable
+    at its own URL regardless, only the nav links to it switch. Home/logo
+    and About/Contact still stay on Django -- no equivalent kind here, so
+    templates keep using {% url %} for those directly.
     """
     base = settings.STOREFRONT_URL
 

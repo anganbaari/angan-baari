@@ -17,6 +17,7 @@ READ_METHODS = ('GET', 'HEAD')
 # status, GET-only) is untouched.
 POST_ALLOWED_PATHS = {
     '/api/v1/orders/',
+    '/api/v1/cart/quote/',
     '/api/v1/auth/signup/',
     '/api/v1/auth/login/',
     '/api/v1/auth/logout/',

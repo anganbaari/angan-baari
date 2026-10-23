@@ -16,13 +16,14 @@ from django.utils.dateparse import parse_date, parse_datetime
 from rest_framework import generics, permissions, status
 from rest_framework.authentication import SessionAuthentication, TokenAuthentication
 from rest_framework.authtoken.models import Token
+from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from shop.emails import send_order_cancelled_email, send_order_received_email, send_resend_email
 from shop.models import (
-    Category, CostEntry, CreditTransaction, Customer, InventoryMovement, POSSale, Product, ProductOrder,
-    UserProfile, Wishlist, get_live_coupons,
+    Category, CostEntry, CreditTransaction, Customer, InventoryMovement, Offer, POSSale, Product,
+    ProductOrder, UserProfile, Wishlist, get_live_coupons,
 )
 from shop.views import (
     build_sale_receipt_data,
@@ -31,6 +32,8 @@ from shop.views import (
     create_pos_sale,
     format_weight,
     get_pos_operator,
+    quote_cart_line,
+    resolve_automatic_offer,
     resolve_combo_reference_price,
     resolve_pos_coupon,
     POSSaleValidationError,
@@ -44,6 +47,7 @@ from shop import reports as reports_lib
 
 from .permissions import IsOwnerOrManager, IsStaffUser
 from .serializers import (
+    CartQuoteInputSerializer,
     CategorySerializer,
     ChangePasswordSerializer,
     CostEntryReadSerializer,
@@ -1125,12 +1129,207 @@ class PosRefundRecentListView(APIView):
 
 # ─── WEBSITE ORDERS (public, guest checkout) ───────────────────
 
+def _authenticate_optional(request):
+    """Returns the authenticated User for a valid `Authorization: Token
+    <key>` header, or None for a guest — including when the header is
+    present but invalid/expired. Used instead of `authentication_classes`
+    specifically so an invalid token degrades to a guest request rather
+    than DRF's automatic 401 (the owner's rule: an invalid/expired token
+    must never block a guest cart quote or guest checkout — treat it as
+    a guest instead)."""
+    if not request.META.get('HTTP_AUTHORIZATION'):
+        return None
+    try:
+        result = TokenAuthentication().authenticate(request)
+    except AuthenticationFailed:
+        return None
+    if result is None:
+        return None
+    user, _token = result
+    return user
+
+
+class PublicOffersListView(APIView):
+    """GET /api/v1/offers/ — public, read-only, no auth. Live offers only
+    (Offer.is_live()'s own condition, applied at the queryset level).
+    Uses Offer.discounted_price() — the exact same function the POS uses
+    via resolve_pos_offer_discount() — so the advertised numbers always
+    match what a sale would actually charge.
+
+    fixed_weight (animal) products: shown only if `product.price` is
+    itself set, same as the existing Django offers page (shop/views.py's
+    `offers` view) already does — most fixed_weight products price each
+    animal individually via ProductVariant rows instead, which this list
+    (like that page) doesn't discount. variable_weight products are
+    shown with their per-unit `price_unit` discounted the same way as
+    fixed_quantity — price_pos_cart_line() is what actually applies the
+    discount per-unit-weight at cart/quote time, this list just previews
+    that same per-unit rate.
+
+    Combo bundles stay display-only here too, same as the Django offers
+    page — no cart pricing for combos, WhatsApp hand-off only."""
+
+    authentication_classes = []
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request, *args, **kwargs):
+        now = timezone.now()
+        live_offers = Offer.objects.filter(is_active=True, start_date__lte=now, end_date__gte=now)
+
+        discount_offers = []
+        for offer in live_offers.exclude(discount_type='combo'):
+            for product in offer.get_products():
+                if product.hide_from_website or not product.price or product.price <= 0:
+                    continue
+                offer_price = offer.discounted_price(product.price)
+                if offer.discount_type == 'percent':
+                    discount_percent = int(offer.discount_value)
+                else:
+                    discount_percent = int(round((float(offer.discount_value) / float(product.price)) * 100))
+                discount_offers.append({
+                    'id': product.id,
+                    'slug': product.slug,
+                    'name': product.name,
+                    'image': product.main_image.url if product.main_image else None,
+                    'original_price': str(product.price),
+                    'offer_price': str(offer_price),
+                    'discount_percent': discount_percent,
+                    'price_unit': product.price_unit,
+                    'is_available': product.is_available,
+                    'offer_id': offer.id,
+                    'offer_title': offer.title,
+                    'end_date': offer.end_date,
+                })
+
+        combo_bundles = []
+        for offer in live_offers.filter(discount_type='combo'):
+            bundle_items = list(offer.bundle_items.select_related('product').all())
+            if not bundle_items or any(bi.product.hide_from_website for bi in bundle_items):
+                continue
+            natural_total = offer.get_bundle_natural_total()
+            bundle_price = offer.combo_price or natural_total
+            savings_percent = 0
+            if natural_total > 0:
+                savings_percent = int(round((1 - (float(bundle_price) / float(natural_total))) * 100))
+            items = [
+                {'name': bi.product.name, 'quantity': str(bi.quantity)}
+                for bi in bundle_items
+            ]
+            combo_bundles.append({
+                'id': offer.id,
+                'title': offer.title,
+                'description': offer.description,
+                'banner_image': offer.banner_image.url if offer.banner_image else None,
+                'items': items,
+                'combo_price': str(bundle_price),
+                'original_price': str(natural_total),
+                'savings_percent': savings_percent,
+                'end_date': offer.end_date,
+                'whatsapp_message': f'Hello Angan Baari! I want to order the {offer.title} Bundle.',
+            })
+
+        return Response({'discount_offers': discount_offers, 'combo_bundles': combo_bundles})
+
+
+class CartQuoteView(APIView):
+    """POST /api/v1/cart/quote/ — public; token auth optional (see
+    _authenticate_optional above). Body: {"lines": [{"product_id": ...,
+    "weight": ..., "quantity": ..., "variant_id": ...}, ...]}. Never
+    trusts any price from the caller — every line is priced here via
+    quote_cart_line() (shop/views.py), which reuses price_pos_cart_line()
+    so the rupee rounding exactly matches the POS. Offer prices apply
+    only when the caller is authenticated (the owner's rule); a guest
+    gets normal prices plus `login_required_for_offers` when at least
+    one line would have gotten an offer price if logged in."""
+
+    authentication_classes = []
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request, *args, **kwargs):
+        input_serializer = CartQuoteInputSerializer(data=request.data)
+        input_serializer.is_valid(raise_exception=True)
+        lines_in = input_serializer.validated_data['lines']
+
+        user = _authenticate_optional(request)
+
+        result_lines = []
+        subtotal = Decimal('0')
+        total_discount = Decimal('0')
+        total = Decimal('0')
+        offers_applied = False
+        login_required_for_offers = False
+
+        for line in lines_in:
+            try:
+                product = Product.objects.public().get(id=line.get('product_id'), is_available=True)
+            except (Product.DoesNotExist, TypeError, ValueError):
+                result_lines.append({'product_id': line.get('product_id'), 'error': 'Product not available.'})
+                continue
+
+            try:
+                qty = max(1, int(line.get('quantity') or line.get('qty') or 1))
+            except (TypeError, ValueError):
+                qty = 1
+            weight = line.get('weight')
+            variant_id = line.get('variant_id')
+
+            quote = quote_cart_line(
+                product=product, qty=qty, weight=weight, variant_id=variant_id,
+                user_is_authenticated=user is not None,
+            )
+            if quote is None:
+                result_lines.append({'product_id': product.id, 'error': 'Could not price this line.'})
+                continue
+
+            if quote['offer_available'] and user is None:
+                login_required_for_offers = True
+            if quote['offer_id']:
+                offers_applied = True
+
+            subtotal += quote['normal_price']
+            total_discount += quote['discount']
+            total += quote['final_price']
+
+            result_lines.append({
+                'product_id': product.id,
+                'weight': weight,
+                'quantity': qty,
+                'variant_id': variant_id,
+                'normal_price': str(quote['normal_price']),
+                'final_price': str(quote['final_price']),
+                'discount': str(quote['discount']),
+                'offer_id': quote['offer_id'],
+                'offer_title': quote['offer_title'],
+            })
+
+        return Response({
+            'lines': result_lines,
+            'subtotal': str(subtotal),
+            'total_discount': str(total_discount),
+            'total': str(total),
+            'offers_applied': offers_applied,
+            'login_required_for_offers': login_required_for_offers,
+        })
+
+
 class OrderCreateView(APIView):
     """Public — matches current checkout() behavior (no login required).
     Calls create_order_inventory_movements(), which itself calls
     create_inventory_movements_from_snapshot(strict=False): bad lines are
     silently skipped rather than losing the whole order, same as the
-    website. Coupon/offer pricing isn't part of this v1 surface."""
+    website.
+
+    Offer pricing: every line is re-priced here via quote_cart_line(),
+    same as CartQuoteView, and the result is stored additively on each
+    cart_snapshot line (normal_price/final_price/discount/offer_id/
+    offer_title) — no model change, no migration: cart_snapshot is
+    already a JSONField, so this is new keys on an existing structure,
+    not a new column. Any price in the request body is ignored outright
+    (there never was one in this serializer's cart-line shape to begin
+    with). Authentication is optional and never blocking — an invalid or
+    expired token is treated as a guest (_authenticate_optional above),
+    exactly like CartQuoteView, so a bad/stale token can never break
+    guest checkout."""
 
     authentication_classes = []
     permission_classes = [permissions.AllowAny]
@@ -1139,6 +1338,8 @@ class OrderCreateView(APIView):
         input_serializer = OrderCreateSerializer(data=request.data)
         input_serializer.is_valid(raise_exception=True)
         data = input_serializer.validated_data
+
+        user = _authenticate_optional(request)
 
         items_desc = []
         cart_snapshot = []
@@ -1155,9 +1356,23 @@ class OrderCreateView(APIView):
             weight = line.get('weight')
             variant_id = line.get('variant_id')
 
-            cart_snapshot.append({
+            snapshot_line = {
                 'product_id': product.id, 'weight': weight, 'qty': qty, 'variant_id': variant_id,
-            })
+            }
+            quote = quote_cart_line(
+                product=product, qty=qty, weight=weight, variant_id=variant_id,
+                user_is_authenticated=user is not None,
+            )
+            if quote is not None:
+                snapshot_line.update({
+                    'normal_price': str(quote['normal_price']),
+                    'final_price': str(quote['final_price']),
+                    'discount': str(quote['discount']),
+                    'offer_id': quote['offer_id'],
+                    'offer_title': quote['offer_title'],
+                })
+
+            cart_snapshot.append(snapshot_line)
             items_desc.append(f"{product.name} ({weight}kg) x{qty}" if weight else f"{product.name} x{qty}")
 
         if not cart_snapshot:

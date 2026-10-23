@@ -963,6 +963,90 @@ def price_pos_cart_line(*, product, qty, weight, variant_id, unit_id, is_wholesa
     return line_total, list_line_total, unit
 
 
+def resolve_automatic_offer(product):
+    """Automatic offer selection for the public website/API surface —
+    there is no "which of several applicable offers wins" rule in the POS
+    to reuse here: resolve_pos_offer_discount() takes an operator-chosen
+    `offer_id`, it never picks among candidates itself. This is a new,
+    separate rule for contexts with no human picking one: among every
+    currently-live, non-combo Offer whose get_products() includes this
+    product, returns whichever gives the LOWEST discounted price on
+    `product.price` (ties broken by Offer's own default ordering,
+    newest-created first) — the best deal automatically, same spirit as
+    "offers are automatic" rather than requiring a chosen offer_id.
+
+    Returns (offer, discounted_price) for the winning offer, or
+    (None, None) if no live offer covers this product at all. The
+    returned discounted_price is only used to pick a winner; the actual
+    line price is still computed by price_pos_cart_line() with that
+    offer's id, so weight/qty/variant-specific pricing stays exact."""
+    from .models import Offer
+    from django.utils import timezone
+
+    if not product.price or product.price <= 0:
+        return None, None
+
+    now = timezone.now()
+    best_offer, best_price = None, None
+    for offer in Offer.objects.filter(
+        is_active=True, start_date__lte=now, end_date__gte=now,
+    ).exclude(discount_type='combo'):
+        if product not in offer.get_products():
+            continue
+        candidate_price = offer.discounted_price(product.price)
+        if best_price is None or candidate_price < best_price:
+            best_offer, best_price = offer, candidate_price
+    return best_offer, best_price
+
+
+def quote_cart_line(*, product, qty, weight, variant_id, user_is_authenticated):
+    """Public (non-POS, non-wholesale) pricing for one cart line — used by
+    CartQuoteView and OrderCreateView (api/views.py). Reuses
+    price_pos_cart_line() for the actual line math so the rupee rounding
+    exactly matches the POS; never trusts any price from the caller.
+
+    Offer pricing is only ever applied when `user_is_authenticated` is
+    True (the owner's "offer prices apply only to authenticated
+    customers" rule) — a guest always gets `normal_price` as
+    `final_price`, but `offer_available` is still reported so the caller
+    can tell a guest "log in to get this price" without exposing it.
+
+    Returns a dict (normal_price, final_price, discount, offer_id,
+    offer_title, offer_available — all Decimal except the ids/title/bool)
+    or None if this line can't be priced at all (e.g. a fixed_weight
+    product whose chosen variant is no longer available) — the caller
+    decides whether to skip or report the line."""
+    try:
+        normal_price, _, _ = price_pos_cart_line(
+            product=product, qty=qty, weight=weight, variant_id=variant_id, unit_id=None,
+            is_wholesale=False, price_override=None, is_single_offer_line=False, offer_id=None,
+        )
+    except POSSaleValidationError:
+        return None
+
+    offer, _ = resolve_automatic_offer(product)
+    final_price = normal_price
+    offer_applied = None
+    if offer is not None and user_is_authenticated:
+        try:
+            final_price, _, _ = price_pos_cart_line(
+                product=product, qty=qty, weight=weight, variant_id=variant_id, unit_id=None,
+                is_wholesale=False, price_override=None, is_single_offer_line=True, offer_id=offer.id,
+            )
+            offer_applied = offer
+        except POSSaleValidationError:
+            final_price, offer_applied = normal_price, None
+
+    return {
+        'normal_price': normal_price,
+        'final_price': final_price,
+        'discount': normal_price - final_price,
+        'offer_id': offer_applied.id if offer_applied else None,
+        'offer_title': offer_applied.title if offer_applied else None,
+        'offer_available': offer is not None,
+    }
+
+
 def resolve_combo_reference_price(bundle_item, available_variants):
     """For a fixed_weight BundleItem, the price a chosen animal is compared
     against to work out the combo upcharge (see BundleItem.reference_weight).
