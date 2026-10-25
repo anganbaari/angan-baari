@@ -14,6 +14,53 @@ Before adding something to `CLAUDE.md`, ask: *"Would this still be useful and co
 
 ---
 
+## 2026-10-25 — The server is the only price authority
+
+`POST /api/v1/cart/quote/` and `POST /api/v1/orders/` price every line
+themselves with `quote_cart_line()` (which reuses `price_pos_cart_line()`)
+and ignore any price the client sends; the legacy session cart's
+`add_to_cart_offer()` was changed the same way. Alternative considered
+and rejected: let the storefront compute and send prices — it can't be
+trusted (a tampered request would set its own price), and it would let
+the website drift from the POS's rounding. Reusing the POS function means
+one rounding rule everywhere. Each order line stores its own
+normal/final/discount in `cart_snapshot`, so what the customer was
+charged is recorded. See [[Offers-and-Cart-Quote]], [[Orders-and-Profile]].
+
+## 2026-10-25 — Offers visible to everyone, priced only for logged-in customers
+
+The owner's rule: anyone can **see** current offers (`GET /api/v1/offers/`
+is public), but only an authenticated customer **gets** the offer price in
+the cart and on orders. A guest is quoted the normal price plus a
+`login_required_for_offers` flag so the storefront can invite them to log
+in. Among several live offers the lowest resulting price wins
+(`resolve_automatic_offer()`) — offers are automatic, nobody picks one.
+Combo bundles stay display-only (WhatsApp). POS offers are unaffected and
+stay operator-chosen. See [[Offers-and-Cart-Quote]].
+
+## 2026-10-25 — "Remove from history" hides an order, it never deletes it
+
+Customers can remove Delivered or Cancelled orders from their profile
+list, but this only sets `ProductOrder.hidden_by_customer` (migration
+0051). The order, its inventory movements and its admin/report presence
+are untouched. Alternative rejected: deleting the order — it would erase
+the ledger link behind `InventoryMovement.related_order`, the sales
+records and anything the owner needs for a dispute. Pending and Confirmed
+orders cannot be hidden (the API returns 400), so a customer can't lose
+sight of an order they're still waiting on. See [[Orders-and-Profile]].
+
+## 2026-10-25 — Orders are linked to accounts by `user`, not by email
+
+`ProductOrder.user` (nullable FK, migration 0051) is set only when
+`POST /api/v1/orders/` carries a valid token. Profile orders, cancel and
+reorder match by `user` alone. Matching by email was rejected: the project
+has no email verification, so anyone could type another person's email
+into checkout and the real owner would then see (and be able to cancel)
+that order — or an attacker could register with a victim's email and read
+their history. The cost: guest orders and orders from before the field
+existed have `user=None` and never appear in a profile unless an admin
+links them by hand. See [[Orders-and-Profile]].
+
 ## 2026-10-23 — On-demand backups instead of a scheduled task
 
 PythonAnywhere's free tier has no scheduled-task feature, so the daily

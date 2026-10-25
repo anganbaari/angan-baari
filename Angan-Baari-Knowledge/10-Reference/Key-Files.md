@@ -1,7 +1,10 @@
 # Key Files
 
-- `shop/models.py` — `Category`, `Product`, `ProductVariant`, `NewsletterSubscriber`, `ContactMessage`, `ProductOrder`, `Review`, `Wishlist`, `Offer`, `BundleItem`, `Coupon`, `InventoryMovement`, `POSSale`, `RevenueTarget`
+- `shop/models.py` — `Category`, `Product`, `ProductVariant`, `ProductSellingUnit`, `NewsletterSubscriber`, `ContactMessage`, `ProductOrder`, `Review`, `Wishlist`, `Offer`, `BundleItem`, `Coupon`, `InventoryMovement`, `POSSale`, `RevenueTarget`
 - `shop/views.py` — all view logic: cart (session-based), save-for-later, wishlist, checkout, coupon/offer application, POS (`pos_view`, `pos_service_worker`), the staff Reports dashboard shell (`dashboard_view`, `_is_owner_or_manager()`), the shared `create_inventory_movements_from_snapshot()` and `create_pos_sale()` helpers
+- `shop/views.py` pricing/order helpers: `price_pos_cart_line()`, `resolve_automatic_offer()`, `quote_cart_line()`, `ensure_order_cancellation_stock_returned()` — see [[Offers-and-Cart-Quote]], [[Orders-and-Profile]], [[Selling-Units]].
+- `api/views.py` — the `/api/v1/` views, incl. `PublicOffersListView`, `CartQuoteView`, `OrderCreateView`, `OrderHideView`, `_authenticate_optional()`.
+- Tests for this work: `api/tests_offers_pricing.py`, `api/tests_profile_orders.py`, `api/tests_selling_units_followup.py`, `shop/tests_offer_cart_security.py`.
 - `shop/reports.py` — all Reports dashboard aggregation (read-only). See [[Reports-Dashboard]].
 - `shop/bs_calendar.py` — Bikram Sambat ↔ A.D. conversion, the server-side source of truth (tested in `shop/tests_bs_calendar.py`). See [[Reports-Dashboard]] for why this exists alongside two other copies of the same data table.
 - `templates/dashboard.html` + `static/css/dashboard.css` + `static/js/dashboard.js` + `static/js/bs-calendar.js` — the Reports dashboard page (`/dashboard/`, staff owner/manager only, dark theme, B.S. dates only). See [[Reports-Dashboard]].

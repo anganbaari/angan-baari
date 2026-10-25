@@ -94,8 +94,6 @@ The tag's own docstring is explicit about this, and it's enforced simply
 by these templates never calling `{% storefront_link %}` for these
 routes — there's no bypass to accidentally trigger:
 
-- **Offers** (`/offers/`) — Vercel has no `/offers` route yet. See
-  "Deferred" below.
 - **Home page / logo** — the home page (`index.html`) is itself a
   Django-rendered page (see [[Home-Page-Sections]]); only the *links
   inside* it switch.
@@ -116,10 +114,14 @@ routes — there's no bypass to accidentally trigger:
 
 ## Deferred / known gaps
 
-- **No public `/api/v1/offers/` endpoint**, and no Offers page on
-  Vercel. `pos/offers/` exists but is staff-only POS internal (offers
-  valid *right now* for ringing up a sale) — not the same thing as a
-  public offers-browsing page, and not reusable for one without review.
+- **Offers now exist on both sides:** the public `GET /api/v1/offers/`
+  feeds Vercel's own `/offers` page, and `{% storefront_link 'offers' %}`
+  switches the Django nav links to it when `STOREFRONT_URL` is set (the
+  Django `templates/offers.html` stays reachable at its own URL).
+  `pos/offers/` is still the separate staff-only POS endpoint. See
+  [[Offers-and-Cart-Quote]].
+- **Coupons are not applied by the Vercel cart** — `GET /api/v1/coupons/`
+  is shown read-only (profile, offers page).
 - **Two password-reset systems**, as above — a future cleanup candidate,
   not urgent while both still work.
 - **Order/cancel emails still hard-code the PythonAnywhere domain**

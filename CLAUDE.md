@@ -57,11 +57,11 @@ doesn't use, so new packages silently never reach the running site.
 PythonAnywhere after pulling. Say so explicitly when proposing a model
 change — don't assume it happens automatically.**
 
-Latest migration as of this writing: `0050_product_tagline`.
+Latest migration as of this writing: `0051_productorder_hidden_by_customer_productorder_user`.
 Don't treat this as a goalpost — just confirm the real latest with
 `python manage.py showmigrations shop | tail` before assuming it's current.
 
-Full test suite: `python manage.py test` (596 passing as of this writing).
+Full test suite: `python manage.py test` (643 passing as of this writing).
 Same caveat — re-run it rather than trusting this number once it's old.
 
 ## Architecture decisions already made (don't relitigate these)
@@ -168,9 +168,30 @@ Endpoints:
   session-authed Django view (the old `pos_create_sale`/`/pos/sale/` thin
   wrapper around the same helper was removed as dead code once nothing
   called it anymore).
-- `POST /api/v1/orders/` — public, guest checkout. Reuses
+- `POST /api/v1/orders/` — public: guest, or token (optional — an invalid
+  token is treated as a guest, never a 401). Re-prices every line
+  server-side via `quote_cart_line()` and ignores any client price; stores
+  `normal_price`/`final_price`/`discount`/`offer_*`/`selling_unit_*` per
+  line in `cart_snapshot`; returns `pricing_summary` (subtotal,
+  total_discount, total) and an `errors` list (`{product_id, error}`) for
+  lines it skipped — the order is still created from the lines that
+  priced. A valid token sets `ProductOrder.user`. Reuses
   `create_order_inventory_movements()` /
   `create_inventory_movements_from_snapshot(..., strict=False)`.
+- `GET /api/v1/offers/` — public. Live per-product discount offers and
+  display-only combo bundles (combos are never added to a cart — WhatsApp
+  hand-off only).
+- `POST /api/v1/cart/quote/` — public, token optional. Body
+  `{"lines": [{product_id, weight, quantity, variant_id,
+  selling_unit_id}]}`; prices a cart server-side. Offer prices apply only
+  to authenticated customers; a guest gets normal prices plus
+  `login_required_for_offers`. A bad line gets a per-line `error`, never
+  fails the request.
+- `POST /api/v1/profile/orders/<id>/hide/` — token-authed. Delivered or
+  Cancelled orders only; sets `hidden_by_customer`, never deletes.
+- The products API also exposes `selling_units` (id, name, label, factor,
+  is_default, own `price`), `base_unit_label`, `min_quantity`,
+  `step_quantity` — see "Offers, cart quote and selling units".
 - `GET /api/v1/orders/{id}/` — returns only status fields (`id`,
   `order_number`, `status`, `ordered_at`, `product_interest`) by default.
   Returns the FULL order (name, email, phone, address, cart_snapshot,
@@ -213,11 +234,12 @@ legitimate REST API boundary in this project.
   When set, Shop/Category/Product/Cart/Checkout/Login/Signup/Profile
   links across `index.html`, `shop.html`, `cart.html`, `checkout.html`,
   `product_detail.html`, and `auth/{login,signup,profile}.html` point at
-  Vercel instead of the Django page. Offers, Home/logo, POS, admin, the
-  Reports dashboard, `/cancel/<token>/`, and the legacy
-  `/account/reset-password/<token>/` flow deliberately stay on Django
-  regardless of `STOREFRONT_URL` — Vercel has no equivalent route for any
-  of these. Full routing table:
+  Vercel instead of the Django page — including the Offers nav link
+  (`{% storefront_link 'offers' %}`, now that Vercel has its own
+  `/offers`). Home/logo, POS, admin, the Reports dashboard,
+  `/cancel/<token>/`, and the legacy `/account/reset-password/<token>/`
+  flow deliberately stay on Django regardless of `STOREFRONT_URL` —
+  Vercel has no equivalent route for any of these. Full routing table:
   `Angan-Baari-Knowledge/02-Architecture/Storefront-and-Vercel.md`.
 
 ## Home page
@@ -699,6 +721,43 @@ now only ever fires for a percentage coupon's fractional discount, since
 every line going into it is already whole-rupee. The printed receipt never
 shows a "Round off" row at all (see "Receipts" below).
 
+## Offers, cart quote and selling units
+
+Website/API pricing (`quote_cart_line()`, `shop/views.py`) — full detail in
+the vault: `Offers-and-Cart-Quote.md`, `Selling-Units.md`,
+`Orders-and-Profile.md`.
+
+- **The server is the only price authority.** `POST /cart/quote/` and
+  `POST /orders/` price every line themselves; client-sent prices are
+  ignored. The legacy session cart's `add_to_cart_offer()` likewise
+  recomputes from a live `Offer` (`shop/tests_offer_cart_security.py`).
+- **Offers are automatic** on the website/API. Among several live,
+  non-combo offers covering a product, the **lowest resulting price wins**
+  (`resolve_automatic_offer()`). POS offers are still operator-chosen
+  (`offer_id`). Offers are *visible* to everyone (`GET /offers/`) but
+  *priced* only for authenticated customers.
+- **Rounding matches the POS** because the quote reuses
+  `price_pos_cart_line()` (whole-rupee rounding on weighed lines, after the
+  offer discount).
+- **Selling units** (`ProductSellingUnit`, `fixed_quantity` products only)
+  have their own independent price — a line is priced by the unit's price,
+  never base price × factor; `quantity_in_base_units` is only for stock
+  deduction. Offers discount the unit's own price.
+- **Weighed (`variable_weight`) lines** must be at least `weight_step` and
+  a whole multiple of it (website/API only; the POS is unchanged).
+- **Orders ↔ accounts:** `ProductOrder.user` (nullable FK, migration 0051)
+  is set only when `POST /orders/` carries a valid token. Profile orders,
+  cancel and reorder match by `user` only — never by email, because there
+  is no email verification. Older/guest orders have `user=None` and are
+  linked by hand in admin. `ProductOrder.hidden_by_customer` is a
+  customer-side hide from `GET /profile/orders/` only; the order stays in
+  admin and in reports.
+- **Stock on cancel:** `ensure_order_cancellation_stock_returned()`
+  (`shop/views.py`) is idempotent and is fired by the profile cancel, the
+  emailed cancel link, and a `post_save` signal on `ProductOrder`
+  (`shop/signals.py`) for admin status changes. **Known gap:**
+  reactivating a cancelled order does not deduct stock again.
+
 ## Receipts
 
 Printable sale receipt: `GET /pos/receipt/<sale_number>/` (`pos_receipt_view`,
@@ -1021,9 +1080,15 @@ off-server-copy gap: `Angan-Baari-Knowledge/02-Architecture/Backups.md`.
   verify or flag)
 - Receipt/slip `?width=58` (58mm thermal roll) is implemented and tested,
   but not yet verified on real thermal printer hardware — see "Receipts"
-- No public `/api/v1/offers/` endpoint, and no Offers page on the Vercel
-  storefront — `pos/offers/` is staff-only POS internal, not the same
-  thing (see "Storefront" above)
+- Known gaps in the offers/orders work: no stock re-deduction when a
+  cancelled order is reactivated; combo bundle items carry no unit in
+  `GET /offers/` (`{name, quantity}` only); coupons are not applied by the
+  Vercel cart (`GET /coupons/` is display-only there); the Vercel offers
+  page's guest "log in for offer price" teaser depends on the quote's
+  `login_required_for_offers` flag; a product with `weight_step` 0 (e.g.
+  Coriander at the time of writing) is treated as step 0.50 by the quote
+  (`product.weight_step or '0.50'`), so a weight like 0.25 is rejected even
+  though the product data suggests none is set — fix the data in admin
 - Two separate password-reset systems exist, don't assume only one: the
   legacy Django flow (`shop/auth_views.py`, `/account/reset-password/
   <token>/`) and the API flow Vercel actually uses (`POST /api/v1/auth/
@@ -1057,7 +1122,8 @@ off-server-copy gap: `Angan-Baari-Knowledge/02-Architecture/Backups.md`.
 
 ## Key files
 
-- `shop/models.py` — Category, Product, ProductVariant, NewsletterSubscriber,
+- `shop/models.py` — Category, Product, ProductVariant, ProductSellingUnit,
+  NewsletterSubscriber,
   ContactMessage, ProductOrder, Review, Wishlist, Offer, BundleItem, Coupon,
   InventoryMovement, POSSale, POSSaleLine, CreditTransaction, BusinessSettings,
   Refund, RefundLine, RevenueTarget
@@ -1065,8 +1131,18 @@ off-server-copy gap: `Angan-Baari-Knowledge/02-Architecture/Backups.md`.
   wishlist, checkout, coupon/offer application, POS (`pos_view`,
   `pos_service_worker`), the Reports dashboard shell (`dashboard_view`),
   the shared `create_inventory_movements_from_snapshot()`,
-  `create_pos_sale()` / `price_pos_cart_line()` (see "POS pricing"), and
-  `create_pos_refund()` (see "Refunds") helpers
+  `create_pos_sale()` / `price_pos_cart_line()` (see "POS pricing"),
+  `create_pos_refund()` (see "Refunds"), `resolve_automatic_offer()` /
+  `quote_cart_line()` (see "Offers, cart quote and selling units"), and
+  `ensure_order_cancellation_stock_returned()` helpers
+- `api/views.py` — the `/api/v1/` views, incl. `PublicOffersListView`,
+  `CartQuoteView`, `OrderCreateView`, `OrderHideView`, and
+  `_authenticate_optional()` (token optional, invalid token = guest)
+- `api/tests_offers_pricing.py` / `api/tests_profile_orders.py` /
+  `api/tests_selling_units_followup.py` / `shop/tests_offer_cart_security.py`
+  — tests for offers + quote + order pricing, profile orders (user link,
+  hide, cancel), selling units + admin-cancel stock return, and the legacy
+  cart's server-side offer price
 - `shop/reports.py` — all Reports dashboard aggregation logic (read-only —
   see the "Reports dashboard" section above)
 - `shop/pl_report.py` — Profit & Loss aggregation (read-only; see "Refunds"
