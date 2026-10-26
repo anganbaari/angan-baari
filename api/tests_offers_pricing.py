@@ -164,6 +164,25 @@ class OffersListTests(OffersPricingTestsBase):
         self.assertEqual(bundle['combo_price'], '500.00')
         self.assertIn('whatsapp_message', bundle)
         self.assertNotIn('add_to_cart', bundle)
+        self.assertEqual(bundle['items'][0]['unit'], 'kg')  # self.product's price_unit defaults to 'per kg'
+
+    def test_combo_item_unit_for_fixed_weight_product_is_kg(self):
+        animal = Product.objects.create(
+            name='API Test Goat', slug='api-test-goat', category=self.category,
+            description='test', price=Decimal('0'), pricing_mode='fixed_weight', price_unit='per piece',
+        )
+        combo = Offer.objects.create(
+            title='API Test Animal Combo', discount_type='combo', discount_value=Decimal('0'),
+            combo_price=Decimal('5000.00'),
+            start_date=timezone.now() - timedelta(hours=1), end_date=timezone.now() + timedelta(hours=1),
+        )
+        from shop.models import BundleItem
+        BundleItem.objects.create(offer=combo, product=animal, quantity=Decimal('25.00'))
+
+        response = self.client.get(reverse('v1_offers_list'))
+
+        bundle = next(b for b in response.json()['combo_bundles'] if b['id'] == combo.id)
+        self.assertEqual(bundle['items'][0]['unit'], 'kg')  # weight, regardless of this product's own price_unit
 
     def test_public_no_auth_required(self):
         response = self.client.get(reverse('v1_offers_list'))

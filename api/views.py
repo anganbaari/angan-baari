@@ -1150,6 +1150,24 @@ def _authenticate_optional(request):
     return user
 
 
+def _bundle_item_unit_label(product):
+    """A short unit label for one combo-bundle item, e.g. "kg", "piece",
+    "dozen" — derived the same way the Django offers page already does
+    for its own combo cards (shop/views.py's `offers()` view): strip a
+    leading "per " off `Product.price_unit` ("per kg" -> "kg"), falling
+    back to "unit" if blank. One deliberate addition on top of that: for
+    a fixed_weight (animal) product, BundleItem.quantity is always a
+    weight (see that model's own docstring), so this always returns
+    "kg" for one regardless of what `price_unit` happens to hold for
+    that product — `price_unit` is mostly irrelevant for fixed_weight
+    pricing (it's priced via ProductVariant, not product.price/price_unit
+    at all), so it isn't a reliable signal there the way it is for every
+    other pricing mode."""
+    if product.pricing_mode == 'fixed_weight':
+        return 'kg'
+    return (product.price_unit or '').replace('per ', '').strip() or 'unit'
+
+
 class PublicOffersListView(APIView):
     """GET /api/v1/offers/ — public, read-only, no auth. Live offers only
     (Offer.is_live()'s own condition, applied at the queryset level).
@@ -1213,7 +1231,11 @@ class PublicOffersListView(APIView):
             if natural_total > 0:
                 savings_percent = int(round((1 - (float(bundle_price) / float(natural_total))) * 100))
             items = [
-                {'name': bi.product.name, 'quantity': str(bi.quantity)}
+                {
+                    'name': bi.product.name,
+                    'quantity': str(bi.quantity),
+                    'unit': _bundle_item_unit_label(bi.product),
+                }
                 for bi in bundle_items
             ]
             combo_bundles.append({
