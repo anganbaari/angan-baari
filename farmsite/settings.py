@@ -158,6 +158,10 @@ RESEND_API_KEY = os.getenv('RESEND_API_KEY')
 DEFAULT_FROM_EMAIL = 'Angan Baari <orders@anganbaari.com>'
 ADMIN_EMAIL = 'anganbaari@gmail.com'
 
+# Shared secret for the owner-only Rudra assistant (/api/rudra/). Unset or
+# under 32 chars = the endpoints deny everything (see api.permissions.IsRudraToken).
+RUDRA_API_TOKEN = os.getenv('RUDRA_API_TOKEN', '')
+
 # Telegram notifications
 TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
 TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')

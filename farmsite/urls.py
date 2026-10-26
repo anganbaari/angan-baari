@@ -16,6 +16,7 @@ urlpatterns = [
     path('api/inventory/', include('shop.api_urls')),
     path('api/costs/', include('shop.costs_urls')),
     path('api/v1/', include('api.urls')),
+    path('api/rudra/', include('api.rudra_urls')),
     path('', include('shop.urls')),
     path('account/', include('shop.auth_urls')),
     path('sitemap.xml', sitemap, {'sitemaps': sitemaps},
