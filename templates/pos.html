@@ -3959,6 +3959,18 @@
         // regular print dialog) and under Chrome's --kiosk-printing flag
         // (silently prints) -- both just call window.print() under the
         // hood, same as this does on the iframe's own contentWindow.
+        //
+        // Found on a real thermal printer: a 0x0 iframe has no rendered
+        // layout box at all, and calling print() on the contentWindow of
+        // a frame Chrome never actually laid out does not reliably print
+        // that frame's document -- it printed the TOP-level /pos/ page
+        // instead (hence the default date/title/URL header-footer and a
+        // blank body, since pos.html has no print styles of its own).
+        // Fix: give the iframe real, non-zero dimensions (still
+        // positioned off-screen, never display:none) so Chrome actually
+        // renders it as a distinct paintable frame before printing, and
+        // wait for its images + webfonts + one animation frame to settle
+        // first so nothing is printed half-loaded.
         function printReceiptViaIframe(saleNumber, btn) {
             const originalText = btn.textContent;
             btn.disabled = true;
@@ -3976,13 +3988,17 @@
             };
 
             const iframe = document.createElement('iframe');
-            // Off-screen, NOT display:none -- some browsers refuse to
-            // print a display:none frame's contents at all.
+            // Off-screen, but a REAL rendered frame -- not display:none
+            // (some browsers refuse to print that at all) and not 0x0
+            // (Chrome then prints the parent page instead -- see above).
+            // Width/height roughly match the receipt's own content box so
+            // it lays out exactly as it will when printed.
             iframe.style.position = 'fixed';
-            iframe.style.left = '-9999px';
+            iframe.style.left = '-10000px';
             iframe.style.top = '0';
-            iframe.style.width = '0';
-            iframe.style.height = '0';
+            iframe.style.width = '320px';
+            iframe.style.height = '800px';
+            iframe.style.visibility = 'visible';
             iframe.style.border = '0';
             iframe.setAttribute('aria-hidden', 'true');
 
@@ -3995,9 +4011,26 @@
 
             iframe.addEventListener('load', () => {
                 try {
-                    iframe.contentWindow.addEventListener('afterprint', finish);
-                    iframe.contentWindow.focus();
-                    iframe.contentWindow.print();
+                    const idoc = iframe.contentDocument;
+                    const iwin = iframe.contentWindow;
+                    const images = Array.from(idoc.images || []);
+                    const imagesReady = images.length
+                        ? Promise.all(images.map((img) => img.complete
+                            ? Promise.resolve()
+                            : new Promise((resolve) => {
+                                img.addEventListener('load', resolve, { once: true });
+                                img.addEventListener('error', resolve, { once: true });
+                            })))
+                        : Promise.resolve();
+                    const fontsReady = (idoc.fonts && idoc.fonts.ready) ? idoc.fonts.ready : Promise.resolve();
+
+                    Promise.all([imagesReady, fontsReady]).then(() => {
+                        requestAnimationFrame(() => {
+                            iwin.addEventListener('afterprint', finish);
+                            iwin.focus();
+                            iwin.print();
+                        });
+                    });
                 } catch (err) {
                     showToast('Could not print the receipt.');
                     finish();

@@ -100,7 +100,12 @@ var POS_QUEUE_STORE = 'queuedSales';
 // tab, and "New order" explicitly calls resetPostSaleState() itself. An
 // installed app cold-starting offline on the old v22 shell would keep
 // running the previous window.open()-based print flow instead.
-var POS_SHELL_CACHE = 'pos-shell-v23';
+// v23 -> v24: printReceiptViaIframe() fixed a real-printer bug -- the
+// iframe was 0x0, so Chrome printed the parent /pos/ page (its default
+// header/footer) instead of the receipt inside the frame. The iframe now
+// gets real, non-zero dimensions and print() waits for its images,
+// webfonts, and one animation frame before firing.
+var POS_SHELL_CACHE = 'pos-shell-v24';
 var POS_META_STORE = 'meta';
 var POS_OFFLINE_PIN_STORE = 'offlineOperators';
 var POS_CREDIT_CUSTOMER_STORE = 'creditCustomers';

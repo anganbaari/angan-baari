@@ -1273,12 +1273,19 @@ class SaleCompleteOverlayMarkupTests(TestCase):
         response = self.client.get('/pos/')
         content = response.content.decode()
         self.assertIn('function printReceiptViaIframe(', content)
-        self.assertIn('iframe.contentWindow.focus();', content)
-        self.assertIn('iframe.contentWindow.print();', content)
-        self.assertIn("iframe.contentWindow.addEventListener('afterprint', finish);", content)
-        # Not display:none -- some browsers refuse to print a display:none
-        # frame's contents at all.
-        self.assertIn("iframe.style.width = '0';", content)
+        # Real non-zero dimensions -- a 0x0 iframe printed the parent
+        # /pos/ page on a real printer instead of the receipt inside it.
+        self.assertIn("iframe.style.width = '320px';", content)
+        self.assertIn("iframe.style.height = '800px';", content)
+        self.assertIn("iframe.style.visibility = 'visible';", content)
+        self.assertNotIn("iframe.style.width = '0';", content)
+        self.assertNotIn("iframe.style.height = '0';", content)
+        # Waits for images + webfonts + one animation frame before print().
+        self.assertIn('idoc.fonts', content)
+        self.assertIn('requestAnimationFrame(', content)
+        self.assertIn('iwin.focus();', content)
+        self.assertIn('iwin.print();', content)
+        self.assertIn("iwin.addEventListener('afterprint', finish);", content)
         self.assertNotIn("window.open(`/pos/receipt/", content)
 
     def test_offline_queued_sale_print_note_markup_present(self):
