@@ -4,6 +4,7 @@ from django.utils.html import escape
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.contrib.admin.views.decorators import staff_member_required
+from django.views.decorators.clickjacking import xframe_options_sameorigin
 from django.urls import reverse
 from django.contrib import messages
 from .models import NewsletterSubscriber, ContactMessage, ProductOrder, Review, Wishlist
@@ -2344,6 +2345,7 @@ def pos_view(request):
 
 
 @staff_member_required
+@xframe_options_sameorigin
 def pos_receipt_view(request, sale_number):
     """Printable receipt for a completed POS sale -- GET /pos/receipt/
     <sale_number>/, url name 'pos_receipt'. Reachable by any staff login,
@@ -2351,6 +2353,13 @@ def pos_receipt_view(request, sale_number):
     the reprint path (see shop/admin.py's POSSaleAdmin.receipt_link()).
     ?width=58 switches the print CSS to a 58mm roll; anything else
     (including no param) uses 80mm.
+
+    @xframe_options_sameorigin overrides the site-wide X-Frame-Options:
+    DENY (XFrameOptionsMiddleware, farmsite/settings.py) specifically
+    for this view -- templates/pos.html's "Print bill" loads this URL
+    into a same-origin hidden <iframe> to print it (printReceiptViaIframe()),
+    which DENY silently blocked. Scoped to this view only; the refund
+    slip is never loaded in an iframe and keeps the global DENY.
 
     Uses build_sale_receipt_data() -- the exact same helper
     POSSaleView.post() (api/views.py) uses for its own response -- so

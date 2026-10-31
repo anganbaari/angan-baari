@@ -1529,6 +1529,24 @@ class PosReceiptViewTests(TestCase):
         self.assertIn('Cashier: Receipt<', content)
         self.assertNotIn('Cashier: Receipt Tester', content)
 
+    def test_receipt_allows_same_origin_framing(self):
+        """pos.html's "Print bill" loads this URL into a hidden same-origin
+        <iframe> (printReceiptViaIframe()) to print it -- the site-wide
+        X-Frame-Options: DENY (XFrameOptionsMiddleware, farmsite/settings.py)
+        would silently block that, so this view overrides it to SAMEORIGIN
+        via @xframe_options_sameorigin, and only this view."""
+        self.client.login(username='receipt_cashier', password='pw')
+        response = self.client.get(reverse('pos_receipt', args=[self.sale.sale_number]))
+        self.assertEqual(response['X-Frame-Options'], 'SAMEORIGIN')
+
+    def test_other_views_still_deny_framing(self):
+        """The /pos/ screen itself and the refund slip are never loaded in
+        an iframe and must keep the site-wide DENY -- the SAMEORIGIN
+        override above is scoped to pos_receipt_view only."""
+        self.client.login(username='receipt_cashier', password='pw')
+        pos_response = self.client.get('/pos/')
+        self.assertEqual(pos_response['X-Frame-Options'], 'DENY')
+
     def test_cashier_and_sale_number_share_one_row(self):
         self.client.login(username='receipt_cashier', password='pw')
         response = self.client.get(reverse('pos_receipt', args=[self.sale.sale_number]))

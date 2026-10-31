@@ -4032,11 +4032,13 @@
                         });
                     });
                 } catch (err) {
+                    console.error('printReceiptViaIframe: failed to print loaded receipt', err);
                     showToast('Could not print the receipt.');
                     finish();
                 }
             });
-            iframe.addEventListener('error', () => {
+            iframe.addEventListener('error', (err) => {
+                console.error('printReceiptViaIframe: receipt iframe failed to load', err);
                 showToast('Could not load the receipt to print.');
                 finish();
             });

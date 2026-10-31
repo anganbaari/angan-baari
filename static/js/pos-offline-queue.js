@@ -105,7 +105,13 @@ var POS_QUEUE_STORE = 'queuedSales';
 // header/footer) instead of the receipt inside the frame. The iframe now
 // gets real, non-zero dimensions and print() waits for its images,
 // webfonts, and one animation frame before firing.
-var POS_SHELL_CACHE = 'pos-shell-v24';
+// v24 -> v25: the receipt iframe was still blocked -- the site-wide
+// X-Frame-Options: DENY applied to /pos/receipt/<n>/ too, so the
+// same-origin iframe couldn't load it at all ("Could not print the
+// receipt." toast). Fixed server-side (pos_receipt_view gained
+// @xframe_options_sameorigin, shop/views.py) plus added console.error
+// logging in printReceiptViaIframe()'s failure paths here in pos.html.
+var POS_SHELL_CACHE = 'pos-shell-v25';
 var POS_META_STORE = 'meta';
 var POS_OFFLINE_PIN_STORE = 'offlineOperators';
 var POS_CREDIT_CUSTOMER_STORE = 'creditCustomers';
