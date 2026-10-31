@@ -94,7 +94,13 @@ var POS_QUEUE_STORE = 'queuedSales';
 // navigation within the idle window. An installed app cold-starting
 // offline on the old v21 shell would keep running pos.html's previous
 // always-lock-on-load logic instead.
-var POS_SHELL_CACHE = 'pos-shell-v22';
+// v22 -> v23: "Sale complete" overlay reworked -- buttons renamed to
+// "Print bill"/"New order", Print now prints via a hidden same-origin
+// <iframe> (printReceiptViaIframe()) instead of window.open() to a new
+// tab, and "New order" explicitly calls resetPostSaleState() itself. An
+// installed app cold-starting offline on the old v22 shell would keep
+// running the previous window.open()-based print flow instead.
+var POS_SHELL_CACHE = 'pos-shell-v23';
 var POS_META_STORE = 'meta';
 var POS_OFFLINE_PIN_STORE = 'offlineOperators';
 var POS_CREDIT_CUSTOMER_STORE = 'creditCustomers';

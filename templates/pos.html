@@ -835,7 +835,12 @@
             font-weight: 800; font-size: 0.9rem; cursor: pointer;
         }
         #saleCompletePrintBtn { background: var(--moss); color: var(--white); }
+        #saleCompletePrintBtn:disabled { opacity: 0.5; cursor: not-allowed; }
         #saleCompleteNewSaleBtn { background: var(--forest); color: var(--gold); }
+        /* Shown only when "Print bill" is disabled -- a queued-offline
+           sale has no sale number yet to print (see the overlay's own
+           comment above); showSaleCompleteOverlay() toggles this. */
+        #saleCompletePrintNote { font-size: 0.74rem; color: var(--text-muted); margin: 8px 0 0; }
 
         #posToast {
             position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px);
@@ -1376,7 +1381,11 @@
     <!-- "Sale complete" overlay -- shown after a successful (online) sale;
          see performCompleteSale()'s success branch. A queued-offline sale
          has no sale number yet, so it gets a toast instead (see the same
-         function's catch branch), never this overlay. -->
+         function's catch branch), never this overlay -- saleCompletePrintNote
+         below exists purely as a defensive guard for "Print bill" in case
+         this overlay is ever shown without one (showSaleCompleteOverlay()
+         disables the button and shows this note instead of attempting to
+         load a receipt URL that doesn't exist). -->
     <div id="saleCompleteBackdrop">
         <div class="sale-complete-card">
             <h3>Sale complete</h3>
@@ -1388,9 +1397,10 @@
                 <span>Change due</span><span id="saleCompleteChange">Rs. 0</span>
             </div>
             <div class="sale-complete-actions">
-                <button type="button" id="saleCompletePrintBtn">Print receipt</button>
-                <button type="button" id="saleCompleteNewSaleBtn">New sale</button>
+                <button type="button" id="saleCompletePrintBtn">Print bill</button>
+                <button type="button" id="saleCompleteNewSaleBtn">New order</button>
             </div>
+            <p id="saleCompletePrintNote" style="display:none;">Receipt available after sync</p>
         </div>
     </div>
 
@@ -3908,19 +3918,109 @@
             } else {
                 changeRow.style.display = 'none';
             }
-            document.getElementById('saleCompletePrintBtn').dataset.saleNumber = data.sale_number;
+            const printBtn = document.getElementById('saleCompletePrintBtn');
+            const printNote = document.getElementById('saleCompletePrintNote');
+            // Defensive: this overlay is only ever shown today from the
+            // success branch, where data.sale_number is always present --
+            // but "Print bill" must never attempt to load a receipt URL
+            // that doesn't exist, so it's disabled (with a short note)
+            // rather than assumed-safe whenever a sale number is missing.
+            if (data.sale_number) {
+                printBtn.disabled = false;
+                printBtn.dataset.saleNumber = data.sale_number;
+                printNote.style.display = 'none';
+            } else {
+                printBtn.disabled = true;
+                delete printBtn.dataset.saleNumber;
+                printNote.style.display = '';
+            }
             document.getElementById('saleCompleteBackdrop').classList.add('active');
         }
         function closeSaleCompleteOverlay() {
             document.getElementById('saleCompleteBackdrop').classList.remove('active');
         }
-        document.getElementById('saleCompleteNewSaleBtn').addEventListener('click', closeSaleCompleteOverlay);
+        document.getElementById('saleCompleteNewSaleBtn').addEventListener('click', () => {
+            // "New order" explicitly returns to a fresh empty cart --
+            // resetPostSaleState() already ran right after the sale
+            // succeeded (see performCompleteSale()), so this is normally
+            // a no-op repeat, but calling it here too (rather than just
+            // dismissing the overlay) keeps this button correct on its
+            // own even if that timing ever changes.
+            resetPostSaleState();
+            closeSaleCompleteOverlay();
+        });
         document.getElementById('saleCompleteBackdrop').addEventListener('click', (e) => {
             if (e.target.id === 'saleCompleteBackdrop') closeSaleCompleteOverlay();
         });
+
+        // "Print bill" -- prints via a hidden same-origin <iframe> instead
+        // of window.open(), so it never opens a new tab or navigates away
+        // from /pos/. Works unchanged under a normal browser (shows the
+        // regular print dialog) and under Chrome's --kiosk-printing flag
+        // (silently prints) -- both just call window.print() under the
+        // hood, same as this does on the iframe's own contentWindow.
+        function printReceiptViaIframe(saleNumber, btn) {
+            const originalText = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = 'Printing…';
+
+            let settled = false;
+            let fallbackTimer;
+            const finish = () => {
+                if (settled) return;
+                settled = true;
+                clearTimeout(fallbackTimer);
+                if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
+                btn.disabled = false;
+                btn.textContent = originalText;
+            };
+
+            const iframe = document.createElement('iframe');
+            // Off-screen, NOT display:none -- some browsers refuse to
+            // print a display:none frame's contents at all.
+            iframe.style.position = 'fixed';
+            iframe.style.left = '-9999px';
+            iframe.style.top = '0';
+            iframe.style.width = '0';
+            iframe.style.height = '0';
+            iframe.style.border = '0';
+            iframe.setAttribute('aria-hidden', 'true');
+
+            // Fallback in case afterprint never fires (observed to happen
+            // occasionally depending on the OS print dialog/driver) --
+            // ~60s is long enough for a cashier to actually use the real
+            // print dialog, short enough not to leave a stray iframe in
+            // the DOM indefinitely.
+            fallbackTimer = setTimeout(finish, 60000);
+
+            iframe.addEventListener('load', () => {
+                try {
+                    iframe.contentWindow.addEventListener('afterprint', finish);
+                    iframe.contentWindow.focus();
+                    iframe.contentWindow.print();
+                } catch (err) {
+                    showToast('Could not print the receipt.');
+                    finish();
+                }
+            });
+            iframe.addEventListener('error', () => {
+                showToast('Could not load the receipt to print.');
+                finish();
+            });
+
+            document.body.appendChild(iframe);
+            iframe.src = `/pos/receipt/${saleNumber}/`;
+        }
         document.getElementById('saleCompletePrintBtn').addEventListener('click', () => {
-            const saleNumber = document.getElementById('saleCompletePrintBtn').dataset.saleNumber;
-            if (saleNumber) window.open(`/pos/receipt/${saleNumber}/`, '_blank');
+            const btn = document.getElementById('saleCompletePrintBtn');
+            if (btn.disabled) return;
+            const saleNumber = btn.dataset.saleNumber;
+            // Belt-and-braces -- the button is already disabled whenever
+            // there's no sale number (see showSaleCompleteOverlay() above),
+            // but never attempt to load a receipt URL that doesn't exist
+            // regardless of how this got clicked.
+            if (!saleNumber) return;
+            printReceiptViaIframe(saleNumber, btn);
         });
 
         function openPaymentPanel() {

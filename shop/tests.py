@@ -1249,6 +1249,56 @@ class PosTotalsBoxTaxableRowRemovedTests(TestCase):
         self.assertIn('जम्मा', content)
 
 
+class SaleCompleteOverlayMarkupTests(TestCase):
+    """The "Sale complete" overlay in templates/pos.html -- renamed
+    buttons ("Print bill"/"New order"), "Print bill" now prints via a
+    hidden same-origin <iframe> instead of window.open() to a new tab,
+    and "New order" explicitly calls resetPostSaleState() itself."""
+
+    def setUp(self):
+        user = User.objects.create_user('sale_complete_cashier', password='pw', is_staff=True)
+        UserProfile.objects.create(user=user, role='cashier')
+        self.client.login(username='sale_complete_cashier', password='pw')
+
+    def test_buttons_renamed(self):
+        response = self.client.get('/pos/')
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertIn('>Print bill<', content)
+        self.assertIn('>New order<', content)
+        self.assertNotIn('>Print receipt<', content)
+        self.assertNotIn('>New sale<', content)
+
+    def test_print_bill_uses_hidden_iframe_not_window_open(self):
+        response = self.client.get('/pos/')
+        content = response.content.decode()
+        self.assertIn('function printReceiptViaIframe(', content)
+        self.assertIn('iframe.contentWindow.focus();', content)
+        self.assertIn('iframe.contentWindow.print();', content)
+        self.assertIn("iframe.contentWindow.addEventListener('afterprint', finish);", content)
+        # Not display:none -- some browsers refuse to print a display:none
+        # frame's contents at all.
+        self.assertIn("iframe.style.width = '0';", content)
+        self.assertNotIn("window.open(`/pos/receipt/", content)
+
+    def test_offline_queued_sale_print_note_markup_present(self):
+        """Defensive guard markup: "Print bill" disables itself with a
+        short note instead of attempting to load a receipt URL that
+        doesn't exist whenever there's no sale number yet."""
+        response = self.client.get('/pos/')
+        content = response.content.decode()
+        self.assertIn('id="saleCompletePrintNote"', content)
+        self.assertIn('Receipt available after sync', content)
+
+    def test_new_order_resets_state(self):
+        response = self.client.get('/pos/')
+        content = response.content.decode()
+        new_order_handler = content[content.index("getElementById('saleCompleteNewSaleBtn').addEventListener"):]
+        new_order_handler = new_order_handler[:new_order_handler.index('});')]
+        self.assertIn('resetPostSaleState();', new_order_handler)
+        self.assertIn('closeSaleCompleteOverlay();', new_order_handler)
+
+
 class PosCouponPickerDataTests(TestCase):
     """pos_view() embeds a live-coupons list (POS Phase E coupon picker)
     the same way PRODUCTS/CATEGORIES are already embedded -- staff-only
