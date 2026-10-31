@@ -732,7 +732,11 @@ class RefundSlipViewTests(RefundTestBase):
 
     def test_refund_slip_has_no_barcode_element(self):
         """Refund-slip polish task: no barcode, and no JsBarcode script
-        at all -- unlike the sale receipt, which has both."""
+        at all -- unlike the sale receipt, which has both. Checks for the
+        barcode's own element id specifically, not "no <svg> at all" --
+        the page legitimately has one now, the thermal-printer threshold
+        filter's <svg> defs (see templates/pos_refund_slip.html), which
+        is unrelated to a barcode and must not trip this check."""
         sale = self.complete_sale(
             cart=[{'product_id': self.jar.id, 'qty': 2}], payments=[{'method': 'cash', 'amount': '500.00'}],
         )
@@ -740,7 +744,7 @@ class RefundSlipViewTests(RefundTestBase):
         create_response = self.post_refund(sale.sale_number, [{'sale_line_id': line.id, 'quantity': '2'}])
         response = self.client.get(reverse('pos_refund_slip', args=[create_response.data['refund_number']]))
         content = response.content.decode()
-        self.assertNotIn('<svg', content)
+        self.assertNotIn('id="receiptBarcode"', content)
         self.assertNotIn('JsBarcode', content)
         self.assertNotIn('jsbarcode', content)
 
@@ -776,6 +780,25 @@ class RefundSlipViewTests(RefundTestBase):
         response = self.client.get(reverse('pos_refund_slip', args=[create_response.data['refund_number']]))
         content = response.content.decode()
         self.assertIn('Qty: 2', content)
+
+    def test_refund_slip_print_css_has_pure_black_text_and_width_variable(self):
+        """Thermal-printer legibility fix, same as the sale receipt's own
+        version of this test (shop/tests.py): the print-width variable is
+        present, the item-detail/muted rows are pure #000 (not the old
+        pale #333), and the logo/flag use the black-and-white threshold
+        filter instead of the old grayscale(1) contrast(1.3)."""
+        sale = self.complete_sale(
+            cart=[{'product_id': self.jar.id, 'qty': 2}], payments=[{'method': 'cash', 'amount': '500.00'}],
+        )
+        line = sale.lines.get()
+        create_response = self.post_refund(sale.sale_number, [{'sale_line_id': line.id, 'quantity': '2'}])
+        response = self.client.get(reverse('pos_refund_slip', args=[create_response.data['refund_number']]))
+        content = response.content.decode()
+        self.assertIn('--receipt-print-width:', content)
+        self.assertIn('.r-item-detail { font-size: 11px; color: #000;', content)
+        self.assertIn('.r-row.r-muted { color: #000; font-size: 11px; }', content)
+        self.assertIn('filter: url(#thermalThreshold)', content)
+        self.assertIn('id="thermalThreshold"', content)
 
     def test_refund_slip_shows_flag_and_qr_images_when_set_skips_blank_ones(self):
         settings_row = BusinessSettings.get_solo()
@@ -820,7 +843,7 @@ class RefundSlipViewTests(RefundTestBase):
         )
         self.assertEqual(response.status_code, 200)
         content = response.content.decode()
-        self.assertIn('width: 58mm', content)
+        self.assertIn('--receipt-print-width: 58mm', content)
         self.assertIn('@page { size: 58mm auto; margin: 0; }', content)
         self.assertIn('>Website<', content)
         self.assertIn('>Tiktok<', content)

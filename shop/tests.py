@@ -1598,9 +1598,32 @@ class PosReceiptViewTests(TestCase):
         response = self.client.get(reverse('pos_receipt', args=[self.sale.sale_number]), {'width': '58'})
         self.assertEqual(response.status_code, 200)
         content = response.content.decode()
-        self.assertIn('width: 58mm', content)
-        self.assertNotIn('width: 80mm', content)
+        self.assertIn('--receipt-print-width: 58mm', content)
+        self.assertNotIn('--receipt-print-width: 72mm', content)
         self.assertIn('@page { size: 58mm auto; margin: 0; }', content)
+
+    def test_default_80mm_narrows_print_content_to_72mm(self):
+        """Real-printer fix: @page stays the full 80mm (what the driver
+        expects), but the receipt's own content is narrowed to 72mm via
+        --receipt-print-width, since content sitting in the outer ~4mm
+        on each side got clipped at Chrome print scale 100% on a real
+        Zy-Q821/"POS-80C" thermal printer."""
+        self.client.login(username='receipt_cashier', password='pw')
+        response = self.client.get(reverse('pos_receipt', args=[self.sale.sale_number]))
+        content = response.content.decode()
+        self.assertIn('--receipt-print-width: 72mm', content)
+        self.assertIn('@page { size: 80mm auto; margin: 0; }', content)
+
+    def test_receipt_print_css_has_pure_black_text_and_width_variable(self):
+        """Thermal-printer legibility fix: the print-width variable this
+        task added is present, and the two rows that used to be a pale
+        grey (#333, barely visible on a real print) are now pure #000."""
+        self.client.login(username='receipt_cashier', password='pw')
+        response = self.client.get(reverse('pos_receipt', args=[self.sale.sale_number]))
+        content = response.content.decode()
+        self.assertIn('--receipt-print-width:', content)
+        self.assertIn('.r-item-detail { font-size: 11px; color: #000;', content)
+        self.assertIn('.r-row.r-muted { color: #000; font-size: 11px; }', content)
 
     def test_unknown_sale_number_is_404(self):
         self.client.login(username='receipt_cashier', password='pw')

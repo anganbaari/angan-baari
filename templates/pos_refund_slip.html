@@ -7,6 +7,10 @@
     <title>Refund {{ refund_number }} — Angan Baari</title>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Noto+Sans+Devanagari:wght@400;500;600;700;800&family=Cormorant+Garamond:wght@600&display=swap" rel="stylesheet">
     <style>
+        /* Same real-printer-clipping fix as templates/pos_receipt.html --
+           see that file's own comment and pos_receipt_view()/
+           pos_refund_slip_view() (shop/views.py) for content_width_mm. */
+        :root { --receipt-print-width: {{ content_width_mm }}mm; }
         * { box-sizing: border-box; }
         html, body {
             margin: 0; padding: 0; background: #e9e9e4;
@@ -14,13 +18,16 @@
         }
         .receipt-wrap { padding: 20px 0 40px; }
         .receipt {
-            width: {{ width_mm }}mm; max-width: 100%; margin: 0 auto; background: #fff; padding: 10px 10px;
-            font-size: 11.5px; line-height: 1.4; box-shadow: 0 2px 10px rgba(0,0,0,0.15); overflow: hidden;
+            width: var(--receipt-print-width); max-width: 100%; margin: 0 auto; background: #fff; padding: 10px 10px;
+            font-size: 11.5px; line-height: 1.4; font-weight: 500; box-shadow: 0 2px 10px rgba(0,0,0,0.15); overflow: hidden;
         }
 
         .r-header { display: flex; align-items: center; justify-content: center; gap: 8px; }
         .r-header-side { flex: 0 0 auto; display: flex; align-items: center; }
-        .r-header-side img { max-width: 57px; max-height: 57px; filter: grayscale(1) contrast(1.3); }
+        /* Same fixed-size + threshold-filter fix as pos_receipt.html --
+           see that file's own comment and its inline <svg> defs, which
+           this page duplicates right after <body> below. */
+        .r-header-side img { width: 60px; height: 60px; object-fit: contain; filter: url(#thermalThreshold); }
         .r-header-center { flex: 0 1 auto; text-align: center; min-width: 0; }
         .r-shop-name {
             font-family: 'Noto Sans Devanagari', 'Cormorant Garamond', serif;
@@ -45,10 +52,10 @@
         .r-item-row { display: flex; justify-content: space-between; gap: 6px; }
         .r-item-name { font-weight: 700; word-break: break-word; }
         .r-item-amount { white-space: nowrap; }
-        .r-item-detail { font-size: 10px; color: #333; padding-left: 10px; margin-top: 1px; }
+        .r-item-detail { font-size: 11px; color: #000; padding-left: 10px; margin-top: 1px; }
 
         .r-row { display: flex; justify-content: space-between; font-size: 11px; padding: 1px 0; }
-        .r-row.r-muted { color: #333; font-size: 10.5px; }
+        .r-row.r-muted { color: #000; font-size: 11px; }
 
         .r-total-row {
             display: flex; justify-content: space-between; align-items: baseline;
@@ -63,9 +70,9 @@
         .r-social-qr-row { display: flex; flex-wrap: wrap; justify-content: center; margin: 4px 0; gap: 10px; }
         .r-social-qr-col { flex: 0 0 auto; min-width: 0; }
         .r-social-qr-col img { display: block; width: 78px; height: 78px; margin: 0 auto; object-fit: contain; filter: grayscale(1) contrast(1.3); }
-        .r-social-qr-caption { font-size: 9.5px; margin-top: 2px; text-align: center; }
+        .r-social-qr-caption { font-size: 11px; margin-top: 2px; text-align: center; }
 
-        .print-btn-wrap { text-align: center; margin: 14px auto 0; width: {{ width_mm }}mm; max-width: 100%; }
+        .print-btn-wrap { text-align: center; margin: 14px auto 0; width: var(--receipt-print-width); max-width: 100%; }
         .print-btn-wrap button {
             width: 100%; padding: 12px; border: none; border-radius: 8px; background: #285917; color: #fff;
             font-family: inherit; font-weight: 700; cursor: pointer; font-size: 14px;
@@ -75,12 +82,33 @@
         @media print {
             html, body { background: #fff; }
             .receipt-wrap { padding: 0; }
-            .receipt { width: {{ width_mm }}mm; margin: 0; padding: 4px 6px; box-shadow: none; }
+            .receipt { width: var(--receipt-print-width); margin: 0 auto; padding: 4px 6px; box-shadow: none; }
             .print-btn-wrap { display: none; }
         }
     </style>
 </head>
 <body>
+    <!-- Same inline SVG threshold filter as templates/pos_receipt.html --
+         see that file's own comment for why (a real print of the previous
+         grayscale(1) contrast(1.3) filter still left grey pixels for the
+         thermal head to dither into a blotchy pattern). Must stay
+         byte-identical to the receipt's copy, same reason the CSS classes
+         in both files' own <style> blocks are kept byte-identical. -->
+    <svg width="0" height="0" style="position:absolute; overflow:hidden;" aria-hidden="true">
+        <filter id="thermalThreshold" color-interpolation-filters="sRGB">
+            <feColorMatrix type="matrix" values="
+                0.33 0.33 0.33 0 -0.08
+                0.33 0.33 0.33 0 -0.08
+                0.33 0.33 0.33 0 -0.08
+                0    0    0    1  0
+            "/>
+            <feComponentTransfer>
+                <feFuncR type="discrete" tableValues="0 1"/>
+                <feFuncG type="discrete" tableValues="0 1"/>
+                <feFuncB type="discrete" tableValues="0 1"/>
+            </feComponentTransfer>
+        </filter>
+    </svg>
     <div class="receipt-wrap">
         <div class="receipt">
             <!-- Header -- shared with templates/pos_receipt.html, see templates/_receipt_header.html -->

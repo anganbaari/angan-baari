@@ -7,6 +7,17 @@
     <title>Receipt {{ sale_number }} — Angan Baari</title>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Noto+Sans+Devanagari:wght@400;500;600;700;800&family=Cormorant+Garamond:wght@600&display=swap" rel="stylesheet">
     <style>
+        /* The actual printable area on a real 80mm thermal roll (Zy-Q821/
+           "POS-80C" driver) is narrower than the full 80mm page -- content
+           sitting in the outer ~4mm on each side got clipped at Chrome
+           print scale 100%. One tunable number: @page below still spans
+           the FULL width_mm (the page size the OS/driver expects), but
+           the receipt's own content uses this narrower width and is
+           centred inside it. content_width_mm is computed server-side
+           (pos_receipt_view(), shop/views.py) -- 72mm for the 80mm roll,
+           unchanged (58mm) for the 58mm roll, which wasn't reported as
+           clipped. */
+        :root { --receipt-print-width: {{ content_width_mm }}mm; }
         * { box-sizing: border-box; }
         html, body {
             margin: 0; padding: 0; background: #e9e9e4;
@@ -14,8 +25,8 @@
         }
         .receipt-wrap { padding: 20px 0 40px; }
         .receipt {
-            width: {{ width_mm }}mm; max-width: 100%; margin: 0 auto; background: #fff; padding: 10px 10px;
-            font-size: 11.5px; line-height: 1.4; box-shadow: 0 2px 10px rgba(0,0,0,0.15); overflow: hidden;
+            width: var(--receipt-print-width); max-width: 100%; margin: 0 auto; background: #fff; padding: 10px 10px;
+            font-size: 11.5px; line-height: 1.4; font-weight: 500; box-shadow: 0 2px 10px rgba(0,0,0,0.15); overflow: hidden;
         }
 
         /* 1. Header: logo, shop name (+ English), flag as ONE centred
@@ -30,7 +41,19 @@
            nothing reserves space for the missing side anymore. */
         .r-header { display: flex; align-items: center; justify-content: center; gap: 8px; }
         .r-header-side { flex: 0 0 auto; display: flex; align-items: center; }
-        .r-header-side img { max-width: 57px; max-height: 57px; filter: grayscale(1) contrast(1.3); }
+        /* Fixed width/height (not just max-width/max-height) so the logo
+           and flag always render at the same controlled size regardless
+           of their source files' own resolution -- an oddly-sized source
+           image gets resampled by the printer driver itself otherwise,
+           which is part of what made these print as a blotchy smudge.
+           filter: url(#thermalThreshold) -- see the inline <svg> defs
+           right after <body> -- replaces the previous grayscale(1)
+           contrast(1.3), which still left midtone grey pixels for a
+           thermal printer to dither into a blotchy dot pattern (confirmed
+           on a real print). The SVG filter hard-thresholds every pixel to
+           pure black or pure white, which is what a 1-bit thermal head
+           actually needs -- no dithering left for it to do. */
+        .r-header-side img { width: 60px; height: 60px; object-fit: contain; filter: url(#thermalThreshold); }
         .r-header-center { flex: 0 1 auto; text-align: center; min-width: 0; }
         .r-shop-name {
             font-family: 'Noto Sans Devanagari', 'Cormorant Garamond', serif;
@@ -51,11 +74,11 @@
         .r-item-row { display: flex; justify-content: space-between; gap: 6px; }
         .r-item-name { font-weight: 700; word-break: break-word; }
         .r-item-amount { white-space: nowrap; }
-        .r-item-detail { font-size: 10px; color: #333; padding-left: 10px; margin-top: 1px; }
+        .r-item-detail { font-size: 11px; color: #000; padding-left: 10px; margin-top: 1px; }
 
         .r-row { display: flex; justify-content: space-between; font-size: 11px; padding: 1px 0; }
-        .r-row.r-muted { color: #333; font-size: 10.5px; }
-        .r-row.r-devanagari-label span:first-child { font-family: 'Noto Sans Devanagari', 'DM Sans', sans-serif; font-weight: 600; }
+        .r-row.r-muted { color: #000; font-size: 11px; }
+        .r-row.r-devanagari-label span:first-child { font-family: 'Noto Sans Devanagari', 'DM Sans', sans-serif; font-weight: 700; }
 
         .r-total-row {
             display: flex; justify-content: space-between; align-items: baseline;
@@ -78,7 +101,7 @@
            (80mm receipt minus 2x10px padding), so all three still fit
            on one row there; see flex-wrap above for the narrower 58mm case. */
         .r-social-qr-col img { display: block; width: 78px; height: 78px; margin: 0 auto; object-fit: contain; filter: grayscale(1) contrast(1.3); }
-        .r-social-qr-caption { font-size: 9.5px; margin-top: 2px; text-align: center; }
+        .r-social-qr-caption { font-size: 11px; margin-top: 2px; text-align: center; }
 
         /* display:block + margin:0 auto, not text-align:center alone --
            the same inline-centering unreliability already found and
@@ -104,7 +127,7 @@
             font-family: 'Noto Sans Devanagari', 'DM Sans', sans-serif; white-space: pre-wrap;
         }
 
-        .print-btn-wrap { text-align: center; margin: 14px auto 0; width: {{ width_mm }}mm; max-width: 100%; }
+        .print-btn-wrap { text-align: center; margin: 14px auto 0; width: var(--receipt-print-width); max-width: 100%; }
         .print-btn-wrap button {
             width: 100%; padding: 12px; border: none; border-radius: 8px; background: #285917; color: #fff;
             font-family: inherit; font-weight: 700; cursor: pointer; font-size: 14px;
@@ -114,7 +137,7 @@
            .print-btn-wrap itself is (see the @media print block below).
            Only rendered at all when this sale has a refund. */
         .refund-slip-links-wrap {
-            text-align: center; margin: 10px auto 0; width: {{ width_mm }}mm; max-width: 100%;
+            text-align: center; margin: 10px auto 0; width: var(--receipt-print-width); max-width: 100%;
             font-size: 13px; color: #333;
         }
         .refund-slip-links-wrap a { color: #285917; font-weight: 700; text-decoration: underline; margin: 0 4px; }
@@ -123,13 +146,43 @@
         @media print {
             html, body { background: #fff; }
             .receipt-wrap { padding: 0; }
-            .receipt { width: {{ width_mm }}mm; margin: 0; padding: 4px 6px; box-shadow: none; }
+            /* margin: 0 auto (not plain 0) -- @page above is still the
+               FULL width_mm; this is what actually centres the narrower
+               --receipt-print-width content inside it. */
+            .receipt { width: var(--receipt-print-width); margin: 0 auto; padding: 4px 6px; box-shadow: none; }
             .print-btn-wrap { display: none; }
             .refund-slip-links-wrap { display: none; }
         }
     </style>
 </head>
 <body>
+    <!-- Hidden SVG filter defs, referenced by filter: url(#thermalThreshold)
+         on the logo/flag images in _receipt_header.html below. Converts to
+         greyscale, darkens slightly (so a logo's thin/antialiased strokes
+         lean toward black rather than vanishing to white), then hard-
+         thresholds every pixel to pure black or pure white via a
+         2-entry feComponentTransfer discrete table -- no grey left for a
+         1-bit thermal head to dither into the blotchy dot pattern seen on
+         a real print with the previous grayscale(1) contrast(1.3). Must
+         NOT be display:none (Chrome won't apply a filter referencing a
+         display:none defs element) -- position:absolute + zero size is
+         the standard safe way to keep it off-screen/off-print without
+         breaking the reference. -->
+    <svg width="0" height="0" style="position:absolute; overflow:hidden;" aria-hidden="true">
+        <filter id="thermalThreshold" color-interpolation-filters="sRGB">
+            <feColorMatrix type="matrix" values="
+                0.33 0.33 0.33 0 -0.08
+                0.33 0.33 0.33 0 -0.08
+                0.33 0.33 0.33 0 -0.08
+                0    0    0    1  0
+            "/>
+            <feComponentTransfer>
+                <feFuncR type="discrete" tableValues="0 1"/>
+                <feFuncG type="discrete" tableValues="0 1"/>
+                <feFuncB type="discrete" tableValues="0 1"/>
+            </feComponentTransfer>
+        </filter>
+    </svg>
     <div class="receipt-wrap">
         <div class="receipt">
             <!-- 1. Header -- shared with templates/pos_refund_slip.html, see templates/_receipt_header.html -->

@@ -2443,6 +2443,16 @@ def pos_receipt_view(request, sale_number):
     qr_facebook_url = image_url(business.qr_facebook)
 
     width_mm = 58 if request.GET.get('width') == '58' else 80
+    # The 80mm driver's actual printable area is narrower than the full
+    # page (confirmed on a real Zy-Q821/"POS-80C" printer: content sitting
+    # in the outer ~4mm on each side got clipped at Chrome print scale
+    # 100%) -- @page stays the full width_mm below so the OS/driver still
+    # sees "80mm paper", but the receipt's own content is narrower and
+    # centred inside it via --receipt-print-width (see the template). The
+    # 58mm roll wasn't reported as clipped, so its content width is left
+    # equal to the page width, unchanged -- only routed through the same
+    # variable for consistency/future tuning.
+    content_width_mm = 72 if width_mm == 80 else width_mm
 
     # Display-only -- the barcode below still encodes sale.sale_number in
     # FULL (never this stripped form), so it always scans back to the
@@ -2490,6 +2500,7 @@ def pos_receipt_view(request, sale_number):
         'has_any_social_qr': bool(qr_website_url or qr_tiktok_url or qr_facebook_url),
         'receipt_footer': business.receipt_footer,
         'width_mm': width_mm,
+        'content_width_mm': content_width_mm,
     })
 
 
@@ -2565,6 +2576,10 @@ def pos_refund_slip_view(request, refund_number):
     qr_facebook_url = image_url(business.qr_facebook)
 
     width_mm = 58 if request.GET.get('width') == '58' else 80
+    # Same real-printer-clipping fix as pos_receipt_view() above -- see
+    # that function's comment for why 80mm narrows to 72mm of actual
+    # content while 58mm is left unchanged.
+    content_width_mm = 72 if width_mm == 80 else width_mm
 
     return render(request, 'pos_refund_slip.html', {
         'business': business,
@@ -2587,6 +2602,7 @@ def pos_refund_slip_view(request, refund_number):
         'qr_facebook_url': qr_facebook_url,
         'has_any_social_qr': bool(qr_website_url or qr_tiktok_url or qr_facebook_url),
         'width_mm': width_mm,
+        'content_width_mm': content_width_mm,
     })
 
 
