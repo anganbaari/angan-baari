@@ -2453,6 +2453,12 @@ def pos_receipt_view(request, sale_number):
     # equal to the page width, unchanged -- only routed through the same
     # variable for consistency/future tuning.
     content_width_mm = 72 if width_mm == 80 else width_mm
+    # Confirmed on the same real printer: even after narrowing to 72mm,
+    # the content still sits ~4mm too far right (~12mm blank on the left,
+    # ~3mm on the right) -- the 72mm box itself needs to shift left within
+    # the full 80mm page, not just narrow. Left unshifted (0) for the
+    # 58mm roll, which wasn't reported as misaligned.
+    content_shift_mm = -4 if width_mm == 80 else 0
 
     # Display-only -- the barcode below still encodes sale.sale_number in
     # FULL (never this stripped form), so it always scans back to the
@@ -2501,6 +2507,7 @@ def pos_receipt_view(request, sale_number):
         'receipt_footer': business.receipt_footer,
         'width_mm': width_mm,
         'content_width_mm': content_width_mm,
+        'content_shift_mm': content_shift_mm,
     })
 
 
@@ -2576,10 +2583,12 @@ def pos_refund_slip_view(request, refund_number):
     qr_facebook_url = image_url(business.qr_facebook)
 
     width_mm = 58 if request.GET.get('width') == '58' else 80
-    # Same real-printer-clipping fix as pos_receipt_view() above -- see
-    # that function's comment for why 80mm narrows to 72mm of actual
-    # content while 58mm is left unchanged.
+    # Same real-printer-clipping/alignment fix as pos_receipt_view() above
+    # -- see that function's comments for why 80mm narrows to 72mm of
+    # actual content, shifted 4mm left within the full page, while 58mm
+    # is left unchanged on both counts.
     content_width_mm = 72 if width_mm == 80 else width_mm
+    content_shift_mm = -4 if width_mm == 80 else 0
 
     return render(request, 'pos_refund_slip.html', {
         'business': business,
@@ -2603,6 +2612,7 @@ def pos_refund_slip_view(request, refund_number):
         'has_any_social_qr': bool(qr_website_url or qr_tiktok_url or qr_facebook_url),
         'width_mm': width_mm,
         'content_width_mm': content_width_mm,
+        'content_shift_mm': content_shift_mm,
     })
 
 

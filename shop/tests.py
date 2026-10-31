@@ -1625,6 +1625,29 @@ class PosReceiptViewTests(TestCase):
         self.assertIn('.r-item-detail { font-size: 11px; color: #000;', content)
         self.assertIn('.r-row.r-muted { color: #000; font-size: 11px; }', content)
 
+    def test_logo_has_no_threshold_filter_and_shift_variable_present(self):
+        """Logo-pixel-art fix: the uploaded logo is a pre-made 1-bit
+        dithered PNG -- the thermalThreshold filter would destroy that
+        dither pattern, so it must NOT be applied to the logo image rule
+        specifically (the flag still carries it, unchanged). The
+        print-shift variable this task added must also be present."""
+        self.client.login(username='receipt_cashier', password='pw')
+        response = self.client.get(reverse('pos_receipt', args=[self.sale.sale_number]))
+        content = response.content.decode()
+        self.assertIn('--receipt-print-shift:', content)
+        self.assertIn('--receipt-logo-size:', content)
+
+        start = content.index('.r-header-logo img {')
+        end = content.index('}', start)
+        logo_rule = content[start:end]
+        self.assertNotIn('filter:', logo_rule)
+        self.assertIn('image-rendering: pixelated', logo_rule)
+
+        self.assertIn(
+            '.r-header-flag img { width: 60px; height: 60px; object-fit: contain; filter: url(#thermalThreshold); }',
+            content,
+        )
+
     def test_unknown_sale_number_is_404(self):
         self.client.login(username='receipt_cashier', password='pw')
         response = self.client.get(reverse('pos_receipt', args=['POS-NOSUCH1']))

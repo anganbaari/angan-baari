@@ -800,6 +800,33 @@ class RefundSlipViewTests(RefundTestBase):
         self.assertIn('filter: url(#thermalThreshold)', content)
         self.assertIn('id="thermalThreshold"', content)
 
+    def test_refund_slip_logo_has_no_threshold_filter_and_shift_variable_present(self):
+        """Logo-pixel-art fix, same as the sale receipt's own version of
+        this test (shop/tests.py): the logo is a pre-made 1-bit dithered
+        PNG, so the thermalThreshold filter must NOT be on the logo's own
+        image rule (the flag still carries it), and the print-shift
+        variable this task added must be present."""
+        sale = self.complete_sale(
+            cart=[{'product_id': self.jar.id, 'qty': 2}], payments=[{'method': 'cash', 'amount': '500.00'}],
+        )
+        line = sale.lines.get()
+        create_response = self.post_refund(sale.sale_number, [{'sale_line_id': line.id, 'quantity': '2'}])
+        response = self.client.get(reverse('pos_refund_slip', args=[create_response.data['refund_number']]))
+        content = response.content.decode()
+        self.assertIn('--receipt-print-shift:', content)
+        self.assertIn('--receipt-logo-size:', content)
+
+        start = content.index('.r-header-logo img {')
+        end = content.index('}', start)
+        logo_rule = content[start:end]
+        self.assertNotIn('filter:', logo_rule)
+        self.assertIn('image-rendering: pixelated', logo_rule)
+
+        self.assertIn(
+            '.r-header-flag img { width: 60px; height: 60px; object-fit: contain; filter: url(#thermalThreshold); }',
+            content,
+        )
+
     def test_refund_slip_shows_flag_and_qr_images_when_set_skips_blank_ones(self):
         settings_row = BusinessSettings.get_solo()
         settings_row.receipt_flag = 'business/flag-test.png'

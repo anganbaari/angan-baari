@@ -7,16 +7,23 @@
      own context -- each page's view builds these itself (pos_receipt_view()/
      pos_refund_slip_view(), shop/views.py); this partial has no view
      logic of its own. The including page must also define the matching
-     CSS classes (.r-header/.r-header-side/.r-header-center/.r-shop-name/
-     .r-shop-name-en) in its own <style> block -- these are two separate
+     CSS classes (.r-header/.r-header-side/.r-header-logo/.r-header-flag/
+     .r-header-center/.r-shop-name/.r-shop-name-en) in its own <style>
+     block -- these are two separate
      self-contained print pages with no shared stylesheet, so the MARKUP
      is shared here but the CSS rules are still duplicated in each page,
      kept byte-identical between them by hand. -->
 <div class="r-header">
-    {% if logo_url %}<div class="r-header-side"><img src="{{ logo_url }}" alt=""></div>{% endif %}
+    <!-- r-header-logo/r-header-flag (added alongside the shared
+         r-header-side) exist so each page's CSS can style the two
+         images differently: the logo is now a pre-made 1-bit dithered
+         PNG that must print untouched (no threshold filter, pixelated
+         scaling), while the flag still needs the thermalThreshold SVG
+         filter applied. -->
+    {% if logo_url %}<div class="r-header-side r-header-logo"><img src="{{ logo_url }}" alt=""></div>{% endif %}
     <div class="r-header-center">
         {% if business.shop_name %}<p class="r-shop-name">{{ business.shop_name }}</p>{% endif %}
         {% if business.shop_name_en %}<p class="r-shop-name-en">{{ business.shop_name_en }}</p>{% endif %}
     </div>
-    {% if flag_url %}<div class="r-header-side"><img src="{{ flag_url }}" alt=""></div>{% endif %}
+    {% if flag_url %}<div class="r-header-side r-header-flag"><img src="{{ flag_url }}" alt=""></div>{% endif %}
 </div>
