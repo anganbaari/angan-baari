@@ -762,9 +762,15 @@ the vault: `Offers-and-Cart-Quote.md`, `Selling-Units.md`,
 
 Printable sale receipt: `GET /pos/receipt/<sale_number>/` (`pos_receipt_view`,
 `templates/pos_receipt.html`) — staff-only (`@staff_member_required`), 80mm
-by default, `?width=58` switches to a 58mm roll. **58mm is implemented and
-covered by tests, but not yet verified on a real thermal printer** — same
-"needs real hardware" caveat as the offline-PWA work above.
+by default, `?width=58` switches to a 58mm roll. **80mm is now verified on
+real thermal printer hardware (Zy-Q821 / "POS-80C" driver); 58mm is still
+implemented and tested only, not yet verified on real hardware.**
+`pos_receipt_view` carries `@xframe_options_sameorigin` (global
+`X-Frame-Options` elsewhere stays `DENY`) so the sale-complete overlay's
+"Print bill" can load it into a hidden same-origin iframe and print it
+silently under Chrome's `--kiosk-printing`. Full setup, retunable
+print-width/shift/logo values, and the shop-computer checklist:
+`Angan-Baari-Knowledge/02-Architecture/Thermal-Printing.md`.
 
 Header (logo + shop name + English name + flag, one centred group — see
 `templates/_receipt_header.html`, shared with the refund slip), address,
@@ -1079,7 +1085,8 @@ off-server-copy gap: `Angan-Baari-Knowledge/02-Architecture/Backups.md`.
   available (this is business data, not something the code itself can
   verify or flag)
 - Receipt/slip `?width=58` (58mm thermal roll) is implemented and tested,
-  but not yet verified on real thermal printer hardware — see "Receipts"
+  but not yet verified on real thermal printer hardware — 80mm is now
+  verified (see "Receipts" and `Thermal-Printing.md` in the vault)
 - Known gaps in the offers/orders work: no stock re-deduction when a
   cancelled order is reactivated; combo bundle items carry no unit in
   `GET /offers/` (`{name, quantity}` only); coupons are not applied by the

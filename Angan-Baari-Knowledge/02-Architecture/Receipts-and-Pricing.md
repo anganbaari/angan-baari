@@ -53,11 +53,13 @@ by any staff login (not scoped to who rang the sale up), since it's also
 the reprint path (`POSSaleAdmin.receipt_link()`). 80mm by default,
 `?width=58` switches the print CSS to a 58mm roll.
 
-**Not yet verified on real thermal printer hardware.** 58mm support is
-implemented and covered by (string-assertion) tests confirming the right
-CSS/markup renders, but nothing here has been checked against an actual
-80mm/58mm thermal printer — same "needs real hardware before fully
-trusted" caveat the POS-PWA offline work carries (see [[POS]]).
+**80mm is now verified on real thermal printer hardware** (Zy-Q821,
+"POS-80C" driver) — see [[Thermal-Printing]] for the printer setup, the
+retunable print-width/shift/logo values, and the `--kiosk-printing`
+silent-print mechanism "Print bill" relies on. **58mm support is still
+implemented and covered by (string-assertion) tests only** — not yet
+checked against actual 58mm hardware, same "needs real hardware before
+fully trusted" caveat the POS-PWA offline work carries (see [[POS]]).
 
 **Header/branding** — logo, shop name (+ English name under it), and the
 Nepal flag render as ONE centred flex group with a small fixed gap, via

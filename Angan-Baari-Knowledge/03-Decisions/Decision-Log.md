@@ -14,6 +14,27 @@ Before adding something to `CLAUDE.md`, ask: *"Would this still be useful and co
 
 ---
 
+## 2026-11-01 — Silent printing via Chrome `--kiosk-printing`, not a print server or WebUSB/ESC-POS
+
+"Print bill" needs to print a receipt with no dialog and no cashier
+interaction, on a real thermal printer (Zy-Q821/"POS-80C") now confirmed
+working. Chosen approach: run the POS in Chrome launched with
+`--kiosk-printing`, which prints straight to the Windows default
+printer — no new software, no new dependency, nothing added to this
+Django project at all. Alternatives considered and rejected: a local
+print-server/agent process, or driving the printer directly over
+WebUSB/ESC-POS from the browser — both would add a new piece of software
+to install and maintain on every shop computer, for a problem
+`--kiosk-printing` already solves with a Chrome flag. The accepted cost:
+this depends on OS-level setup done correctly on each machine (POS-80C
+set as the Windows default printer, "Let Windows manage my default
+printer" off, and a dedicated `--user-data-dir` shortcut, since the flag
+is ignored if Chrome is already running under that profile) — see
+[[Thermal-Printing]] for the full checklist. `pos_receipt_view` also
+needed `@xframe_options_sameorigin` (scoped to that one view) so the
+hidden same-origin iframe "Print bill" prints through isn't blocked by
+the site-wide `X-Frame-Options: DENY`.
+
 ## 2026-10-25 — The server is the only price authority
 
 `POST /api/v1/cart/quote/` and `POST /api/v1/orders/` price every line
