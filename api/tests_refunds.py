@@ -805,7 +805,10 @@ class RefundSlipViewTests(RefundTestBase):
         this test (shop/tests.py): the logo is a pre-made 1-bit dithered
         PNG, so the thermalThreshold filter must NOT be on the logo's own
         image rule (the flag still carries it), and the print-shift
-        variable this task added must be present."""
+        variable this task added must be present. The logo rule DOES
+        carry a brightness(...) filter (--receipt-logo-brightness,
+        default 1.4) -- the dither printed too dark/blobby on a real
+        thermal printer without it."""
         sale = self.complete_sale(
             cart=[{'product_id': self.jar.id, 'qty': 2}], payments=[{'method': 'cash', 'amount': '500.00'}],
         )
@@ -815,11 +818,13 @@ class RefundSlipViewTests(RefundTestBase):
         content = response.content.decode()
         self.assertIn('--receipt-print-shift:', content)
         self.assertIn('--receipt-logo-size:', content)
+        self.assertIn('--receipt-logo-brightness: 1.4;', content)
 
         start = content.index('.r-header-logo img {')
         end = content.index('}', start)
         logo_rule = content[start:end]
-        self.assertNotIn('filter:', logo_rule)
+        self.assertNotIn('url(#thermalThreshold)', logo_rule)
+        self.assertIn('filter: brightness(var(--receipt-logo-brightness));', logo_rule)
         self.assertIn('image-rendering: pixelated', logo_rule)
 
         self.assertIn(

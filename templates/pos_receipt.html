@@ -27,6 +27,7 @@
             --receipt-print-width: {{ content_width_mm }}mm;
             --receipt-print-shift: {{ content_shift_mm }}mm;
             --receipt-logo-size: 80px;
+            --receipt-logo-brightness: 1.4;
         }
         * { box-sizing: border-box; }
         html, body {
@@ -60,12 +61,16 @@
            three) so the browser doesn't blur those dots when scaling.
            --receipt-logo-size is a plain CSS variable (not server-
            computed -- this one doesn't depend on width_mm) so the
-           display size can be tuned in one place. */
+           display size can be tuned in one place. --receipt-logo-brightness
+           (also plain CSS, default 1.4) lightens the printed dither --
+           confirmed on the real thermal printer the leaf printed as a
+           dark blob and the house inside went pale without this. */
         .r-header-logo img {
             width: var(--receipt-logo-size); height: var(--receipt-logo-size); object-fit: contain;
             image-rendering: -webkit-optimize-contrast;
             image-rendering: crisp-edges;
             image-rendering: pixelated;
+            filter: brightness(var(--receipt-logo-brightness));
         }
         /* The flag is an ordinary photo/graphic, still needs the
            threshold filter -- see the inline <svg> defs right after

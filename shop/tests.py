@@ -1704,18 +1704,23 @@ class PosReceiptViewTests(TestCase):
         """Logo-pixel-art fix: the uploaded logo is a pre-made 1-bit
         dithered PNG -- the thermalThreshold filter would destroy that
         dither pattern, so it must NOT be applied to the logo image rule
-        specifically (the flag still carries it, unchanged). The
-        print-shift variable this task added must also be present."""
+        specifically (the flag still carries it, unchanged). The logo
+        rule DOES carry a brightness(...) filter (--receipt-logo-brightness,
+        default 1.4) -- the dither printed too dark/blobby on a real
+        thermal printer without it. The print-shift variable this task
+        added must also be present."""
         self.client.login(username='receipt_cashier', password='pw')
         response = self.client.get(reverse('pos_receipt', args=[self.sale.sale_number]))
         content = response.content.decode()
         self.assertIn('--receipt-print-shift:', content)
         self.assertIn('--receipt-logo-size:', content)
+        self.assertIn('--receipt-logo-brightness: 1.4;', content)
 
         start = content.index('.r-header-logo img {')
         end = content.index('}', start)
         logo_rule = content[start:end]
-        self.assertNotIn('filter:', logo_rule)
+        self.assertNotIn('url(#thermalThreshold)', logo_rule)
+        self.assertIn('filter: brightness(var(--receipt-logo-brightness));', logo_rule)
         self.assertIn('image-rendering: pixelated', logo_rule)
 
         self.assertIn(

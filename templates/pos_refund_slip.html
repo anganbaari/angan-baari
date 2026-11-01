@@ -14,6 +14,7 @@
             --receipt-print-width: {{ content_width_mm }}mm;
             --receipt-print-shift: {{ content_shift_mm }}mm;
             --receipt-logo-size: 80px;
+            --receipt-logo-brightness: 1.4;
         }
         * { box-sizing: border-box; }
         html, body {
@@ -30,12 +31,15 @@
         .r-header { display: flex; align-items: center; justify-content: center; gap: 8px; }
         .r-header-side { flex: 0 0 auto; display: flex; align-items: center; }
         /* Same logo-is-pre-dithered / flag-still-filtered split as
-           pos_receipt.html -- see that file's own comments. */
+           pos_receipt.html -- see that file's own comments.
+           --receipt-logo-brightness (default 1.4) lightens the printed
+           dither, same real-printer fix as that file. */
         .r-header-logo img {
             width: var(--receipt-logo-size); height: var(--receipt-logo-size); object-fit: contain;
             image-rendering: -webkit-optimize-contrast;
             image-rendering: crisp-edges;
             image-rendering: pixelated;
+            filter: brightness(var(--receipt-logo-brightness));
         }
         .r-header-flag img { width: 60px; height: 60px; object-fit: contain; filter: url(#thermalThreshold); }
         .r-header-center { flex: 0 1 auto; text-align: center; min-width: 0; }
