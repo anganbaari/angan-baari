@@ -1307,38 +1307,48 @@ class SaleCompleteOverlayMarkupTests(TestCase):
 
 
 class CashTenderedMarkupTests(TestCase):
-    """Cash received/change due feature: the payment panel's optional
-    "Cash received" input, and the sale-complete overlay's server-
-    confirmed Change-to-return/Cash-received box."""
+    """Cash received/change due feature: cash_tendered is derived
+    automatically from the cash payment line(s) the cashier already typed
+    into the keypad (no separate "Cash received" input), and the
+    sale-complete overlay's server-confirmed Change-to-return/
+    Cash-received box is the ONE change display there (the older,
+    duplicate client-only "Change due" row was removed)."""
 
     def setUp(self):
         user = User.objects.create_user('cash_tendered_cashier', password='pw', is_staff=True)
         UserProfile.objects.create(user=user, role='cashier')
         self.client.login(username='cash_tendered_cashier', password='pw')
 
-    def test_cash_tendered_input_and_change_row_markup_present(self):
+    def test_separate_cash_received_input_is_gone(self):
         response = self.client.get('/pos/')
         self.assertEqual(response.status_code, 200)
         content = response.content.decode()
-        self.assertIn('id="cashTenderedSection"', content)
-        self.assertIn('id="cashTenderedInput"', content)
-        self.assertIn('id="cashTenderedChangeRow"', content)
-        self.assertIn('id="cashTenderedError"', content)
-        self.assertIn('function cashPortionCents()', content)
-        self.assertIn('function renderCashTenderedSection()', content)
+        self.assertNotIn('id="cashTenderedSection"', content)
+        self.assertNotIn('id="cashTenderedInput"', content)
+        self.assertNotIn('id="cashTenderedChangeRow"', content)
+        self.assertNotIn('id="cashTenderedError"', content)
+        self.assertNotIn('function renderCashTenderedSection()', content)
+        self.assertNotIn('function cashTenderedInputCents()', content)
 
-    def test_payload_includes_cash_tendered_when_present(self):
+    def test_cash_tendered_is_derived_from_cash_payment_lines(self):
         response = self.client.get('/pos/')
         content = response.content.decode()
-        self.assertIn('payload.cash_tendered = centsToStr(cashTenderedCentsAtStart);', content)
+        self.assertIn('function derivedCashTenderedCents()', content)
+        self.assertIn('function cashPortionCents()', content)
+        self.assertIn('const derivedTenderedCents = derivedCashTenderedCents();', content)
+        self.assertIn('if (derivedTenderedCents !== null) payload.cash_tendered = centsToStr(derivedTenderedCents);', content)
 
-    def test_sale_complete_overlay_has_change_given_box(self):
+    def test_sale_complete_overlay_has_change_given_box_and_no_duplicate_row(self):
         response = self.client.get('/pos/')
         content = response.content.decode()
         self.assertIn('id="saleCompleteCashTenderedBox"', content)
         self.assertIn('id="saleCompleteChangeGiven"', content)
         self.assertIn('id="saleCompleteCashReceived"', content)
         self.assertIn('data.change_given', content)
+        # The older, duplicate client-only "Change due" row is gone --
+        # change is shown exactly once in this overlay now.
+        self.assertNotIn('id="saleCompleteChangeRow"', content)
+        self.assertNotIn('id="saleCompleteChange"', content)
 
 
 class PosCouponPickerDataTests(TestCase):

@@ -118,7 +118,13 @@ var POS_QUEUE_STORE = 'queuedSales';
 // a server-confirmed "Change to return"/"Cash received" box. An installed
 // app cold-starting offline on the old v25 shell would keep running
 // without any of this.
-var POS_SHELL_CACHE = 'pos-shell-v26';
+// v26 -> v27: removed the separate "Cash received" input/section and the
+// duplicate client-only "Change due" row in the sale-complete overlay --
+// cash_tendered is now derived automatically from the cash payment
+// line(s) the cashier already typed into the keypad
+// (derivedCashTenderedCents(), replacing cashTenderedInputCents()/
+// renderCashTenderedSection()), so there's no second typing step.
+var POS_SHELL_CACHE = 'pos-shell-v27';
 var POS_META_STORE = 'meta';
 var POS_OFFLINE_PIN_STORE = 'offlineOperators';
 var POS_CREDIT_CUSTOMER_STORE = 'creditCustomers';
