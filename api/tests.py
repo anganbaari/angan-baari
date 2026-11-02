@@ -536,6 +536,153 @@ class POSSaleApiTests(ApiTestBase):
         self.assertEqual(old_sale.payments.count(), 0)
 
 
+class POSSaleCashTenderedApiTests(ApiTestBase):
+    """POST /api/v1/sales/'s optional cash_tendered input -- change_given
+    is always server-computed from it, never trusted from the client."""
+
+    def test_cash_tendered_computes_change_given_server_side(self):
+        self.client.login(username='cashier', password='pw')
+        self.unlock_terminal()
+        payload = {
+            'client_sale_id': str(uuid.uuid4()),
+            'payments': [{'method': 'cash', 'amount': '250.00'}],  # self.jar qty 1 = Rs. 250
+            'cart': [{'product_id': self.jar.id, 'qty': 1}],
+            'cash_tendered': '500.00',
+            # Not a real input field (POSSaleCreateSerializer has no
+            # change_given input at all) -- sent anyway to prove it's
+            # simply ignored rather than trusted, even if a client sent it.
+            'change_given': '999.00',
+        }
+        response = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertEqual(Decimal(response.data['cash_tendered']), Decimal('500.00'))
+        self.assertEqual(Decimal(response.data['change_given']), Decimal('250.00'))
+
+        sale = POSSale.objects.get(sale_number=response.data['sale_number'])
+        self.assertEqual(sale.cash_tendered, Decimal('500.00'))
+        self.assertEqual(sale.change_given, Decimal('250.00'))
+        # The sale's own cash PAYMENT amount is untouched by cash_tendered
+        # -- still exactly the Rs. 250 the sale actually needed.
+        self.assertEqual(sale.payments.get(method='cash').amount, Decimal('250.00'))
+
+    def test_cash_tendered_rejected_when_less_than_cash_portion(self):
+        self.client.login(username='cashier', password='pw')
+        self.unlock_terminal()
+        payload = {
+            'client_sale_id': str(uuid.uuid4()),
+            'payments': [{'method': 'cash', 'amount': '250.00'}],
+            'cart': [{'product_id': self.jar.id, 'qty': 1}],
+            'cash_tendered': '200.00',
+        }
+        response = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('less than', response.data['message'])
+        self.assertFalse(POSSale.objects.filter(client_sale_id=payload['client_sale_id']).exists())
+
+    def test_cash_tendered_rejected_without_a_cash_payment_line(self):
+        self.client.login(username='cashier', password='pw')
+        self.unlock_terminal()
+        payload = {
+            'client_sale_id': str(uuid.uuid4()),
+            'payments': [{'method': 'esewa', 'amount': '250.00'}],
+            'cart': [{'product_id': self.jar.id, 'qty': 1}],
+            'cash_tendered': '300.00',
+        }
+        response = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('no cash payment line', response.data['message'])
+        self.assertFalse(POSSale.objects.filter(client_sale_id=payload['client_sale_id']).exists())
+
+    def test_cash_tendered_exact_amount_gives_no_change(self):
+        """Tendering exactly the cash portion is valid -- change_given is
+        0, not rejected, not treated as a missing/invalid value."""
+        self.client.login(username='cashier', password='pw')
+        self.unlock_terminal()
+        payload = {
+            'client_sale_id': str(uuid.uuid4()),
+            'payments': [{'method': 'cash', 'amount': '250.00'}],
+            'cart': [{'product_id': self.jar.id, 'qty': 1}],
+            'cash_tendered': '250.00',
+        }
+        response = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertEqual(Decimal(response.data['change_given']), Decimal('0.00'))
+
+    def test_omitting_cash_tendered_leaves_both_fields_null(self):
+        """Leaving cash_tendered out entirely -- "nothing changes from
+        today" -- must not somehow set change_given to 0 or anything else;
+        both stay genuinely null, same as an old pre-feature sale."""
+        self.client.login(username='cashier', password='pw')
+        self.unlock_terminal()
+        payload = {
+            'client_sale_id': str(uuid.uuid4()),
+            'payments': [{'method': 'cash', 'amount': '250.00'}],
+            'cart': [{'product_id': self.jar.id, 'qty': 1}],
+        }
+        response = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertIsNone(response.data['cash_tendered'])
+        self.assertIsNone(response.data['change_given'])
+        sale = POSSale.objects.get(sale_number=response.data['sale_number'])
+        self.assertIsNone(sale.cash_tendered)
+        self.assertIsNone(sale.change_given)
+
+    def test_idempotent_replay_returns_identical_cash_tendered(self):
+        self.client.login(username='cashier', password='pw')
+        self.unlock_terminal()
+        client_sale_id = str(uuid.uuid4())
+        payload = {
+            'client_sale_id': client_sale_id,
+            'payments': [{'method': 'cash', 'amount': '250.00'}],
+            'cart': [{'product_id': self.jar.id, 'qty': 1}],
+            'cash_tendered': '500.00',
+        }
+        first = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        second = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        self.assertEqual(first.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(second.status_code, status.HTTP_200_OK)
+        self.assertEqual(first.data['cash_tendered'], second.data['cash_tendered'])
+        self.assertEqual(first.data['change_given'], second.data['change_given'])
+        self.assertEqual(POSSale.objects.filter(client_sale_id=client_sale_id).count(), 1)
+
+    def test_queued_offline_sale_replay_carries_cash_tendered(self):
+        """The offline queue replays the exact same payload object it
+        queued (static/js/pos-offline-queue.js posReplayQueue()) -- this
+        is the server-side half of that path. Deliberately no
+        unlock_terminal() call here: a queued-sale replay must work from
+        queued_operator_id alone, with no PIN-unlocked session at all
+        (see get_pos_operator()'s own docstring), and cash_tendered must
+        still be validated/computed the same way on this path."""
+        self.client.login(username='cashier', password='pw')
+        payload = {
+            'client_sale_id': str(uuid.uuid4()),
+            'payments': [{'method': 'cash', 'amount': '250.00'}],
+            'cart': [{'product_id': self.jar.id, 'qty': 1}],
+            'cash_tendered': '400.00',
+            'queued_operator_id': self.staff.id,
+        }
+        response = self.client.post(reverse('v1_sale_list_create'), payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertEqual(Decimal(response.data['change_given']), Decimal('150.00'))
+
+    def test_sale_history_list_includes_cash_tendered_and_change_given(self):
+        """POSSaleReadSerializer (GET /api/v1/sales/, sale history) --
+        read-only output, added alongside the existing fields."""
+        self.client.login(username='cashier', password='pw')
+        self.unlock_terminal()
+        self.client.post(reverse('v1_sale_list_create'), {
+            'client_sale_id': str(uuid.uuid4()),
+            'payments': [{'method': 'cash', 'amount': '250.00'}],
+            'cart': [{'product_id': self.jar.id, 'qty': 1}],
+            'cash_tendered': '500.00',
+        }, format='json')
+        response = self.client.get(reverse('v1_sale_list_create'))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        row = response.data['results'][0]
+        self.assertEqual(Decimal(row['cash_tendered']), Decimal('500.00'))
+        self.assertEqual(Decimal(row['change_given']), Decimal('250.00'))
+
+
 class POSSaleLineApiTests(ApiTestBase):
     """POST /api/v1/sales/ -- the only entry point for a POS sale (see
     POSSaleView's own docstring: it's a thin wrapper around

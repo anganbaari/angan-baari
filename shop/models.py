@@ -1322,6 +1322,21 @@ class POSSale(models.Model):
                    'no automatic offers/combos. See create_pos_sale() in shop/views.py.'
     )
 
+    # Cash received/change given -- both null for a sale with no cash
+    # payment line, or an old sale that predates this field. Deliberately
+    # separate from any existing field: the payments relation's own cash
+    # line already holds the SALE's cash portion (e.g. 300 on a Rs. 300
+    # total), which must stay exactly that for the payments-sum-equals-
+    # total rule (create_pos_sale()) -- cash_tendered is the larger amount
+    # actually handed over (e.g. 500), recorded purely so a reprint can
+    # still show it, which was impossible before this (see
+    # pos_receipt_view()'s own prior "nothing is persisted" note).
+    # change_given is always computed server-side as
+    # cash_tendered - (cash payment portion), never trusted from the
+    # client.
+    cash_tendered = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    change_given = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

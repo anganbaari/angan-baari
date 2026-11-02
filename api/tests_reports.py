@@ -171,6 +171,26 @@ class ReconciliationTests(ReportsTestBase):
         self.assertEqual(Decimal(str(k['credit_given']['current'])), Decimal('200.00'))
         self.assertEqual(Decimal(str(k['total_sales']['current'])), Decimal('500.00'))
 
+    def test_cash_collected_unaffected_by_cash_tendered(self):
+        """cash_collected must always reflect the real cash PAYMENT amount
+        (POSSalePayment.amount, the sale's actual cash portion), never
+        cash_tendered (what was handed over) -- a Rs. 500 note for a
+        Rs. 300 total must still show cash_collected of exactly 300, the
+        same as a sale that never used this field at all."""
+        today = resolve_date_range(None, None)[1]
+        start_utc, _ = local_range_to_utc(today, today)
+        sale = self.make_sale(Decimal('300.00'), payments=[('cash', Decimal('300.00'))],
+                               created_at=start_utc + timedelta(hours=9))
+        sale.cash_tendered = Decimal('500.00')
+        sale.change_given = Decimal('200.00')
+        sale.save(update_fields=['cash_tendered', 'change_given'])
+
+        self.client.login(username='owner1', password='pw')
+        response = self.client.get(reverse('v1_report_summary'), {'start': today.isoformat(), 'end': today.isoformat()})
+        k = response.data['kpis']
+        self.assertEqual(Decimal(str(k['cash_collected']['current'])), Decimal('300.00'))
+        self.assertEqual(Decimal(str(k['total_sales']['current'])), Decimal('300.00'))
+
     def test_cancelled_orders_excluded_from_online_count(self):
         from shop.models import ProductOrder
         ProductOrder.objects.create(name='A', email='a@example.com', phone='1', address='x', product_interest='Mango', status='pending')

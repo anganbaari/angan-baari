@@ -1306,6 +1306,41 @@ class SaleCompleteOverlayMarkupTests(TestCase):
         self.assertIn('closeSaleCompleteOverlay();', new_order_handler)
 
 
+class CashTenderedMarkupTests(TestCase):
+    """Cash received/change due feature: the payment panel's optional
+    "Cash received" input, and the sale-complete overlay's server-
+    confirmed Change-to-return/Cash-received box."""
+
+    def setUp(self):
+        user = User.objects.create_user('cash_tendered_cashier', password='pw', is_staff=True)
+        UserProfile.objects.create(user=user, role='cashier')
+        self.client.login(username='cash_tendered_cashier', password='pw')
+
+    def test_cash_tendered_input_and_change_row_markup_present(self):
+        response = self.client.get('/pos/')
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertIn('id="cashTenderedSection"', content)
+        self.assertIn('id="cashTenderedInput"', content)
+        self.assertIn('id="cashTenderedChangeRow"', content)
+        self.assertIn('id="cashTenderedError"', content)
+        self.assertIn('function cashPortionCents()', content)
+        self.assertIn('function renderCashTenderedSection()', content)
+
+    def test_payload_includes_cash_tendered_when_present(self):
+        response = self.client.get('/pos/')
+        content = response.content.decode()
+        self.assertIn('payload.cash_tendered = centsToStr(cashTenderedCentsAtStart);', content)
+
+    def test_sale_complete_overlay_has_change_given_box(self):
+        response = self.client.get('/pos/')
+        content = response.content.decode()
+        self.assertIn('id="saleCompleteCashTenderedBox"', content)
+        self.assertIn('id="saleCompleteChangeGiven"', content)
+        self.assertIn('id="saleCompleteCashReceived"', content)
+        self.assertIn('data.change_given', content)
+
+
 class PosCouponPickerDataTests(TestCase):
     """pos_view() embeds a live-coupons list (POS Phase E coupon picker)
     the same way PRODUCTS/CATEGORIES are already embedded -- staff-only
@@ -1528,6 +1563,54 @@ class PosReceiptViewTests(TestCase):
         content = response.content.decode()
         self.assertIn('Cashier: Receipt<', content)
         self.assertNotIn('Cashier: Receipt Tester', content)
+
+    def test_cash_tendered_rows_absent_when_not_set(self):
+        """self.sale (setUp) never set cash_tendered -- "nothing changes
+        from today" for a sale that never used this field."""
+        self.client.login(username='receipt_cashier', password='pw')
+        response = self.client.get(reverse('pos_receipt', args=[self.sale.sale_number]))
+        content = response.content.decode()
+        # Not the bare substring "Cash received" -- the layout-order
+        # comment right above these rows mentions that phrase in English
+        # prose regardless of whether the rows themselves render.
+        self.assertNotIn('Cash received (नगद प्राप्त)', content)
+        self.assertNotIn('Change (फिर्ता)', content)
+
+    def test_cash_tendered_rows_present_when_there_is_change(self):
+        sale, created = create_pos_sale(
+            client_sale_id=str(uuid.uuid4()),
+            cart=[{'product_id': self.product.id, 'qty': 1}],
+            payments=[{'method': 'cash', 'amount': '200.00'}],
+            operator_user=self.operator,
+            cash_tendered='500.00',
+        )
+        self.assertTrue(created)
+        self.client.login(username='receipt_cashier', password='pw')
+        response = self.client.get(reverse('pos_receipt', args=[sale.sale_number]))
+        content = response.content.decode()
+        self.assertIn('Cash received (नगद प्राप्त)', content)
+        self.assertIn('Change (फिर्ता)', content)
+        self.assertIn('>500<', content)
+        self.assertIn('>300<', content)  # 500 - 200
+
+    def test_cash_tendered_rows_absent_when_exact_amount_no_change(self):
+        """cash_tendered is set but change_given is exactly 0 -- still no
+        extra rows, per spec ("No extra rows when ... there is no
+        change")."""
+        sale, created = create_pos_sale(
+            client_sale_id=str(uuid.uuid4()),
+            cart=[{'product_id': self.product.id, 'qty': 1}],
+            payments=[{'method': 'cash', 'amount': '200.00'}],
+            operator_user=self.operator,
+            cash_tendered='200.00',
+        )
+        self.assertTrue(created)
+        self.assertEqual(sale.change_given, Decimal('0.00'))
+        self.client.login(username='receipt_cashier', password='pw')
+        response = self.client.get(reverse('pos_receipt', args=[sale.sale_number]))
+        content = response.content.decode()
+        self.assertNotIn('Cash received (नगद प्राप्त)', content)
+        self.assertNotIn('Change (फिर्ता)', content)
 
     def test_receipt_allows_same_origin_framing(self):
         """pos.html's "Print bill" loads this URL into a hidden same-origin

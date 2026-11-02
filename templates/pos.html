@@ -778,6 +778,21 @@
         .new-customer-form { display: none; flex-direction: column; gap: 8px; margin-top: 8px; }
         .new-customer-form.active { display: flex; }
         .new-customer-form input { padding: 9px 12px; border: 1.5px solid var(--mist); border-radius: 8px; font-family: inherit; }
+        .cash-tendered-section { border-top: 1px dashed var(--mist); margin-top: 10px; padding-top: 14px; }
+        .cash-tendered-label { font-weight: 700; font-size: 0.85rem; color: var(--forest); margin-bottom: 8px; display: block; }
+        .cash-tendered-section input[type="text"] {
+            width: 100%; min-height: 44px; padding: 9px 12px; border: 1.5px solid var(--mist);
+            border-radius: 8px; font-family: inherit; font-size: 1rem; box-sizing: border-box;
+        }
+        /* "large and clear" per spec -- a filled, high-contrast box, not
+           just another small summary row. */
+        .cash-tendered-change {
+            display: flex; justify-content: space-between; align-items: center; margin-top: 10px;
+            padding: 12px 14px; border-radius: 10px; background: var(--cream); font-weight: 700;
+        }
+        .cash-tendered-change span:first-child { font-size: 0.9rem; color: var(--forest); }
+        .cash-tendered-change span:last-child { font-size: 1.35rem; color: var(--forest); }
+        .cash-tendered-error { margin-top: 8px; color: #b23b3b; font-weight: 700; font-size: 0.82rem; }
         #completeSaleBtn {
             width: 100%; padding: 14px; border: none; border-radius: 10px; background: var(--forest);
             color: var(--gold); font-size: 1rem; font-weight: 700; cursor: pointer; font-family: inherit; margin-top: 18px;
@@ -829,6 +844,20 @@
         .sale-complete-tax { font-size: 0.76rem; font-weight: 600; color: var(--text-muted); font-family: 'Noto Sans Devanagari', 'DM Sans', sans-serif; }
         .sale-complete-total { font-size: 1.15rem; font-weight: 800; border-top: 1px dashed var(--mist); margin-top: 6px; padding-top: 8px; }
         .sale-complete-change { color: var(--pos-enter-orange); }
+        /* "large and clear" per spec -- its own filled box, not just
+           another small row, same reasoning as .cash-tendered-change in
+           the payment panel. */
+        .sale-complete-cash-tendered { margin: 0 0 14px; }
+        .sale-complete-change-big {
+            display: flex; justify-content: space-between; align-items: center; text-align: left;
+            background: var(--cream); border-radius: 10px; padding: 12px 14px; margin-bottom: 6px;
+        }
+        .sale-complete-change-big span:first-child { font-size: 0.85rem; font-weight: 700; color: var(--forest); }
+        .sale-complete-change-big span:last-child { font-size: 1.5rem; font-weight: 800; color: var(--pos-enter-orange); }
+        .sale-complete-cash-received-row {
+            display: flex; justify-content: space-between; text-align: left; font-size: 0.82rem;
+            font-weight: 600; color: var(--text-muted); padding: 0 2px;
+        }
         .sale-complete-actions { display: flex; gap: 10px; margin-top: 18px; }
         .sale-complete-actions button {
             flex: 1; padding: 13px 10px; border: none; border-radius: 12px; font-family: inherit;
@@ -1346,6 +1375,23 @@
             </div>
         </div>
 
+        <!-- Cash received -- optional, only shown while paymentLines has a
+             cash line (see updatePaymentSummary()). Separate from the
+             cash payment LINE's own amount (which stays exactly the
+             sale's cash portion, e.g. 300, for the strict payments-sum-
+             equals-total rule) -- this records what the customer actually
+             handed over (e.g. 500) purely so "Change to return" can be
+             shown and so a reprint can later show it too (cash_tendered/
+             change_given, POSSale). Leaving it empty changes nothing. -->
+        <div class="cash-tendered-section" id="cashTenderedSection" style="display:none;">
+            <label for="cashTenderedInput" class="cash-tendered-label">Cash received</label>
+            <input type="text" id="cashTenderedInput" inputmode="decimal" placeholder="Amount handed over" autocomplete="off">
+            <div class="cash-tendered-change" id="cashTenderedChangeRow" style="display:none;">
+                <span>Change to return</span><span id="cashTenderedChangeValue">Rs. 0</span>
+            </div>
+            <div class="cash-tendered-error" id="cashTenderedError" style="display:none;"></div>
+        </div>
+
         <button type="button" id="completeSaleBtn" disabled>Complete Sale</button>
 
         <!-- Full cash confirmation -- centred within the payment panel
@@ -1390,6 +1436,18 @@
         <div class="sale-complete-card">
             <h3>Sale complete</h3>
             <p id="saleCompleteNumber"></p>
+            <!-- Only shown when the server actually recorded change
+                 (change_given > 0, from a persisted cash_tendered) --
+                 see showSaleCompleteOverlay(). Near the top, since this is
+                 the one figure the cashier most urgently needs right now.
+                 Independent of saleCompleteChangeRow below, which is the
+                 PRE-EXISTING client-only change display for a plain cash
+                 overpay typed straight into the cash line -- that one
+                 stays exactly as it was. -->
+            <div class="sale-complete-cash-tendered" id="saleCompleteCashTenderedBox" style="display:none;">
+                <div class="sale-complete-change-big"><span>Change to return</span><span id="saleCompleteChangeGiven">Rs. 0</span></div>
+                <div class="sale-complete-cash-received-row"><span>Cash received</span><span id="saleCompleteCashReceived">Rs. 0</span></div>
+            </div>
             <div class="sale-complete-row sale-complete-tax"><span>कुल कर</span><span id="saleCompleteTax">Rs. 0</span></div>
             <div class="sale-complete-row sale-complete-tax"><span>कर स. मूल्य</span><span id="saleCompleteValueInclTax">Rs. 0</span></div>
             <div class="sale-complete-row sale-complete-total"><span>Total</span><span id="saleCompleteTotal">Rs. 0</span></div>
@@ -3449,6 +3507,70 @@
             return isNaN(n) ? 0 : Math.round(n * 100);
         }
 
+        // The cash portion as it will actually be SENT to the server --
+        // same reduction buildPaymentsPayload() applies at submit time
+        // (an overpaid cash line is trimmed down by the overall overpay
+        // amount), computed here too so "Cash received"'s own math always
+        // agrees with what create_pos_sale() will validate against.
+        function cashPortionCents() {
+            const changeCents = Math.max(0, -remainingCents());
+            const totalCashCents = paymentLines
+                .filter(l => l.method === 'cash')
+                .reduce((sum, l) => sum + Math.round(parseFloat(l.amount) * 100), 0);
+            return Math.max(0, totalCashCents - changeCents);
+        }
+
+        // Single source of truth for "Cash received" -- read fresh from
+        // the input every time rather than tracked in a separate variable,
+        // so there's nothing to keep in sync with the DOM.
+        function cashTenderedInputCents() {
+            const raw = document.getElementById('cashTenderedInput').value.trim();
+            if (raw === '') return null; // empty -- "nothing changes from today"
+            const n = parseFloat(raw);
+            if (isNaN(n)) return null;
+            return Math.round(n * 100);
+        }
+
+        // Renders the whole "Cash received" section AND returns whether
+        // Complete Sale must be blocked on it (tendered entered but less
+        // than the cash portion) -- one function so the display and the
+        // gating condition can never drift apart.
+        function renderCashTenderedSection() {
+            const section = document.getElementById('cashTenderedSection');
+            const hasCashLine = paymentLines.some(l => l.method === 'cash');
+            section.style.display = hasCashLine ? '' : 'none';
+            if (!hasCashLine) {
+                // A removed cash line leaves nothing for this field to
+                // apply to -- clear it so stale state can't leak into a
+                // later, unrelated payment combination on the same sale.
+                document.getElementById('cashTenderedInput').value = '';
+                document.getElementById('cashTenderedChangeRow').style.display = 'none';
+                document.getElementById('cashTenderedError').style.display = 'none';
+                return false;
+            }
+
+            const tenderedCents = cashTenderedInputCents();
+            const changeRow = document.getElementById('cashTenderedChangeRow');
+            const errorEl = document.getElementById('cashTenderedError');
+            if (tenderedCents === null) {
+                changeRow.style.display = 'none';
+                errorEl.style.display = 'none';
+                return false;
+            }
+            const portionCents = cashPortionCents();
+            if (tenderedCents < portionCents) {
+                changeRow.style.display = 'none';
+                errorEl.textContent = 'Received is less than the cash amount';
+                errorEl.style.display = '';
+                return true;
+            }
+            errorEl.style.display = 'none';
+            document.getElementById('cashTenderedChangeValue').textContent =
+                'Rs. ' + formatMoneyFromCents(tenderedCents - portionCents);
+            changeRow.style.display = '';
+            return false;
+        }
+
         function renderPaymentSummaryHeader() {
             // Display-only tax rows -- कुल कर/कर स. मूल्य never feed into
             // Total/Paid/Remaining or the payload (see the HTML comment
@@ -3530,12 +3652,16 @@
             document.getElementById('creditSection').style.display = showCredit ? '' : 'none';
 
             const needsCustomer = (hasCreditLine || wholesaleMode) && !selectedCustomer;
+            const cashTenderedInvalid = renderCashTenderedSection();
             // Complete is enabled at Remaining <= 0 -- covers both exactly
             // settled (0) and a cash overpay (negative, shown as Change
             // due); only cash can ever push this negative, since every
             // other method's Add button is capped at Remaining (see
-            // keypadAddIsValid()).
-            document.getElementById('completeSaleBtn').disabled = remaining > 0 || needsCustomer || saleInFlight;
+            // keypadAddIsValid()). Also blocked while "Cash received" has
+            // been typed but is less than the cash portion -- cleared by
+            // fixing or emptying that field, same as any other gate here.
+            document.getElementById('completeSaleBtn').disabled =
+                remaining > 0 || needsCustomer || saleInFlight || cashTenderedInvalid;
 
             const fullCashBtn = document.getElementById('fullCashBtn');
             if (fullCashBtn) fullCashBtn.disabled = cart.length === 0 || remaining <= 0 || saleInFlight;
@@ -3662,6 +3788,14 @@
                 showToast('Payment does not cover the total yet.');
                 return;
             }
+            // Defensive -- Complete Sale is already disabled while this is
+            // true (updatePaymentSummary()), but Full cash's own confirm
+            // calls straight here without checking that attribute.
+            const cashTenderedCentsAtStart = cashTenderedInputCents();
+            if (cashTenderedCentsAtStart !== null && cashTenderedCentsAtStart < cashPortionCents()) {
+                showToast('Received is less than the cash amount.');
+                return;
+            }
             // Captured now, before buildPaymentsPayload() below reduces
             // the cash line(s) to make the SENT sum match the total
             // exactly -- the server never sees an overpayment at all, so
@@ -3693,6 +3827,11 @@
             if (selectedCustomer) payload.customer_id = selectedCustomer.id;
             if (appliedCoupon) payload.coupon_code = appliedCoupon.code;
             if (wholesaleMode) payload.is_wholesale = true;
+            // cash_tendered rides inside this same payload object, so it's
+            // automatically included when a dropped connection queues this
+            // exact object for later replay (posQueueEnqueue()) -- no
+            // separate wiring needed for the offline path.
+            if (cashTenderedCentsAtStart !== null) payload.cash_tendered = centsToStr(cashTenderedCentsAtStart);
 
             try {
                 const response = await apiFetch('/api/v1/sales/', {
@@ -3806,6 +3945,7 @@
         document.querySelectorAll('.pm-qr-btn').forEach(btn => {
             btn.addEventListener('click', (e) => { e.stopPropagation(); openPaymentQr(btn.dataset.method); });
         });
+        document.getElementById('cashTenderedInput').addEventListener('input', updatePaymentSummary);
         document.getElementById('paymentKeypadBack').addEventListener('click', closePaymentKeypad);
         document.querySelectorAll('.keypad-key').forEach(btn => {
             btn.addEventListener('click', () => handleKeypadKey(btn.dataset.key));
@@ -3908,6 +4048,20 @@
             // perfectly normal success response, and this overlay must
             // never show "Rs. undefined" for an already-saved sale.
             document.getElementById('saleCompleteNumber').textContent = `Sale ${data.sale_number}`;
+            // Server-confirmed cash_tendered/change_given -- independent
+            // of changeDueCents below (the pre-existing client-only
+            // display for a plain cash overpay). Both can show at once in
+            // the rare case both mechanisms were used on the same sale;
+            // each is accurate on its own terms either way.
+            const cashTenderedBox = document.getElementById('saleCompleteCashTenderedBox');
+            const changeGiven = data.change_given != null ? parseFloat(data.change_given) : 0;
+            if (data.change_given != null && changeGiven > 0) {
+                document.getElementById('saleCompleteChangeGiven').textContent = 'Rs. ' + formatMoney(data.change_given);
+                document.getElementById('saleCompleteCashReceived').textContent = 'Rs. ' + formatMoney(data.cash_tendered);
+                cashTenderedBox.style.display = '';
+            } else {
+                cashTenderedBox.style.display = 'none';
+            }
             document.getElementById('saleCompleteTax').textContent = 'Rs. ' + formatMoney(data.vat_amount || 0);
             document.getElementById('saleCompleteValueInclTax').textContent = 'Rs. ' + formatMoney(data.exempt_value || 0);
             document.getElementById('saleCompleteTotal').textContent = 'Rs. ' + formatMoney(data.total);

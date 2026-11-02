@@ -188,6 +188,7 @@ class POSSaleReadSerializer(serializers.ModelSerializer):
             'id', 'sale_number', 'cashier', 'cashier_username', 'payment_method',
             'payment_method_display', 'cart_snapshot', 'total_amount',
             'client_sale_id', 'created_at', 'coupon_code', 'discount_amount', 'round_off_amount',
+            'cash_tendered', 'change_given',
         ]
 
 
@@ -226,6 +227,13 @@ class POSSaleCreateSerializer(serializers.Serializer):
     # NOT validated here — it depends on request.user, which this
     # input-shape-only serializer has no access to; see POSSaleView.post().
     is_wholesale = serializers.BooleanField(required=False, default=False)
+    # Cash received -- optional write input, validated for real in
+    # create_pos_sale() (needs a cash payment line to compare against).
+    # change_given is never a write input at all -- it's always server-
+    # computed and only ever appears in the OUTPUT serializer above.
+    cash_tendered = serializers.DecimalField(
+        max_digits=10, decimal_places=2, required=False, allow_null=True,
+    )
 
 
 class PosUnlockSerializer(serializers.Serializer):

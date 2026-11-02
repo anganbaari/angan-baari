@@ -272,6 +272,7 @@ class POSSaleView(generics.ListAPIView):
                 # create_pos_sale() itself still enforces this (fails
                 # closed if omitted) — this is just where it's computed.
                 wholesale_authorized=_wholesale_authorized_for_request(request),
+                cash_tendered=data.get('cash_tendered'),
             )
         except POSSaleValidationError as e:
             # `reason` lets the offline queue (static/js/pos-offline-queue.js)

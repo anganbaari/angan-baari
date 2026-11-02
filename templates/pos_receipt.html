@@ -259,7 +259,8 @@
                  No Round-off row -- the receipt shows what was actually
                  paid, not the pre-rounding math (see Subtotal/कर स. मूल्य
                  below). Order: items, dashed, [Subtotal, Discount if
-                 any, payment lines, credit due], dashed, कुल कर,
+                 any, payment lines, cash_tendered/change_given rows if
+                 recorded, credit due], dashed, कुल कर,
                  कर स. मूल्य, dashed, Total, dashed, QR row, barcode,
                  thank-you -- exactly ONE dashed line in each of those
                  slots, not two stacked after Total as before. -->
@@ -271,6 +272,10 @@
             {% for p in payments %}
             <div class="r-row r-muted"><span>{{ p.method_label }}</span><span>{{ p.amount }}</span></div>
             {% endfor %}
+            {% if cash_tendered_display %}
+            <div class="r-row r-muted"><span>Cash received (नगद प्राप्त)</span><span>{{ cash_tendered_display }}</span></div>
+            <div class="r-row r-muted"><span>Change (फिर्ता)</span><span>{{ change_given_display }}</span></div>
+            {% endif %}
             {% if customer_outstanding_balance %}
             <div class="r-row r-muted"><span>Credit due (बाँकी)</span><span>{{ customer_outstanding_balance }}</span></div>
             {% endif %}

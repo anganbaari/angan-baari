@@ -111,7 +111,14 @@ var POS_QUEUE_STORE = 'queuedSales';
 // receipt." toast). Fixed server-side (pos_receipt_view gained
 // @xframe_options_sameorigin, shop/views.py) plus added console.error
 // logging in printReceiptViaIframe()'s failure paths here in pos.html.
-var POS_SHELL_CACHE = 'pos-shell-v25';
+// v25 -> v26: cash received/change due feature -- new #cashTenderedSection
+// in the payment panel (and its cashPortionCents()/cashTenderedInputCents()/
+// renderCashTenderedSection() helpers), performCompleteSale() now sends
+// cash_tendered in the sale payload, and showSaleCompleteOverlay() shows
+// a server-confirmed "Change to return"/"Cash received" box. An installed
+// app cold-starting offline on the old v25 shell would keep running
+// without any of this.
+var POS_SHELL_CACHE = 'pos-shell-v26';
 var POS_META_STORE = 'meta';
 var POS_OFFLINE_PIN_STORE = 'offlineOperators';
 var POS_CREDIT_CUSTOMER_STORE = 'creditCustomers';

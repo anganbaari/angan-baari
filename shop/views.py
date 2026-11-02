@@ -1257,7 +1257,7 @@ def resolve_pos_combo_lines(cart):
 
 def create_pos_sale(*, client_sale_id, cart, payments, operator_user, customer=None,
                      source='pos', note_prefix='POS sale', coupon_code=None,
-                     is_wholesale=False, wholesale_authorized=False):
+                     is_wholesale=False, wholesale_authorized=False, cash_tendered=None):
     """Called by POSSaleView.post() (api/views.py) — the sole entry point
     for completing a POS sale since templates/pos.html's completeSaleBtn
     switched to POST /api/v1/sales/ (POS-PWA Phase 1); the earlier plain-
@@ -1308,6 +1308,15 @@ def create_pos_sale(*, client_sale_id, cart, payments, operator_user, customer=N
     bypassed by a caller that forgets to pass it. A non-owner/manager
     sending is_wholesale=True gets a 403 before any pricing happens, so a
     price_override can never produce a discount for them. See CLAUDE.md.
+
+    cash_tendered (optional) is the amount actually handed over in cash --
+    only accepted when the payments above include a cash line, and must
+    be at least that line's amount (the sale's cash portion, which
+    payments_sum's exact-match rule already pins to the real total minus
+    every other payment line). change_given is always DERIVED here from
+    cash_tendered minus the cash portion; there is no client-sent change
+    value at all, so there's nothing to ignore -- the door is closed by
+    never accepting one in the first place.
     """
     from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
     from django.core.exceptions import ValidationError
@@ -1503,6 +1512,29 @@ def create_pos_sale(*, client_sale_id, cart, payments, operator_user, customer=N
             f'Payments (Rs. {payments_sum}) do not match the sale total (Rs. {required_total}).'
         )
 
+    # Cash received/change given -- cash_tendered is the amount actually
+    # handed over (may exceed the sale's own cash portion below, which is
+    # what payments_sum above already enforces); change_given is always
+    # DERIVED here, from the server's own cash portion, never from any
+    # client-sent change value (there isn't one -- the client never sends
+    # change, only cash_tendered, exactly to close that door).
+    cash_portion = sum(
+        (Decimal(str(line['amount'])) for line in payments if line['method'] == 'cash'), Decimal('0')
+    )
+    change_given = None
+    if cash_tendered is not None:
+        try:
+            cash_tendered = Decimal(str(cash_tendered))
+        except (InvalidOperation, TypeError, ValueError):
+            raise POSSaleValidationError('Cash received must be a valid number.')
+        if cash_portion <= 0:
+            raise POSSaleValidationError('Cash received was sent, but this sale has no cash payment line.')
+        if cash_tendered < cash_portion:
+            raise POSSaleValidationError(
+                f'Cash received (Rs. {cash_tendered}) is less than the cash amount (Rs. {cash_portion}).'
+            )
+        change_given = cash_tendered - cash_portion
+
     payment_method = payments[0]['method'] if len(payments) == 1 else 'split'
 
     try:
@@ -1521,6 +1553,8 @@ def create_pos_sale(*, client_sale_id, cart, payments, operator_user, customer=N
                 discount_amount=discount_amount,
                 round_off_amount=round_off_amount,
                 is_wholesale=is_wholesale,
+                cash_tendered=cash_tendered,
+                change_given=change_given,
             )
             if coupon_obj:
                 coupon_obj.used_count += 1
@@ -1673,6 +1707,10 @@ def build_sale_receipt_data(sale):
         'payments': payments_data,
         'vat_amount': str(Decimal(sale.vat_amount).quantize(Decimal('0.01'))),
         'exempt_value': str(Decimal(sale.exempt_value).quantize(Decimal('0.01'))),
+        # Both None for a sale with no cash line, or one that predates
+        # this field -- see POSSale.cash_tendered's own help_text.
+        'cash_tendered': str(sale.cash_tendered.quantize(Decimal('0.01'))) if sale.cash_tendered is not None else None,
+        'change_given': str(sale.change_given.quantize(Decimal('0.01'))) if sale.change_given is not None else None,
     }
 
 
@@ -2372,11 +2410,13 @@ def pos_receipt_view(request, sale_number):
     can test the real Decimal's truthiness, not a formatted string
     (which, being non-empty, would be truthy even for "0").
 
-    Change due is deliberately NOT shown here -- it only ever exists
-    client-side, at the moment of sale, in templates/pos.html's own
-    paymentLines/buildPaymentsPayload() (see that file's Full cash/
-    performCompleteSale() handling); nothing is persisted that would let
-    a later reprint reconstruct it."""
+    Cash received/change due: shown via cash_tendered_display/
+    change_given_display, derived from POSSale.cash_tendered/change_given
+    (both persisted at create_pos_sale() time -- see that function). Only
+    rendered when cash_tendered is actually set AND there was real change
+    (change_given > 0); null for any sale with no cash line, an exact-cash
+    sale, or one that predates this field, in which case the template
+    shows nothing extra, exactly as before this feature existed."""
     from decimal import Decimal
     from django.utils import timezone
     from .models import BusinessSettings, POSSale, POSSalePayment
@@ -2444,6 +2484,12 @@ def pos_receipt_view(request, sale_number):
     subtotal_display = format_money_display(sale.total_amount if not has_discount else subtotal)
     exempt_value_display = format_money_display(Decimal(data['exempt_value']) + sale.round_off_amount)
 
+    # Cash received/change rows -- only shown when there's actually
+    # change to report (see pos_receipt_view()'s own docstring above).
+    show_cash_tendered = sale.cash_tendered is not None and sale.change_given is not None and sale.change_given > 0
+    cash_tendered_display = format_money_display(sale.cash_tendered) if show_cash_tendered else None
+    change_given_display = format_money_display(sale.change_given) if show_cash_tendered else None
+
     def image_url(field):
         return field.url if field else ''
 
@@ -2509,6 +2555,8 @@ def pos_receipt_view(request, sale_number):
         'exempt_value_display': exempt_value_display,
         'total': format_money_display(sale.total_amount),
         'payments': payments_display,
+        'cash_tendered_display': cash_tendered_display,
+        'change_given_display': change_given_display,
         'qr_website_url': qr_website_url,
         'qr_tiktok_url': qr_tiktok_url,
         'qr_facebook_url': qr_facebook_url,
