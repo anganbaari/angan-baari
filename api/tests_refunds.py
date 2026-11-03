@@ -567,6 +567,25 @@ class RefundSlipViewTests(RefundTestBase):
         self.assertIn('500', content)
         self.assertIn('REFUND', content)
 
+    def test_refund_slip_allows_same_origin_framing(self):
+        """templates/pos_refund.html's "Print refund slip" (and the
+        "Reprint slip" buttons in the Previous/Recent refunds lists) load
+        this URL into a hidden same-origin <iframe> to print it silently
+        (printRefundSlipViaIframe()) -- the site-wide X-Frame-Options: DENY
+        would otherwise block that, so this view carries the same
+        @xframe_options_sameorigin override as pos_receipt_view. See
+        shop/tests.py's test_other_views_still_deny_framing for proof the
+        refund SCREEN (/pos/refund/, not this slip) still gets DENY."""
+        sale = self.complete_sale(
+            cart=[{'product_id': self.jar.id, 'qty': 1}], payments=[{'method': 'cash', 'amount': '250.00'}],
+        )
+        line = sale.lines.get()
+        create_response = self.post_refund(sale.sale_number, [{'sale_line_id': line.id, 'quantity': '1'}])
+        refund_number = create_response.data['refund_number']
+
+        response = self.client.get(reverse('pos_refund_slip', args=[refund_number]))
+        self.assertEqual(response['X-Frame-Options'], 'SAMEORIGIN')
+
     def test_refund_page_is_staff_only(self):
         self.client.logout()
         response = self.client.get(reverse('pos_refund'))
@@ -967,6 +986,38 @@ class RecentRefundsApiTests(RefundTestBase):
             self.assertIn('total_amount', row)
             self.assertIn('method', row)
             self.assertIn('created_by', row)
+
+
+class RefundSlipSilentPrintMarkupTests(RefundTestBase):
+    """"Print refund slip" (and the history lists' "Reprint slip" buttons)
+    print through a hidden same-origin <iframe>, copied from pos.html's
+    proven printReceiptViaIframe() -- never a new tab/window.open(). See
+    RefundSlipViewTests.test_refund_slip_allows_same_origin_framing for
+    the server-side X-Frame-Options half of this."""
+
+    def test_print_refund_slip_uses_hidden_iframe_not_window_open(self):
+        response = self.client.get(reverse('pos_refund'))
+        content = response.content.decode()
+        self.assertIn('function printRefundSlipViaIframe(refundNumber, btn)', content)
+        self.assertIn("printRefundSlipViaIframe(data.refund_number, document.getElementById('printSlipBtn'));", content)
+        self.assertNotIn("window.open(slipUrl(data.refund_number), '_blank')", content)
+        # Real, non-zero, off-screen dimensions -- a 0x0 or display:none
+        # iframe doesn't print reliably in Chrome (see the copied comment
+        # in pos_refund.html itself for the full story).
+        self.assertIn("iframe.style.width = '320px';", content)
+        self.assertIn("iframe.style.height = '800px';", content)
+
+    def test_history_list_reprint_buttons_use_silent_print(self):
+        """The "Reprint slip" entries in both "Previous refunds" (on a
+        looked-up sale) and site-wide "Recent refunds" are buttons wired
+        to the same print function via delegation (wireReprintSlipButtons()),
+        not plain target="_blank" links, now that reprinting from history
+        is one tap too."""
+        response = self.client.get(reverse('pos_refund'))
+        content = response.content.decode()
+        self.assertIn('class="reprint-slip-btn" data-refund-number="${r.refund_number}"', content)
+        self.assertIn('function wireReprintSlipButtons(root)', content)
+        self.assertNotIn('target="_blank">Reprint slip</a>', content)
 
 
 class RefundSlipLinkResolutionTests(RefundTestBase):

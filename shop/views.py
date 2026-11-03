@@ -2586,6 +2586,7 @@ def pos_refund_view(request):
 
 
 @staff_member_required
+@xframe_options_sameorigin
 def pos_refund_slip_view(request, refund_number):
     """Printable refund slip -- GET /pos/refund/<refund_number>/. Same
     overall shape/conventions as pos_receipt_view() (BS date via
@@ -2595,7 +2596,13 @@ def pos_refund_slip_view(request, refund_number):
     shared templates/_receipt_header.html / _receipt_social_qr.html
     partials -- see those files' own comments) but for a Refund instead
     of a POSSale -- still no barcode, no thank-you line (neither was
-    asked for here, see templates/pos_refund_slip.html)."""
+    asked for here, see templates/pos_refund_slip.html).
+
+    @xframe_options_sameorigin overrides the site-wide X-Frame-Options:
+    DENY for this view only (same reasoning/scope as pos_receipt_view()
+    above) -- templates/pos_refund.html's "Print refund slip" loads this
+    URL into a hidden same-origin <iframe> to print it silently, which
+    DENY would otherwise block outright."""
     from django.utils import timezone
     from .models import BusinessSettings, Refund
     from .bs_calendar import ad_to_bs, BSDateOutOfRangeError

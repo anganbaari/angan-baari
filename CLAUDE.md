@@ -57,11 +57,11 @@ doesn't use, so new packages silently never reach the running site.
 PythonAnywhere after pulling. Say so explicitly when proposing a model
 change — don't assume it happens automatically.**
 
-Latest migration as of this writing: `0051_productorder_hidden_by_customer_productorder_user`.
+Latest migration as of this writing: `0052_possale_cash_tendered_possale_change_given`.
 Don't treat this as a goalpost — just confirm the real latest with
 `python manage.py showmigrations shop | tail` before assuming it's current.
 
-Full test suite: `python manage.py test` (643 passing as of this writing).
+Full test suite: `python manage.py test` (688 passing as of this writing).
 Same caveat — re-run it rather than trusting this number once it's old.
 
 ## Architecture decisions already made (don't relitigate these)
@@ -790,6 +790,16 @@ encodes the untouched original). All dates are shown in B.S. There is no
 made to agree exactly instead (see "POS pricing" above for why that's now
 the common case for an ordinary sale).
 
+## Cash received and change due
+
+`POSSale.cash_tendered`/`change_given` (nullable, migration `0052`) let a
+cash overpayment show "Change to return" and be reprinted later. There is
+**no separate "Cash received" input** — `pos.html` derives it automatically
+from the cash payment line(s) the cashier already typed into the keypad
+(`derivedCashTenderedCents()`); the server still validates/computes
+`change_given` itself and ignores any client-sent value. Full detail:
+`Angan-Baari-Knowledge/02-Architecture/Receipts-and-Pricing.md`.
+
 ## Refunds
 
 Staff-only screens: lookup/process at `/pos/refund/` (`templates/
@@ -798,6 +808,14 @@ pos_refund.html`), printable slip at `/pos/refund/<refund_number>/`
 `create_pos_refund()` (`shop/views.py`), the sole entry point, mirroring
 `create_pos_sale()`'s own shape — idempotent on a client-generated
 `client_refund_id`, same pattern as `client_sale_id`.
+
+The refund slip prints silently the same way the sale receipt does — a
+hidden-iframe `print()` call (`printRefundSlipViaIframe()`, copied into
+`pos_refund.html` rather than refactored out of `pos.html`), from "Print
+refund slip" and from "Reprint slip" in both the Previous/Recent refunds
+lists. `pos_refund_slip_view` carries `@xframe_options_sameorigin`, the
+only other view besides `pos_receipt_view` with that override. See
+`Angan-Baari-Knowledge/02-Architecture/Thermal-Printing.md`.
 
 **What can be refunded, and how:** a plain `fixed_quantity` line (not part of
 a combo) can be partially refunded, one base unit at a time. **Everything

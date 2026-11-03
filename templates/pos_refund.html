@@ -271,6 +271,12 @@
            shape either way. */
         .prior-refund-row { display: flex; justify-content: space-between; gap: 10px; padding: 3px 0; flex-wrap: wrap; }
         .prior-refund-row a { color: var(--pos-text-green); font-weight: 700; margin-left: 8px; }
+        .reprint-slip-btn {
+            color: var(--pos-text-green); font-weight: 700; margin-left: 8px; background: none;
+            border: none; padding: 0; font-family: inherit; font-size: inherit; cursor: pointer;
+            text-decoration: underline;
+        }
+        .reprint-slip-btn:disabled { opacity: 0.6; cursor: not-allowed; text-decoration: none; }
 
         .line-card { border: 1.5px solid var(--mist); border-radius: 10px; padding: 8px; margin-bottom: 6px; }
         .line-card.line-done { opacity: 0.5; }
@@ -638,6 +644,95 @@
         function slipUrl(refundNumber) {
             return '/pos/refund/' + refundNumber + '/';
         }
+
+        // Prints the refund slip through a hidden same-origin <iframe> --
+        // never opens a new tab, never navigates away from this page. This
+        // is a deliberate COPY of pos.html's own printReceiptViaIframe()
+        // (see that function there for the full "why" -- a 0x0 or
+        // display:none iframe doesn't print reliably in Chrome, a real
+        // off-screen size does), not a shared-JS refactor, specifically to
+        // keep the already-proven sale-receipt print flow untouched. Keep
+        // the two in sync by hand if the printing mechanism itself ever
+        // changes.
+        function printRefundSlipViaIframe(refundNumber, btn) {
+            const originalText = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = 'Printing…';
+
+            let settled = false;
+            let fallbackTimer;
+            const finish = () => {
+                if (settled) return;
+                settled = true;
+                clearTimeout(fallbackTimer);
+                if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
+                btn.disabled = false;
+                btn.textContent = originalText;
+            };
+
+            const iframe = document.createElement('iframe');
+            iframe.style.position = 'fixed';
+            iframe.style.left = '-10000px';
+            iframe.style.top = '0';
+            iframe.style.width = '320px';
+            iframe.style.height = '800px';
+            iframe.style.visibility = 'visible';
+            iframe.style.border = '0';
+            iframe.setAttribute('aria-hidden', 'true');
+
+            fallbackTimer = setTimeout(finish, 60000);
+
+            iframe.addEventListener('load', () => {
+                try {
+                    const idoc = iframe.contentDocument;
+                    const iwin = iframe.contentWindow;
+                    const images = Array.from(idoc.images || []);
+                    const imagesReady = images.length
+                        ? Promise.all(images.map((img) => img.complete
+                            ? Promise.resolve()
+                            : new Promise((resolve) => {
+                                img.addEventListener('load', resolve, { once: true });
+                                img.addEventListener('error', resolve, { once: true });
+                            })))
+                        : Promise.resolve();
+                    const fontsReady = (idoc.fonts && idoc.fonts.ready) ? idoc.fonts.ready : Promise.resolve();
+
+                    Promise.all([imagesReady, fontsReady]).then(() => {
+                        requestAnimationFrame(() => {
+                            iwin.addEventListener('afterprint', finish);
+                            iwin.focus();
+                            iwin.print();
+                        });
+                    });
+                } catch (err) {
+                    console.error('printRefundSlipViaIframe: failed to print loaded slip', err);
+                    showToast('Could not print the refund slip.');
+                    finish();
+                }
+            });
+            iframe.addEventListener('error', (err) => {
+                console.error('printRefundSlipViaIframe: refund slip iframe failed to load', err);
+                showToast('Could not load the refund slip to print.');
+                finish();
+            });
+
+            document.body.appendChild(iframe);
+            iframe.src = slipUrl(refundNumber);
+        }
+
+        // Wires every ".reprint-slip-btn" under `root` (re-rendered history
+        // lists -- "Previous refunds" on the looked-up sale, and the
+        // site-wide "Recent refunds" panel) to the same silent print
+        // function above, rather than the plain new-tab link these used to
+        // be. Re-run after each innerHTML rebuild, same delegation pattern
+        // as the existing qty-dec/qty-inc buttons elsewhere on this page.
+        function wireReprintSlipButtons(root) {
+            root.querySelectorAll('.reprint-slip-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    printRefundSlipViaIframe(btn.dataset.refundNumber, btn);
+                });
+            });
+        }
         function showToast(text) {
             const toast = document.getElementById('toast');
             toast.textContent = text;
@@ -872,7 +967,7 @@
                         ${saleData.refunds.map(r => `
                             <div class="prior-refund-row">
                                 <span>${r.refund_number} — ${formatDateTime(r.created_at)} (${r.method})</span>
-                                <span>Rs ${formatMoney(r.amount)}<a href="${slipUrl(r.refund_number)}" target="_blank">Reprint slip</a></span>
+                                <span>Rs ${formatMoney(r.amount)}<button type="button" class="reprint-slip-btn" data-refund-number="${r.refund_number}">Reprint slip</button></span>
                             </div>`).join('')}
                     </div>
                 </div>` : '';
@@ -890,6 +985,7 @@
             `;
 
             renderLines();
+            wireReprintSlipButtons(saleCard);
 
             document.getElementById('methodCard').style.display = saleData.fully_refunded ? 'none' : '';
             document.getElementById('reasonCard').style.display = saleData.fully_refunded ? 'none' : '';
@@ -1100,9 +1196,10 @@
                 list.innerHTML = data.length ? data.map(r => `
                     <div class="prior-refund-row">
                         <span>${r.refund_number} — sale ${r.sale_number.replace(/^POS-/, '')} — ${formatDateTime(r.created_at)} (${r.method})</span>
-                        <span>Rs ${formatMoney(r.total_amount)}<a href="${slipUrl(r.refund_number)}" target="_blank">Reprint slip</a></span>
+                        <span>Rs ${formatMoney(r.total_amount)}<button type="button" class="reprint-slip-btn" data-refund-number="${r.refund_number}">Reprint slip</button></span>
                     </div>
                 `).join('') : '<p>No refunds yet.</p>';
+                wireReprintSlipButtons(list);
                 recentRefundsLoaded = true;
             } catch (err) {
                 list.textContent = 'Could not reach the server.';
@@ -1217,11 +1314,12 @@
                 document.getElementById('successNumber').textContent =
                     `${data.refund_number} — Rs ${formatMoney(data.total_amount)}`;
                 document.getElementById('printSlipBtn').onclick = () => {
-                    window.open(slipUrl(data.refund_number), '_blank');
+                    printRefundSlipViaIframe(data.refund_number, document.getElementById('printSlipBtn'));
                 };
-                // A real, persistent link (not just the button's JS handler
-                // above) -- stays usable even after that tab is closed, so
-                // a closed tab is never the only way back to the slip.
+                // A real, persistent link -- stays usable even if printing
+                // silently fails (e.g. a popup/print permission issue), so
+                // there's always a plain way back to the slip besides the
+                // one-tap print button above.
                 document.getElementById('openSlipLink').href = slipUrl(data.refund_number);
                 document.getElementById('successBackdrop').classList.add('active');
             } catch (err) {

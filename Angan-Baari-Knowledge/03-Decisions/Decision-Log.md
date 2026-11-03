@@ -14,6 +14,31 @@ Before adding something to `CLAUDE.md`, ask: *"Would this still be useful and co
 
 ---
 
+## 2026-11-03 — X-Frame-Options SAMEORIGIN exemption extended to the refund slip view
+
+`pos_refund_slip_view` now carries `@xframe_options_sameorigin`, the same
+scoped override `pos_receipt_view` already had — needed because the
+refund slip now prints silently through a hidden same-origin `<iframe>`
+(`printRefundSlipViaIframe()`, `templates/pos_refund.html`), copied from
+the sale receipt's already-proven approach rather than refactored into
+shared JS. The site-wide `X-Frame-Options: DENY` is otherwise unchanged;
+these are now the only two views with this exemption. See
+[[Thermal-Printing]].
+
+## 2026-11-02 — Cash received is derived from the cash payment line, not a separate input
+
+The "cash received and change due" feature's first version added a
+dedicated "Cash received" input to the payment panel. Removed once in
+real use: the cashier already types the amount handed over into the
+Cash payment keypad, so a second input meant typing the same figure
+twice. `cash_tendered` is now derived automatically
+(`derivedCashTenderedCents()`, `templates/pos.html`) from the cash
+payment line(s) as typed. `POSSale.cash_tendered`/`change_given` still
+exist as real stored fields — the point of storing them was always so a
+reprint could show "Change to return" later, which is unaffected by
+where the number comes from on the way in. See
+[[Receipts-and-Pricing]].
+
 ## 2026-11-01 — Silent printing via Chrome `--kiosk-printing`, not a print server or WebUSB/ESC-POS
 
 "Print bill" needs to print a receipt with no dialog and no cashier

@@ -86,13 +86,38 @@ Windows **default printer** with no dialog at all — this is what makes
      to load at all — the site-wide `X-Frame-Options: DENY`
      (`XFrameOptionsMiddleware`, `farmsite/settings.py`) blocks it
      otherwise, either failing to print or printing the POS page.
-     **This decorator is scoped to this one view** — the refund slip and
-     every other view keep the global `DENY`.
+     **This decorator is scoped to this one view and `pos_refund_slip_view`**
+     (see "Refund slip printing" below) — every other view keeps the
+     global `DENY`.
   `printReceiptViaIframe()` also waits for the iframe's images and
   `document.fonts.ready` before calling `print()`, so nothing prints
   half-loaded. `POS_SHELL_CACHE` was `pos-shell-v25` (`static/js/
   pos-offline-queue.js`) at the point this was last verified working —
   confirm the current value with the file itself, not this note.
+
+## Refund slip printing
+
+The refund slip (`/pos/refund/<refund_number>/`, `pos_refund_slip_view`)
+prints the same way: a hidden-iframe `print()` call, triggered from
+`templates/pos_refund.html`'s "Print refund slip" button on the
+post-refund success screen, and from "Reprint slip" buttons in both the
+"Previous refunds" (on a looked-up sale) and "Recent refunds" (site-wide,
+last 20) lists.
+
+- `printRefundSlipViaIframe()` is a deliberate **copy** of `pos.html`'s
+  `printReceiptViaIframe()` into `pos_refund.html` itself, not a shared-JS
+  refactor — `pos.html` and the proven sale-receipt print flow are
+  untouched by this. Keep the two in sync by hand if the printing
+  mechanism itself ever changes.
+- `pos_refund_slip_view` carries `@xframe_options_sameorigin` for the same
+  reason `pos_receipt_view` does — it's now the only other view with this
+  override.
+- The slip still has **no barcode** (see [[Receipts-and-Pricing]]) —
+  unaffected by how it's printed.
+- `POS_SHELL_CACHE` is **not involved** here — `pos_refund.html` doesn't
+  register the service worker, isn't precached, and isn't the `/pos/`
+  navigation the worker's shell-cache logic matches on, so it isn't
+  service-worker-tracked at all.
 
 ## New shop computer: setup checklist
 

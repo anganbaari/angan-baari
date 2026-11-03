@@ -1627,18 +1627,24 @@ class PosReceiptViewTests(TestCase):
         <iframe> (printReceiptViaIframe()) to print it -- the site-wide
         X-Frame-Options: DENY (XFrameOptionsMiddleware, farmsite/settings.py)
         would silently block that, so this view overrides it to SAMEORIGIN
-        via @xframe_options_sameorigin, and only this view."""
+        via @xframe_options_sameorigin. pos_refund_slip_view carries the
+        same override for the same reason -- see
+        test_refund_slip_allows_same_origin_framing in
+        api/tests_refunds.py's RefundSlipViewTests."""
         self.client.login(username='receipt_cashier', password='pw')
         response = self.client.get(reverse('pos_receipt', args=[self.sale.sale_number]))
         self.assertEqual(response['X-Frame-Options'], 'SAMEORIGIN')
 
     def test_other_views_still_deny_framing(self):
-        """The /pos/ screen itself and the refund slip are never loaded in
-        an iframe and must keep the site-wide DENY -- the SAMEORIGIN
-        override above is scoped to pos_receipt_view only."""
+        """The /pos/ screen and the refund screen (/pos/refund/, the
+        lookup/process page -- NOT the printable slip, which now has its
+        own SAMEORIGIN override) are never loaded in an iframe and must
+        keep the site-wide DENY."""
         self.client.login(username='receipt_cashier', password='pw')
         pos_response = self.client.get('/pos/')
         self.assertEqual(pos_response['X-Frame-Options'], 'DENY')
+        refund_page_response = self.client.get(reverse('pos_refund'))
+        self.assertEqual(refund_page_response['X-Frame-Options'], 'DENY')
 
     def test_cashier_and_sale_number_share_one_row(self):
         self.client.login(username='receipt_cashier', password='pw')
